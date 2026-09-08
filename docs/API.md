@@ -1,0 +1,323 @@
+# API contract
+
+This theme talks to its data through one interface. Two adapters implement it:
+
+| Adapter | File | Used when |
+| --- | --- | --- |
+| Mock | `src/lib/api/mock.js` | `VITE_DATA_SOURCE=mock` (default) |
+| HTTP | `src/lib/api/http.js` | `VITE_DATA_SOURCE=api` |
+
+`src/lib/api/index.js` picks one at boot and asserts that both expose the same
+function names, so an endpoint added to one and forgotten in the other fails
+immediately rather than at runtime on a page nobody tested.
+
+**If your server answers the routes below with the shapes below, the storefront
+works unchanged.** Nothing else needs editing.
+
+---
+
+## Conventions
+
+**Money is an integer of the currency's smallest unit, plus a code.**
+
+```json
+{ "amount": 12800, "currency": "USD" }   // $128.00
+```
+
+Never a float and never a formatted string. `0.1 + 0.2` is not `0.3` in binary
+floating point, and a cart that adds up in floats is eventually a cent out on a
+real invoice. Zero-decimal currencies (JPY, KRW, VND, CLP, ISK) use whole units;
+`src/lib/money.js` knows the list.
+
+**Errors** use the HTTP status, plus a JSON body the theme will surface verbatim:
+
+```json
+{ "message": "Only 2 left in that size.", "code": "insufficient_inventory" }
+```
+
+`message` is shown to the shopper, so write it for them. `code` is for you.
+
+**Auth** is `Authorization: Bearer <token>`. The token comes from
+`POST /auth/login` and is kept in `localStorage` under `loom.session`. Set
+`VITE_API_TOKEN` instead if your catalogue needs a publishable key on every
+request — but never put a secret key there, because Vite compiles `VITE_*`
+variables into the JavaScript bundle.
+
+**CORS.** The storefront is a static site on its own origin. Your API must send
+`Access-Control-Allow-Origin` for it and allow `Authorization`, or every request
+fails with an opaque network error.
+
+**Pagination.** List endpoints take `page` (1-based) and `per_page`, and return:
+
+```json
+{ "items": [], "total": 128, "page": 1, "perPage": 12 }
+```
+
+**Validation.** Every response is checked at the boundary
+(`src/lib/api/contracts.js`). A 200 with a missing `price` or an empty `variants`
+array throws a `ContractError` naming the endpoint and the field, because a
+wrong shape that passes silently surfaces three components later as a null
+dereference and takes an afternoon to trace.
+
+---
+
+## Catalogue
+
+### `GET /products`
+
+| Query | Type | Notes |
+| --- | --- | --- |
+| `category` | string | Category slug |
+| `collection` | string | Collection slug |
+| `q` | string | Free-text search |
+| `sizes` | csv | `S,M,L` |
+| `colors` | csv | Colour names as they appear in `options` |
+| `tags` | csv | |
+| `min_price`, `max_price` | int | Minor units |
+| `in_stock` | `1` | Only products with a buyable variant |
+| `sort` | enum | `featured` `newest` `price-asc` `price-desc` `rating` |
+| `page`, `per_page` | int | |
+
+```json
+{
+  "items": [ /* Product */ ],
+  "total": 24,
+  "page": 1,
+  "perPage": 12,
+  "facets": {
+    "sizes": ["XS", "S", "M", "L", "XL"],
+    "colors": [{ "name": "Ecru", "hex": "#EDE6D8" }],
+    "tags": ["cotton", "linen"],
+    "priceRange": { "min": 4800, "max": 68500 }
+  }
+}
+```
+
+> **Facets must be computed over the whole category, not over the filtered
+> result set.** If you narrow them to what is currently showing, selecting one
+> colour removes every other colour from the panel and the shopper can never
+> widen their own search. This is the single most common catalogue bug.
+
+### `GET /products/:slug` → `Product`
+
+```json
+{
+  "id": "prod_1",
+  "slug": "merino-crew-knit",
+  "title": "Fine Merino Crew",
+  "subtitle": "19.5 micron extra-fine merino",
+  "description": "Long-form copy…",
+  "details": ["19.5 micron extra-fine merino", "Fully fashioned, 12gg"],
+  "care": ["Hand wash cool", "Dry flat"],
+  "price": { "amount": 16800, "currency": "USD" },
+  "compareAtPrice": null,
+  "images": [
+    { "url": "https://cdn…/1.jpg", "alt": "Fine Merino Crew in Oat", "width": 900, "height": 1125 }
+  ],
+  "options": [
+    { "name": "Color", "values": ["Oat", "Charcoal"] },
+    { "name": "Size", "values": ["XS", "S", "M", "L", "XL"] }
+  ],
+  "swatches": { "Oat": "#DCD3C3", "Charcoal": "#3A3A3C" },
+  "variants": [
+    {
+      "id": "var_merino_oat_m",
+      "sku": "MERINO-OAT-M",
+      "options": { "Color": "Oat", "Size": "M" },
+      "price": { "amount": 16800, "currency": "USD" },
+      "compareAtPrice": null,
+      "inventory": 6,
+      "available": true
+    }
+  ],
+  "categories": ["knitwear"],
+  "tags": ["merino", "layering"],
+  "rating": { "average": 4.8, "count": 302 },
+  "badges": ["bestseller"],
+  "createdAt": "2026-02-14T00:00:00.000Z"
+}
+```
+
+Notes that matter in practice:
+
+- **At least two images.** The grid swaps to the second one on hover; with one
+  image the card still works but loses the interaction shoppers actually use.
+- **`alt` is required.** An empty string is a bug, not a styling choice.
+- **`variants` is the source of truth for stock**, not the product. The size
+  picker greys out sizes with `inventory: 0` *in the selected colour*, which is
+  only possible because inventory is per variant.
+- **`swatches`** maps colour name to hex. Without it the colour picker has to
+  guess what "Ecru" looks like.
+- **`badges`** — `new` `sale` `bestseller` `low-stock` `sold-out`.
+
+### `GET /products/:slug/related?limit=4` → `{ items, total }`
+
+### `GET /products/:slug/reviews?page=1&per_page=5`
+
+```json
+{
+  "items": [
+    { "id": "rev_1", "author": "Priya S.", "rating": 5, "body": "…",
+      "createdAt": "2026-08-28T00:00:00.000Z", "verified": true }
+  ],
+  "total": 302,
+  "summary": {
+    "average": 4.8,
+    "count": 302,
+    "breakdown": [{ "stars": 5, "count": 217 }, { "stars": 4, "count": 57 }]
+  }
+}
+```
+
+### `GET /categories` → `{ items: [{ slug, name, blurb, image, count }], total }`
+### `GET /collections` → `{ items: [{ slug, title, blurb, image, count }], total }`
+
+---
+
+## Cart
+
+The cart lives on the server. Every mutation returns the **whole repriced cart**
+and the theme replaces its state wholesale — it never recomputes a total
+locally. Discounts, shipping thresholds and tax are server concerns, and a
+client that recalculates them will eventually disagree with the invoice.
+
+| Method | Route | Body |
+| --- | --- | --- |
+| `POST` | `/carts` | `{}` — creates one, returns `Cart` |
+| `GET` | `/carts/:id` | 404 if expired; the theme silently creates a new one |
+| `POST` | `/carts/:id/lines` | `{ variant_id, quantity }` |
+| `PATCH` | `/carts/:id/lines/:lineId` | `{ quantity }` |
+| `DELETE` | `/carts/:id/lines/:lineId` | |
+| `DELETE` | `/carts/:id/lines` | Empties the cart |
+| `POST` | `/carts/:id/discount` | `{ code }` — `""` clears it |
+
+```json
+{
+  "id": "cart_a1b2",
+  "currency": "USD",
+  "lines": [
+    {
+      "id": "line_1",
+      "variantId": "var_merino_oat_m",
+      "productSlug": "merino-crew-knit",
+      "title": "Fine Merino Crew",
+      "options": { "Color": "Oat", "Size": "M" },
+      "image": { "url": "…", "alt": "…" },
+      "quantity": 2,
+      "unitPrice": { "amount": 16800, "currency": "USD" },
+      "lineTotal": { "amount": 33600, "currency": "USD" }
+    }
+  ],
+  "subtotal": { "amount": 33600, "currency": "USD" },
+  "discount": { "amount": 3360, "currency": "USD" },
+  "shipping": { "amount": 0, "currency": "USD" },
+  "tax": { "amount": 2419, "currency": "USD" },
+  "total": { "amount": 32659, "currency": "USD" },
+  "discountCode": { "code": "LOOM10", "label": "10% off" },
+  "freeShippingThreshold": { "amount": 15000, "currency": "USD" },
+  "freeShippingRemaining": { "amount": 0, "currency": "USD" }
+}
+```
+
+`freeShippingRemaining` drives the progress bar in the cart and drawer. Return
+zero when it does not apply.
+
+Expected errors: `409 insufficient_inventory`, `409 out_of_stock`,
+`422 invalid_discount`.
+
+---
+
+## Checkout
+
+### `POST /carts/:id/checkout`
+
+```json
+{
+  "email": "sam@example.com",
+  "shipping_address": {
+    "name": "Sam Rivera", "line1": "117 Mercer Street", "line2": "Apt 4B",
+    "city": "New York", "region": "NY", "postalCode": "10012",
+    "country": "US", "phone": "+1 555 0134"
+  },
+  "shipping_method": "standard"
+}
+```
+
+→ `Order`.
+
+> **The theme never collects card details, and it never should.** A storefront
+> that touches a card number drags your whole frontend into PCI scope. In
+> production, replace this call with your provider's flow — Stripe Elements,
+> Razorpay Checkout, Adyen Drop-in — and create the order server-side when the
+> payment webhook confirms. The address form here is exactly the part that is
+> safe to own.
+
+---
+
+## Orders and account
+
+| Method | Route | Returns |
+| --- | --- | --- |
+| `GET` | `/orders` | `{ items: Order[], total }` |
+| `GET` | `/orders/:id` | `Order` |
+| `POST` | `/auth/login` | `{ token, customer }` |
+| `POST` | `/auth/register` | `{ token, customer }` |
+| `POST` | `/auth/logout` | `{ ok: true }` |
+| `GET` | `/me` | `Customer` — **401 when signed out is expected**, not an error |
+| `PATCH` | `/me` | `Customer` |
+| `POST` | `/me/addresses` | `Customer` |
+| `PATCH` | `/me/addresses/:id` | `Customer` |
+| `DELETE` | `/me/addresses/:id` | `Customer` |
+
+Address endpoints return the **whole customer**, not the address, so the account
+page never has to merge state by hand.
+
+```json
+{
+  "id": "order_1", "number": "LM-10428", "status": "placed",
+  "placedAt": "2026-09-09T10:14:00.000Z",
+  "lines": [ /* CartLine */ ],
+  "subtotal": {}, "discount": {}, "shipping": {}, "tax": {}, "total": {},
+  "shippingAddress": { }, "email": "sam@example.com",
+  "tracking": { "carrier": "DHL", "code": "JD014600…", "url": "https://…" }
+}
+```
+
+`status` — `placed` `paid` `fulfilled` `delivered` `cancelled`.
+
+---
+
+## Wishlist
+
+| Method | Route | Notes |
+| --- | --- | --- |
+| `GET` | `/me/wishlist` | `{ items: Product[], total }` |
+| `POST` | `/me/wishlist` | `{ product_slug }` |
+| `DELETE` | `/me/wishlist/:slug` | |
+
+The heart button updates optimistically and rolls back if the call fails, so
+these can be slow without the grid feeling slow.
+
+---
+
+## Newsletter
+
+`POST /newsletter` with `{ email }` → `{ ok: true }`. Return
+`422 invalid_email` for a malformed address.
+
+---
+
+## Wiring it up
+
+1. `cp .env.example .env.local`
+2. Set `VITE_DATA_SOURCE=api` and `VITE_API_BASE_URL=https://api.yourstore.com/v1`
+3. `npm run dev`
+
+Start with `GET /products` and `GET /products/:slug`. The home page, catalogue
+and product page work off those two alone — cart, account and checkout can come
+later, and the theme degrades to a visible error on those routes rather than a
+blank screen.
+
+If a response is the wrong shape you will get a `ContractError` in the console
+naming the endpoint and the field. That message is the fastest debugging tool
+in the project; read it before reaching for the network tab.
