@@ -84,8 +84,23 @@ function parse(src) {
       continue
     }
 
+    // Paragraph. The guard below stops at anything that starts another block,
+    // but a line can start with one of those characters without opening one —
+    // a bare `|` outside a table, a `#hashtag` with no space, a single
+    // backtick. Those match no branch above and are refused here, so without
+    // the forward-progress check the loop never advances: the tab hangs and
+    // then the heap dies. Consume one line unconditionally if nothing else did.
+    const startedAt = i
     const para = []
-    while (i < lines.length && lines[i].trim() && !/^[#>|`]|^\s*[-*]\s/.test(lines[i])) para.push(lines[i++])
+    while (
+      i < lines.length &&
+      lines[i].trim() &&
+      !/^(#{1,4}\s|>\s|```)/.test(lines[i]) &&
+      !/^\s*([-*]|\d+\.)\s/.test(lines[i])
+    ) {
+      para.push(lines[i++])
+    }
+    if (i === startedAt) para.push(lines[i++])
     out.push({ type: 'p', text: para.join(' ') })
   }
 

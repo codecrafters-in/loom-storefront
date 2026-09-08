@@ -155,11 +155,23 @@ export default function ProductEditor() {
           <h1 className="text-display-md">{isNew ? 'New product' : draft.title || 'Untitled'}</h1>
           <p className="mt-1.5 font-mono text-[12px] text-faint">{draft.slug || 'no-slug-yet'}</p>
         </div>
-        {dirty && (
-          <span className="rounded-xs bg-accent-soft px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-accent">
-            Unsaved
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {dirty && (
+            <span className="rounded-xs bg-accent-soft px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-accent">
+              Unsaved
+            </span>
+          )}
+          {!isNew && draft.slug && (
+            <a
+              href={`/product/${draft.slug}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-[13px] text-muted transition-colors hover:text-ink"
+            >
+              View on store <Icon name="arrow-right" size={14} />
+            </a>
+          )}
+        </div>
       </div>
 
       <div className="mt-7 flex gap-1 overflow-x-auto border-b border-line" role="tablist">
