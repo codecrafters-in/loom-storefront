@@ -23,6 +23,7 @@ const NAV = [
   { to: '/admin/categories', label: 'Categories', icon: 'map-pin' },
   { to: '/admin/size-charts', label: 'Size charts', icon: 'filter' },
   { to: '/admin/orders', label: 'Orders', icon: 'truck' },
+  { to: '/admin/discounts', label: 'Discounts', icon: 'sparkle' },
   { to: '/admin/storefront', label: 'Storefront', icon: 'star' },
   { to: '/admin/data', label: 'Import / export', icon: 'refresh' },
   { to: '/admin/docs', label: 'Developer docs', icon: 'info' },

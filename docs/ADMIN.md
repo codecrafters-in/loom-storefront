@@ -30,12 +30,34 @@ anything else.
 | Screen | Does |
 | --- | --- |
 | Overview | Counts, low and out-of-stock, orders, revenue |
-| Products | Search, edit title, subtitle, description, price, compare-at |
+| Products | Search; click a row to open the full record |
+| Product record | Five tabs: details, media, variants, fit and fabric, organise. Create and delete |
 | Inventory | Every variant, filterable to low or out, adjust by delta |
 | Categories | Tree with parents and children, create and re-parent |
-| Orders | Everything placed through the storefront |
-| Storefront | Company profile, currency, features, recommendations, checkout |
+| Size charts | Shared measurement tables |
+| Orders | Status, tracking, cancellation with stock return |
+| Discounts | Codes, percentage, fixed or free shipping |
+| Storefront | Company profile, currency, features, recommendations, checkout, trust |
 | Import / export | Whole-catalogue JSON, the shape the bulk endpoint takes |
+| Developer docs | This documentation, rendered, with copy buttons |
+
+### Derived on write, not stored
+
+Three things the server computes rather than trusting a client to send:
+
+- **`badges`** — `sale` from compare-at, `sold-out` and `low-stock` from the
+  variants. A product that sells out in admin must turn over on the grid, which
+  it will not do if badges were computed once at import.
+- **`available`** — always `inventory > 0`.
+- **Variant price** — a product price change cascades to every variant that was
+  not individually overridden. Without it the grid shows the new price and the
+  cart charges the old one, with nothing on screen to warn anyone.
+
+### Drafts
+
+`Product.published: false` hides a product from `GET /products`, from search,
+from recommendations, and makes its own URL return 404. Admin still lists it.
+This is what lets a season be staged before it opens.
 
 ---
 
@@ -134,8 +156,15 @@ make each chunk idempotent so a partial failure can be retried safely.
 
 ## Authentication
 
-The demo accepts any email with a six-character password, because it has no
-server to check against. That is a demo affordance, not a design.
+```
+POST /admin/auth/login   { username, password } → { token }
+```
+
+The demo checks `VITE_ADMIN_USER` / `VITE_ADMIN_PASSWORD` — `admin` / `admin` by
+default — entirely in the browser. Those are compiled into the bundle like every
+`VITE_` variable, so they are public by construction. That is a demo affordance,
+not a design; the customer sign-in at `POST /auth/login` is a separate thing with
+a separate session.
 
 For a real deployment:
 

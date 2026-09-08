@@ -190,6 +190,10 @@ they could have touched. See [PERFORMANCE.md](docs/PERFORMANCE.md).
 **The demo catalogue is its own chunk.** In `api` mode those 34KB never leave
 the server.
 
+**Every route sets its own metadata**, and product pages emit `Product`
+structured data with real availability and — only when there are reviews — an
+aggregate rating.
+
 ---
 
 ## Photography

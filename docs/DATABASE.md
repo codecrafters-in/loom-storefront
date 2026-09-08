@@ -387,12 +387,14 @@ CREATE TABLE collection_products (
 );
 ```
 
-**Products store their leaf category only.** `merino-crew-knit` is in
-`knitwear-sweaters`, not also in `knitwear`; ancestors are resolved at query
-time. Denormalising ancestors means every reparent rewrites thousands of rows,
-and the day one of those rewrites half-runs you have products in categories that
-no longer contain them. Collections are curated and ordered, categories are
-structural — which is why one join carries `position` and the other does not.
+Products are filed against **the leaf and its ancestors** — `merino-crew-knit`
+carries both `knitwear` and `knitwear-sweaters`. That is what the storefront
+emits and what `docs/DATA-MODEL.md` specifies.
+
+Storing only the leaf is defensible and cheaper to maintain, but then every
+category read has to walk the tree, and the recursive CTE below stops being an
+optimisation and becomes mandatory. Store both rows; keep the CTE for the case
+where a category is re-parented and the denormalised rows need rebuilding.
 
 ### Size charts
 
@@ -619,10 +621,15 @@ CREATE TABLE cart_lines (
 );
 ```
 
-**Cart lines store no prices.** Every mutation returns the whole repriced cart
-and pricing is a server concern; a stored `unit_price` means a cart opened in
-March still quotes March's price in June. Price at read time from `variants`,
-and let the shopper see the change before checkout rather than after.
+**Cart lines capture `unit_price_amount` at add-time.** The storefront does the
+same (`src/lib/api/mock.js`), and the reason is that a shopper who put something
+in a bag at one price should not silently be charged another when a sale ends
+mid-session.
+
+The captured price is a quote, not a promise. **Reprice every line from
+`variants` at checkout** and tell the shopper if anything moved. Both halves are
+required: capture without repricing lets a stale bag undercut you, repricing
+without capture makes the bag flicker.
 
 `cart_lines_variant_unique` collapses "add the same thing twice" into a quantity
 increment at the schema level. `ON DELETE RESTRICT` means you cannot hard-delete
@@ -637,7 +644,7 @@ CREATE TABLE discounts (
   store_id        text NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
   code            citext NOT NULL,
   label           text NOT NULL,             -- '10% off' — shown to the shopper
-  kind            text NOT NULL CHECK (kind IN ('percentage','fixed','free-shipping')),
+  kind            text NOT NULL CHECK (kind IN ('percent','fixed','shipping')),
   percent_off     integer CHECK (percent_off IS NULL OR percent_off BETWEEN 1 AND 100),
   amount_off      money_minor,
   currency        currency_code,
@@ -653,10 +660,10 @@ CREATE TABLE discounts (
   CONSTRAINT discounts_window CHECK (ends_at IS NULL OR starts_at IS NULL
                                   OR ends_at > starts_at),
   CONSTRAINT discounts_shape CHECK (CASE kind
-    WHEN 'percentage'    THEN percent_off IS NOT NULL AND amount_off IS NULL
+    WHEN 'percent'    THEN percent_off IS NOT NULL AND amount_off IS NULL
     WHEN 'fixed'         THEN amount_off IS NOT NULL AND currency IS NOT NULL
                               AND percent_off IS NULL
-    WHEN 'free-shipping' THEN percent_off IS NULL AND amount_off IS NULL END),
+    WHEN 'shipping' THEN percent_off IS NULL AND amount_off IS NULL END),
   CONSTRAINT discounts_redemptions CHECK (redemptions >= 0
     AND (max_redemptions IS NULL OR redemptions <= max_redemptions))
 );

@@ -49,6 +49,7 @@ const BLANK = () => ({
   fabric: null,
   sizeChartId: null,
   social: null,
+  published: false,
   createdAt: new Date().toISOString(),
 })
 
@@ -291,7 +292,22 @@ function DetailsTab({ draft, set, isNew }) {
           placeholder="Machine wash cold, gentle" />
       </Panel>
 
-      <Panel title="Badges" note="Sale and sold-out are applied automatically from price and stock.">
+      <Panel
+        title="Visibility"
+        note="A draft is invisible to shoppers and returns 404 on its own URL, so a season can be staged before it opens."
+      >
+        <label className="flex cursor-pointer items-center gap-2.5 text-[14px]">
+          <input
+            type="checkbox"
+            checked={draft.published !== false}
+            onChange={(e) => set('published', e.target.checked)}
+            className="h-4 w-4 accent-[rgb(var(--accent))]"
+          />
+          Published — visible on the storefront
+        </label>
+      </Panel>
+
+      <Panel title="Badges" note="Sale, sold-out and low-stock are derived from price and stock on save. These two are yours.">
         <div className="flex flex-wrap gap-2">
           {['new', 'bestseller', 'low-stock'].map((b) => {
             const on = draft.badges?.includes(b)
@@ -364,6 +380,11 @@ function MediaTab({ draft, set }) {
               <div className="min-w-0 flex-1 space-y-3">
                 <Text label="URL" mono value={img.url} onChange={(v) => patch(i, 'url', v)}
                   placeholder="/images/products/slug-1.jpg or https://cdn…" />
+                <div className="grid grid-cols-2 gap-3">
+                  <Text label="Width" type="number" value={img.width ?? ''} onChange={(v) => patch(i, 'width', Number(v) || null)}
+                    hint="Sent to the browser so the grid does not reflow while the image decodes." />
+                  <Text label="Height" type="number" value={img.height ?? ''} onChange={(v) => patch(i, 'height', Number(v) || null)} />
+                </div>
                 <Text
                   label="Alt text"
                   value={img.alt}
@@ -382,7 +403,8 @@ function MediaTab({ draft, set }) {
                       {colors.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <p className="mt-1.5 text-[12px] text-faint">
-                      Assign a colour and the gallery jumps here when a shopper picks it.
+                      Assign a colour and the gallery jumps here when a shopper picks it. Rebuild the
+                      variant matrix afterwards so the variants point at it too.
                     </p>
                   </div>
                 )}
@@ -443,7 +465,10 @@ function VariantsTab({ draft, set }) {
             compareAtPrice: draft.compareAtPrice,
             inventory: 0,
             available: false,
-            imageId: draft.images?.[0]?.id || null,
+            // Prefer a shot tagged with this colour, so a store with per-colour
+            // photography wires itself up without anyone picking image ids.
+            imageId:
+              draft.images?.find((img) => img.color === c)?.id || draft.images?.[0]?.id || null,
           },
         )
       }
@@ -692,6 +717,18 @@ function OrganiseTab({ draft, set, cats }) {
       <Panel title="Tags" note="Used by filters and by the automatic recommendation strategy. Fabric and use, not adjectives.">
         <TokenEditor values={draft.tags || []} onChange={(v) => set('tags', v)}
           suggestions={['cotton', 'linen', 'merino', 'cashmere', 'wool', 'silk', 'denim', 'leather', 'everyday', 'summer', 'winter', 'organic', 'recycled']} />
+      </Panel>
+
+      <Panel
+        title="Demand"
+        note="Shown under the buy button when it clears the threshold in Storefront settings. Real counts only — a shopper who spots one invented number stops believing the rest of the page."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Text label="Bought in 30 days" type="number" value={draft.social?.boughtLast30Days ?? 0}
+            onChange={(v) => set('social.boughtLast30Days', Number(v))} />
+          <Text label="Times saved" type="number" value={draft.social?.savedCount ?? 0}
+            onChange={(v) => set('social.savedCount', Number(v))} />
+        </div>
       </Panel>
 
       <Panel title="Rating" note="Normally written by your review system. Editable here so a migrated catalogue can carry its history.">

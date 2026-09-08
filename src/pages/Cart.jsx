@@ -1,13 +1,16 @@
 import { useState } from 'react'
+import Seo from '../components/Seo.jsx'
 import { Link } from 'react-router-dom'
 import { useCart } from '../store/CartContext.jsx'
 import { Button, Empty, Icon, QuantityStepper, Skeleton } from '../components/ui/index.jsx'
 import Promises from '../components/layout/Promises.jsx'
 import { formatMoney } from '../lib/money.js'
+import { useStorefront } from '../store/StorefrontContext.jsx'
 
 export default function Cart() {
   const { cart, loading, busy, update, remove, applyDiscount } = useCart()
   const [code, setCode] = useState('')
+  const config = useStorefront()
 
   if (loading) {
     return (
@@ -39,6 +42,7 @@ export default function Cart() {
 
   return (
     <>
+      <Seo title={'Your bag'} noindex />
       <div className="wrap py-10">
         <h1 className="text-display-lg">Your bag</h1>
         <p className="mt-3 text-[15px] text-muted">
@@ -102,6 +106,8 @@ export default function Cart() {
               </div>
             )}
 
+            {config.features?.discountCodes !== false && (
+            <>
             <form
               onSubmit={(e) => { e.preventDefault(); applyDiscount(code).catch(() => {}) }}
               className="mt-5 flex gap-2"
@@ -124,6 +130,8 @@ export default function Cart() {
               </p>
             )}
             <p className="mt-2 text-[11px] text-faint">Demo codes: LOOM10, WELCOME15, FREESHIP</p>
+            </>
+            )}
 
             <dl className="mt-6 space-y-2.5 border-t border-line pt-5 text-sm">
               <Row label="Subtotal" value={formatMoney(cart.subtotal)} />
@@ -133,6 +141,9 @@ export default function Cart() {
               <Row label="Shipping" value={cart.shipping.amount === 0 ? 'Free' : formatMoney(cart.shipping)} />
               <Row label="Estimated tax" value={formatMoney(cart.tax)} />
             </dl>
+            {config.pricing?.showTaxNote && config.pricing?.taxNote && (
+              <p className="mt-2 text-[11px] text-faint">{config.pricing.taxNote}</p>
+            )}
             <p className="mt-4 flex justify-between border-t border-line pt-4 text-lg">
               <span>Total</span>
               <span className="tabular-nums">{formatMoney(cart.total)}</span>

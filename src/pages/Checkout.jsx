@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import Seo from '../components/Seo.jsx'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { startCheckout } from '../lib/checkout.js'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import { useCart } from '../store/CartContext.jsx'
@@ -41,6 +42,12 @@ export default function Checkout() {
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
+  // Guest checkout is the default. A store that requires an account sends the
+  // shopper to sign in and back, rather than failing at submit.
+  if (config.checkout?.requireAccount && !customer) {
+    return <Navigate to="/login" state={{ from: '/checkout' }} replace />
+  }
+
   if (!cart?.lines.length) {
     return (
       <Empty
@@ -79,7 +86,9 @@ export default function Checkout() {
   }
 
   return (
-    <div className="wrap grid items-start gap-12 py-10 pb-20 lg:grid-cols-[1fr_22rem]">
+    <>
+      <Seo title={'Checkout'} noindex />
+      <div className="wrap grid items-start gap-12 py-10 pb-20 lg:grid-cols-[1fr_22rem]">
       <form onSubmit={submit} className="max-w-xl">
         <h1 className="text-display-lg">Checkout</h1>
 
@@ -161,6 +170,12 @@ export default function Checkout() {
               ? `Continue to payment · ${formatMoney(cart.total)}`
               : `Place order · ${formatMoney(cart.total)}`}
         </Button>
+        {config.checkout?.termsUrl && (
+          <p className="mt-4 text-center text-[12px] leading-relaxed text-faint">
+            By placing this order you agree to our{' '}
+            <Link to={config.checkout.termsUrl} className="link-underline text-muted">terms</Link>.
+          </p>
+        )}
         <Link to="/cart" className="mt-4 block text-center text-[13px] text-muted link-underline">
           Back to bag
         </Link>
@@ -203,7 +218,8 @@ export default function Checkout() {
           </p>
         </div>
       </aside>
-    </div>
+      </div>
+    </>
   )
 }
 

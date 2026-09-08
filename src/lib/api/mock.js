@@ -44,6 +44,7 @@ db.subscribe(adopt)
 
 const CURRENCY = config.store.currency
 const KEY = {
+  discounts: 'loom.discounts',
   cart: 'loom.cart',
   orders: 'loom.orders',
   session: 'loom.session',
@@ -118,7 +119,10 @@ function listProductsSync(query = {}) {
     inStock = false,
   } = query
 
-  let items = products.slice()
+  // Drafts are invisible to shoppers. `includeDrafts` is only ever passed by
+  // the admin adapter, so a storefront call can never leak an unfinished
+  // product no matter what the caller asks for.
+  let items = products.filter((p) => p.published !== false)
 
   if (category) {
     // Filtering by a parent has to include its children, or /shop/shirts is
@@ -191,7 +195,9 @@ function buildFacets(scope) {
 export async function getProduct(slug) {
   await latency()
   const p = products.find((x) => x.slug === slug)
-  if (!p) throw new ApiError(`No product with slug "${slug}".`, { status: 404, code: 'not_found' })
+  if (!p || p.published === false) {
+    throw new ApiError(`No product with slug "${slug}".`, { status: 404, code: 'not_found' })
+  }
   return publicProduct(p)
 }
 
@@ -209,7 +215,7 @@ export async function getRelated(slug, { limit = 4, strategy = 'automatic' } = {
   const p = products.find((x) => x.slug === slug)
   if (!p) return { items: [], total: 0, strategy }
 
-  const others = products.filter((x) => x.slug !== slug)
+  const others = products.filter((x) => x.slug !== slug && x.published !== false)
   let ranked = []
 
   switch (strategy) {
@@ -426,13 +432,18 @@ export async function getReviews(slug, { page = 1, perPage = 5 } = {}) {
 
 /* ── cart ──────────────────────────────────────────────────────────────── */
 
-const DISCOUNTS = {
-  LOOM10: { label: '10% off', kind: 'percent', value: 10 },
-  WELCOME15: { label: '15% off your first order', kind: 'percent', value: 15 },
-  FREESHIP: { label: 'Free shipping', kind: 'shipping', value: 0 },
-}
+/** Seeded, then owned by the merchant through the admin screen. */
+const SEED_DISCOUNTS = [
+  { code: 'LOOM10', label: '10% off', kind: 'percent', value: 10, active: true },
+  { code: 'WELCOME15', label: '15% off your first order', kind: 'percent', value: 15, active: true },
+  { code: 'FREESHIP', label: 'Free shipping', kind: 'shipping', value: 0, active: true },
+]
 
-const SHIPPING_FLAT = 1200 // $12.00
+const discounts = () => read(KEY.discounts, SEED_DISCOUNTS)
+const discountByCode = (code) =>
+  discounts().find((d) => d.code === String(code || '').toUpperCase() && d.active !== false)
+
+const shippingFlat = () => storefront.commerce?.shippingMethods?.[0]?.price ?? 1200
 
 const emptyCart = () => ({
   id: id('cart'),
@@ -443,14 +454,21 @@ const emptyCart = () => ({
 
 function priceCart(cart) {
   const subtotalAmount = cart.lines.reduce((a, l) => a + l.unitPrice.amount * l.quantity, 0)
-  const rule = cart.discountCode ? DISCOUNTS[cart.discountCode.code] : null
+  const rule = cart.discountCode ? discountByCode(cart.discountCode.code) : null
 
-  const discountAmount = rule?.kind === 'percent' ? Math.round((subtotalAmount * rule.value) / 100) : 0
+  const discountAmount =
+    rule?.kind === 'percent'
+      ? Math.round((subtotalAmount * rule.value) / 100)
+      : rule?.kind === 'fixed'
+        ? Math.min(subtotalAmount, rule.value)
+        : 0
   const afterDiscount = subtotalAmount - discountAmount
 
-  const freeOver = config.store.freeShippingOver * 100
+  // The admin-editable value, not the build-time env default — otherwise the
+  // product page promises free shipping the cart still charges for.
+  const freeOver = storefront.commerce?.freeShippingOver ?? config.store.freeShippingOver * 100
   const shippingFree = rule?.kind === 'shipping' || afterDiscount >= freeOver || cart.lines.length === 0
-  const shippingAmount = shippingFree ? 0 : SHIPPING_FLAT
+  const shippingAmount = shippingFree ? 0 : shippingFlat()
 
   // A flat 8% stands in for a real tax engine. Swap this out server-side —
   // never compute tax in the browser for a live store.
@@ -546,7 +564,7 @@ export async function applyDiscount(code) {
     cart.discountCode = null
     return saveCart(cart)
   }
-  const rule = DISCOUNTS[key]
+  const rule = discountByCode(key)
   if (!rule) throw new ApiError(`"${key}" is not a valid code.`, { status: 422, code: 'invalid_discount' })
   cart.discountCode = { code: key, label: rule.label }
   return saveCart(cart)
@@ -582,9 +600,35 @@ export async function checkout({ email, shippingAddress, shippingMethod = 'stand
     email,
     tracking: null,
   }
+  // Decrement what was sold. A checkout that leaves inventory alone lets the
+  // same last unit be bought indefinitely, which hides every stock bug there is.
+  for (const line of cart.lines) db.adjustInventory(line.variantId, -line.quantity)
+  adopt()
+
   write(KEY.orders, [order, ...orders])
   saveCart(emptyCart())
   return order
+}
+
+const ORDER_STATUSES = ['placed', 'paid', 'fulfilled', 'delivered', 'cancelled']
+
+export async function adminUpdateOrder(orderId, patch) {
+  await latency()
+  const orders = read(KEY.orders, [])
+  const i = orders.findIndex((o) => o.id === orderId || o.number === orderId)
+  if (i < 0) throw new ApiError('Order not found.', { status: 404, code: 'not_found' })
+  if (patch.status && !ORDER_STATUSES.includes(patch.status)) {
+    throw new ApiError(`"${patch.status}" is not a valid status.`, { status: 422, code: 'invalid_status' })
+  }
+  // Cancelling puts the stock back. An order that vanishes without returning
+  // its units is how a catalogue slowly loses inventory nobody can account for.
+  if (patch.status === 'cancelled' && orders[i].status !== 'cancelled') {
+    for (const line of orders[i].lines) db.adjustInventory(line.variantId, line.quantity)
+    adopt()
+  }
+  orders[i] = { ...orders[i], ...patch, updatedAt: new Date().toISOString() }
+  write(KEY.orders, orders)
+  return orders[i]
 }
 
 export async function listOrders() {
@@ -753,6 +797,7 @@ export async function getDeliveryEstimate({ method = 'standard', country = 'US' 
 export async function adminListProducts({ q = '', page = 1, perPage = 25 } = {}) {
   await latency()
   const needle = q.trim().toLowerCase()
+  // Admin sees drafts. `listProducts` never does.
   const all = needle
     ? products.filter((p) => `${p.title} ${p.slug} ${p.tags.join(' ')}`.toLowerCase().includes(needle))
     : products
@@ -807,6 +852,31 @@ export async function adminImport(payload) {
 export async function adminExport() {
   await latency()
   return db.exportCatalog()
+}
+
+export async function adminListDiscounts() {
+  await latency()
+  const items = discounts()
+  return { items, total: items.length }
+}
+
+export async function adminSaveDiscount(discount) {
+  await latency()
+  const code = String(discount.code || '').trim().toUpperCase()
+  if (!code) throw new ApiError('A code is required.', { status: 422, code: 'code_required' })
+  const list = discounts().slice()
+  const i = list.findIndex((d) => d.code === code)
+  const next = { ...discount, code }
+  if (i >= 0) list[i] = { ...list[i], ...next }
+  else list.push(next)
+  write(KEY.discounts, list)
+  return next
+}
+
+export async function adminDeleteDiscount(code) {
+  await latency()
+  write(KEY.discounts, discounts().filter((d) => d.code !== code))
+  return { ok: true }
 }
 
 export async function listSizeCharts() {

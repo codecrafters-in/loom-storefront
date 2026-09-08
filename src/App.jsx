@@ -37,6 +37,7 @@ const AdminStorefront = lazy(() => import('./pages/admin/pages2.jsx').then((m) =
 const AdminData = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Data })))
 const AdminProductEditor = lazy(() => import('./pages/admin/ProductEditor.jsx'))
 const AdminSizeCharts = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.SizeCharts })))
+const AdminDiscounts = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Discounts })))
 const AdminDocs = lazy(() => import('./pages/admin/Docs.jsx'))
 const AdminLogin = lazy(() => import('./pages/admin/Login.jsx'))
 
@@ -90,6 +91,7 @@ export default function App() {
                   <Route path="categories" element={<AdminCategories />} />
                   <Route path="size-charts" element={<AdminSizeCharts />} />
                   <Route path="orders" element={<AdminOrders />} />
+                  <Route path="discounts" element={<AdminDiscounts />} />
                   <Route path="storefront" element={<AdminStorefront />} />
                   <Route path="data" element={<AdminData />} />
                   <Route path="docs" element={<AdminDocs />} />

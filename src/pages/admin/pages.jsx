@@ -142,7 +142,11 @@ export function Products() {
                     <td className="p-3 tabular-nums">{formatMoney(p.price)}</td>
                     <td className={`p-3 tabular-nums ${stock === 0 ? 'text-sale' : ''}`}>{stock}</td>
                     <td className="p-3">
-                      {stock === 0 ? <Badge kind="sold-out" /> : p.badges?.[0] ? <Badge kind={p.badges[0]} /> : <span className="text-faint">—</span>}
+                      <span className="flex flex-wrap gap-1.5">
+                        {p.published === false && <Badge kind="low-stock">Draft</Badge>}
+                        {(p.badges || []).slice(0, 2).map((b) => <Badge key={b} kind={b} />)}
+                        {p.published !== false && !p.badges?.length && <span className="text-faint">—</span>}
+                      </span>
                     </td>
                     <td className="p-3 text-right text-faint">
                       <Icon name="chevron-right" size={16} />

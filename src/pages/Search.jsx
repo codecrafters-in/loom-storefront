@@ -1,4 +1,5 @@
 import { useSearchParams, Link } from 'react-router-dom'
+import Seo from '../components/Seo.jsx'
 import api from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
@@ -18,7 +19,9 @@ export default function Search() {
   )
 
   return (
-    <div className="wrap py-12 pb-20">
+    <>
+      <Seo title={q ? `“${q}”` : 'Search'} noindex />
+      <div className="wrap py-12 pb-20">
       <p className="eyebrow">Search</p>
       <h1 className="mt-3 text-display-lg">
         {q ? <>“{q}”</> : 'What are you after?'}
@@ -59,6 +62,7 @@ export default function Search() {
           <ProductGrid products={data?.items || []} loading={loading} skeletonCount={8} />
         )}
       </div>
-    </div>
+      </div>
+    </>
   )
 }

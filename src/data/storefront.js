@@ -35,7 +35,12 @@ export const storefront = {
   pricing: {
     currency: 'USD',
     locale: 'en-US',
-    /** Offered in the currency switcher. One entry hides the switcher. */
+    /**
+     * The currencies this store prices in. Display metadata only — the theme
+     * never converts. Prices arrive from the API already in the currency it
+     * was asked for, because a browser doing FX with a stale rate is wrong the
+     * day the rate moves, and wrong on an invoice is a refund.
+     */
     currencies: [
       { code: 'USD', label: 'US Dollar', symbol: '$' },
       { code: 'EUR', label: 'Euro', symbol: '€' },
@@ -69,7 +74,6 @@ export const storefront = {
     accounts: true,
     discountCodes: true,
     newsletter: true,
-    currencySwitcher: true,
   },
 
   /**

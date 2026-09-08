@@ -1,4 +1,5 @@
 import Section from '../components/home/sections.jsx'
+import Seo from '../components/Seo.jsx'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 
 /**
@@ -10,5 +11,12 @@ import { useStorefront } from '../store/StorefrontContext.jsx'
  */
 export default function Home() {
   const { home = [] } = useStorefront()
-  return home.map((section, i) => <Section key={`${section.type}-${i}`} section={section} />)
+  return (
+    <>
+      <Seo />
+      {home.map((section, i) => (
+        <Section key={`${section.type}-${i}`} section={section} />
+      ))}
+    </>
+  )
 }

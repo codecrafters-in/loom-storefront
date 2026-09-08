@@ -132,7 +132,8 @@ GET /collections                → { items: Collection[], total }
   "compareAtPrice": null,
 
   "images": [
-    { "url": "https://cdn/1.jpg", "alt": "Fine Merino Crew in Oat", "width": 900, "height": 1125 }
+    { "id": "merino-1", "url": "https://cdn/1.jpg", "alt": "Fine Merino Crew in Oat",
+      "width": 900, "height": 1125, "color": "Oat" }
   ],
 
   "options": [
@@ -149,7 +150,8 @@ GET /collections                → { items: Collection[], total }
       "price": { "amount": 16800, "currency": "USD" },
       "compareAtPrice": null,
       "inventory": 6,
-      "available": true
+      "available": true,
+      "imageId": "merino-1"
     }
   ],
 
@@ -157,6 +159,7 @@ GET /collections                → { items: Collection[], total }
   "tags": ["merino", "layering"],
   "rating": { "average": 4.8, "count": 302 },
   "badges": ["bestseller"],
+  "published": true,
   "createdAt": "2026-02-14T00:00:00.000Z",
 
   "fit": {
@@ -173,6 +176,7 @@ GET /collections                → { items: Collection[], total }
     "origin": "Biella, Italy",
     "certifications": ["Responsible Wool Standard", "OEKO-TEX Standard 100"]
   },
+  "sizeChartId": "tops",
   "sizeChart": {
     "id": "tops",
     "unit": "cm",
@@ -428,20 +432,31 @@ system, expose these under `/admin`, authenticated, and **never reachable with a
 storefront token**:
 
 ```
-GET    /admin/products?q=&page=&per_page=   → { items, total, page, perPage }
-POST   /admin/products                      → Product
-PATCH  /admin/products/:id                  → Product
+POST   /admin/auth/login  { username, password }         → { token }
+GET    /admin/products?q=&page=&per_page=                → { items, total, page, perPage }
+GET    /admin/products/:id                               → Product (raw, sizeChartId unresolved)
+POST   /admin/products                                   → Product
+PATCH  /admin/products/:id                               → Product
 DELETE /admin/products/:id
 PATCH  /admin/variants/:id/inventory  { quantity }                    → Variant
 POST   /admin/variants/:id/inventory  { delta, reason?, operationId? } → Variant
 POST   /admin/categories              { slug, name, parent, blurb }
 DELETE /admin/categories/:slug
+GET    /size-charts                                      → { items, total }   (public)
+POST   /admin/size-charts             { id, unit, note, columns, rows }
+PATCH  /admin/orders/:id              { status, tracking }
+GET    /admin/discounts                                  → { items, total }
+POST   /admin/discounts               { code, label, kind, value, active }
+DELETE /admin/discounts/:code
 PATCH  /admin/storefront
-POST   /admin/import   { mode: "merge"|"replace", products, categories, collections, settings }
+POST   /admin/import   { mode: "merge"|"replace", products, categories, collections, sizeCharts, settings }
 GET    /admin/export
 ```
 
-Three rules on writes:
+`discounts.kind` is `percent`, `fixed` (minor units) or `shipping`.
+`orders.status` is `placed` `paid` `fulfilled` `delivered` `cancelled`.
+
+Six rules on writes:
 
 1. **Prefer the inventory delta over the set.** Two people adjusting the same
    SKU with `set` silently overwrite each other; with a delta both land, and a
@@ -450,6 +465,14 @@ Three rules on writes:
    an explicit override — or the store sells at last month's price.
 3. **Deleting a category promotes its children** to the deleted node's parent.
    A tree with unreachable nodes is worse than a flat list.
+4. **Derive `badges` and `available` on write.** `sale` from compare-at,
+   `sold-out` and `low-stock` from the variants, `available` from
+   `inventory > 0`. Computing them once at import and never again is how a
+   product sells out and keeps advertising itself as in stock.
+5. **Cancelling an order returns its stock.** Post a compensating movement; do
+   not mutate a counter.
+6. **`published: false` hides a product everywhere** — list, search,
+   recommendations — and makes its own URL 404. Admin still lists it.
 
 `POST /admin/import` is what a nightly dump from my system should use. A
 thousand individual writes is a thousand transactions and a rate limit I will

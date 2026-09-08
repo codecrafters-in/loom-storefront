@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Seo from '../components/Seo.jsx'
 import { Link, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import api from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
@@ -87,6 +88,7 @@ function Profile() {
 
   return (
     <>
+      <Seo title={'Your account'} noindex />
       <h1 className="text-display-md">Profile</h1>
       <form onSubmit={submit} className="mt-8 max-w-md space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">

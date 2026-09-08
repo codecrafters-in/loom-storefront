@@ -1,4 +1,5 @@
 import api from '../lib/api/index.js'
+import Seo from '../components/Seo.jsx'
 import useAsync from '../hooks/useAsync.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
 import Promises from '../components/layout/Promises.jsx'
@@ -12,6 +13,7 @@ export default function Wishlist() {
 
   return (
     <>
+      <Seo title={'Saved'} noindex />
       <div className="wrap py-10">
         <h1 className="text-display-lg">Saved</h1>
         <p className="mt-3 text-[15px] text-muted">

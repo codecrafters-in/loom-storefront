@@ -23,11 +23,14 @@ Zero-decimal currencies (JPY, KRW, VND, CLP, ISK) use whole units. Handled in
 ## Image
 
 ```ts
-{ url: string, alt: string, width?: number, height?: number }
+{ id?: string, url: string, alt: string, width?: number, height?: number, color?: string }
 ```
 
 `alt` is required. An empty string is a bug, not a styling choice. `width` and
 `height` prevent layout shift and should be sent when known.
+
+`color` tags a shot with an option value, so the gallery follows the colour
+picker. `id` is what `Variant.imageId` references as the fallback.
 
 ## Product
 
@@ -46,11 +49,13 @@ Zero-decimal currencies (JPY, KRW, VND, CLP, ISK) use whole units. Handled in
   tags: string[]
   rating: { average: number, count: number }
   badges: ('new'|'sale'|'bestseller'|'low-stock'|'sold-out')[]
+  published: boolean                // false hides it from every storefront read
   createdAt: string                 // ISO 8601
 
   fit?: Fit
   fabric?: Fabric
-  sizeChart?: SizeChart
+  sizeChartId?: string | null       // reference to a shared chart
+  sizeChart?: SizeChart             // resolved from sizeChartId on read
   social?: Social
 }
 ```
@@ -64,7 +69,8 @@ Zero-decimal currencies (JPY, KRW, VND, CLP, ISK) use whole units. Handled in
   price: Money
   compareAtPrice: Money | null
   inventory: number
-  available: boolean
+  available: boolean                // always derived from inventory > 0
+  imageId: string | null            // shown when this variant is selected
 }
 ```
 
@@ -122,7 +128,8 @@ transfer between brands; a chest measurement does.
 { unitsAvailable: number, boughtLast30Days: number, savedCount: number }
 ```
 
-Real counts. Below a configurable threshold the theme renders nothing.
+Real counts. Below `trust.socialProofThresholds` the theme renders nothing —
+see [CONFIGURATION.md](CONFIGURATION.md#trust).
 
 ## Cart and CartLine
 
@@ -158,6 +165,7 @@ The cart is server-owned. Every mutation returns the whole repriced cart.
   lines: CartLine[]
   subtotal, discount, shipping, tax, total: Money
   shippingAddress: Address
+  shippingMethod: string
   email: string
   tracking: { carrier, code, url } | null
 }
@@ -208,6 +216,7 @@ Address mutations return the whole Customer, so the client never merges by hand.
   body: string
   createdAt: string
   verified: boolean
+  title?: string
   size?: string
   height?: string
   fit?: 'small' | 'true' | 'large'
@@ -217,7 +226,8 @@ Address mutations return the whole Customer, so the client never merges by hand.
 
 ## Validation
 
-`src/lib/api/contracts.js` asserts these shapes at the response boundary. A 200
+Every type above has a JSDoc typedef in `src/lib/api/contracts.js`, which also
+asserts the critical ones at the response boundary. A 200
 with a missing `price` throws a `ContractError` naming the endpoint and the
 field, rather than surfacing three components later as a null dereference. See
 [ERRORS.md](ERRORS.md).

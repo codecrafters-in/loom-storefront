@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Seo from '../components/Seo.jsx'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../store/AuthContext.jsx'
 import { Button, Icon } from '../components/ui/index.jsx'
@@ -30,7 +31,9 @@ export default function Login() {
   }
 
   return (
-    <div className="wrap flex justify-center py-16">
+    <>
+      <Seo title={'Sign in'} noindex />
+      <div className="wrap flex justify-center py-16">
       <div className="w-full max-w-sm">
         <h1 className="text-display-md">{mode === 'login' ? 'Sign in' : 'Create an account'}</h1>
         <p className="mt-3 text-[14px] text-muted">
@@ -96,6 +99,7 @@ export default function Login() {
           <Link to="/shop" className="text-faint link-underline">Keep shopping instead</Link>
         </p>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

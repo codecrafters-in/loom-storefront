@@ -3,11 +3,26 @@ import { Link } from 'react-router-dom'
 import { useCart } from '../../store/CartContext.jsx'
 import { Button, Icon, QuantityStepper, Empty } from '../ui/index.jsx'
 import { formatMoney } from '../../lib/money.js'
+import { useStorefront } from '../../store/StorefrontContext.jsx'
+import api from '../../lib/api/index.js'
+import useAsync from '../../hooks/useAsync.js'
 
 /** Slides in after every add. Nothing here is decorative — it is the fastest
  *  path from "added" to "checkout", which is the only job of a cart drawer. */
 export default function CartDrawer() {
   const { cart, open, setOpen, update, remove, busy } = useCart()
+  const config = useStorefront()
+  const rec = config.recommendations?.inCart || {}
+
+  // Keyed on the last line added, so the suggestions follow what the shopper is
+  // actually buying. Skipped entirely when the bag is empty or the feature is
+  // off, so an empty drawer costs no request.
+  const anchor = cart?.lines?.at(-1)?.productSlug
+  const suggestions = useAsync(
+    () => api.getRelated(anchor, { limit: rec.limit || 3, strategy: rec.strategy || 'same-category' }),
+    [anchor, rec.limit, rec.strategy],
+    { skip: !open || !anchor || rec.enabled === false },
+  )
 
   useEffect(() => {
     if (!open) return undefined
@@ -93,6 +108,25 @@ export default function CartDrawer() {
                 </li>
               ))}
             </ul>
+
+            {rec.enabled !== false && suggestions.data?.items?.length > 0 && (
+              <div className="border-t border-line px-5 py-4">
+                <p className="eyebrow">{rec.title || 'Goes with this'}</p>
+                <ul className="mt-3 flex gap-3 overflow-x-auto no-scrollbar">
+                  {suggestions.data.items.map((p) => (
+                    <li key={p.slug} className="w-24 shrink-0">
+                      <Link to={`/product/${p.slug}`} onClick={() => setOpen(false)}>
+                        <div className="shot rounded-xs">
+                          <img src={p.images[0]?.url} alt={p.images[0]?.alt || p.title} loading="lazy" />
+                        </div>
+                        <p className="mt-1.5 truncate text-[11px] leading-snug">{p.title}</p>
+                        <p className="text-[11px] text-faint">{formatMoney(p.price)}</p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <footer className="border-t border-line px-5 py-5">
               <dl className="space-y-1.5 text-sm">

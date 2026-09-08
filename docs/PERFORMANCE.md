@@ -175,6 +175,29 @@ checkout — which a correct implementation does anyway.
 
 ---
 
+## Search engines
+
+Every route sets its own `<title>`, description, canonical, Open Graph tags and —
+on a product page — `Product` structured data with price, availability and, when
+there is one, an aggregate rating. Without that, all fifty-four URLs in the
+sitemap share the one title in `index.html`, which is the first thing a
+merchant's marketer raises.
+
+Two honest caveats:
+
+- **It is set at runtime.** Google executes JavaScript and reads the resulting
+  DOM, so this works for Google. Other crawlers and most link-preview scrapers
+  do not. A store that depends on organic search should prerender or
+  server-render the catalogue routes; the tags are written by a small component
+  (`src/components/Seo.jsx`) that a prerenderer can execute at build time
+  unchanged.
+- **Availability and rating are claimed from real data.** `availability` follows
+  actual variant stock, and `aggregateRating` is omitted entirely when there are
+  no reviews. Claiming either falsely is how rich results get suspended.
+
+Cart, checkout, account and search are marked `noindex` — they are per-visitor
+and have nothing to rank.
+
 ## What the theme already does
 
 - **Route-level code splitting.** Cart, checkout, account, admin and the content
@@ -189,6 +212,8 @@ checkout — which a correct implementation does anyway.
   first response cannot overwrite the fast second one.
 - **Filter state in the URL**, so the back button is a cache hit rather than a
   refetch.
+- **Per-route metadata and Product structured data**, rather than one title for
+  the whole site.
 
 ## Checklist before real traffic
 

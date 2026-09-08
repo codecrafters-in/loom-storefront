@@ -160,6 +160,43 @@ For **redirect**, paste the address your developer gives you into **Create URL**
 
 ---
 
+## Stage a product before it goes live
+
+**Open the product → Details → Visibility → untick Published**
+
+A draft is invisible: it does not appear in the shop, in search or in
+recommendations, and its own web address returns "not found". You can still see
+and edit it here, marked **Draft** in the list.
+
+Tick it back on when the season opens.
+
+---
+
+## Fulfil an order
+
+**Orders → change the status dropdown**
+
+`placed` → `paid` → `fulfilled` → `delivered`, or `cancelled`.
+
+> Cancelling puts the stock back automatically. An order that disappears without
+> returning its units is how a shop slowly loses inventory nobody can account
+> for.
+
+---
+
+## Create a discount code
+
+**Discounts → New code**
+
+- **Percentage off** — `10` means 10%
+- **Fixed amount off** — in the smallest unit, so `1000` is $10.00
+- **Free shipping** — waives delivery whatever the basket
+
+Untick **Active** to switch a code off without deleting it, so you keep the
+history.
+
+---
+
 ## Fix a size chart everywhere at once
 
 **Size charts → click one → edit the table → Save**

@@ -93,19 +93,27 @@ Match these to the storefront's shapes.
 
 **Catalogue**
 - `products` — slug (unique), title, subtitle, description, details (string
-  list), care (string list), price, compare_at_price, rating_average,
-  rating_count, badges, published, created_at, updated_at, version
-- `product_images` — product_id, url, alt (not null), width, height, position,
-  and an optional `option_value_id` so a colour can own its photograph
+  list), care (string list), tags (filterable — it is a facet and a
+  recommendation input, so do not bury it in a JSON blob), price,
+  compare_at_price, rating_average, rating_count, badges, published (drafts are
+  invisible to the storefront and 404 on their own URL), created_at, updated_at,
+  version
+- `product_images` — product_id, url, alt (**not null** — an empty string is a
+  bug, not a styling choice), width, height, position, and an optional
+  `option_value_id` so a colour can own its photograph. The storefront's gallery
+  follows the colour picker when this is set.
 - `product_options` — product_id, name ("Color", "Size"), position
 - `option_values` — option_id, value, swatch_hex, position
 - `variants` — product_id, sku (unique), price, compare_at_price, inventory
-  (cached), available (generated from inventory > 0), primary_image_id
+  (cached), available (generated from inventory > 0), image_id (which shot to
+  show when this variant is picked)
 - `variant_option_values` — the join that says which value combination a variant
   is
 - `categories` — slug (unique), name, parent_id (self-reference), blurb,
   image_url, position
-- `product_categories` — join
+- `product_categories` — join. Products are filed against **the leaf and its
+  ancestors**, so a category read does not have to walk the tree on every
+  request. Keep the recursive CTE for rebuilding those rows after a re-parent.
 - `collections`, `collection_products` — hand-curated sets
 
 **Apparel specifics.** These are the highest-value fields in an apparel
@@ -122,9 +130,11 @@ catalogue — size and fit cause roughly two thirds of fashion returns:
 
 **Commerce**
 - `carts`, `cart_lines` — cart lines store `unit_price_amount` **as captured**,
-  so a price change mid-session does not silently reprice an open bag. Reprice
-  explicitly at checkout.
-- `discounts` — code, kind (percent | fixed | shipping), value, starts_at,
+  so a sale ending mid-session does not silently reprice an open bag. The
+  captured price is a quote, not a promise: reprice every line from `variants`
+  at checkout and tell the shopper if anything moved.
+- `discounts` — code, label, active, kind (`percent` | `fixed` | `shipping` —
+  these exact strings; the storefront branches on them), value, starts_at,
   ends_at, usage_limit, used_count, minimum_subtotal
 - `orders`, `order_lines` — order lines are a **snapshot**: title, options and
   price copied at purchase, never a live join to `products`. A product renamed
@@ -133,6 +143,14 @@ catalogue — size and fit cause roughly two thirds of fashion returns:
 - `reviews` — product_id, author, rating, body, verified, size_purchased,
   height, fit (`small` | `true` | `large`), created_at
 - `review_photos`
+
+**Derived, not stored by a client**
+
+Say explicitly in your API layer which fields the server computes:
+`badges` (`sale` from compare-at, `sold-out` and `low-stock` from the variants),
+`available` (`inventory > 0`), and the cascade of a product price change onto
+variants that were not individually overridden. A client that can set these can
+put the catalogue into a state the storefront renders wrongly.
 
 **Operations**
 - `stores` / `store_settings` — the storefront configuration document

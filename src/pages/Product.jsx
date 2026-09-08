@@ -7,6 +7,8 @@ import Promises from '../components/layout/Promises.jsx'
 import {
   Badge, Breadcrumbs, Button, Empty, ErrorState, Icon, Price, QuantityStepper, Rating, Skeleton,
 } from '../components/ui/index.jsx'
+import { formatMoney } from '../lib/money.js'
+import Seo from '../components/Seo.jsx'
 import { useCart } from '../store/CartContext.jsx'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import { useWishlist } from '../store/WishlistContext.jsx'
@@ -123,12 +125,25 @@ export default function Product() {
     }
   }, [product, params, color, size])
 
-  // The gallery follows the picker when a store ships per-colour photography.
+  /**
+   * The gallery follows the colour picker.
+   *
+   * An image tagged with the chosen colour wins; failing that, the variant's
+   * own `imageId`. Both are optional, so a store with one set of photography
+   * behaves exactly as before.
+   */
   useEffect(() => {
-    if (!variant?.imageId || !product) return
-    const i = product.images.findIndex((img) => img.id === variant.imageId)
-    if (i >= 0) setShot(i)
-  }, [variant, product])
+    if (!product) return
+    const byColor = product.images.findIndex((img) => img.color && img.color === activeColor)
+    if (byColor >= 0) {
+      setShot(byColor)
+      return
+    }
+    if (variant?.imageId) {
+      const i = product.images.findIndex((img) => img.id === variant.imageId)
+      if (i >= 0) setShot(i)
+    }
+  }, [variant, product, activeColor])
 
   // A sticky buy bar once the real one scrolls away — on a long product page
   // the decision often happens next to the reviews, and walking back up to a
@@ -164,12 +179,21 @@ export default function Product() {
 
   return (
     <>
+      <Seo
+        title={product.title}
+        description={product.subtitle ? `${product.subtitle}. ${product.description}`.slice(0, 300) : product.description?.slice(0, 300)}
+        image={product.images?.[0]?.url}
+        type="product"
+        product={product}
+      />
       <div className="wrap pt-8">
         <Breadcrumbs
           trail={[
             { label: 'Home', to: '/' },
             { label: 'Shop', to: '/shop' },
-            { label: product.categories[0], to: `/shop/${product.categories[0]}` },
+            ...(product.categories?.[0]
+              ? [{ label: product.categories[0], to: `/shop/${product.categories[0]}` }]
+              : []),
             { label: product.title },
           ]}
         />
@@ -376,8 +400,23 @@ export default function Product() {
               )}
               {tab === 'shipping' && (
                 <div className="space-y-3 text-[14px] leading-relaxed text-muted">
-                  <p>Standard shipping is $12, free over $150. Orders placed before 2pm ship the same working day.</p>
-                  <p>Returns are free within 30 days, unworn and with tags attached. A prepaid label is in every parcel.</p>
+                  <p>
+                    Standard shipping is{' '}
+                    {formatMoney({
+                      amount: config.commerce?.shippingMethods?.[0]?.price ?? 1200,
+                      currency: config.pricing?.currency || 'USD',
+                    })}
+                    , free over{' '}
+                    {formatMoney({
+                      amount: config.commerce?.freeShippingOver ?? 15000,
+                      currency: config.pricing?.currency || 'USD',
+                    })}
+                    . Orders placed before 2pm ship the same working day.
+                  </p>
+                  <p>
+                    Returns are free within {config.commerce?.returnsWindowDays ?? 30} days, unworn and
+                    with tags attached. A prepaid label is in every parcel.
+                  </p>
                   <p>We repair anything we made. Send it back and we will quote before doing the work.</p>
                 </div>
               )}
@@ -392,7 +431,7 @@ export default function Product() {
         <div className="wrap grid gap-10 py-16 md:grid-cols-[18rem_1fr]">
           <div>
             <h2 className="text-display-md">Reviews</h2>
-            {reviews.data && (
+            {reviews.data?.summary && (
               <>
                 <div className="mt-5 flex items-baseline gap-3">
                   <span className="font-display text-4xl">{reviews.data.summary.average}</span>

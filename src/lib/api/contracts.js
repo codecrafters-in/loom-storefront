@@ -18,6 +18,8 @@
  * @property {string} currency  ISO 4217, e.g. "USD".
  *
  * @typedef  {object} Image
+ * @property {string} [id]      Referenced by Variant.imageId.
+ * @property {string} [color]   Shown when this colour is selected.
  * @property {string} url       Absolute, or root-relative for bundled assets.
  * @property {string} alt       Required. An empty string is a bug, not a choice.
  * @property {number} [width]
@@ -31,6 +33,7 @@
  * @property {Money|null} compareAtPrice
  * @property {number} inventory
  * @property {boolean} available
+ * @property {string|null} imageId    Which image to show when this variant is picked.
  *
  * @typedef  {object} Product
  * @property {string} id
@@ -48,8 +51,69 @@
  * @property {string[]} categories     Category slugs.
  * @property {string[]} tags
  * @property {{average:number, count:number}} rating
- * @property {string[]} badges         "new" | "sale" | "low-stock" | "sold-out"
+ * @property {string[]} badges         "new" | "sale" | "bestseller" | "low-stock" | "sold-out"
+ * @property {boolean} published       Drafts are invisible to the storefront.
  * @property {string} createdAt        ISO 8601.
+ * @property {Fit|null} fit
+ * @property {Fabric|null} fabric
+ * @property {string|null} sizeChartId Reference to a shared SizeChart.
+ * @property {SizeChart|null} sizeChart Resolved from `sizeChartId` on read.
+ * @property {Social|null} social
+ *
+ * @typedef  {object} Fit
+ * @property {'true-to-size'|'runs-small'|'runs-large'|null} verdict
+ * @property {{small:number, true:number, large:number}|null} feedback  Percentages, from purchasers.
+ * @property {number} sample
+ * @property {string} note
+ * @property {{height:number, size:string, label:string}|null} model    Height in cm.
+ *
+ * @typedef  {object} Fabric
+ * @property {[string, number][]} composition   [["Merino wool", 100]]
+ * @property {number|null} weight               gsm.
+ * @property {string} weave
+ * @property {string} origin
+ * @property {string[]} certifications          Third-party marks only.
+ *
+ * @typedef  {object} SizeChart
+ * @property {string} id
+ * @property {'cm'|'in'} unit
+ * @property {string} note
+ * @property {string[]} columns                 First column is the size label.
+ * @property {(string|number)[][]} rows
+ *
+ * @typedef  {object} Social
+ * @property {number} unitsAvailable
+ * @property {number} boughtLast30Days
+ * @property {number} savedCount
+ *
+ * @typedef  {object} Category
+ * @property {string} slug
+ * @property {string} name
+ * @property {string|null} parent
+ * @property {string} blurb
+ * @property {Image} image
+ * @property {number} count             Includes descendants.
+ * @property {Category[]} [children]
+ *
+ * @typedef  {object} Collection
+ * @property {string} slug
+ * @property {string} title
+ * @property {string} blurb
+ * @property {Image} image
+ * @property {number} count
+ *
+ * @typedef  {object} Review
+ * @property {string} id
+ * @property {string} author
+ * @property {number} rating           1–5.
+ * @property {string} title
+ * @property {string} body
+ * @property {string} createdAt
+ * @property {boolean} verified
+ * @property {string} [size]
+ * @property {string} [height]
+ * @property {'small'|'true'|'large'} [fit]
+ * @property {Image[]} [photos]
  *
  * @typedef  {object} CartLine
  * @property {string} id
@@ -92,10 +156,12 @@
  * @property {string} placedAt
  * @property {CartLine[]} lines
  * @property {Money} subtotal
+ * @property {Money} discount
  * @property {Money} shipping
  * @property {Money} tax
  * @property {Money} total
  * @property {Address} shippingAddress
+ * @property {string} shippingMethod
  * @property {string} email
  * @property {{carrier:string, code:string, url:string}|null} tracking
  *

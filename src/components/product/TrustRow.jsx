@@ -91,11 +91,15 @@ export default function TrustRow() {
  * nothing rather than advertising that a product is unpopular.
  */
 export function SocialProof({ product }) {
+  const config = useStorefront()
   const s = product.social
   if (!s) return null
+  const limits = config.trust?.socialProofThresholds || {}
+  const boughtFloor = limits.bought ?? 25
+  const savedFloor = limits.saved ?? 20
   const notes = []
-  if (s.boughtLast30Days >= 25) notes.push(`${s.boughtLast30Days} bought in the last 30 days`)
-  if (s.savedCount >= 20) notes.push(`${s.savedCount} people have this saved`)
+  if (s.boughtLast30Days >= boughtFloor) notes.push(`${s.boughtLast30Days} bought in the last 30 days`)
+  if (s.savedCount >= savedFloor) notes.push(`${s.savedCount} people have this saved`)
   if (!notes.length) return null
 
   return (

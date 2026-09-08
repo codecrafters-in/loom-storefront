@@ -11,7 +11,7 @@
  * endpoint and the field.
  */
 import { config } from '../config.js'
-import { ApiError, assertCart, assertList, assertProduct } from './contracts.js'
+import { ApiError, ContractError, assertCart, assertList, assertProduct } from './contracts.js'
 
 const SESSION_KEY = 'loom.session'
 
@@ -147,7 +147,14 @@ export async function listCollections() {
 
 export async function getReviews(slug, { page = 1, perPage = 5 } = {}) {
   const res = await get(`/products/${encodeURIComponent(slug)}/reviews`, { page, per_page: perPage })
-  return assertList(res, `GET /products/${slug}/reviews`)
+  assertList(res, `GET /products/${slug}/reviews`)
+  // `summary` drives the whole ratings panel. A backend that omits it should
+  // fail here with a message naming the field, not three components later on a
+  // null dereference.
+  if (!res.summary || typeof res.summary.average !== 'number') {
+    throw new ContractError(`GET /products/${slug}/reviews summary`, '{ average, count, breakdown }', res.summary)
+  }
+  return res
 }
 
 /* ── cart ──────────────────────────────────────────────────────────────── */
@@ -310,7 +317,11 @@ export const adminDeleteCategory = (slug) => del(`/admin/categories/${encodeURIC
 export const adminUpdateSettings = (body) => patch_('/admin/storefront', body)
 export const adminImport = (body) => post('/admin/import', body)
 export const adminExport = () => get('/admin/export')
-export const listSizeCharts = () => get('/size-charts')
+export const listSizeCharts = () => get('/size-charts').then((r) => assertList(r, 'GET /size-charts'))
 export const adminSaveSizeChart = (chart) => post('/admin/size-charts', chart)
 export const adminGetProduct = (id) => get(`/admin/products/${encodeURIComponent(id)}`)
+export const adminUpdateOrder = (id, body) => patch_(`/admin/orders/${encodeURIComponent(id)}`, body)
+export const adminListDiscounts = () => get('/admin/discounts').then((r) => assertList(r, 'GET /admin/discounts'))
+export const adminSaveDiscount = (body) => post('/admin/discounts', body)
+export const adminDeleteDiscount = (code) => del(`/admin/discounts/${encodeURIComponent(code)}`)
 export const adminReset = () => post('/admin/reset', {})

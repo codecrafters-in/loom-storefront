@@ -131,13 +131,70 @@ export function upsertSizeChart(chart) {
 
 const uid = (p) => `${p}_${Math.random().toString(36).slice(2, 10)}`
 
+/**
+ * Badges are derived, never stored by hand.
+ *
+ * `sale` follows compare-at, `sold-out` and `low-stock` follow the variants.
+ * Computing them once at seed time and then never again is how a product sells
+ * out in admin and keeps advertising itself as in stock on the grid.
+ */
+function deriveBadges(product) {
+  const manual = (product.badges || []).filter((b) => ['new', 'bestseller'].includes(b))
+  const variants = product.variants || []
+  const live = variants.filter((v) => v.available)
+  const out = [...manual]
+  if (product.compareAtPrice?.amount > product.price?.amount) out.push('sale')
+  if (variants.length && live.length === 0) out.push('sold-out')
+  else if (live.length && live.length <= 2) out.push('low-stock')
+  return [...new Set(out)]
+}
+
+/**
+ * Product price cascades to variants that were not individually overridden.
+ *
+ * Without this the grid shows the new price and the cart charges the old one —
+ * a live mispricing with nothing on screen to warn anyone.
+ */
+function cascadePrice(next, previous) {
+  if (!next.variants?.length || !next.price) return next
+  const oldAmount = previous?.price?.amount
+  return {
+    ...next,
+    variants: next.variants.map((v) => {
+      const overridden = oldAmount !== undefined && v.price?.amount !== oldAmount
+      return overridden ? v : { ...v, price: next.price, compareAtPrice: next.compareAtPrice ?? null }
+    }),
+  }
+}
+
 export function upsertProduct(patch) {
   const products = getProducts().slice()
-  const i = products.findIndex((p) => p.id === patch.id || p.slug === patch.slug)
-  const next = { ...(i >= 0 ? products[i] : {}), ...patch, updatedAt: nowIso() }
+  const byId = patch.id ? products.findIndex((p) => p.id === patch.id) : -1
+  const bySlug = products.findIndex((p) => p.slug === patch.slug)
+
+  // Creating a product whose slug is already taken must fail loudly. Merging
+  // silently is how one product quietly overwrites another.
+  if (byId === -1 && bySlug !== -1 && patch.id && products[bySlug].id !== patch.id) {
+    const err = new Error(`The slug "${patch.slug}" is already used by another product.`)
+    err.code = 'slug_taken'
+    throw err
+  }
+  if (byId === -1 && !patch.id && bySlug !== -1) {
+    const err = new Error(`The slug "${patch.slug}" is already in use.`)
+    err.code = 'slug_taken'
+    throw err
+  }
+
+  const i = byId !== -1 ? byId : bySlug
+  const previous = i >= 0 ? products[i] : null
+  let next = { ...(previous || {}), ...patch, updatedAt: nowIso() }
   if (!next.id) next.id = uid('prod')
+  if (!next.createdAt) next.createdAt = nowIso()
+  next = cascadePrice(next, previous)
+  next.badges = deriveBadges(next)
+
   if (i >= 0) products[i] = next
-  else products.unshift({ createdAt: nowIso(), ...next })
+  else products.unshift(next)
   persist({ ...cache, products })
   return next
 }
@@ -159,7 +216,7 @@ export function deleteProduct(idOrSlug) {
 export function adjustInventory(variantId, delta) {
   const products = getProducts().map((p) => {
     if (!p.variants.some((v) => v.id === variantId)) return p
-    return {
+    const updated = {
       ...p,
       updatedAt: nowIso(),
       variants: p.variants.map((v) =>
@@ -168,6 +225,8 @@ export function adjustInventory(variantId, delta) {
           : v,
       ),
     }
+    // Selling the last one must turn the card over on the grid.
+    return { ...updated, badges: deriveBadges(updated) }
   })
   persist({ ...cache, products })
   return getProducts().flatMap((p) => p.variants).find((v) => v.id === variantId)

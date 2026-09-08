@@ -5,6 +5,7 @@ import useAsync from '../hooks/useAsync.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
 import FilterPanel from '../components/shop/FilterPanel.jsx'
 import Promises from '../components/layout/Promises.jsx'
+import Seo from '../components/Seo.jsx'
 import { useBootstrap } from '../store/StorefrontContext.jsx'
 import { Breadcrumbs, Button, Empty, ErrorState, Icon, Pagination } from '../components/ui/index.jsx'
 
@@ -110,6 +111,7 @@ export default function Shop({ mode = 'category' }) {
 
   return (
     <>
+      <Seo title={title} description={blurb} />
       <div className="wrap pt-8">
         <Breadcrumbs
           trail={[

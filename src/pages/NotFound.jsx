@@ -1,8 +1,11 @@
 import { Button, Empty } from '../components/ui/index.jsx'
+import Seo from '../components/Seo.jsx'
 
 export default function NotFound() {
   return (
-    <Empty
+    <>
+      <Seo title={'Not found'} noindex />
+      <Empty
       icon="search"
       title="That page does not exist"
       body="It may have moved, or the link may be wrong."
@@ -13,6 +16,7 @@ export default function NotFound() {
         </div>
       }
       className="min-h-[60vh]"
-    />
+      />
+    </>
   )
 }

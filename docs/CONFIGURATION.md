@@ -116,6 +116,8 @@ built-in mark, which inherits `currentColor` and stays sharp at any size. See
 }
 ```
 
+`showTaxNote` renders `taxNote` under the cart totals.
+
 - `currency` is the display default and what `Intl.NumberFormat` formats with.
 - `currencies` populates the switcher. One entry hides it.
 - Zero-decimal currencies (JPY, KRW, VND, CLP, ISK) are handled — see
@@ -141,9 +143,14 @@ built-in mark, which inherits `currentColor` and stays sharp at any size. See
 }
 ```
 
-`freeShippingOver` is **minor units** and drives the progress bar in the cart and
-drawer. `shippingMethods` renders the delivery picker at checkout; the server
-still decides what is actually charged.
+`freeShippingOver` is **minor units**. It drives the progress bar in the cart and
+drawer, the promise beside the buy button, *and the cart's own shipping
+calculation* — editing it in admin changes all three together, which is the
+whole point of it living here rather than in an environment variable.
+
+`returnsWindowDays` appears in the trust block on the product page and in the
+Shipping tab. `shippingMethods[0].price` is the standard rate the cart charges
+below the threshold.
 
 ### `features`
 
@@ -158,8 +165,14 @@ still decides what is actually charged.
 ```
 
 Setting one to `false` removes its entry points — the heart on product cards,
-the search field, the account icon. Routes stay reachable so an existing
-bookmark does not 404; nothing links to them.
+the search field, the account icon, the discount field in the cart. Routes stay
+reachable so an existing bookmark does not 404; nothing links to them.
+
+There is no `currencySwitcher`. Multiple currencies are a backend negotiation —
+the API returns prices already in the currency it was asked for — and a client
+toggle that did FX with a hardcoded rate would be wrong the day the rate moved.
+`pricing.currencies` is display metadata for a switcher you build against your
+own backend.
 
 ### `navigation`
 
@@ -288,10 +301,15 @@ top-level one on purpose — "another merino thing" is a better suggestion than
     "cancelUrl": "/cart",
     "collectPhone": true,
     "requireAccount": false,
-    "termsUrl": "/pages/terms"
+    "termsUrl": "/pages/shipping"
   }
 }
 ```
+
+`collectPhone: false` drops the phone field. `requireAccount: true` sends a
+signed-out shopper to sign in first rather than failing at submit. `termsUrl`
+renders an agreement line under the place-order button; omit it and the line
+disappears.
 
 Three modes. Full guide with provider examples: **[CHECKOUT.md](CHECKOUT.md)**.
 
@@ -302,6 +320,32 @@ Three modes. Full guide with provider examples: **[CHECKOUT.md](CHECKOUT.md)**.
 | `api` | POSTs to `createUrl`, expects an `Order` back. For invoicing, COD, wholesale terms |
 
 `createUrl` may be a full URL or a path on your API. `:cartId` is substituted.
+
+### `trust`
+
+```json
+{
+  "trust": {
+    "payments": ["Visa", "Mastercard", "Amex", "PayPal", "Apple Pay", "UPI"],
+    "repairs": true,
+    "showCertifications": true,
+    "showFitFeedback": true,
+    "showSocialProof": true,
+    "socialProofThresholds": { "bought": 25, "saved": 20 }
+  }
+}
+```
+
+Rendered inside the buy box, not in the footer — placement is most of the effect.
+See [CRO.md](CRO.md).
+
+| Key | Does |
+| --- | --- |
+| `payments` | Payment marks beside the secure-checkout line. Text labels, no logos to license |
+| `repairs` | The "repaired, not replaced" line |
+| `showFitFeedback` | The fit verdict and purchaser distribution |
+| `showSocialProof` | Demand counts under the buy button |
+| `socialProofThresholds` | Below these, the block renders **nothing** rather than advertising low demand |
 
 ### `promises`
 

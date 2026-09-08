@@ -53,11 +53,14 @@ fails with an opaque network error.
 { "items": [], "total": 128, "page": 1, "perPage": 12 }
 ```
 
-Clamp `per_page` server-side — 48 is a sensible ceiling. Above a few thousand
-products, also return `nextCursor` and accept `?cursor=`; offset pagination
-makes the database count and discard rows it will never send, and an insert
-between page loads shifts every row after it. Both can coexist; the theme uses
-whichever it is given. See [PERFORMANCE.md](PERFORMANCE.md#pagination).
+Clamp `per_page` server-side — 48 is a sensible ceiling.
+
+**The theme sends `page` and `per_page` only.** Above a few thousand products
+you will want cursors as well — offset pagination makes the database count and
+discard rows it will never send, and an insert between page loads shifts every
+row after it. Returning `nextCursor` alongside `page` is harmless and forward-
+compatible, but the shipped storefront does not yet consume it; the numbered
+pager is offset-based. See [PERFORMANCE.md](PERFORMANCE.md#pagination).
 
 **Validation.** Every response is checked at the boundary
 (`src/lib/api/contracts.js`). A 200 with a missing `price` or an empty `variants`
@@ -186,7 +189,8 @@ Cache it hard — it changes when a merchant saves settings, not per request.
   "price": { "amount": 16800, "currency": "USD" },
   "compareAtPrice": null,
   "images": [
-    { "url": "https://cdn…/1.jpg", "alt": "Fine Merino Crew in Oat", "width": 900, "height": 1125 }
+    { "id": "merino-crew-knit-1", "url": "https://cdn…/1.jpg", "alt": "Fine Merino Crew in Oat",
+      "width": 900, "height": 1125, "color": "Oat" }
   ],
   "options": [
     { "name": "Color", "values": ["Oat", "Charcoal"] },
@@ -201,13 +205,15 @@ Cache it hard — it changes when a merchant saves settings, not per request.
       "price": { "amount": 16800, "currency": "USD" },
       "compareAtPrice": null,
       "inventory": 6,
-      "available": true
+      "available": true,
+      "imageId": "merino-crew-knit-1"
     }
   ],
-  "categories": ["knitwear"],
+  "categories": ["knitwear", "knitwear-sweaters"],
   "tags": ["merino", "layering"],
   "rating": { "average": 4.8, "count": 302 },
   "badges": ["bestseller"],
+  "published": true,
   "createdAt": "2026-02-14T00:00:00.000Z",
 
   "fit": {
@@ -224,6 +230,7 @@ Cache it hard — it changes when a merchant saves settings, not per request.
     "origin": "Biella, Italy",
     "certifications": ["Responsible Wool Standard", "OEKO-TEX Standard 100"]
   },
+  "sizeChartId": "tops",
   "sizeChart": {
     "id": "tops", "unit": "cm",
     "note": "Measured flat, garment not body.",
@@ -250,7 +257,11 @@ category. Reasoning and evidence: **[CRO.md](CRO.md)**.
 | `fabric.composition` | `[[material, percent], …]` |
 | `fabric.weight` | gsm. The field that decides drape and warmth |
 | `fabric.certifications` | Third-party marks only — OEKO-TEX, GOTS, RWS, GRS, LWG |
+| `sizeChartId` | Reference to a shared chart. `sizeChart` is the resolved copy the storefront reads |
 | `sizeChart` | Garment measurements, laid flat. `columns` + `rows`, first column is the size |
+| `published` | `false` hides it from every storefront read and 404s its URL |
+| `images[].id` / `images[].color` | A colour-tagged image makes the gallery follow the picker |
+| `variants[].imageId` | Fallback when no image carries the colour |
 | `social` | Real counts only. Below a threshold the theme hides the block rather than showing a low number |
 
 > Every one of these degrades cleanly. Omit `fit` and the block disappears; omit

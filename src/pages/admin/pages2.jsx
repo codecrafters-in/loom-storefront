@@ -228,8 +228,21 @@ export function SizeCharts() {
 
 /* ── orders ────────────────────────────────────────────────────────────── */
 
+const STATUSES = ['placed', 'paid', 'fulfilled', 'delivered', 'cancelled']
+
 export function Orders() {
-  const { data, loading } = useAsync(() => api.listOrders(), [])
+  const { data, loading, reload } = useAsync(() => api.listOrders(), [])
+  const { push } = useToast()
+
+  const setStatus = async (id, status) => {
+    try {
+      await api.adminUpdateOrder(id, { status })
+      push(status === 'cancelled' ? 'Cancelled — stock returned' : `Marked ${status}`)
+      reload()
+    } catch (err) {
+      push(err.message, { tone: 'error' })
+    }
+  }
   if (loading) return <Skeleton className="h-64 w-full" />
   if (!data?.items.length) {
     return <Empty icon="truck" title="No orders yet" body="Place one from the storefront and it will appear here." />
@@ -237,6 +250,10 @@ export function Orders() {
   return (
     <>
       <h1 className="text-display-md">Orders</h1>
+      <p className="mt-3 text-[13px] text-muted">
+        Cancelling returns the stock. An order that disappears without giving its units back is how
+        a catalogue quietly loses inventory nobody can account for.
+      </p>
       <div className="mt-8 overflow-x-auto rounded-xs border border-line bg-surface">
         <table className="w-full border-collapse text-[14px]">
           <thead>
@@ -246,6 +263,7 @@ export function Orders() {
               <th className="p-3 font-medium">Customer</th>
               <th className="p-3 font-medium">Items</th>
               <th className="p-3 font-medium">Status</th>
+              <th className="p-3 font-medium">Tracking</th>
               <th className="p-3 font-medium text-right">Total</th>
             </tr>
           </thead>
@@ -256,13 +274,114 @@ export function Orders() {
                 <td className="p-3 text-muted">{new Date(o.placedAt).toLocaleDateString()}</td>
                 <td className="p-3 text-muted">{o.email}</td>
                 <td className="p-3 tabular-nums">{o.lines.length}</td>
-                <td className="p-3"><Badge kind="bestseller">{o.status}</Badge></td>
+                <td className="p-3">
+                  <select
+                    aria-label={`Status for ${o.number}`}
+                    value={o.status}
+                    onChange={(e) => setStatus(o.id, e.target.value)}
+                    className="field h-8 py-0 text-[12px]"
+                  >
+                    {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </td>
+                <td className="p-3 font-mono text-[11px] text-faint">{o.tracking?.code || '—'}</td>
                 <td className="p-3 text-right tabular-nums">{formatMoney(o.total)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+    </>
+  )
+}
+
+/* ── discounts ─────────────────────────────────────────────────────────── */
+
+export function Discounts() {
+  const { data, loading, reload } = useAsync(() => api.adminListDiscounts(), [])
+  const [editing, setEditing] = useState(null)
+  const { push } = useToast()
+
+  const save = async (e) => {
+    e.preventDefault()
+    try {
+      await api.adminSaveDiscount(editing)
+      push('Code saved')
+      setEditing(null)
+      reload()
+    } catch (err) {
+      push(err.message, { tone: 'error' })
+    }
+  }
+
+  const remove = async (code) => {
+    await api.adminDeleteDiscount(code)
+    push('Code removed')
+    reload()
+  }
+
+  if (loading) return <Skeleton className="h-64 w-full" />
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-display-md">Discounts</h1>
+        {!editing && (
+          <Button size="sm" icon="plus"
+            onClick={() => setEditing({ code: '', label: '', kind: 'percent', value: 10, active: true })}>
+            New code
+          </Button>
+        )}
+      </div>
+
+      {editing ? (
+        <form onSubmit={save} className="mt-8 max-w-md space-y-4">
+          <Row label="Code" mono required value={editing.code}
+            onChange={(e) => setEditing((d) => ({ ...d, code: e.target.value.toUpperCase() }))} />
+          <Row label="Label shown to the shopper" value={editing.label}
+            onChange={(e) => setEditing((d) => ({ ...d, label: e.target.value }))} />
+          <div>
+            <label htmlFor="kind" className="mb-1.5 block text-[13px] font-medium">Type</label>
+            <select id="kind" className="field" value={editing.kind}
+              onChange={(e) => setEditing((d) => ({ ...d, kind: e.target.value }))}>
+              <option value="percent">Percentage off</option>
+              <option value="fixed">Fixed amount off (minor units)</option>
+              <option value="shipping">Free shipping</option>
+            </select>
+          </div>
+          {editing.kind !== 'shipping' && (
+            <Row label={editing.kind === 'percent' ? 'Percent' : 'Amount (minor units)'} type="number"
+              value={editing.value}
+              onChange={(e) => setEditing((d) => ({ ...d, value: Number(e.target.value) }))} />
+          )}
+          <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
+            <input type="checkbox" checked={editing.active !== false}
+              onChange={(e) => setEditing((d) => ({ ...d, active: e.target.checked }))}
+              className="h-4 w-4 accent-[rgb(var(--accent))]" />
+            Active
+          </label>
+          <div className="flex gap-3 pt-2">
+            <Button as="button" type="submit">Save</Button>
+            <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
+          </div>
+        </form>
+      ) : (
+        <ul className="mt-8 space-y-3">
+          {(data?.items || []).map((d) => (
+            <li key={d.code} className="flex flex-wrap items-center gap-4 rounded-xs border border-line bg-surface p-4">
+              <code className="font-mono text-[14px] text-ink">{d.code}</code>
+              <span className="text-[13px] text-muted">{d.label}</span>
+              <Badge kind={d.active === false ? 'sold-out' : 'bestseller'}>
+                {d.active === false ? 'inactive' : d.kind === 'percent' ? `${d.value}% off` : d.kind === 'fixed' ? 'fixed' : 'free shipping'}
+              </Badge>
+              <span className="ml-auto flex gap-4 text-[13px]">
+                <button type="button" onClick={() => setEditing({ ...d })} className="text-accent link-underline">Edit</button>
+                <button type="button" onClick={() => remove(d.code)} className="text-faint link-underline hover:text-sale">Remove</button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   )
 }
@@ -333,6 +452,21 @@ export function Storefront() {
             value={cfg.commerce?.freeShippingOver ?? 0}
             onChange={(e) => patch('commerce.freeShippingOver', Number(e.target.value))}
           />
+          <Row
+            label="Returns window (days)"
+            type="number"
+            value={cfg.commerce?.returnsWindowDays ?? 30}
+            onChange={(e) => patch('commerce.returnsWindowDays', Number(e.target.value))}
+          />
+          <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
+            <input type="checkbox" checked={!!cfg.pricing?.showTaxNote}
+              onChange={(e) => patch('pricing.showTaxNote', e.target.checked)}
+              className="h-4 w-4 accent-[rgb(var(--accent))]" />
+            Show a tax note in the cart
+          </label>
+          {cfg.pricing?.showTaxNote && (
+            <Row label="Tax note" value={cfg.pricing?.taxNote || ''} onChange={(e) => patch('pricing.taxNote', e.target.value)} />
+          )}
           <p className="text-[12px] text-faint">
             {formatMoney({ amount: cfg.commerce?.freeShippingOver || 0, currency: cfg.pricing?.currency || 'USD' })}
           </p>

@@ -12,7 +12,7 @@
  * boundary. See src/lib/money.js.
  */
 import { toMinor } from '../lib/money.js'
-import { productFacts, sizeCharts } from './fit.js'
+import { productFacts } from './fit.js'
 
 /**
  * Categories are a flat list with a `parent` pointer rather than nested arrays.
@@ -591,12 +591,15 @@ function build(raw) {
     rating: { average: raw.rating[0], count: raw.rating[1] },
     badges: [...(raw.badges || []), ...(compareAt ? ['sale'] : []), ...(soldOut ? ['sold-out'] : low ? ['low-stock'] : [])],
     createdAt: new Date(2026, 0, 1 + hashInt(raw.slug, 240)).toISOString(),
+    published: true,
 
     // Fit, fabric and provenance — the fields that decide whether a shopper
     // buys once or buys, returns, and does not come back. See src/data/fit.js.
     fit: facts.fit || null,
     fabric: facts.fabric || null,
-    sizeChart: facts.chart ? { id: facts.chart, ...sizeCharts[facts.chart] } : null,
+    // A reference, not a copy. Editing the shared "tops" chart has to change
+    // every product using it — a snapshot per product silently drifts.
+    sizeChartId: facts.chart || null,
 
     // Honest scarcity and demand, derived rather than invented. A fabricated
     // "17 people are viewing" is the fastest way to lose a considered buyer.
