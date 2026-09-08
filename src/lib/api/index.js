@@ -30,6 +30,7 @@ const SURFACE = [
   'adminSetInventory', 'adminAdjustInventory',
   'adminSaveCategory', 'adminDeleteCategory',
   'adminUpdateSettings', 'adminImport', 'adminExport', 'adminReset',
+  'listSizeCharts', 'adminSaveSizeChart', 'adminGetProduct',
 ]
 
 const missing = SURFACE.filter((name) => typeof adapter[name] !== 'function')
@@ -56,13 +57,15 @@ const CACHEABLE = {
   getRelated: TTL.product,
   getReviews: TTL.reviews,
   getDeliveryEstimate: TTL.catalog,
+  listSizeCharts: TTL.catalog,
 }
 
 /** A write to any of these drops the read namespaces it could have invalidated. */
 const PURGES = {
   addToCart: [], updateCartLine: [], removeCartLine: [], applyDiscount: [], clearCart: [],
   checkout: ['listProducts', 'getProduct', 'getBootstrap'],
-  adminSaveProduct: ['listProducts', 'getProduct', 'getRelated', 'getBootstrap', 'adminListProducts'],
+  adminSaveProduct: ['listProducts', 'getProduct', 'getRelated', 'getBootstrap', 'adminListProducts', 'adminGetProduct'],
+  adminSaveSizeChart: ['listSizeCharts', 'getProduct', 'adminGetProduct'],
   adminDeleteProduct: ['listProducts', 'getProduct', 'getRelated', 'getBootstrap', 'adminListProducts'],
   adminSetInventory: ['listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
   adminAdjustInventory: ['listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],

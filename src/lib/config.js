@@ -33,6 +33,17 @@ export const config = {
 
   repoUrl: env.VITE_REPO_URL || 'https://github.com/codecrafters-in/loom-storefront',
 
+  /**
+   * Demo admin credential. Mock mode only.
+   *
+   * These are compiled into the bundle like every VITE_ variable, so they are
+   * public by construction. That is acceptable for a demo whose data lives in
+   * localStorage and unacceptable for anything else — in api mode the server
+   * authenticates and these are ignored.
+   */
+  adminUser: env.VITE_ADMIN_USER || 'admin',
+  adminPassword: env.VITE_ADMIN_PASSWORD || 'admin',
+
   /** Mock mode fakes network latency so loading states are real, not theoretical. */
   mockLatency: num(env.VITE_MOCK_LATENCY, 220),
 }

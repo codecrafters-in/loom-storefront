@@ -3,6 +3,7 @@ import { Icon } from '../../components/ui/index.jsx'
 import { LoomMark } from '../../components/ui/Logo.jsx'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { isMock } from '../../lib/api/index.js'
+import { useAdminAuth } from '../../store/AdminAuthContext.jsx'
 
 /**
  * The admin shell.
@@ -20,13 +21,16 @@ const NAV = [
   { to: '/admin/products', label: 'Products', icon: 'package' },
   { to: '/admin/inventory', label: 'Inventory', icon: 'filter' },
   { to: '/admin/categories', label: 'Categories', icon: 'map-pin' },
+  { to: '/admin/size-charts', label: 'Size charts', icon: 'filter' },
   { to: '/admin/orders', label: 'Orders', icon: 'truck' },
   { to: '/admin/storefront', label: 'Storefront', icon: 'star' },
   { to: '/admin/data', label: 'Import / export', icon: 'refresh' },
+  { to: '/admin/docs', label: 'Developer docs', icon: 'info' },
 ]
 
 export default function AdminLayout() {
   const config = useStorefront()
+  const { session, signOut } = useAdminAuth()
   return (
     <div className="flex min-h-[100dvh] flex-col bg-page">
       <header className="border-b border-line bg-surface">
@@ -38,12 +42,16 @@ export default function AdminLayout() {
           <span className="rounded-xs bg-sunken px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
             {isMock ? 'local data' : 'live api'}
           </span>
-          <Link
-            to="/"
-            className="ml-auto inline-flex items-center gap-1.5 text-[13px] text-muted transition-colors hover:text-ink"
-          >
-            View store <Icon name="arrow-right" size={14} />
-          </Link>
+          <div className="ml-auto flex items-center gap-4">
+            <Link to="/" className="inline-flex items-center gap-1.5 text-[13px] text-muted transition-colors hover:text-ink">
+              View store <Icon name="arrow-right" size={14} />
+            </Link>
+            <span className="hidden text-[13px] text-faint sm:inline">{session?.username}</span>
+            <button type="button" onClick={signOut} className="inline-flex items-center gap-1.5 text-[13px] text-muted transition-colors hover:text-sale">
+              <Icon name="log-out" size={15} />
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
+          </div>
         </div>
       </header>
 

@@ -30,12 +30,14 @@ import { ApiError } from './contracts.js'
 let products = []
 let categories = []
 let collections = []
+let sizeCharts = []
 let storefront = {}
 
 function adopt() {
   products = db.getProducts()
   categories = db.getCategories()
   collections = db.getCollections()
+  sizeCharts = db.getSizeCharts()
   storefront = db.getSettings()
 }
 db.subscribe(adopt)
@@ -78,8 +80,11 @@ const id = (p) => `${p}_${Math.random().toString(36).slice(2, 10)}`
 
 /** Strip the fields that only exist to drive the image script. */
 const publicProduct = (p) => {
-  const { _imageQuery, _altQuery, ...rest } = p
-  return rest
+  const { _imageQuery, _altQuery, sizeChartId, ...rest } = p
+  // A product either references a shared chart by id or carries its own. The
+  // reference is resolved here so the storefront always sees one shape.
+  const chart = sizeChartId ? sizeCharts.find((c) => c.id === sizeChartId) : rest.sizeChart
+  return { ...rest, sizeChartId: sizeChartId ?? rest.sizeChart?.id ?? null, sizeChart: chart || null }
 }
 
 /* ── catalogue ─────────────────────────────────────────────────────────── */
@@ -802,6 +807,26 @@ export async function adminImport(payload) {
 export async function adminExport() {
   await latency()
   return db.exportCatalog()
+}
+
+export async function listSizeCharts() {
+  await latency()
+  return { items: sizeCharts, total: sizeCharts.length }
+}
+
+export async function adminSaveSizeChart(chart) {
+  await latency()
+  return db.upsertSizeChart(chart)
+}
+
+export async function adminGetProduct(idOrSlug) {
+  await latency()
+  const p = products.find((x) => x.id === idOrSlug || x.slug === idOrSlug)
+  if (!p) throw new ApiError('Product not found.', { status: 404, code: 'not_found' })
+  // Admin sees the raw record, including the chart reference rather than the
+  // resolved copy — you edit the link, not the snapshot.
+  const { _imageQuery, _altQuery, ...rest } = p
+  return rest
 }
 
 export async function adminReset() {

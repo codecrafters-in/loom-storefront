@@ -310,4 +310,7 @@ export const adminDeleteCategory = (slug) => del(`/admin/categories/${encodeURIC
 export const adminUpdateSettings = (body) => patch_('/admin/storefront', body)
 export const adminImport = (body) => post('/admin/import', body)
 export const adminExport = () => get('/admin/export')
+export const listSizeCharts = () => get('/size-charts')
+export const adminSaveSizeChart = (chart) => post('/admin/size-charts', chart)
+export const adminGetProduct = (id) => get(`/admin/products/${encodeURIComponent(id)}`)
 export const adminReset = () => post('/admin/reset', {})

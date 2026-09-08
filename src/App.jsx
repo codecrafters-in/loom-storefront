@@ -6,6 +6,8 @@ import { CartProvider } from './store/CartContext.jsx'
 import { WishlistProvider } from './store/WishlistContext.jsx'
 import { AuthProvider } from './store/AuthContext.jsx'
 import { StorefrontProvider } from './store/StorefrontContext.jsx'
+import { AdminAuthProvider } from './store/AdminAuthContext.jsx'
+import RequireAdmin from './components/admin/RequireAdmin.jsx'
 import Home from './pages/Home.jsx'
 import Shop from './pages/Shop.jsx'
 import Product from './pages/Product.jsx'
@@ -33,6 +35,10 @@ const AdminCategories = lazy(() => import('./pages/admin/pages2.jsx').then((m) =
 const AdminOrders = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Orders })))
 const AdminStorefront = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Storefront })))
 const AdminData = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Data })))
+const AdminProductEditor = lazy(() => import('./pages/admin/ProductEditor.jsx'))
+const AdminSizeCharts = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.SizeCharts })))
+const AdminDocs = lazy(() => import('./pages/admin/Docs.jsx'))
+const AdminLogin = lazy(() => import('./pages/admin/Login.jsx'))
 
 const Loading = () => (
   <div className="wrap py-20">
@@ -44,6 +50,7 @@ export default function App() {
   return (
     <ToastProvider>
       <StorefrontProvider>
+        <AdminAuthProvider>
         <AuthProvider>
         <WishlistProvider>
           <CartProvider>
@@ -67,20 +74,33 @@ export default function App() {
                   <Route path="*" element={<Navigate to="/404" replace />} />
                 </Route>
 
-                <Route path="/admin" element={<AdminLayout />}>
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route
+                  path="/admin"
+                  element={
+                    <RequireAdmin>
+                      <AdminLayout />
+                    </RequireAdmin>
+                  }
+                >
                   <Route index element={<AdminOverview />} />
                   <Route path="products" element={<AdminProducts />} />
+                  <Route path="products/:id" element={<AdminProductEditor />} />
                   <Route path="inventory" element={<AdminInventory />} />
                   <Route path="categories" element={<AdminCategories />} />
+                  <Route path="size-charts" element={<AdminSizeCharts />} />
                   <Route path="orders" element={<AdminOrders />} />
                   <Route path="storefront" element={<AdminStorefront />} />
                   <Route path="data" element={<AdminData />} />
+                  <Route path="docs" element={<AdminDocs />} />
+                  <Route path="docs/:page" element={<AdminDocs />} />
                 </Route>
               </Routes>
             </Suspense>
           </CartProvider>
         </WishlistProvider>
         </AuthProvider>
+        </AdminAuthProvider>
       </StorefrontProvider>
     </ToastProvider>
   )

@@ -2,6 +2,23 @@
 
 Everything a merchant would change without touching code.
 
+## Deployment modes
+
+| Mode | `VITE_DATA_SOURCE` | Where data lives | Admin panel writes to |
+| --- | --- | --- | --- |
+| Demo | `mock` | `localStorage` (`src/lib/db.js`) | The same local store the shop reads |
+| Existing system | `api` | Odoo, Shopify, Medusa, your ERP | Your `/admin/*` endpoints |
+| Own backend | `api` | [Your database](DATABASE.md) | Your `/admin/*` endpoints |
+
+The last two are the same as far as the storefront is concerned — it calls an
+API either way. The difference is who owns the schema, and whether you need
+[DATABASE.md](DATABASE.md).
+
+**In `mock` mode the admin panel and the storefront share one database**, so an
+edit in admin is on the shop immediately with no publish step. That is a
+property of the demo store, not a simplification of the architecture: in `api`
+mode the same admin screens call the same documented write endpoints.
+
 ## Where settings come from
 
 Three layers. Higher wins.
@@ -41,6 +58,13 @@ cp .env.example .env.local
 | `VITE_FREE_SHIPPING_OVER` | `150` | Major units |
 | `VITE_MOCK_LATENCY` | `220` | Fake delay in mock mode, ms. `0` disables |
 | `VITE_REPO_URL` | this repo | Footer source link |
+| `VITE_ADMIN_USER` | `admin` | Demo back-office username. **Mock mode only** |
+| `VITE_ADMIN_PASSWORD` | `admin` | Demo back-office password. **Mock mode only** |
+
+In `api` mode the admin credential is checked by your server at
+`POST /admin/auth/login` and those two variables are ignored. They are compiled
+into the bundle like every `VITE_` variable, so they gate a browser-local demo
+and nothing more — see [ADMIN.md](ADMIN.md#authentication).
 
 > **Vite inlines every `VITE_*` variable into the JavaScript bundle.** Anything
 > here is readable by anyone who opens devtools. Publishable keys are fine;

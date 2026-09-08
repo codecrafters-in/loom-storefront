@@ -4,6 +4,7 @@ import { Button, Icon } from '../ui/index.jsx'
 import api, { isMock } from '../../lib/api/index.js'
 import { useToast } from '../../store/ToastContext.jsx'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
+import { useAdminAuth } from '../../store/AdminAuthContext.jsx'
 import Logo from '../ui/Logo.jsx'
 import { config as envConfig } from '../../lib/config.js'
 
@@ -12,6 +13,7 @@ export default function Footer() {
   const [busy, setBusy] = useState(false)
   const { push } = useToast()
   const config = useStorefront()
+  const { signedIn: isAdmin } = useAdminAuth()
 
   const submit = async (e) => {
     e.preventDefault()
@@ -89,6 +91,17 @@ export default function Footer() {
             >
               {isMock ? 'demo data' : 'live api'}
             </span>
+            {/* Only rendered for a signed-in admin — a shopper never sees that
+                a back office exists. */}
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className="inline-flex items-center gap-1.5 rounded-xs border border-accent/40 px-2.5 py-1 text-[12px] text-accent transition-colors hover:bg-accent hover:text-accent-ink"
+              >
+                <Icon name="user" size={13} />
+                Admin
+              </Link>
+            )}
             <a
               href={envConfig.repoUrl}
               target="_blank"

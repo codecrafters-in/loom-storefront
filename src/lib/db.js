@@ -17,7 +17,7 @@
  */
 
 const KEY = 'loom.db'
-const VERSION = 3
+const VERSION = 4
 
 const listeners = new Set()
 let cache = null
@@ -28,9 +28,10 @@ function nowIso() {
 
 /** Seeded once, then owned by the user. Bumping VERSION reseeds. */
 async function seed() {
-  const [{ products, categories, collections }, { storefront }] = await Promise.all([
+  const [{ products, categories, collections }, { storefront }, { sizeCharts }] = await Promise.all([
     import('../data/catalog.js'),
     import('../data/storefront.js'),
+    import('../data/fit.js'),
   ])
   return {
     version: VERSION,
@@ -38,6 +39,9 @@ async function seed() {
     products: products.map((p) => ({ ...p, updatedAt: nowIso() })),
     categories: categories.map((c) => ({ ...c })),
     collections: collections.map((c) => ({ ...c })),
+    // Shared and referenced by id, so editing "tops" fixes it on all nine
+    // products that use it instead of nine separate tables drifting apart.
+    sizeCharts: Object.entries(sizeCharts).map(([id, chart]) => ({ id, ...chart })),
     settings: storefront,
   }
 }
@@ -112,6 +116,16 @@ export const getProducts = () => cache?.products || []
 export const getCategories = () => cache?.categories || []
 export const getCollections = () => cache?.collections || []
 export const getSettings = () => cache?.settings || {}
+export const getSizeCharts = () => cache?.sizeCharts || []
+
+export function upsertSizeChart(chart) {
+  const charts = getSizeCharts().slice()
+  const i = charts.findIndex((c) => c.id === chart.id)
+  if (i >= 0) charts[i] = { ...charts[i], ...chart }
+  else charts.push(chart)
+  persist({ ...cache, sizeCharts: charts })
+  return chart
+}
 
 /* ── writes ────────────────────────────────────────────────────────────── */
 
@@ -207,7 +221,7 @@ function deepMerge(base, patch) {
  * whole set. This is the shape a nightly ERP dump wants, and the reason the
  * write API documents a bulk endpoint rather than expecting a thousand POSTs.
  */
-export function importCatalog({ products = [], categories = [], collections = [], settings, mode = 'merge' }) {
+export function importCatalog({ products = [], categories = [], collections = [], sizeCharts = [], settings, mode = 'merge' }) {
   let next = { ...cache }
   if (mode === 'replace') {
     if (products.length) next.products = products
@@ -230,6 +244,11 @@ export function importCatalog({ products = [], categories = [], collections = []
       next.collections = [...bySlug.values()]
     }
   }
+  if (sizeCharts.length) {
+    const byId = new Map(getSizeCharts().map((c) => [c.id, c]))
+    sizeCharts.forEach((c) => byId.set(c.id, { ...byId.get(c.id), ...c }))
+    next.sizeCharts = [...byId.values()]
+  }
   if (settings) next.settings = deepMerge(next.settings, settings)
   persist(next)
   return {
@@ -246,6 +265,7 @@ export function exportCatalog() {
     products: getProducts(),
     categories: getCategories(),
     collections: getCollections(),
+    sizeCharts: getSizeCharts(),
     settings: getSettings(),
   }
 }
@@ -257,7 +277,7 @@ export async function resetToSeed() {
 
 export default {
   ready, snapshot, subscribe,
-  getProducts, getCategories, getCollections, getSettings,
+  getProducts, getCategories, getCollections, getSettings, getSizeCharts, upsertSizeChart,
   upsertProduct, deleteProduct, adjustInventory, setInventory,
   upsertCategory, deleteCategory, updateSettings,
   importCatalog, exportCatalog, resetToSeed,

@@ -2,14 +2,39 @@
 
 For whoever runs the shop. Ten tasks, one screen each.
 
-> Everything here is at **`/admin`**. Changes are live immediately — there is no
-> publish button.
+> Everything here is at **`/admin`**. Sign in with `admin` / `admin` on the demo.
+> Changes are live immediately — there is no publish button.
+
+Once you are signed in, an **Admin** link appears in the shop's footer so you can
+move between the two. Shoppers never see it.
+
+---
+
+## Add a product
+
+**Products → New**
+
+Five tabs, filled in the order you would think about them:
+
+| Tab | What goes in it |
+| --- | --- |
+| **Details** | Title, slug, description, price, the Details and Care lists |
+| **Media** | Images. First is the card, second is the hover shot |
+| **Variants** | Colours with swatches, sizes, then **Rebuild matrix** |
+| **Fit & fabric** | Fit verdict, model, size chart, composition, certifications |
+| **Organise** | Categories, tags, rating |
+
+Colours and sizes come first, then **Rebuild matrix** creates one row per
+combination. Fill in stock per row.
+
+> Rebuilding keeps everything you already typed. Adding a fourth colour does not
+> wipe the stock counts on the first three.
 
 ---
 
 ## Change a price
 
-**Products → find it → Edit → Price → Save**
+**Products → click the row → Details → Price → Save**
 
 Type it the way you say it: `168` for $168.00. It is stored as an integer so it
 can never drift by a cent.
@@ -24,6 +49,8 @@ for no sale.
 ## Mark something out of stock
 
 **Inventory → find the size → `−` until it reads 0**
+
+(Or open the product, **Variants** tab, and set the number directly.)
 
 That size greys out on the product page with a line through it. When every size
 in a colour is gone, the colour swatch is struck through too. When everything is
@@ -130,6 +157,27 @@ For **redirect**, paste the address your developer gives you into **Create URL**
 > provider's job, and keeping it that way keeps your site out of card-security
 > compliance entirely. Your developer will want
 > [CHECKOUT.md](CHECKOUT.md).
+
+---
+
+## Fix a size chart everywhere at once
+
+**Size charts → click one → edit the table → Save**
+
+Charts are shared. Nine products pointing at **tops** all update together, rather
+than nine copies of the same table drifting apart.
+
+Attach one on a product under **Fit & fabric → Use chart**.
+
+---
+
+## Find the API details
+
+**Developer docs** in the admin sidebar.
+
+The whole reference is in there — endpoints, data shapes, the database schema,
+and two prompts you can paste into an AI to have it build your backend or design
+your database. Every code block has a copy button.
 
 ---
 

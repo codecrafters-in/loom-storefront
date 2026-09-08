@@ -12,14 +12,30 @@ own backend by changing one environment variable.
 | Connect your own backend | **[API.md](API.md)** |
 | Take real payments | **[CHECKOUT.md](CHECKOUT.md)** |
 | Know the exact shape of every object | **[DATA-MODEL.md](DATA-MODEL.md)** |
+| Build your own database behind it | **[DATABASE.md](DATABASE.md)** |
 | Change colours, fonts, the logo | **[THEMING.md](THEMING.md)** |
 | Wire it to Odoo, Shopify, Medusa, WooCommerce | **[RECIPES.md](RECIPES.md)** |
 | Hand the whole spec to an AI and have it build the backend | **[INTEGRATION-PROMPT.md](INTEGRATION-PROMPT.md)** |
+| Have an AI design the database | **[SCHEMA-PROMPT.md](SCHEMA-PROMPT.md)** |
 | Understand the trust and conversion elements | **[CRO.md](CRO.md)** |
 | Run the back office, or build the write API | **[ADMIN.md](ADMIN.md)** |
 | Serve real traffic without melting | **[PERFORMANCE.md](PERFORMANCE.md)** |
 | Hand it to a merchant | **[USER-GUIDE.md](USER-GUIDE.md)** |
 | Understand an error you are seeing | **[ERRORS.md](ERRORS.md)** |
+
+## Three ways to run it
+
+| Mode | Database | Backend | Use when |
+| --- | --- | --- | --- |
+| `mock` | None — browser storage | None | Demos, design review, the public preview |
+| `api` | Someone else's | Odoo, Shopify, Medusa, WooCommerce | You already have a system of record |
+| `api` + your own | [This schema](DATABASE.md) | You build it, from the prompts | You are building the commerce backend too |
+
+One environment variable moves between them. Nothing above `src/lib/api/` knows
+which is running.
+
+The documentation is also served **inside the product**, at `/admin/docs` — the
+same files, rendered, with copy buttons on every prompt and code block.
 
 ## Quick start
 
@@ -30,6 +46,8 @@ npm run dev          # http://localhost:5173
 
 No database, no API key, no account. Twenty-four products, working cart,
 checkout and account, all in the browser.
+
+The back office is at **`/admin`** — demo credential `admin` / `admin`.
 
 ## How it fits together
 

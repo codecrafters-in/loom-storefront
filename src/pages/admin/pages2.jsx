@@ -96,6 +96,136 @@ export function Categories() {
   )
 }
 
+/* ── size charts ───────────────────────────────────────────────────────── */
+
+export function SizeCharts() {
+  const { data, loading, reload } = useAsync(() => api.listSizeCharts(), [])
+  const [editing, setEditing] = useState(null)
+  const { push } = useToast()
+
+  const save = async (e) => {
+    e.preventDefault()
+    try {
+      await api.adminSaveSizeChart(editing)
+      push('Size chart saved — every product using it updates')
+      setEditing(null)
+      reload()
+    } catch (err) {
+      push(err.message, { tone: 'error' })
+    }
+  }
+
+  const setCell = (r, c, v) =>
+    setEditing((ch) => ({
+      ...ch,
+      rows: ch.rows.map((row, i) => (i === r ? row.map((cell, k) => (k === c ? v : cell)) : row)),
+    }))
+
+  if (loading) return <Skeleton className="h-64 w-full" />
+
+  if (editing) {
+    return (
+      <form onSubmit={save} className="max-w-3xl">
+        <button type="button" onClick={() => setEditing(null)} className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted link-underline">
+          <Icon name="chevron-left" size={14} /> All charts
+        </button>
+        <h1 className="text-display-md">{editing.id}</h1>
+        <p className="mt-2 text-[13px] text-muted">
+          Garment measurements laid flat, not body measurements. Shared — every product pointing at
+          this chart shows the change.
+        </p>
+
+        <div className="mt-8 overflow-x-auto rounded-xs border border-line">
+          <table className="w-full border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-line bg-sunken/40 text-left">
+                {editing.columns.map((c, i) => (
+                  <th key={i} className="p-2">
+                    <input
+                      className="field h-8 font-medium"
+                      value={c}
+                      onChange={(e) => setEditing((ch) => ({ ...ch, columns: ch.columns.map((x, k) => (k === i ? e.target.value : x)) }))}
+                    />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {editing.rows.map((row, r) => (
+                <tr key={r} className="border-b border-line last:border-0">
+                  {row.map((cell, c) => (
+                    <td key={c} className="p-2">
+                      <input className="field h-8 tabular-nums" value={cell} onChange={(e) => setCell(r, c, e.target.value)} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 flex gap-3">
+          <Button size="sm" variant="quiet" icon="plus"
+            onClick={() => setEditing((ch) => ({ ...ch, rows: [...ch.rows, ch.columns.map(() => '')] }))}>
+            Add size
+          </Button>
+        </div>
+
+        <div className="mt-6 space-y-4">
+          <div>
+            <label htmlFor="unit" className="mb-1.5 block text-[13px] font-medium">Unit</label>
+            <select id="unit" className="field max-w-[10rem]" value={editing.unit}
+              onChange={(e) => setEditing((ch) => ({ ...ch, unit: e.target.value }))}>
+              <option value="cm">cm</option>
+              <option value="in">in</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="note" className="mb-1.5 block text-[13px] font-medium">Note</label>
+            <textarea id="note" rows={2} className="field" value={editing.note}
+              onChange={(e) => setEditing((ch) => ({ ...ch, note: e.target.value }))} />
+          </div>
+        </div>
+
+        <div className="mt-8 flex gap-3">
+          <Button as="button" type="submit">Save chart</Button>
+          <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
+        </div>
+      </form>
+    )
+  }
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-display-md">Size charts</h1>
+        <Button size="sm" icon="plus"
+          onClick={() => setEditing({ id: '', unit: 'cm', note: '', columns: ['Size', 'Chest', 'Length'], rows: [['S', '', ''], ['M', '', '']] })}>
+          New chart
+        </Button>
+      </div>
+      <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-muted">
+        Shared across products. Editing one here fixes it everywhere it is used, rather than nine
+        copies of the same table drifting apart.
+      </p>
+
+      <ul className="mt-8 grid gap-4 sm:grid-cols-2">
+        {(data?.items || []).map((c) => (
+          <li key={c.id}>
+            <button type="button" onClick={() => setEditing(structuredClone(c))}
+              className="w-full rounded-xs border border-line bg-surface p-5 text-left transition-colors hover:border-ink">
+              <p className="font-mono text-[13px] text-ink">{c.id}</p>
+              <p className="mt-1.5 text-[12px] text-faint">
+                {c.rows.length} sizes · {c.columns.slice(1).join(', ')} · {c.unit}
+              </p>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
 /* ── orders ────────────────────────────────────────────────────────────── */
 
 export function Orders() {

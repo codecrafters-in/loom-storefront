@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import api from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
 import { Button, Empty, Icon, Skeleton, Badge } from '../../components/ui/index.jsx'
 import { useToast } from '../../store/ToastContext.jsx'
-import { formatMoney, toMinor, toMajor } from '../../lib/money.js'
+import { formatMoney } from '../../lib/money.js'
 import Tour, { Hint } from '../../components/admin/Tour.jsx'
 
 /* ── overview ──────────────────────────────────────────────────────────── */
@@ -75,33 +75,22 @@ export function Overview() {
 
 export function Products() {
   const [q, setQ] = useState('')
-  const [editing, setEditing] = useState(null)
-  const { data, loading, reload } = useAsync(() => api.adminListProducts({ q, perPage: 200 }), [q])
-  const { push } = useToast()
-
-  const save = async (patch) => {
-    try {
-      await api.adminSaveProduct(patch)
-      push('Saved — refresh the storefront to see it')
-      setEditing(null)
-      reload()
-    } catch (err) {
-      push(err.message, { tone: 'error' })
-    }
-  }
-
-  if (editing) return <ProductEditor product={editing} onCancel={() => setEditing(null)} onSave={save} />
+  const { data, loading } = useAsync(() => api.adminListProducts({ q, perPage: 200 }), [q])
+  const navigate = useNavigate()
 
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-display-md">Products</h1>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search products"
-          className="field h-10 max-w-xs"
-        />
+        <div className="flex gap-3">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search products"
+            className="field h-10 max-w-xs"
+          />
+          <Button size="md" icon="plus" to="/admin/products/new" className="shrink-0">New</Button>
+        </div>
       </div>
 
       {loading ? (
@@ -122,7 +111,23 @@ export function Products() {
               {(data?.items || []).map((p) => {
                 const stock = p.variants.reduce((a, v) => a + v.inventory, 0)
                 return (
-                  <tr key={p.id} className="border-b border-line last:border-0">
+                  // The whole row opens the record. An Edit link at the end of a
+                  // row is a small target for something that is the only thing
+                  // anyone comes to this table to do.
+                  <tr
+                    key={p.id}
+                    onClick={() => navigate(`/admin/products/${p.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        navigate(`/admin/products/${p.id}`)
+                      }
+                    }}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Edit ${p.title}`}
+                    className="cursor-pointer border-b border-line transition-colors last:border-0 hover:bg-sunken/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+                  >
                     <td className="p-3">
                       <div className="flex items-center gap-3">
                         <div className="w-10 shrink-0">
@@ -139,10 +144,8 @@ export function Products() {
                     <td className="p-3">
                       {stock === 0 ? <Badge kind="sold-out" /> : p.badges?.[0] ? <Badge kind={p.badges[0]} /> : <span className="text-faint">—</span>}
                     </td>
-                    <td className="p-3 text-right">
-                      <button type="button" onClick={() => setEditing(p)} className="text-[13px] text-accent link-underline">
-                        Edit
-                      </button>
+                    <td className="p-3 text-right text-faint">
+                      <Icon name="chevron-right" size={16} />
                     </td>
                   </tr>
                 )
@@ -152,81 +155,6 @@ export function Products() {
         </div>
       )}
     </>
-  )
-}
-
-function ProductEditor({ product, onCancel, onSave }) {
-  const [form, setForm] = useState({
-    slug: product.slug,
-    id: product.id,
-    title: product.title,
-    subtitle: product.subtitle,
-    description: product.description,
-    price: toMajor(product.price),
-    compareAt: product.compareAtPrice ? toMajor(product.compareAtPrice) : '',
-  })
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-
-  const submit = (e) => {
-    e.preventDefault()
-    const price = { amount: toMinor(Number(form.price)), currency: product.price.currency }
-    onSave({
-      id: form.id,
-      slug: form.slug,
-      title: form.title,
-      subtitle: form.subtitle,
-      description: form.description,
-      price,
-      compareAtPrice: form.compareAt ? { amount: toMinor(Number(form.compareAt)), currency: product.price.currency } : null,
-      // Variant prices follow the product unless they were overridden. Leaving
-      // them behind is how a store ends up selling at last month's price.
-      variants: product.variants.map((v) => ({ ...v, price })),
-    })
-  }
-
-  return (
-    <form onSubmit={submit} className="max-w-2xl">
-      <button type="button" onClick={onCancel} className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted link-underline">
-        <Icon name="chevron-left" size={14} /> All products
-      </button>
-      <h1 className="text-display-md">{product.title}</h1>
-
-      <div className="mt-8 space-y-4">
-        <Field label="Title" value={form.title} onChange={set('title')} />
-        <Field label="Subtitle" value={form.subtitle} onChange={set('subtitle')} />
-        <div>
-          <label htmlFor="desc" className="mb-1.5 block text-[13px] font-medium">Description</label>
-          <textarea id="desc" rows={5} className="field" value={form.description} onChange={set('description')} />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Price" type="number" step="0.01" value={form.price} onChange={set('price')} />
-          <Field label="Compare at (optional)" type="number" step="0.01" value={form.compareAt} onChange={set('compareAt')} />
-        </div>
-        <p className="text-[12px] text-faint">
-          Stored as {formatMoney({ amount: toMinor(Number(form.price) || 0), currency: product.price.currency })}.
-          <Hint>
-            Type it the way you say it — 168 for $168.00. It is stored as an integer number of
-            cents so a total can never drift by a fraction of a penny. Saving also updates every
-            size and colour of this product.
-          </Hint>
-        </p>
-      </div>
-
-      <div className="mt-8 flex gap-3">
-        <Button as="button" type="submit">Save</Button>
-        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
-      </div>
-    </form>
-  )
-}
-
-function Field({ label, ...rest }) {
-  const id = label.toLowerCase().replace(/\W+/g, '-')
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1.5 block text-[13px] font-medium">{label}</label>
-      <input id={id} className="field" {...rest} />
-    </div>
   )
 }
 

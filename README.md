@@ -43,10 +43,27 @@ would want to change is data rather than code.
 
 ### Admin panel
 
-`/admin` is a working back office — products, inventory, categories, orders,
-storefront settings, import and export — and the reference implementation of the
-write API. In mock mode it writes to a local database that the storefront reads,
-so **an edit in admin shows on the shop immediately, with no publish step**.
+`/admin` — demo credential `admin` / `admin`.
+
+A working back office: a full product record editor (details, media, variant
+matrix, fit and fabric, categories), inventory, category tree, shared size
+charts, orders, storefront settings, import and export. It is also the reference
+implementation of the write API, so every documented endpoint has a screen
+proving it works.
+
+In mock mode it writes to a local database that the storefront reads, so **an
+edit in admin shows on the shop immediately, with no publish step**.
+
+The documentation is served inside it at `/admin/docs` — the same markdown
+files, rendered, with copy buttons on every prompt.
+
+### Three ways to run it
+
+| Mode | Database | Backend |
+| --- | --- | --- |
+| `mock` | None — browser storage | None |
+| `api` | Someone else's | Odoo, Shopify, Medusa, WooCommerce |
+| `api` + your own | [This schema](docs/DATABASE.md) | You build it, from the prompts |
 
 ### Documentation
 
@@ -63,8 +80,10 @@ so **an edit in admin shows on the shop immediately, with no publish step**.
 | [ADMIN.md](docs/ADMIN.md) | The back office and the write API |
 | [PERFORMANCE.md](docs/PERFORMANCE.md) | Bootstrap, caching, pagination, webhooks, scale |
 | [USER-GUIDE.md](docs/USER-GUIDE.md) | For whoever runs the shop — ten tasks, one screen each |
+| [DATABASE.md](docs/DATABASE.md) | PostgreSQL schema for running your own backend |
 | [ERRORS.md](docs/ERRORS.md) | Error codes and a debugging checklist |
 | **[INTEGRATION-PROMPT.md](docs/INTEGRATION-PROMPT.md)** | **Copy-paste prompt that has an AI build your backend** |
+| **[SCHEMA-PROMPT.md](docs/SCHEMA-PROMPT.md)** | **Copy-paste prompt that has an AI design your database** |
 
 ---
 
