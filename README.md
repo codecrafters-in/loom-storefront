@@ -41,6 +41,13 @@ that drives identity, currency, navigation, the entire home page,
 recommendations and checkout. Between the two, almost everything a merchant
 would want to change is data rather than code.
 
+### Admin panel
+
+`/admin` is a working back office — products, inventory, categories, orders,
+storefront settings, import and export — and the reference implementation of the
+write API. In mock mode it writes to a local database that the storefront reads,
+so **an edit in admin shows on the shop immediately, with no publish step**.
+
 ### Documentation
 
 | | |
@@ -53,6 +60,9 @@ would want to change is data rather than code.
 | [CRO.md](docs/CRO.md) | The trust and fit elements, and the research behind them |
 | [THEMING.md](docs/THEMING.md) | Palette, type, logo, brand assets, image ratios |
 | [RECIPES.md](docs/RECIPES.md) | Odoo, Shopify, Medusa, WooCommerce mappings |
+| [ADMIN.md](docs/ADMIN.md) | The back office and the write API |
+| [PERFORMANCE.md](docs/PERFORMANCE.md) | Bootstrap, caching, pagination, webhooks, scale |
+| [USER-GUIDE.md](docs/USER-GUIDE.md) | For whoever runs the shop — ten tasks, one screen each |
 | [ERRORS.md](docs/ERRORS.md) | Error codes and a debugging checklist |
 | **[INTEGRATION-PROMPT.md](docs/INTEGRATION-PROMPT.md)** | **Copy-paste prompt that has an AI build your backend** |
 
@@ -65,7 +75,8 @@ would want to change is data rather than code.
 | `/` | Home — hero, categories, new in, editorial, collections, bestsellers |
 | `/shop` · `/shop/:category` | Catalogue with faceted filters, sort and pagination |
 | `/collections/:slug` | A curated set, same grid |
-| `/product/:slug` | Gallery, colour and size pickers with per-variant stock, fit panel, size chart, fabric and certifications, reviews with fit data, related |
+| `/product/:slug` | Gallery, colour and size pickers with per-variant stock, fit panel, size chart, fabric and certifications, reviews with fit data, related, sticky buy bar |
+| `/admin/*` | Products, inventory, categories, orders, settings, import/export |
 | `/search?q=` | Free-text search |
 | `/cart` | Full bag, quantity, discount codes, free-shipping progress |
 | `/wishlist` | Saved items |
@@ -150,6 +161,15 @@ the API for that reason, and the reasoning is written up in
 
 **Requests are generation-guarded.** Change a filter twice quickly and the slow
 first response cannot overwrite the fast second one.
+
+**One request for the first screen.** `GET /bootstrap` returns settings,
+categories, collections and the home rails together — five sequential round
+trips become one. Reads then pass through a cache that de-duplicates in-flight
+requests and serves stale-while-revalidating; writes purge only the namespaces
+they could have touched. See [PERFORMANCE.md](docs/PERFORMANCE.md).
+
+**The demo catalogue is its own chunk.** In `api` mode those 34KB never leave
+the server.
 
 ---
 

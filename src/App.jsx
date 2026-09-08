@@ -24,6 +24,16 @@ const Search = lazy(() => import('./pages/Search.jsx'))
 const StaticPage = lazy(() => import('./pages/StaticPage.jsx'))
 const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 
+// The admin panel is a separate chunk. A shopper never downloads it.
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout.jsx'))
+const AdminOverview = lazy(() => import('./pages/admin/pages.jsx').then((m) => ({ default: m.Overview })))
+const AdminProducts = lazy(() => import('./pages/admin/pages.jsx').then((m) => ({ default: m.Products })))
+const AdminInventory = lazy(() => import('./pages/admin/pages.jsx').then((m) => ({ default: m.Inventory })))
+const AdminCategories = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Categories })))
+const AdminOrders = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Orders })))
+const AdminStorefront = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Storefront })))
+const AdminData = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Data })))
+
 const Loading = () => (
   <div className="wrap py-20">
     <Skeleton className="h-96 w-full" />
@@ -55,6 +65,16 @@ export default function App() {
                   <Route path="pages/:slug" element={<StaticPage />} />
                   <Route path="404" element={<NotFound />} />
                   <Route path="*" element={<Navigate to="/404" replace />} />
+                </Route>
+
+                <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<AdminOverview />} />
+                  <Route path="products" element={<AdminProducts />} />
+                  <Route path="inventory" element={<AdminInventory />} />
+                  <Route path="categories" element={<AdminCategories />} />
+                  <Route path="orders" element={<AdminOrders />} />
+                  <Route path="storefront" element={<AdminStorefront />} />
+                  <Route path="data" element={<AdminData />} />
                 </Route>
               </Routes>
             </Suspense>

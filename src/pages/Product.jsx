@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import api from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
@@ -27,12 +27,15 @@ export default function Product() {
     skip: config.features?.reviews === false,
   })
 
+  const [params, setParams] = useSearchParams()
   const [color, setColor] = useState(null)
   const [size, setSize] = useState(null)
   const [qty, setQty] = useState(1)
   const [shot, setShot] = useState(0)
   const [tab, setTab] = useState('details')
   const [chartOpen, setChartOpen] = useState(false)
+  const [showSticky, setShowSticky] = useState(false)
+  const buyRef = useRef(null)
 
   const { add, busy } = useCart()
   const { has, toggle } = useWishlist()
@@ -45,7 +48,22 @@ export default function Product() {
     () => product?.options.find((o) => o.name === 'Size')?.values || [],
     [product],
   )
-  const activeColor = color ?? colors[0]
+  /**
+   * Default to the first colour that is actually buyable.
+   *
+   * Falling back to `colors[0]` looks harmless until the first colourway sells
+   * out, at which point every visitor lands on a product where every size is
+   * struck through and concludes the whole thing is gone.
+   */
+  const firstInStock = useMemo(() => {
+    if (!product) return null
+    return (
+      colors.find((c) => product.variants.some((v) => v.options.Color === c && v.available)) ||
+      colors[0] ||
+      null
+    )
+  }, [product, colors])
+  const activeColor = color ?? firstInStock
 
   /** Which sizes are actually buyable in the chosen colour — greying these out
    *  is the difference between a picker and a guessing game. */
@@ -62,6 +80,66 @@ export default function Product() {
   const variant = product?.variants.find(
     (v) => v.options.Color === activeColor && v.options.Size === size,
   )
+
+  /** Which colours have nothing left at all — struck through rather than hidden. */
+  const colorSoldOut = useMemo(() => {
+    if (!product) return {}
+    return Object.fromEntries(
+      colors.map((c) => [c, !product.variants.some((v) => v.options.Color === c && v.available)]),
+    )
+  }, [product, colors])
+
+  /**
+   * Changing colour keeps the size when that size still exists in the new
+   * colour. Clearing it every time makes the picker feel like it is fighting
+   * you, and it is the most common thing to get wrong in a variant selector.
+   */
+  const pickColor = (c) => {
+    setColor(c)
+    const stillThere = product.variants.find(
+      (v) => v.options.Color === c && v.options.Size === size && v.available,
+    )
+    if (!stillThere) setSize(null)
+  }
+
+  // The selected variant lives in the URL, so a shared link, an ad or a
+  // back button all land on the exact colour and size that was chosen.
+  useEffect(() => {
+    if (!variant) return
+    const next = new URLSearchParams(params)
+    if (next.get('variant') === variant.id) return
+    next.set('variant', variant.id)
+    setParams(next, { replace: true })
+  }, [variant, params, setParams])
+
+  // Restore from the URL on first load.
+  useEffect(() => {
+    if (!product || color || size) return
+    const wanted = params.get('variant')
+    const found = product.variants.find((v) => v.id === wanted)
+    if (found) {
+      setColor(found.options.Color)
+      setSize(found.options.Size)
+    }
+  }, [product, params, color, size])
+
+  // The gallery follows the picker when a store ships per-colour photography.
+  useEffect(() => {
+    if (!variant?.imageId || !product) return
+    const i = product.images.findIndex((img) => img.id === variant.imageId)
+    if (i >= 0) setShot(i)
+  }, [variant, product])
+
+  // A sticky buy bar once the real one scrolls away — on a long product page
+  // the decision often happens next to the reviews, and walking back up to a
+  // button is where a phone shopper leaves.
+  useEffect(() => {
+    const el = buyRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined
+    const io = new IntersectionObserver(([e]) => setShowSticky(!e.isIntersecting), { threshold: 0 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [product])
 
   if (loading) return <ProductSkeleton />
   if (error) {
@@ -140,7 +218,11 @@ export default function Product() {
           <p className="mt-2 text-[15px] text-muted">{product.subtitle}</p>
 
           <div className="mt-5 flex flex-wrap items-center gap-4">
-            <Price price={product.price} compareAt={product.compareAtPrice} size="lg" />
+            <Price
+              price={variant?.price || product.price}
+              compareAt={variant?.compareAtPrice ?? product.compareAtPrice}
+              size="lg"
+            />
             <a href="#reviews" className="shrink-0">
               <Rating value={product.rating.average} count={product.rating.count} />
             </a>
@@ -154,19 +236,27 @@ export default function Product() {
               Colour: <span className="text-muted">{activeColor}</span>
             </legend>
             <div className="mt-3 flex flex-wrap gap-2.5">
-              {colors.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => { setColor(c); setSize(null) }}
-                  aria-pressed={c === activeColor}
-                  title={c}
-                  className={`h-9 w-9 rounded-full ring-1 ring-inset transition-shadow ${c === activeColor ? 'ring-2 ring-offset-2 ring-ink ring-offset-page' : 'ring-ink/15 hover:ring-muted'}`}
-                  style={{ background: product.swatches?.[c] || '#ddd' }}
-                >
-                  <span className="sr-only">{c}</span>
-                </button>
-              ))}
+              {colors.map((c) => {
+                const out = colorSoldOut[c]
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => pickColor(c)}
+                    aria-pressed={c === activeColor}
+                    title={out ? `${c} — sold out` : c}
+                    className={`relative grid h-11 w-11 place-items-center rounded-full ring-1 ring-inset transition-shadow ${
+                      c === activeColor
+                        ? 'ring-2 ring-offset-2 ring-ink ring-offset-page'
+                        : 'ring-ink/15 hover:ring-muted'
+                    } ${out ? 'opacity-45' : ''}`}
+                    style={{ background: product.swatches?.[c] || '#ddd' }}
+                  >
+                    <span className="sr-only">{c}{out ? ' (sold out)' : ''}</span>
+                    {out && <span aria-hidden="true" className="absolute h-[1.5px] w-8 -rotate-45 bg-ink/60" />}
+                  </button>
+                )
+              })}
             </div>
           </fieldset>
 
@@ -193,7 +283,7 @@ export default function Product() {
                     disabled={out}
                     onClick={() => setSize(s)}
                     aria-pressed={s === size}
-                    className={`relative h-11 min-w-[3.25rem] rounded-xs border px-3 text-sm transition-colors ${
+                    className={`relative h-12 min-w-[3.5rem] rounded-xs border px-3.5 text-sm transition-colors ${
                       out
                         ? 'cursor-not-allowed border-line text-faint'
                         : s === size
@@ -215,7 +305,7 @@ export default function Product() {
           </fieldset>
 
           {/* add */}
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <div ref={buyRef} className="mt-8 flex flex-wrap items-center gap-3">
             <QuantityStepper value={qty} onChange={setQty} max={variant?.inventory || 10} />
             <Button
               size="lg"
@@ -388,6 +478,43 @@ export default function Product() {
 
       <Promises />
       <SizeChartModal product={product} open={chartOpen} onClose={() => setChartOpen(false)} />
+
+      {/* Sticky buy bar. Appears only once the real one has scrolled away, so
+          it never competes with itself, and it repeats the selection so the bar
+          is never ambiguous about what it is about to add. */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-30 border-t border-line bg-page/95 backdrop-blur transition-transform duration-300 ${
+          showSticky ? 'translate-y-0' : 'translate-y-full'
+        }`}
+      >
+        <div className="wrap flex items-center gap-3 py-3">
+          <div className="hidden w-12 shrink-0 sm:block">
+            <div className="shot rounded-xs">
+              <img src={product.images[shot]?.url} alt="" loading="lazy" />
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-medium">{product.title}</p>
+            <p className="truncate text-[12px] text-faint">
+              {activeColor}
+              {size ? ` · ${size}` : ' · select a size'}
+            </p>
+          </div>
+          <Price price={variant?.price || product.price} compareAt={variant?.compareAtPrice ?? product.compareAtPrice} size="sm" className="hidden shrink-0 sm:inline-flex" />
+          <Button
+            size="md"
+            className="shrink-0"
+            disabled={!variant || busy}
+            onClick={() =>
+              variant
+                ? add(variant.id, qty, `${product.title} added to your bag`)
+                : buyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+          >
+            {!size ? 'Choose size' : !variant?.available ? 'Out of stock' : 'Add to bag'}
+          </Button>
+        </div>
+      </div>
     </>
   )
 }

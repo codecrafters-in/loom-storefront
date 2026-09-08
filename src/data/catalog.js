@@ -554,6 +554,11 @@ function build(raw) {
         compareAtPrice: compareAt ? { amount: compareAt, currency } : null,
         inventory,
         available: inventory > 0,
+        // Which shot to show when this variant is selected. The demo catalogue
+        // photographs one colourway, so every variant points at the same image;
+        // a real store sends the id of that colour's shot and the gallery
+        // follows the picker automatically.
+        imageId: `${raw.slug}-1`,
       })
     }
   }
@@ -572,8 +577,8 @@ function build(raw) {
     price: { amount: price, currency },
     compareAtPrice: compareAt ? { amount: compareAt, currency } : null,
     images: [
-      { url: `/images/products/${raw.slug}-1.jpg`, alt: `${raw.title} — ${raw.subtitle}`, width: 1200, height: 1500 },
-      { url: `/images/products/${raw.slug}-2.jpg`, alt: `${raw.title}, fabric detail`, width: 1200, height: 1500 },
+      { id: `${raw.slug}-1`, url: `/images/products/${raw.slug}-1.jpg`, alt: `${raw.title} — ${raw.subtitle}`, width: 900, height: 1125 },
+      { id: `${raw.slug}-2`, url: `/images/products/${raw.slug}-2.jpg`, alt: `${raw.title}, fabric detail`, width: 900, height: 1125 },
     ],
     options: [
       { name: 'Color', values: raw.colors.map(([n]) => n) },

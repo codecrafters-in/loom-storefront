@@ -53,11 +53,54 @@ fails with an opaque network error.
 { "items": [], "total": 128, "page": 1, "perPage": 12 }
 ```
 
+Clamp `per_page` server-side — 48 is a sensible ceiling. Above a few thousand
+products, also return `nextCursor` and accept `?cursor=`; offset pagination
+makes the database count and discard rows it will never send, and an insert
+between page loads shifts every row after it. Both can coexist; the theme uses
+whichever it is given. See [PERFORMANCE.md](PERFORMANCE.md#pagination).
+
 **Validation.** Every response is checked at the boundary
 (`src/lib/api/contracts.js`). A 200 with a missing `price` or an empty `variants`
 array throws a `ContractError` naming the endpoint and the field, because a
 wrong shape that passes silently surfaces three components later as a null
 dereference and takes an afternoon to trace.
+
+---
+
+## Bootstrap
+
+### `GET /bootstrap`
+
+Everything the first screen needs, in one request: settings, the category tree,
+collections, and the products for every home rail.
+
+```json
+{
+  "storefront": { },
+  "categories": [ /* Category tree */ ],
+  "collections": { "items": [], "total": 3 },
+  "rails": { "{\"sort\":\"newest\",\"category\":null,…}": [ /* Product[] */ ] },
+  "generatedAt": "2026-09-09T10:14:00.000Z"
+}
+```
+
+`rails` is keyed by a stable hash of each home section's `source`, computed by
+the same function on both sides (`src/lib/api/railKey.js`). Two sections with
+identical sources share one entry.
+
+**Optional.** Without it the theme makes the individual calls instead — so it is
+a pure performance win you can add at any point.
+
+Worth doing, though: without it the home page is five sequential round trips
+before anything is readable, and on a real backend each is its own connection,
+auth check and query plan. It is also cacheable at the CDN, because it contains
+nothing per-user:
+
+```
+Cache-Control: public, max-age=60, stale-while-revalidate=600
+```
+
+Details and the rest of the caching strategy: **[PERFORMANCE.md](PERFORMANCE.md)**.
 
 ---
 
@@ -435,6 +478,57 @@ these can be slow without the grid feeling slow.
 
 `POST /newsletter` with `{ email }` → `{ ok: true }`. Return
 `422 invalid_email` for a malformed address.
+
+---
+
+## Write API (admin)
+
+Namespaced under `/admin`, authenticated, and **never reachable with a
+storefront token**. Full guide, including the reference implementation at
+`/admin` in this repo: **[ADMIN.md](ADMIN.md)**.
+
+| Method | Route | Notes |
+| --- | --- | --- |
+| `GET` | `/admin/products?q=&page=&per_page=` | `{ items, total, page, perPage }` |
+| `POST` | `/admin/products` | Partial Product → Product |
+| `PATCH` | `/admin/products/:id` | Partial Product → Product |
+| `DELETE` | `/admin/products/:id` | |
+| `PATCH` | `/admin/variants/:id/inventory` | `{ quantity }` — set |
+| `POST` | `/admin/variants/:id/inventory` | `{ delta, reason?, operationId? }` — adjust |
+| `POST` | `/admin/categories` | `{ slug, name, parent, blurb }` |
+| `DELETE` | `/admin/categories/:slug` | Children are promoted to the deleted node's parent |
+| `PATCH` | `/admin/storefront` | Deep-merged; arrays replace |
+| `POST` | `/admin/import` | `{ mode, products, categories, collections, settings }` |
+| `GET` | `/admin/export` | The same shape |
+
+Two things that are easy to get wrong:
+
+- **Prefer the inventory delta over the set.** Two people adjusting the same SKU
+  with `set` silently overwrite each other; with a delta both land, and a
+  replayed webhook keyed on `operationId` is a safe no-op.
+- **A product price change must cascade to its variants** unless a variant has
+  an explicit override — or you sell at last month's price.
+
+`POST /admin/import` is what a nightly ERP dump should use. A thousand
+individual writes is a thousand transactions, a thousand cache purges, and a
+rate limit you will hit.
+
+---
+
+## Webhooks out
+
+Push changes to the storefront so it can purge rather than wait for a TTL:
+
+```
+POST https://your-store.example/api/revalidate
+{ "type": "product.updated", "slug": "merino-crew-knit", "at": "2026-09-09T…" }
+```
+
+`product.updated` · `product.deleted` · `inventory.updated` · `category.updated`
+· `settings.updated` · `order.paid` · `order.fulfilled`.
+
+Sign the payload and verify it — an unauthenticated revalidation endpoint is a
+free cache-flush attack.
 
 ---
 

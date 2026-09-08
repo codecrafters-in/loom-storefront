@@ -4,6 +4,8 @@ import useAsync from '../../hooks/useAsync.js'
 import ProductGrid from '../product/ProductGrid.jsx'
 import Promises from '../layout/Promises.jsx'
 import { Button, ErrorState, Icon } from '../ui/index.jsx'
+import { useBootstrap } from '../../store/StorefrontContext.jsx'
+import { railKey } from '../../lib/api/railKey.js'
 
 /**
  * The home page is data.
@@ -73,9 +75,11 @@ function SectionHead({ eyebrow, title, ctaLabel, ctaTo }) {
 }
 
 function CategoryStrip({ section }) {
-  const { data } = useAsync(() => api.listCategories(), [])
+  // Already in hand from the bootstrap call on almost every visit.
+  const { categories } = useBootstrap()
+  const { data } = useAsync(() => api.listCategories(), [], { skip: !!categories })
   const parent = section.source?.parent
-  const all = data?.items || []
+  const all = categories || data?.items || []
   const items = (parent ? all.find((c) => c.slug === parent)?.children || [] : all).slice(
     0,
     section.source?.limit || 6,
@@ -103,6 +107,9 @@ function CategoryStrip({ section }) {
 
 function ProductRail({ section }) {
   const src = section.source || {}
+  const { rails } = useBootstrap()
+  const prefetched = rails?.[railKey(src)]
+
   const { data, error, loading, reload } = useAsync(
     () =>
       api.listProducts({
@@ -113,7 +120,10 @@ function ProductRail({ section }) {
         perPage: src.limit || 4,
       }),
     [JSON.stringify(src)],
+    { skip: !!prefetched },
   )
+
+  const items = prefetched || data?.items || []
 
   return (
     <section className="wrap pb-16 md:pb-20">
@@ -122,7 +132,7 @@ function ProductRail({ section }) {
         {error ? (
           <ErrorState error={error} onRetry={reload} />
         ) : (
-          <ProductGrid products={data?.items || []} loading={loading} skeletonCount={src.limit || 4} />
+          <ProductGrid products={items} loading={loading && !prefetched} skeletonCount={src.limit || 4} />
         )}
       </div>
     </section>
@@ -155,8 +165,9 @@ function Editorial({ section }) {
 }
 
 function CollectionGrid({ section }) {
-  const { data } = useAsync(() => api.listCollections(), [])
-  const items = (data?.items || []).slice(0, section.source?.limit || 3)
+  const { collections } = useBootstrap()
+  const { data } = useAsync(() => api.listCollections(), [], { skip: !!collections })
+  const items = ((collections?.items ?? data?.items) || []).slice(0, section.source?.limit || 3)
   return (
     <section className="wrap py-16 md:py-20">
       <SectionHead {...section} />

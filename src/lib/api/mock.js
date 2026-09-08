@@ -15,10 +15,30 @@
  *    server-side, so the totals a designer sees here are the totals a customer
  *    will see later.
  */
-import { products, categories, collections } from '../../data/catalog.js'
-import { storefront } from '../../data/storefront.js'
+import * as db from '../db.js'
+import { railKey } from './railKey.js'
 import { config } from '../config.js'
 import { ApiError } from './contracts.js'
+
+/**
+ * The catalogue is read from the demo database, not from a static import.
+ *
+ * That indirection is what lets the admin panel write. `latency()` doubles as
+ * the point where this module picks up the current data — every endpoint awaits
+ * it already, so there is no separate "load" step to forget.
+ */
+let products = []
+let categories = []
+let collections = []
+let storefront = {}
+
+function adopt() {
+  products = db.getProducts()
+  categories = db.getCategories()
+  collections = db.getCollections()
+  storefront = db.getSettings()
+}
+db.subscribe(adopt)
 
 const CURRENCY = config.store.currency
 const KEY = {
@@ -29,8 +49,13 @@ const KEY = {
   customer: 'loom.customer',
 }
 
-const latency = () =>
-  new Promise((r) => setTimeout(r, config.mockLatency + Math.random() * config.mockLatency))
+async function latency() {
+  await db.ready()
+  adopt()
+  if (config.mockLatency > 0) {
+    await new Promise((r) => setTimeout(r, config.mockLatency + Math.random() * config.mockLatency))
+  }
+}
 
 function read(key, fallback) {
   try {
@@ -69,6 +94,10 @@ const SORTS = {
 
 export async function listProducts(query = {}) {
   await latency()
+  return listProductsSync(query)
+}
+
+function listProductsSync(query = {}) {
   const {
     category,
     collection,
@@ -236,8 +265,12 @@ export async function getRelated(slug, { limit = 4, strategy = 'automatic' } = {
  * which is what a database stores and an admin panel edits — and the nesting is
  * built here, once, on read.
  */
-export async function listCategories({ tree = true } = {}) {
+export async function listCategories(opts) {
   await latency()
+  return listCategoriesSync(opts)
+}
+
+function listCategoriesSync({ tree = true } = {}) {
   const decorate = (c) => ({
     slug: c.slug,
     name: c.name,
@@ -267,25 +300,69 @@ const countIn = (slug) => {
   return products.filter((p) => p.categories.some((c) => scope.has(c))).length
 }
 
-/** The whole theme configuration. Mock mode serves the bundled document. */
+/** The whole theme configuration. Mock mode serves the stored document. */
 export async function getStorefront() {
   await latency()
   return storefront
 }
 
-export async function listCollections() {
+/**
+ * Everything the first screen needs, in one response.
+ *
+ * A home page that fetches settings, then categories, then collections, then
+ * two product rails is five sequential round trips before anything is readable
+ * — and on a real backend each one is a fresh connection, a fresh auth check
+ * and a fresh database hit. Bundling them costs the server one query plan and
+ * saves the client four waterfalls.
+ *
+ * `rails` is derived from the configured home sections, so adding a rail in
+ * settings adds it to the bootstrap automatically rather than becoming a fifth
+ * request.
+ */
+export async function getBootstrap() {
   await latency()
+  const sections = (storefront.home || []).filter((s) => s.type === 'product-rail')
+  const rails = {}
+  for (const section of sections) {
+    const src = section.source || {}
+    const key = railKey(src)
+    if (rails[key]) continue
+    const { items } = await listProductsSync({
+      sort: src.sort || 'featured',
+      category: src.category,
+      collection: src.collection,
+      tags: src.tags,
+      perPage: src.limit || 4,
+    })
+    rails[key] = items
+  }
+  const cats = await listCategoriesSync()
   return {
-    items: collections.map((c) => ({
-      slug: c.slug,
-      title: c.title,
-      blurb: c.blurb,
-      image: { url: `/images/collections/${c.slug}.jpg`, alt: c.title },
-      count: c.productSlugs.length,
-    })),
-    total: collections.length,
+    storefront,
+    categories: cats.items,
+    collections: collectionsPublic(),
+    rails,
+    generatedAt: new Date().toISOString(),
   }
 }
+
+
+
+export async function listCollections() {
+  await latency()
+  return collectionsPublic()
+}
+
+const collectionsPublic = () => ({
+  items: collections.map((c) => ({
+    slug: c.slug,
+    title: c.title,
+    blurb: c.blurb,
+    image: { url: `/images/collections/${c.slug}.jpg`, alt: c.title },
+    count: c.productSlugs.length,
+  })),
+  total: collections.length,
+})
 
 /* ── reviews ───────────────────────────────────────────────────────────── */
 
@@ -664,6 +741,74 @@ export async function getDeliveryEstimate({ method = 'standard', country = 'US' 
     shipsToday,
     guaranteed: false,
   }
+}
+
+/* ── admin (write API) ─────────────────────────────────────────────────── */
+
+export async function adminListProducts({ q = '', page = 1, perPage = 25 } = {}) {
+  await latency()
+  const needle = q.trim().toLowerCase()
+  const all = needle
+    ? products.filter((p) => `${p.title} ${p.slug} ${p.tags.join(' ')}`.toLowerCase().includes(needle))
+    : products
+  const start = (page - 1) * perPage
+  return { items: all.slice(start, start + perPage).map(publicProduct), total: all.length, page, perPage }
+}
+
+export async function adminSaveProduct(patch) {
+  await latency()
+  return publicProduct(db.upsertProduct(patch))
+}
+
+export async function adminDeleteProduct(idOrSlug) {
+  await latency()
+  return db.deleteProduct(idOrSlug)
+}
+
+export async function adminSetInventory(variantId, quantity) {
+  await latency()
+  const v = db.setInventory(variantId, quantity)
+  if (!v) throw new ApiError('Unknown variant.', { status: 404, code: 'variant_not_found' })
+  return v
+}
+
+export async function adminAdjustInventory(variantId, delta) {
+  await latency()
+  const v = db.adjustInventory(variantId, delta)
+  if (!v) throw new ApiError('Unknown variant.', { status: 404, code: 'variant_not_found' })
+  return v
+}
+
+export async function adminSaveCategory(patch) {
+  await latency()
+  return db.upsertCategory(patch)
+}
+
+export async function adminDeleteCategory(slug) {
+  await latency()
+  return db.deleteCategory(slug)
+}
+
+export async function adminUpdateSettings(patch) {
+  await latency()
+  return db.updateSettings(patch)
+}
+
+export async function adminImport(payload) {
+  await latency()
+  return db.importCatalog(payload)
+}
+
+export async function adminExport() {
+  await latency()
+  return db.exportCatalog()
+}
+
+export async function adminReset() {
+  await latency()
+  await db.resetToSeed()
+  adopt()
+  return { ok: true }
 }
 
 export async function subscribe(email) {

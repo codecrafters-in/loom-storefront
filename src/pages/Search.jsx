@@ -3,10 +3,13 @@ import api from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
 import { Button, Empty, ErrorState } from '../components/ui/index.jsx'
-import { categories } from '../data/catalog.js'
+import { useBootstrap } from '../store/StorefrontContext.jsx'
 
 export default function Search() {
   const [params] = useSearchParams()
+  const { categories: booted } = useBootstrap()
+  const catTree = useAsync(() => api.listCategories(), [], { skip: !!booted })
+  const categories = booted || catTree.data?.items || []
   const q = params.get('q') || ''
   const { data, error, loading, reload } = useAsync(
     () => api.listProducts({ q, perPage: 24 }),

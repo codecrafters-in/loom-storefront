@@ -43,23 +43,43 @@ function fromEnv() {
 
 export function StorefrontProvider({ children }) {
   const [remote, setRemote] = useState(null)
-  const [ready, setReady] = useState(config.dataSource === 'mock')
+  const [boot, setBoot] = useState(null)
+  const [ready, setReady] = useState(false)
   const [error, setError] = useState(null)
 
+  /**
+   * One request for the first screen.
+   *
+   * `GET /bootstrap` returns settings, categories, collections and the home
+   * rails together. Without it the home page is five sequential round trips
+   * before anything is readable, and each one on a real backend is its own
+   * connection, auth check and query. If the endpoint is missing we fall back
+   * to `GET /storefront` and the individual calls, so this is a pure win that
+   * a backend can add whenever it likes.
+   */
   useEffect(() => {
     let alive = true
     api
-      .getStorefront()
-      .then((cfg) => alive && setRemote(cfg))
-      .catch((err) => {
+      .getBootstrap()
+      .then((data) => {
         if (!alive) return
-        setError(err)
-        // Loud in development, silent in production — a missing settings
-        // endpoint should not be a blank page for a shopper.
-        if (import.meta.env.DEV) {
-          console.warn('[storefront] falling back to bundled defaults:', err.message)
-        }
+        setBoot(data)
+        setRemote(data.storefront || null)
       })
+      .catch(() =>
+        api
+          .getStorefront()
+          .then((cfg) => alive && setRemote(cfg))
+          .catch((err) => {
+            if (!alive) return
+            setError(err)
+            // Loud in development, silent in production — a missing settings
+            // endpoint should not be a blank page for a shopper.
+            if (import.meta.env.DEV) {
+              console.warn('[storefront] falling back to bundled defaults:', err.message)
+            }
+          }),
+      )
       .finally(() => alive && setReady(true))
     return () => {
       alive = false
@@ -68,8 +88,18 @@ export function StorefrontProvider({ children }) {
 
   const value = useMemo(() => {
     const cfg = merge(merge(defaults, fromEnv()), remote)
-    return { config: cfg, ready, error, usingDefaults: !remote }
-  }, [remote, ready, error])
+    return {
+      config: cfg,
+      ready,
+      error,
+      usingDefaults: !remote,
+      // Prefetched by the bootstrap call. Components read these first and only
+      // fall back to their own request when the bootstrap did not include them.
+      categories: boot?.categories || null,
+      collections: boot?.collections || null,
+      rails: boot?.rails || null,
+    }
+  }, [remote, boot, ready, error])
 
   return <StorefrontContext.Provider value={value}>{children}</StorefrontContext.Provider>
 }
@@ -78,6 +108,16 @@ export function useStorefront() {
   const ctx = useContext(StorefrontContext)
   if (!ctx) throw new Error('useStorefront must be used inside <StorefrontProvider>.')
   return ctx.config
+}
+
+/** Bootstrap payload — categories, collections and prefetched home rails. */
+export function useBootstrap() {
+  const ctx = useContext(StorefrontContext)
+  return {
+    categories: ctx?.categories || null,
+    collections: ctx?.collections || null,
+    rails: ctx?.rails || null,
+  }
 }
 
 export function useStorefrontState() {

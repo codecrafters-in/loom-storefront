@@ -37,9 +37,11 @@ Deliver, in this order:
    product pages work off these alone.
 2. Cart and checkout.
 3. Account, orders, wishlist.
-4. The storefront configuration document.
+4. `GET /bootstrap` and `GET /storefront` — performance and settings.
+5. The `/admin/*` write endpoints, only if I want to manage the catalogue from
+   the storefront rather than from my own system.
 
-Each stage is independently useful. Do not try to do all four before I can see
+Each stage is independently useful. Do not try to do all five before I can see
 anything working.
 
 ## Non-negotiable rules
@@ -374,6 +376,39 @@ be logged as an error.
 
 `status`: `placed` `paid` `fulfilled` `delivered` `cancelled`.
 
+### Performance: one request for the first screen
+
+```
+GET /bootstrap
+→ {
+    storefront: {…},            // the settings document below
+    categories: [ Category ],   // the tree
+    collections: { items, total },
+    rails: { "<sourceKey>": [ Product ] },   // products for each home rail
+    generatedAt: "ISO"
+  }
+```
+
+Optional, and the highest-value optional thing here. Without it the home page is
+five sequential round trips before anything is readable; with it, one. It
+contains nothing per-user, so cache it at the CDN:
+
+```
+Cache-Control: public, max-age=60, stale-while-revalidate=600
+```
+
+`rails` is keyed by a JSON string of the rail's source with fields in this exact
+order — `{"sort":…,"category":…,"collection":…,"tags":…,"limit":…}` — because the
+client looks entries up by the same key.
+
+Also apply, on every response:
+
+- `Cache-Control: public, max-age=60, stale-while-revalidate=600` on catalogue reads
+- `Cache-Control: private, no-store` on cart, `/me` and orders — a cached bag is
+  how a shopper ends up looking at someone else's
+- Clamp `per_page` server-side. 48 is a sensible ceiling
+- Above a few thousand products, also return `nextCursor` and accept `?cursor=`
+
 ### Storefront configuration
 
 ```
@@ -384,8 +419,55 @@ Optional — if it 404s the theme uses its bundled defaults. It controls store
 name, logo, currency, navigation, the entire home page (as an ordered list of
 typed sections), recommendation strategy, checkout mode and feature flags.
 
-Build this last, and only if I want merchant-editable settings. If I do, ask me
-and I will paste the schema.
+If I want merchant-editable settings, ask me and I will paste the schema.
+
+### Write API — only if I ask for it
+
+If I want to manage the catalogue from the storefront rather than from my own
+system, expose these under `/admin`, authenticated, and **never reachable with a
+storefront token**:
+
+```
+GET    /admin/products?q=&page=&per_page=   → { items, total, page, perPage }
+POST   /admin/products                      → Product
+PATCH  /admin/products/:id                  → Product
+DELETE /admin/products/:id
+PATCH  /admin/variants/:id/inventory  { quantity }                    → Variant
+POST   /admin/variants/:id/inventory  { delta, reason?, operationId? } → Variant
+POST   /admin/categories              { slug, name, parent, blurb }
+DELETE /admin/categories/:slug
+PATCH  /admin/storefront
+POST   /admin/import   { mode: "merge"|"replace", products, categories, collections, settings }
+GET    /admin/export
+```
+
+Three rules on writes:
+
+1. **Prefer the inventory delta over the set.** Two people adjusting the same
+   SKU with `set` silently overwrite each other; with a delta both land, and a
+   replayed webhook keyed on `operationId` is a safe no-op.
+2. **A product price change must cascade to its variants** unless a variant has
+   an explicit override — or the store sells at last month's price.
+3. **Deleting a category promotes its children** to the deleted node's parent.
+   A tree with unreachable nodes is worse than a flat list.
+
+`POST /admin/import` is what a nightly dump from my system should use. A
+thousand individual writes is a thousand transactions and a rate limit I will
+hit. Chunk large catalogues and make each chunk idempotent.
+
+### Webhooks out
+
+When something changes in my system, POST to the storefront so it can purge
+rather than wait for a cache to expire:
+
+```
+POST <storefront>/api/revalidate
+{ "type": "product.updated", "slug": "…", "at": "ISO" }
+```
+
+`product.updated` `product.deleted` `inventory.updated` `category.updated`
+`settings.updated` `order.paid` `order.fulfilled`. Sign the payload — an
+unauthenticated revalidation endpoint is a free cache-flush attack.
 
 ## How to work
 
@@ -412,7 +494,7 @@ model onto this contract. Then write the code.
 
 Paste one of these under `MY SYSTEM` for a better first pass.
 
-**Odoo** — models are `product.template` (product), `product.product` (variant),
+**Odoo** — this is the most common case. Models are `product.template` (product), `product.product` (variant),
 `product.attribute` / `product.attribute.value` (options), `product.category`,
 `sale.order` (cart and order), `res.partner` (customer and addresses).
 `list_price` is a float — convert at the boundary. Expose via a controller in a

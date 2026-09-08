@@ -12,19 +12,24 @@
 import { config, assertConfig, isMock } from '../config.js'
 import * as mock from './mock.js'
 import * as http from './http.js'
+import { cached, dedupe, invalidate, keyOf, TTL } from './cache.js'
 
 assertConfig()
 
 const adapter = isMock ? mock : http
 
 const SURFACE = [
-  'getStorefront',
+  'getStorefront', 'getBootstrap',
   'listProducts', 'getProduct', 'getRelated', 'listCategories', 'listCollections', 'getReviews',
   'getCart', 'addToCart', 'updateCartLine', 'removeCartLine', 'applyDiscount', 'clearCart',
   'checkout', 'listOrders', 'getOrder',
   'login', 'register', 'logout', 'getMe', 'updateMe', 'saveAddress', 'deleteAddress',
   'getWishlist', 'addToWishlist', 'removeFromWishlist',
   'subscribe', 'getDeliveryEstimate',
+  'adminListProducts', 'adminSaveProduct', 'adminDeleteProduct',
+  'adminSetInventory', 'adminAdjustInventory',
+  'adminSaveCategory', 'adminDeleteCategory',
+  'adminUpdateSettings', 'adminImport', 'adminExport', 'adminReset',
 ]
 
 const missing = SURFACE.filter((name) => typeof adapter[name] !== 'function')
@@ -34,7 +39,63 @@ if (missing.length) {
   )
 }
 
-export const api = Object.fromEntries(SURFACE.map((name) => [name, adapter[name]]))
+/**
+ * Which reads are cacheable, and for how long.
+ *
+ * Anything not listed is passed straight through. Cart, orders and account are
+ * deliberately absent: they are per-user and change on every action, and a
+ * cached bag is how a shopper ends up looking at someone else's.
+ */
+const CACHEABLE = {
+  getBootstrap: TTL.bootstrap,
+  getStorefront: TTL.storefront,
+  listProducts: TTL.catalog,
+  listCategories: TTL.catalog,
+  listCollections: TTL.catalog,
+  getProduct: TTL.product,
+  getRelated: TTL.product,
+  getReviews: TTL.reviews,
+  getDeliveryEstimate: TTL.catalog,
+}
+
+/** A write to any of these drops the read namespaces it could have invalidated. */
+const PURGES = {
+  addToCart: [], updateCartLine: [], removeCartLine: [], applyDiscount: [], clearCart: [],
+  checkout: ['listProducts', 'getProduct', 'getBootstrap'],
+  adminSaveProduct: ['listProducts', 'getProduct', 'getRelated', 'getBootstrap', 'adminListProducts'],
+  adminDeleteProduct: ['listProducts', 'getProduct', 'getRelated', 'getBootstrap', 'adminListProducts'],
+  adminSetInventory: ['listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
+  adminAdjustInventory: ['listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
+  adminSaveCategory: ['listCategories', 'listProducts', 'getBootstrap'],
+  adminDeleteCategory: ['listCategories', 'listProducts', 'getBootstrap'],
+  adminUpdateSettings: ['getStorefront', 'getBootstrap'],
+  adminImport: null,   // null = purge everything
+  adminReset: null,
+}
+
+function wrap(name, fn) {
+  const ttl = CACHEABLE[name]
+  const purges = PURGES[name]
+
+  return async (...args) => {
+    if (ttl) return cached(keyOf(name, args), () => fn(...args), ttl)
+
+    // Uncached reads still de-duplicate — two components asking for the same
+    // cart at once should not produce two requests.
+    const result = purges === undefined
+      ? await dedupe(keyOf(name, args), () => fn(...args))
+      : await fn(...args)
+
+    if (purges === null) invalidate()
+    else if (purges) purges.forEach((prefix) => invalidate(prefix))
+    return result
+  }
+}
+
+export const api = Object.fromEntries(SURFACE.map((name) => [name, wrap(name, adapter[name])]))
+
+/** Escape hatch for a "refresh" button, and for tests. */
+export { invalidate, clearAll, stats as cacheStats } from './cache.js'
 export { ApiError, ContractError } from './contracts.js'
 export { config, isMock }
 export default api

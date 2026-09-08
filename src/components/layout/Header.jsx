@@ -4,7 +4,7 @@ import { Icon } from '../ui/index.jsx'
 import { useCart } from '../../store/CartContext.jsx'
 import { useWishlist } from '../../store/WishlistContext.jsx'
 import { useAuth } from '../../store/AuthContext.jsx'
-import { useStorefront } from '../../store/StorefrontContext.jsx'
+import { useStorefront, useBootstrap } from '../../store/StorefrontContext.jsx'
 import Logo from '../ui/Logo.jsx'
 import useAsync from '../../hooks/useAsync.js'
 import api from '../../lib/api/index.js'
@@ -21,7 +21,9 @@ export default function Header() {
   const { count: savedCount } = useWishlist()
   const { signedIn } = useAuth()
   const config = useStorefront()
-  const { data: cats } = useAsync(() => api.listCategories(), [])
+  const { categories: booted } = useBootstrap()
+  const { data: fetched } = useAsync(() => api.listCategories(), [], { skip: !!booted })
+  const cats = booted ? { items: booted } : fetched
   const [openMenu, setOpenMenu] = useState(null)
 
   const features = config.features || {}

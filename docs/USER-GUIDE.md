@@ -1,0 +1,171 @@
+# User guide
+
+For whoever runs the shop. Ten tasks, one screen each.
+
+> Everything here is at **`/admin`**. Changes are live immediately — there is no
+> publish button.
+
+---
+
+## Change a price
+
+**Products → find it → Edit → Price → Save**
+
+Type it the way you say it: `168` for $168.00. It is stored as an integer so it
+can never drift by a cent.
+
+Fill **Compare at** to show a strikethrough and a "−12%" badge. Leave it empty
+for no sale.
+
+> Saving a price updates every size and colour of that product.
+
+---
+
+## Mark something out of stock
+
+**Inventory → find the size → `−` until it reads 0**
+
+That size greys out on the product page with a line through it. When every size
+in a colour is gone, the colour swatch is struck through too. When everything is
+gone, the product shows **Sold out**.
+
+Use the **Low** and **Out of stock** filters to see what needs attention.
+
+> Stock moves by `+` and `−`, never by typing a number. If two people adjust the
+> same size at once, both adjustments land instead of one overwriting the other.
+
+---
+
+## Restock
+
+**Inventory → `+10`**, or `+` one at a time.
+
+---
+
+## Add a sub-category
+
+**Categories → New**
+
+- **Slug** — the bit in the web address. Lowercase, hyphens: `shirts-linen`
+- **Name** — what shoppers see: `Linen`
+- **Parent** — pick `Shirts` to nest it, or leave blank for a top-level one
+
+It appears in the menu under its parent straight away.
+
+> A parent shows everything underneath it. `/shop/shirts` includes Oxford, Linen
+> and Flannel without you filing anything twice.
+
+---
+
+## Rename the shop, change the logo
+
+**Storefront → Company profile**
+
+Store name changes the header, footer, browser tab and link previews. Leave
+**Logo image URL** empty to use the built-in mark; paste a URL to use your own.
+
+---
+
+## Change currency
+
+**Storefront → Pricing → Currency**
+
+Also set **Locale** so numbers and dates format the way your customers read
+them — `en-US`, `en-GB`, `en-IN`, `de-DE`.
+
+> Currency changes how prices are *displayed and formatted*. It does not convert
+> them. If you sell in more than one currency, your backend sends prices already
+> converted — a browser doing exchange rates is wrong the day the rate moves.
+
+---
+
+## Set the free-shipping threshold
+
+**Storefront → Pricing → Free shipping over**
+
+In the smallest unit — `15000` is $150.00. The figure under the box confirms it.
+
+This drives the "£28 away from free shipping" bar in the cart and the bag.
+
+---
+
+## Turn a feature off
+
+**Storefront → Features**
+
+Untick **Reviews** and every review disappears from the shop. Same for the
+wishlist, search, accounts and the newsletter box.
+
+> The pages stay reachable so old bookmarks and links do not break. Nothing on
+> the site points to them any more.
+
+---
+
+## Change what "You might also like" shows
+
+**Storefront → Recommendations → Strategy**
+
+| Choose | You get |
+| --- | --- |
+| **automatic** | Similar category, fabric and price. Good with no effort |
+| **same-category** | Anything from the same category |
+| **best-sellers** | Your most-reviewed products |
+| **manual** | Exactly what you pick per product |
+| **off** | The section disappears |
+
+---
+
+## Take real payments
+
+**Storefront → Checkout → Mode**
+
+- **demo** — places a fake order. What you have now
+- **redirect** — sends the customer to Stripe, Razorpay or whoever takes your
+  money. **This is what a real shop uses**
+- **api** — for invoicing, cash on delivery or wholesale terms
+
+For **redirect**, paste the address your developer gives you into **Create URL**.
+
+> The shop never asks for a card number and never should. That is the payment
+> provider's job, and keeping it that way keeps your site out of card-security
+> compliance entirely. Your developer will want
+> [CHECKOUT.md](CHECKOUT.md).
+
+---
+
+## Bulk update from another system
+
+**Import / export**
+
+**Download JSON** to back up everything. Feed the same file back through
+**Choose a file** and it merges by slug — existing products updated, new ones
+added, nothing deleted.
+
+If another system (an ERP, a spreadsheet, a warehouse) should push updates
+automatically, that is one call a night rather than a person clicking. Your
+developer wants [ADMIN.md](ADMIN.md#bulk).
+
+---
+
+## Before you go live
+
+- [ ] Real product photography (4:5 for products, 3:2 for collections, 16:9 hero)
+- [ ] **Size measurements on every product** — the single biggest cause of
+      returns is fit, and a measurement table is the cheapest fix there is
+      ([why](CRO.md))
+- [ ] Checkout switched off **demo**
+- [ ] Free-shipping threshold, returns window and delivery times correct
+- [ ] Store name, logo, support email
+- [ ] Export a backup
+
+---
+
+## Something looks wrong
+
+| Symptom | Usually |
+| --- | --- |
+| A change is not showing | Reload the shop tab. Settings are cached for a few minutes |
+| A product vanished from the shop | Every size is at 0. Check **Inventory → Out of stock** |
+| A category shows no products | Nothing is filed under it or its children yet |
+| Prices look wrong by 100× | Free-shipping threshold is in the smallest unit; product prices are not |
+| Everything is broken | **Import / export → Reset to demo data** starts fresh |

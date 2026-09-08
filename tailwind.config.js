@@ -20,6 +20,7 @@ export default {
         accent: 'rgb(var(--accent) / <alpha-value>)',
         'accent-ink': 'rgb(var(--accent-ink) / <alpha-value>)',
         'accent-soft': 'rgb(var(--accent-soft) / <alpha-value>)',
+        'accent-deep': 'rgb(var(--accent-deep) / <alpha-value>)',
         sale: 'rgb(var(--sale) / <alpha-value>)',
         good: 'rgb(var(--good) / <alpha-value>)',
       },

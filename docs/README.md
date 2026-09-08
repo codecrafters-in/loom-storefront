@@ -16,6 +16,9 @@ own backend by changing one environment variable.
 | Wire it to Odoo, Shopify, Medusa, WooCommerce | **[RECIPES.md](RECIPES.md)** |
 | Hand the whole spec to an AI and have it build the backend | **[INTEGRATION-PROMPT.md](INTEGRATION-PROMPT.md)** |
 | Understand the trust and conversion elements | **[CRO.md](CRO.md)** |
+| Run the back office, or build the write API | **[ADMIN.md](ADMIN.md)** |
+| Serve real traffic without melting | **[PERFORMANCE.md](PERFORMANCE.md)** |
+| Hand it to a merchant | **[USER-GUIDE.md](USER-GUIDE.md)** |
 | Understand an error you are seeing | **[ERRORS.md](ERRORS.md)** |
 
 ## Quick start
@@ -31,17 +34,21 @@ checkout and account, all in the browser.
 ## How it fits together
 
 ```
-                    ┌──────────────────────────────┐
-   components  ───► │  src/lib/api/index.js        │  one interface
-   and pages        │  (asserts both adapters match)│
-                    └───────────┬──────────────────┘
-                                │  VITE_DATA_SOURCE
-                    ┌───────────┴───────────┐
-                    ▼                       ▼
-            mock.js                     http.js
-      bundled catalogue            fetch → your server
-      + localStorage               + response validation
+  storefront ─┐
+              ├─► src/lib/api/index.js ─► cache + dedupe + SWR
+  /admin  ────┘        (one interface)          │
+                                                │  VITE_DATA_SOURCE
+                                    ┌───────────┴───────────┐
+                                    ▼                       ▼
+                                mock.js                  http.js
+                          local database            fetch → your server
+                          (src/lib/db.js)          + response validation
 ```
+
+The admin panel and the storefront use the same interface, so an edit in one is
+visible in the other with no publish step. Reads pass through a cache that
+de-duplicates in-flight requests and serves stale-while-revalidating; writes
+purge only the namespaces they could have touched.
 
 Nothing above `src/lib/api/` knows which adapter is running. That is the whole
 design: build and demo against the mock, then point it at production without
@@ -66,6 +73,9 @@ admin panel possible later without a rewrite now.
 | Categories and sub-categories | `GET /categories` |
 | Fit, fabric, size chart, certifications | `Product.fit` / `.fabric` / `.sizeChart` |
 | Payment marks, trust toggles, honest-scarcity thresholds | `trust` |
+
+All of it is editable at **`/admin`**, which is also the reference
+implementation of the write API — see [ADMIN.md](ADMIN.md).
 | "You might also like" strategy | `recommendations` |
 | Checkout mode and payment endpoint | `checkout` |
 | The reassurance strip | `promises` |

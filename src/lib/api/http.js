@@ -93,7 +93,8 @@ async function request(method, path, { query, body } = {}) {
 
 const get = (path, query) => request('GET', path, { query })
 const post = (path, body) => request('POST', path, { body })
-const patch = (path, body) => request('PATCH', path, { body })
+const patch_ = (path, body) => request('PATCH', path, { body })
+const patch = patch_
 const del = (path) => request('DELETE', path)
 
 /* ── catalogue ─────────────────────────────────────────────────────────── */
@@ -282,3 +283,31 @@ export const subscribe = (email) => post('/newsletter', { email })
 /** Optional. If the endpoint 404s the caller falls back to the shipping copy. */
 export const getDeliveryEstimate = ({ method = 'standard', country = 'US' } = {}) =>
   get('/delivery-estimate', { method, country })
+
+/**
+ * Everything the first screen needs, in one round trip.
+ *
+ * Optional: if the endpoint is missing the caller falls back to four separate
+ * requests, so this is a pure performance win you can add whenever. On a real
+ * backend it is the difference between one query plan and five connections,
+ * five auth checks and four waterfalls before the page is readable.
+ */
+export const getBootstrap = () => get('/bootstrap')
+
+/* ── admin (write API) ─────────────────────────────────────────────────── */
+
+export const adminListProducts = ({ q = '', page = 1, perPage = 25 } = {}) =>
+  get('/admin/products', { q, page, per_page: perPage })
+export const adminSaveProduct = (patch) =>
+  patch.id ? patch_(`/admin/products/${patch.id}`, patch) : post('/admin/products', patch)
+export const adminDeleteProduct = (id) => del(`/admin/products/${encodeURIComponent(id)}`)
+export const adminSetInventory = (variantId, quantity) =>
+  patch_(`/admin/variants/${encodeURIComponent(variantId)}/inventory`, { quantity })
+export const adminAdjustInventory = (variantId, delta) =>
+  post(`/admin/variants/${encodeURIComponent(variantId)}/inventory`, { delta })
+export const adminSaveCategory = (body) => post('/admin/categories', body)
+export const adminDeleteCategory = (slug) => del(`/admin/categories/${encodeURIComponent(slug)}`)
+export const adminUpdateSettings = (body) => patch_('/admin/storefront', body)
+export const adminImport = (body) => post('/admin/import', body)
+export const adminExport = () => get('/admin/export')
+export const adminReset = () => post('/admin/reset', {})

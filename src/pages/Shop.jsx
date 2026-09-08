@@ -5,8 +5,8 @@ import useAsync from '../hooks/useAsync.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
 import FilterPanel from '../components/shop/FilterPanel.jsx'
 import Promises from '../components/layout/Promises.jsx'
+import { useBootstrap } from '../store/StorefrontContext.jsx'
 import { Breadcrumbs, Button, Empty, ErrorState, Icon, Pagination } from '../components/ui/index.jsx'
-import { categories } from '../data/catalog.js'
 
 const SORTS = [
   ['featured', 'Featured'],
@@ -66,7 +66,16 @@ export default function Shop({ mode = 'category' }) {
 
   const category = mode === 'category' ? slug : undefined
   const collection = mode === 'collection' ? slug : undefined
-  const meta = categories.find((c) => c.slug === category)
+
+  // Category metadata comes from the API, not from a bundled catalogue —
+  // importing the demo data here shipped it to every visitor in api mode too.
+  const { categories: booted } = useBootstrap()
+  const catTree = useAsync(() => api.listCategories(), [], { skip: !!booted })
+  const flatCats = useMemo(() => {
+    const tree = booted || catTree.data?.items || []
+    return tree.flatMap((c) => [c, ...(c.children || [])])
+  }, [booted, catTree.data])
+  const meta = flatCats.find((c) => c.slug === category)
 
   const { data, error, loading, reload } = useAsync(
     () =>

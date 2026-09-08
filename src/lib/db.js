@@ -1,0 +1,264 @@
+/**
+ * The demo database.
+ *
+ * Mock mode used to read the catalogue straight out of `src/data/catalog.js`,
+ * which meant the storefront was read-only — there was nothing for an admin
+ * panel to write to. This is the seam that fixes that: one localStorage-backed
+ * store that both the storefront and the admin panel read and write, so an edit
+ * in admin is visible on the shop immediately, in the same tab and in every
+ * other tab.
+ *
+ * It is deliberately a *database*, not a React store. The mock API adapter
+ * queries it exactly the way the HTTP adapter queries a server, so nothing
+ * above `src/lib/api/` can tell which is running — including the admin panel,
+ * which talks to the same write endpoints a real backend would expose.
+ *
+ * In api mode this file is never touched.
+ */
+
+const KEY = 'loom.db'
+const VERSION = 3
+
+const listeners = new Set()
+let cache = null
+
+function nowIso() {
+  return new Date().toISOString()
+}
+
+/** Seeded once, then owned by the user. Bumping VERSION reseeds. */
+async function seed() {
+  const [{ products, categories, collections }, { storefront }] = await Promise.all([
+    import('../data/catalog.js'),
+    import('../data/storefront.js'),
+  ])
+  return {
+    version: VERSION,
+    seededAt: nowIso(),
+    products: products.map((p) => ({ ...p, updatedAt: nowIso() })),
+    categories: categories.map((c) => ({ ...c })),
+    collections: collections.map((c) => ({ ...c })),
+    settings: storefront,
+  }
+}
+
+function persist(next) {
+  cache = next
+  try {
+    localStorage.setItem(KEY, JSON.stringify(next))
+  } catch {
+    // Quota, private mode, or a catalogue larger than 5MB. The session still
+    // works from memory; it just will not survive a reload.
+  }
+  listeners.forEach((fn) => {
+    try {
+      fn(next)
+    } catch {
+      /* a bad subscriber must not break a write */
+    }
+  })
+  return next
+}
+
+/** Resolves once, then synchronous. Every caller awaits `ready()` first. */
+let readyPromise = null
+export function ready() {
+  if (cache) return Promise.resolve(cache)
+  if (readyPromise) return readyPromise
+  readyPromise = (async () => {
+    let stored = null
+    try {
+      stored = JSON.parse(localStorage.getItem(KEY) || 'null')
+    } catch {
+      stored = null
+    }
+    if (!stored || stored.version !== VERSION) {
+      // A schema change reseeds rather than migrating. This is demo data; a
+      // real backend migrates, and that is exactly why this file is demo-only.
+      return persist(await seed())
+    }
+    cache = stored
+    return cache
+  })()
+  return readyPromise
+}
+
+export function snapshot() {
+  return cache
+}
+
+export function subscribe(fn) {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
+}
+
+// Another tab wrote. Adopt it and tell this tab's listeners, so an admin open
+// beside the shop updates the shop live.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== KEY || !e.newValue) return
+    try {
+      cache = JSON.parse(e.newValue)
+      listeners.forEach((fn) => fn(cache))
+    } catch {
+      /* ignore a partial write from another tab */
+    }
+  })
+}
+
+/* ── reads ─────────────────────────────────────────────────────────────── */
+
+export const getProducts = () => cache?.products || []
+export const getCategories = () => cache?.categories || []
+export const getCollections = () => cache?.collections || []
+export const getSettings = () => cache?.settings || {}
+
+/* ── writes ────────────────────────────────────────────────────────────── */
+
+const uid = (p) => `${p}_${Math.random().toString(36).slice(2, 10)}`
+
+export function upsertProduct(patch) {
+  const products = getProducts().slice()
+  const i = products.findIndex((p) => p.id === patch.id || p.slug === patch.slug)
+  const next = { ...(i >= 0 ? products[i] : {}), ...patch, updatedAt: nowIso() }
+  if (!next.id) next.id = uid('prod')
+  if (i >= 0) products[i] = next
+  else products.unshift({ createdAt: nowIso(), ...next })
+  persist({ ...cache, products })
+  return next
+}
+
+export function deleteProduct(idOrSlug) {
+  const products = getProducts().filter((p) => p.id !== idOrSlug && p.slug !== idOrSlug)
+  persist({ ...cache, products })
+  return { ok: true }
+}
+
+/**
+ * Stock moves by delta, not by assignment.
+ *
+ * Two people adjusting the same SKU with `set` silently overwrite each other;
+ * with a delta both adjustments land. It is also the only shape that survives
+ * being replayed by a webhook retry without double-counting, because the caller
+ * can key on an operation id.
+ */
+export function adjustInventory(variantId, delta) {
+  const products = getProducts().map((p) => {
+    if (!p.variants.some((v) => v.id === variantId)) return p
+    return {
+      ...p,
+      updatedAt: nowIso(),
+      variants: p.variants.map((v) =>
+        v.id === variantId
+          ? { ...v, inventory: Math.max(0, v.inventory + delta), available: Math.max(0, v.inventory + delta) > 0 }
+          : v,
+      ),
+    }
+  })
+  persist({ ...cache, products })
+  return getProducts().flatMap((p) => p.variants).find((v) => v.id === variantId)
+}
+
+export function setInventory(variantId, quantity) {
+  const current = getProducts().flatMap((p) => p.variants).find((v) => v.id === variantId)
+  if (!current) return null
+  return adjustInventory(variantId, quantity - current.inventory)
+}
+
+export function upsertCategory(patch) {
+  const categories = getCategories().slice()
+  const i = categories.findIndex((c) => c.slug === patch.slug)
+  if (i >= 0) categories[i] = { ...categories[i], ...patch }
+  else categories.push(patch)
+  persist({ ...cache, categories })
+  return patch
+}
+
+export function deleteCategory(slug) {
+  // Children are promoted to the deleted node's parent rather than orphaned.
+  const target = getCategories().find((c) => c.slug === slug)
+  const categories = getCategories()
+    .filter((c) => c.slug !== slug)
+    .map((c) => (c.parent === slug ? { ...c, parent: target?.parent ?? null } : c))
+  persist({ ...cache, categories })
+  return { ok: true }
+}
+
+export function updateSettings(patch) {
+  const settings = deepMerge(getSettings(), patch)
+  persist({ ...cache, settings })
+  return settings
+}
+
+/** Arrays replace wholesale — see StorefrontContext for why. */
+function deepMerge(base, patch) {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return patch
+  const out = { ...base }
+  for (const [k, v] of Object.entries(patch)) {
+    out[k] = v && typeof v === 'object' && !Array.isArray(v) ? deepMerge(base?.[k] ?? {}, v) : v
+  }
+  return out
+}
+
+/* ── bulk ──────────────────────────────────────────────────────────────── */
+
+/**
+ * Import a catalogue. `mode: 'merge'` upserts by slug, `'replace'` swaps the
+ * whole set. This is the shape a nightly ERP dump wants, and the reason the
+ * write API documents a bulk endpoint rather than expecting a thousand POSTs.
+ */
+export function importCatalog({ products = [], categories = [], collections = [], settings, mode = 'merge' }) {
+  let next = { ...cache }
+  if (mode === 'replace') {
+    if (products.length) next.products = products
+    if (categories.length) next.categories = categories
+    if (collections.length) next.collections = collections
+  } else {
+    if (products.length) {
+      const bySlug = new Map(getProducts().map((p) => [p.slug, p]))
+      products.forEach((p) => bySlug.set(p.slug, { ...bySlug.get(p.slug), ...p, updatedAt: nowIso() }))
+      next.products = [...bySlug.values()]
+    }
+    if (categories.length) {
+      const bySlug = new Map(getCategories().map((c) => [c.slug, c]))
+      categories.forEach((c) => bySlug.set(c.slug, { ...bySlug.get(c.slug), ...c }))
+      next.categories = [...bySlug.values()]
+    }
+    if (collections.length) {
+      const bySlug = new Map(getCollections().map((c) => [c.slug, c]))
+      collections.forEach((c) => bySlug.set(c.slug, { ...bySlug.get(c.slug), ...c }))
+      next.collections = [...bySlug.values()]
+    }
+  }
+  if (settings) next.settings = deepMerge(next.settings, settings)
+  persist(next)
+  return {
+    products: next.products.length,
+    categories: next.categories.length,
+    collections: next.collections.length,
+  }
+}
+
+export function exportCatalog() {
+  return {
+    version: VERSION,
+    exportedAt: nowIso(),
+    products: getProducts(),
+    categories: getCategories(),
+    collections: getCollections(),
+    settings: getSettings(),
+  }
+}
+
+export async function resetToSeed() {
+  persist(await seed())
+  return cache
+}
+
+export default {
+  ready, snapshot, subscribe,
+  getProducts, getCategories, getCollections, getSettings,
+  upsertProduct, deleteProduct, adjustInventory, setInventory,
+  upsertCategory, deleteCategory, updateSettings,
+  importCatalog, exportCatalog, resetToSeed,
+}
