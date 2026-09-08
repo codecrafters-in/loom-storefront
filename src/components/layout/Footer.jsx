@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Icon } from '../ui/index.jsx'
-import { site } from '../../data/site.js'
 import api, { isMock } from '../../lib/api/index.js'
 import { useToast } from '../../store/ToastContext.jsx'
+import { useStorefront } from '../../store/StorefrontContext.jsx'
+import Logo from '../ui/Logo.jsx'
+import { config as envConfig } from '../../lib/config.js'
 
 export default function Footer() {
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const { push } = useToast()
+  const config = useStorefront()
 
   const submit = async (e) => {
     e.preventDefault()
@@ -24,19 +27,16 @@ export default function Footer() {
     }
   }
 
-  const cols = [
-    ['Shop', site.footer.shop],
-    ['Account', site.footer.account],
-    ['Help', site.footer.about],
-  ]
+  const cols = config.navigation?.footer || []
 
   return (
     <footer className="mt-24 border-t border-line bg-sunken/50">
       <div className="wrap grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
         <div>
-          <Link to="/" className="font-display text-2xl">{site.name}</Link>
-          <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-muted">{site.tagline}</p>
+          <Link to="/"><Logo config={config} size={26} /></Link>
+          <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-muted">{config.store?.tagline}</p>
 
+          {config.features?.newsletter !== false && (
           <form onSubmit={submit} className="mt-8 max-w-sm">
             <label htmlFor="newsletter" className="eyebrow">Letters, occasionally</label>
             <div className="mt-3 flex gap-2">
@@ -54,9 +54,10 @@ export default function Footer() {
               </Button>
             </div>
           </form>
+          )}
         </div>
 
-        {cols.map(([title, links]) => (
+        {cols.map(({ title, links }) => (
           <nav key={title} aria-label={title}>
             <h2 className="eyebrow">{title}</h2>
             <ul className="mt-5 space-y-3">
@@ -75,7 +76,7 @@ export default function Footer() {
       <div className="border-t border-line">
         <div className="wrap flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[12px] text-faint">
-            © {new Date().getFullYear()} {site.name}. A storefront theme by{' '}
+            © {new Date().getFullYear()} {config.store?.name}. A storefront theme by{' '}
             <a href="https://codecrafters.in" className="link-underline text-muted" target="_blank" rel="noreferrer">
               CodeCrafters
             </a>
@@ -89,7 +90,7 @@ export default function Footer() {
               {isMock ? 'demo data' : 'live api'}
             </span>
             <a
-              href={site.repoUrl}
+              href={envConfig.repoUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 text-[13px] text-muted transition-colors hover:text-ink"

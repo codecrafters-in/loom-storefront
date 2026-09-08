@@ -61,6 +61,37 @@ dereference and takes an afternoon to trace.
 
 ---
 
+## Storefront configuration
+
+### `GET /storefront`
+
+Returns the theme configuration document — identity, currency, navigation, the
+home page, recommendations, checkout. Full field reference in
+[CONFIGURATION.md](CONFIGURATION.md).
+
+**This endpoint is optional.** If it 404s or errors, the theme falls back to its
+bundled defaults and keeps working, so it is safe to add last. Everything it
+returns is optional too; omitted keys keep their defaults.
+
+```json
+{
+  "version": 1,
+  "store": { "name": "LOOM", "tagline": "…", "logo": { "wordmark": "LOOM" } },
+  "pricing": { "currency": "USD", "locale": "en-US", "currencies": [] },
+  "commerce": { "freeShippingOver": 15000, "shippingMethods": [], "countries": [] },
+  "features": { "wishlist": true, "reviews": true },
+  "navigation": { "primary": [], "footer": [], "announcement": { "messages": [] } },
+  "home": [{ "type": "hero", "title": "…" }],
+  "recommendations": { "strategy": "automatic", "limit": 4 },
+  "checkout": { "mode": "redirect", "createUrl": "…" },
+  "promises": []
+}
+```
+
+Cache it hard — it changes when a merchant saves settings, not per request.
+
+---
+
 ## Catalogue
 
 ### `GET /products`
@@ -134,9 +165,54 @@ dereference and takes an afternoon to trace.
   "tags": ["merino", "layering"],
   "rating": { "average": 4.8, "count": 302 },
   "badges": ["bestseller"],
-  "createdAt": "2026-02-14T00:00:00.000Z"
+  "createdAt": "2026-02-14T00:00:00.000Z",
+
+  "fit": {
+    "verdict": "true-to-size",
+    "feedback": { "small": 6, "true": 88, "large": 6 },
+    "sample": 302,
+    "note": "Fully fashioned, so it holds its shape. Take your usual size.",
+    "model": { "height": 175, "size": "S", "label": "5'9\"" }
+  },
+  "fabric": {
+    "composition": [["Extra-fine merino wool", 100]],
+    "weight": 260,
+    "weave": "12gg fully fashioned",
+    "origin": "Biella, Italy",
+    "certifications": ["Responsible Wool Standard", "OEKO-TEX Standard 100"]
+  },
+  "sizeChart": {
+    "id": "tops", "unit": "cm",
+    "note": "Measured flat, garment not body.",
+    "columns": ["Size", "Chest", "Length", "Shoulder", "Sleeve"],
+    "rows": [["XS", 96, 68, 43, 61], ["S", 102, 70, 45, 62]]
+  },
+  "social": { "unitsAvailable": 57, "boughtLast30Days": 168, "savedCount": 27 }
 }
 ```
+
+### The apparel blocks
+
+`fit`, `fabric`, `sizeChart` and `social` are optional, and they are the
+highest-value fields in the whole contract. Size and fit cause roughly two
+thirds of fashion returns; apparel return rates run 20–40%, the highest of any
+category. Reasoning and evidence: **[CRO.md](CRO.md)**.
+
+| Field | Notes |
+| --- | --- |
+| `fit.verdict` | `true-to-size` · `runs-small` · `runs-large` · `null` |
+| `fit.feedback` | Percentages summing to 100, **from purchasers**. Omit rather than invent |
+| `fit.sample` | How many responses the feedback is based on |
+| `fit.model` | `{ height (cm), size, label }`. Turns a photo into a scale reference |
+| `fabric.composition` | `[[material, percent], …]` |
+| `fabric.weight` | gsm. The field that decides drape and warmth |
+| `fabric.certifications` | Third-party marks only — OEKO-TEX, GOTS, RWS, GRS, LWG |
+| `sizeChart` | Garment measurements, laid flat. `columns` + `rows`, first column is the size |
+| `social` | Real counts only. Below a threshold the theme hides the block rather than showing a low number |
+
+> Every one of these degrades cleanly. Omit `fit` and the block disappears; omit
+> `sizeChart` and the picker links to the generic size guide instead. Nothing
+> breaks, so you can add them incrementally.
 
 Notes that matter in practice:
 
@@ -150,26 +226,81 @@ Notes that matter in practice:
   guess what "Ecru" looks like.
 - **`badges`** — `new` `sale` `bestseller` `low-stock` `sold-out`.
 
-### `GET /products/:slug/related?limit=4` → `{ items, total }`
+### `GET /products/:slug/related`
+
+| Query | Notes |
+| --- | --- |
+| `limit` | Default 4 |
+| `strategy` | Echoed from `recommendations.strategy` so you can honour it server-side |
+
+```json
+{ "items": [ /* Product */ ], "total": 12, "strategy": "automatic" }
+```
+
+Only called when `recommendations.strategy` is `api`; every other strategy is
+resolved without a request. Return fewer than `limit` and the theme tops the
+rail up from best-sellers rather than showing a short row.
 
 ### `GET /products/:slug/reviews?page=1&per_page=5`
 
 ```json
 {
   "items": [
-    { "id": "rev_1", "author": "Priya S.", "rating": 5, "body": "…",
-      "createdAt": "2026-08-28T00:00:00.000Z", "verified": true }
+    {
+      "id": "rev_1", "author": "Priya S.", "rating": 5,
+      "body": "The measurements on the size chart were accurate.",
+      "createdAt": "2026-08-28T00:00:00.000Z", "verified": true,
+      "size": "M", "height": "5'9\"", "fit": "true",
+      "photos": [{ "url": "…", "alt": "Customer photo" }]
+    }
   ],
   "total": 302,
   "summary": {
     "average": 4.8,
     "count": 302,
-    "breakdown": [{ "stars": 5, "count": 217 }, { "stars": 4, "count": 57 }]
+    "breakdown": [{ "stars": 5, "count": 217 }, { "stars": 4, "count": 57 }],
+    "fit": { "small": 6, "true": 88, "large": 6 },
+    "withPhotos": 34
   }
 }
 ```
 
-### `GET /categories` → `{ items: [{ slug, name, blurb, image, count }], total }`
+`size`, `height`, `fit` (`"small"` · `"true"` · `"large"`) and `photos` are what
+make a review useful on an apparel page rather than decorative. A five-star
+"lovely" is decoration; "bought M, 5'11\", runs small" is a fitting room.
+
+### `GET /categories`
+
+Returns a **tree**. `?tree=0` returns the flat list, which is what an admin
+panel wants.
+
+```json
+{
+  "items": [
+    {
+      "slug": "shirts", "name": "Shirts", "parent": null,
+      "blurb": "Poplin, oxford, and one very good linen.",
+      "image": { "url": "…", "alt": "Shirts" },
+      "count": 4,
+      "children": [
+        { "slug": "shirts-linen", "name": "Linen", "parent": "shirts",
+          "image": { "url": "…", "alt": "Linen" }, "count": 1 }
+      ]
+    }
+  ],
+  "total": 6
+}
+```
+
+Three rules the theme depends on:
+
+- **`count` on a parent includes its descendants.** Otherwise the menu offers
+  "Shirts (0)" while its children have stock.
+- **Filtering by a parent must include descendants.** `GET /products?category=shirts`
+  returns everything under Oxford, Linen and Flannel. Products only list their
+  leaf category, so this resolution has to happen server-side.
+- **Store flat, serve nested.** Keep `parent` on the row; build the tree on read.
+  Nesting in storage makes every reparent a structural migration.
 ### `GET /collections` → `{ items: [{ slug, title, blurb, image, count }], total }`
 
 ---
@@ -304,6 +435,30 @@ these can be slow without the grid feeling slow.
 
 `POST /newsletter` with `{ email }` → `{ ok: true }`. Return
 `422 invalid_email` for a malformed address.
+
+---
+
+## Delivery estimate
+
+### `GET /delivery-estimate?method=standard&country=US`
+
+```json
+{
+  "method": "standard",
+  "country": "US",
+  "arrivesAt": "2026-09-14T00:00:00.000Z",
+  "cutoff": "14:00 today",
+  "shipsToday": true,
+  "guaranteed": false
+}
+```
+
+Optional. If it 404s the product page falls back to the shipping copy.
+
+Worth implementing: a dated estimate — "Arrives Thursday 12 September" — is a
+fact a shopper can plan around, where "2–4 working days" is arithmetic they have
+to do themselves, and doing it is a moment to abandon. Count working days, and
+respect a same-day cutoff.
 
 ---
 

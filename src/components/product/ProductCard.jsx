@@ -70,6 +70,14 @@ export default function ProductCard({ product, priority = false, className = '' 
         </div>
         <p className="mt-1 text-[13px] text-faint">{product.subtitle}</p>
 
+        {/* One fit signal in the grid. Someone comparing eight products decides
+            which two to open here, and "runs small" is the fact that decides it. */}
+        {product.fit?.verdict && product.fit.verdict !== 'true-to-size' && (
+          <p className="mt-1.5 text-[12px] text-sale">
+            {product.fit.verdict === 'runs-small' ? 'Runs small' : 'Runs large'}
+          </p>
+        )}
+
         {colors.length > 0 && (
           <div className="mt-3 flex items-center gap-1.5">
             {colors.slice(0, 5).map((name) => (

@@ -5,6 +5,7 @@ import { ToastProvider } from './store/ToastContext.jsx'
 import { CartProvider } from './store/CartContext.jsx'
 import { WishlistProvider } from './store/WishlistContext.jsx'
 import { AuthProvider } from './store/AuthContext.jsx'
+import { StorefrontProvider } from './store/StorefrontContext.jsx'
 import Home from './pages/Home.jsx'
 import Shop from './pages/Shop.jsx'
 import Product from './pages/Product.jsx'
@@ -32,7 +33,8 @@ const Loading = () => (
 export default function App() {
   return (
     <ToastProvider>
-      <AuthProvider>
+      <StorefrontProvider>
+        <AuthProvider>
         <WishlistProvider>
           <CartProvider>
             <Suspense fallback={<Loading />}>
@@ -58,7 +60,8 @@ export default function App() {
             </Suspense>
           </CartProvider>
         </WishlistProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </StorefrontProvider>
     </ToastProvider>
   )
 }

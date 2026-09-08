@@ -1,13 +1,16 @@
 import { Icon } from '../ui/index.jsx'
-import { site } from '../../data/site.js'
+import { useStorefront } from '../../store/StorefrontContext.jsx'
 
 /** The reassurance strip. Sits above the footer on most pages because the
  *  objections it answers arrive late, not early. */
 export default function Promises({ className = '' }) {
+  const config = useStorefront()
+  const promises = config.promises || []
+  if (!promises.length) return null
   return (
     <section aria-label="Our promises" className={`border-y border-line bg-surface ${className}`}>
       <div className="wrap grid gap-8 py-10 sm:grid-cols-3">
-        {site.promises.map((p) => (
+        {promises.map((p) => (
           <div key={p.title} className="flex gap-3.5">
             <Icon name={p.icon} size={20} className="mt-0.5 shrink-0 text-accent" />
             <div>

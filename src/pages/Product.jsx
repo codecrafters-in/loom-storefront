@@ -8,20 +8,31 @@ import {
   Badge, Breadcrumbs, Button, Empty, ErrorState, Icon, Price, QuantityStepper, Rating, Skeleton,
 } from '../components/ui/index.jsx'
 import { useCart } from '../store/CartContext.jsx'
+import { useStorefront } from '../store/StorefrontContext.jsx'
 import { useWishlist } from '../store/WishlistContext.jsx'
-import { formatMoney } from '../lib/money.js'
+import { FitBlock, FabricBlock, SizeChartModal } from '../components/product/FitBlock.jsx'
+import TrustRow, { SocialProof } from '../components/product/TrustRow.jsx'
 
 export default function Product() {
   const { slug } = useParams()
   const { data: product, error, loading, reload } = useAsync(() => api.getProduct(slug), [slug])
-  const related = useAsync(() => api.getRelated(slug, 4), [slug])
-  const reviews = useAsync(() => api.getReviews(slug), [slug])
+  const config = useStorefront()
+  const recs = config.recommendations || {}
+  const related = useAsync(
+    () => api.getRelated(slug, { limit: recs.limit || 4, strategy: recs.strategy || 'automatic' }),
+    [slug, recs.strategy, recs.limit],
+    { skip: recs.strategy === 'off' },
+  )
+  const reviews = useAsync(() => api.getReviews(slug), [slug], {
+    skip: config.features?.reviews === false,
+  })
 
   const [color, setColor] = useState(null)
   const [size, setSize] = useState(null)
   const [qty, setQty] = useState(1)
   const [shot, setShot] = useState(0)
   const [tab, setTab] = useState('details')
+  const [chartOpen, setChartOpen] = useState(false)
 
   const { add, busy } = useCart()
   const { has, toggle } = useWishlist()
@@ -163,7 +174,13 @@ export default function Product() {
           <fieldset className="mt-7">
             <div className="flex items-baseline justify-between">
               <legend className="text-[13px] font-medium">Size</legend>
-              <Link to="/pages/size-guide" className="text-[12px] text-muted link-underline">Size guide</Link>
+              {product.sizeChart ? (
+                <button type="button" onClick={() => setChartOpen(true)} className="text-[12px] text-accent link-underline">
+                  Size chart
+                </button>
+              ) : (
+                <Link to="/pages/size-guide" className="text-[12px] text-muted link-underline">Size guide</Link>
+              )}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {sizes.map((s) => {
@@ -208,6 +225,7 @@ export default function Product() {
             >
               {!size ? 'Select a size' : !variant?.available ? 'Out of stock' : busy ? 'Adding…' : 'Add to bag'}
             </Button>
+            {config.features?.wishlist !== false && (
             <Button
               variant="quiet"
               size="lg"
@@ -218,12 +236,16 @@ export default function Product() {
             >
               <Icon name="heart" size={19} filled={saved} className={saved ? 'text-sale' : ''} />
             </Button>
+            )}
           </div>
 
-          <p className="mt-4 flex items-center gap-2 text-[13px] text-muted">
-            <Icon name="truck" size={16} className="text-accent" />
-            Free shipping over {formatMoney({ amount: 15000, currency: 'USD' })} · 30-day returns
-          </p>
+          <TrustRow />
+          {config.trust?.showSocialProof !== false && <SocialProof product={product} />}
+
+          {config.trust?.showFitFeedback !== false && (
+            <FitBlock product={product} onOpenChart={() => setChartOpen(true)} />
+          )}
+          <FabricBlock product={product} />
 
           {/* details */}
           <div className="mt-10 border-t border-line">
@@ -275,6 +297,7 @@ export default function Product() {
       </div>
 
       {/* reviews */}
+      {config.features?.reviews !== false && (
       <section id="reviews" className="border-t border-line bg-surface">
         <div className="wrap grid gap-10 py-16 md:grid-cols-[18rem_1fr]">
           <div>
@@ -285,7 +308,10 @@ export default function Product() {
                   <span className="font-display text-4xl">{reviews.data.summary.average}</span>
                   <Rating value={reviews.data.summary.average} showCount={false} size={15} />
                 </div>
-                <p className="mt-2 text-[13px] text-faint">{reviews.data.summary.count} reviews</p>
+                <p className="mt-2 text-[13px] text-faint">
+                  {reviews.data.summary.count} reviews
+                  {reviews.data.summary.withPhotos > 0 && ` · ${reviews.data.summary.withPhotos} with photos`}
+                </p>
                 <ul className="mt-6 space-y-1.5">
                   {reviews.data.summary.breakdown.map((b) => (
                     <li key={b.stars} className="flex items-center gap-2.5 text-[12px] text-faint">
@@ -320,16 +346,40 @@ export default function Product() {
                   </time>
                 </div>
                 <p className="mt-3 text-[14px] leading-relaxed text-muted">{r.body}</p>
+                {(r.size || r.height || r.fit) && (
+                  <p className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-faint">
+                    {r.size && <span>Bought size <span className="text-muted">{r.size}</span></span>}
+                    {r.height && <span>Height <span className="text-muted">{r.height}</span></span>}
+                    {r.fit && (
+                      <span>
+                        Fit{' '}
+                        <span className={r.fit === 'true' ? 'text-good' : 'text-muted'}>
+                          {r.fit === 'true' ? 'true to size' : `runs ${r.fit}`}
+                        </span>
+                      </span>
+                    )}
+                  </p>
+                )}
+                {r.photos?.length > 0 && (
+                  <ul className="mt-3 flex gap-2">
+                    {r.photos.map((ph, i) => (
+                      <li key={i} className="w-16">
+                        <div className="shot rounded-xs"><img src={ph.url} alt="Customer photo" loading="lazy" /></div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
         </div>
       </section>
+      )}
 
       {/* related */}
       {related.data?.items?.length > 0 && (
         <section className="wrap py-16">
-          <h2 className="text-display-md">You might also like</h2>
+          <h2 className="text-display-md">{recs.title || 'You might also like'}</h2>
           <div className="mt-8">
             <ProductGrid products={related.data.items} />
           </div>
@@ -337,6 +387,7 @@ export default function Product() {
       )}
 
       <Promises />
+      <SizeChartModal product={product} open={chartOpen} onClose={() => setChartOpen(false)} />
     </>
   )
 }

@@ -18,12 +18,13 @@ assertConfig()
 const adapter = isMock ? mock : http
 
 const SURFACE = [
+  'getStorefront',
   'listProducts', 'getProduct', 'getRelated', 'listCategories', 'listCollections', 'getReviews',
   'getCart', 'addToCart', 'updateCartLine', 'removeCartLine', 'applyDiscount', 'clearCart',
   'checkout', 'listOrders', 'getOrder',
   'login', 'register', 'logout', 'getMe', 'updateMe', 'saveAddress', 'deleteAddress',
   'getWishlist', 'addToWishlist', 'removeFromWishlist',
-  'subscribe',
+  'subscribe', 'getDeliveryEstimate',
 ]
 
 const missing = SURFACE.filter((name) => typeof adapter[name] !== 'function')

@@ -1,20 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import api from '../lib/api/index.js'
+import { startCheckout } from '../lib/checkout.js'
+import { useStorefront } from '../store/StorefrontContext.jsx'
 import { useCart } from '../store/CartContext.jsx'
 import { useAuth } from '../store/AuthContext.jsx'
 import { Button, Empty, Icon } from '../components/ui/index.jsx'
 import { formatMoney } from '../lib/money.js'
-
-const COUNTRIES = [
-  ['US', 'United States'], ['GB', 'United Kingdom'], ['IN', 'India'], ['CA', 'Canada'],
-  ['AU', 'Australia'], ['DE', 'Germany'], ['FR', 'France'], ['AE', 'United Arab Emirates'],
-]
-
-const SHIPPING = [
-  { id: 'standard', label: 'Standard', note: '2–4 working days', price: 1200 },
-  { id: 'express', label: 'Express', note: 'Next working day', price: 2400 },
-]
 
 /**
  * Checkout stops at the point where a payment provider would take over.
@@ -27,10 +18,13 @@ const SHIPPING = [
 export default function Checkout() {
   const { cart, refresh } = useCart()
   const { customer } = useAuth()
+  const config = useStorefront()
+  const COUNTRIES = config.commerce?.countries || [['US', 'United States']]
+  const SHIPPING = config.commerce?.shippingMethods || []
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
-  const [method, setMethod] = useState('standard')
+  const [method, setMethod] = useState(config.commerce?.shippingMethods?.[0]?.id || 'standard')
 
   const defaultAddress = customer?.addresses?.find((a) => a.isDefault) || customer?.addresses?.[0]
   const [form, setForm] = useState({
@@ -64,9 +58,20 @@ export default function Checkout() {
     setError(null)
     try {
       const { email, ...address } = form
-      const order = await api.checkout({ email, shippingAddress: address, shippingMethod: method })
+      const result = await startCheckout({
+        config,
+        cart,
+        email,
+        shippingAddress: address,
+        shippingMethod: method,
+      })
+      if (result.kind === 'redirect') {
+        // Hand the browser to the payment provider. Nothing after this runs.
+        window.location.assign(result.url)
+        return
+      }
       await refresh()
-      navigate(`/order/${order.id}`, { state: { order } })
+      navigate(`/order/${result.order.id}`, { state: { order: result.order } })
     } catch (err) {
       setError(err)
       setBusy(false)
@@ -78,13 +83,15 @@ export default function Checkout() {
       <form onSubmit={submit} className="max-w-xl">
         <h1 className="text-display-lg">Checkout</h1>
 
-        <p className="mt-5 flex items-start gap-2.5 rounded-xs border border-line bg-surface p-3.5 text-[13px] leading-relaxed text-muted">
-          <Icon name="info" size={16} className="mt-px shrink-0 text-accent" />
-          <span>
-            This is a demo. No payment is taken and no card details are collected — a real build
-            hands off to a payment provider at this point, so card data never touches the storefront.
-          </span>
-        </p>
+        {config.checkout?.mode === 'demo' && (
+          <p className="mt-5 flex items-start gap-2.5 rounded-xs border border-line bg-surface p-3.5 text-[13px] leading-relaxed text-muted">
+            <Icon name="info" size={16} className="mt-px shrink-0 text-accent" />
+            <span>
+              This is a demo. No payment is taken and no card details are collected — a real build
+              hands off to a payment provider at this point, so card data never touches the storefront.
+            </span>
+          </p>
+        )}
 
         <Section title="Contact">
           <Field label="Email" id="email" type="email" required value={form.email} onChange={set('email')} autoComplete="email" />
@@ -107,7 +114,9 @@ export default function Checkout() {
               </select>
             </div>
           </div>
-          <Field label="Phone (for delivery updates)" id="phone" type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" />
+          {config.checkout?.collectPhone !== false && (
+            <Field label="Phone (for delivery updates)" id="phone" type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" />
+          )}
         </Section>
 
         <Section title="Delivery">
@@ -146,7 +155,11 @@ export default function Checkout() {
         )}
 
         <Button as="button" type="submit" size="lg" full className="mt-8" disabled={busy}>
-          {busy ? 'Placing order…' : `Place order · ${formatMoney(cart.total)}`}
+          {busy
+            ? 'Just a moment…'
+            : config.checkout?.mode === 'redirect'
+              ? `Continue to payment · ${formatMoney(cart.total)}`
+              : `Place order · ${formatMoney(cart.total)}`}
         </Button>
         <Link to="/cart" className="mt-4 block text-center text-[13px] text-muted link-underline">
           Back to bag

@@ -27,13 +27,20 @@ const OUT = path.join(ROOT, 'public/images')
 const LOCK = path.join(ROOT, 'scripts/images.lock.json')
 const FORCE = process.argv.includes('--force')
 
-/** Product and category shots are 4:5; collections and editorial are wider. */
+/**
+ * Every shape carries the orientation to search for.
+ *
+ * This matters more than it looks: cropping a 3:2 banner out of a portrait
+ * photograph throws away most of the frame and usually decapitates the subject.
+ * Asking Unsplash for the right orientation up front means the crop is a trim,
+ * not a rescue.
+ */
 const SHAPES = {
-  product: { w: 900, h: 1125 },
-  category: { w: 640, h: 800 },
-  collection: { w: 1200, h: 800 },
-  hero: { w: 2400, h: 1350 },
-  editorial: { w: 1400, h: 1050 },
+  product: { w: 900, h: 1125, orientation: 'portrait' },      // 4:5,  .shot
+  category: { w: 640, h: 800, orientation: 'portrait' },      // 4:5,  .shot
+  collection: { w: 1200, h: 800, orientation: 'landscape' },  // 3:2,  aspect-[3/2]
+  hero: { w: 2400, h: 1350, orientation: 'landscape' },       // 16:9, full-bleed band
+  editorial: { w: 1400, h: 1050, orientation: 'landscape' },  // 4:3,  aspect-[4/3]
 }
 
 const jobs = []
@@ -43,14 +50,14 @@ for (const p of products) {
 }
 for (const c of categories) jobs.push({ key: `categories/${c.slug}`, query: c.imageQuery, shape: 'category' })
 for (const c of collections) jobs.push({ key: `collections/${c.slug}`, query: c.imageQuery, shape: 'collection' })
-jobs.push({ key: 'editorial/hero', query: 'fashion editorial two models neutral tones autumn coat', shape: 'hero' })
+jobs.push({ key: 'editorial/hero', query: 'fashion lookbook woman wool coat autumn street editorial wide', shape: 'hero' })
 jobs.push({ key: 'editorial/craft', query: 'tailor sewing machine workshop hands fabric', shape: 'editorial' })
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-async function search(query) {
+async function search(query, orientation = 'portrait') {
   const res = await fetch(
-    `https://unsplash.com/napi/search/photos?query=${encodeURIComponent(query)}&per_page=8&orientation=portrait`,
+    `https://unsplash.com/napi/search/photos?query=${encodeURIComponent(query)}&per_page=8&orientation=${orientation}`,
     { headers: { accept: 'application/json' } },
   )
   if (!res.ok) throw new Error(`search "${query}": ${res.status}`)
@@ -115,7 +122,7 @@ async function main() {
     }
 
     try {
-      const entry = lock[job.key] || (await search(job.query))
+      const entry = lock[job.key] || (await search(job.query, SHAPES[job.shape].orientation))
       const buf = await download(entry)
       await (await render(buf, job.shape)).toFile(file)
       const { size } = await fs.stat(file)

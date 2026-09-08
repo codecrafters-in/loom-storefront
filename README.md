@@ -36,6 +36,26 @@ component.
 **[docs/API.md](docs/API.md) is the whole specification.** If your server answers
 those routes with those shapes, this works.
 
+Alongside the data adapters sits a **configuration document** (`GET /storefront`)
+that drives identity, currency, navigation, the entire home page,
+recommendations and checkout. Between the two, almost everything a merchant
+would want to change is data rather than code.
+
+### Documentation
+
+| | |
+| --- | --- |
+| [docs/README.md](docs/README.md) | Index — start here |
+| [CONFIGURATION.md](docs/CONFIGURATION.md) | Every setting: menu, home page, currency, features |
+| [API.md](docs/API.md) | Endpoint reference |
+| [DATA-MODEL.md](docs/DATA-MODEL.md) | Every object shape |
+| [CHECKOUT.md](docs/CHECKOUT.md) | Payment integration, with Stripe and Razorpay examples |
+| [CRO.md](docs/CRO.md) | The trust and fit elements, and the research behind them |
+| [THEMING.md](docs/THEMING.md) | Palette, type, logo, brand assets, image ratios |
+| [RECIPES.md](docs/RECIPES.md) | Odoo, Shopify, Medusa, WooCommerce mappings |
+| [ERRORS.md](docs/ERRORS.md) | Error codes and a debugging checklist |
+| **[INTEGRATION-PROMPT.md](docs/INTEGRATION-PROMPT.md)** | **Copy-paste prompt that has an AI build your backend** |
+
 ---
 
 ## Pages
@@ -45,7 +65,7 @@ those routes with those shapes, this works.
 | `/` | Home — hero, categories, new in, editorial, collections, bestsellers |
 | `/shop` · `/shop/:category` | Catalogue with faceted filters, sort and pagination |
 | `/collections/:slug` | A curated set, same grid |
-| `/product/:slug` | Gallery, colour and size pickers with per-variant stock, tabs, reviews, related |
+| `/product/:slug` | Gallery, colour and size pickers with per-variant stock, fit panel, size chart, fabric and certifications, reviews with fit data, related |
 | `/search?q=` | Free-text search |
 | `/cart` | Full bag, quantity, discount codes, free-shipping progress |
 | `/wishlist` | Saved items |
@@ -121,6 +141,12 @@ payment webhook.
 
 **Filter state lives in the URL.** Shareable, bookmarkable, and survives the back
 button. None of which you get from `useState`.
+
+**The apparel fields are the point.** Size and fit cause roughly two thirds of
+fashion returns, and apparel return rates run 20–40% — the highest of any
+category. `fit`, `fabric`, `sizeChart` and per-review fit data all ship through
+the API for that reason, and the reasoning is written up in
+[CRO.md](docs/CRO.md) with sources.
 
 **Requests are generation-guarded.** Change a filter twice quickly and the slow
 first response cannot overwrite the fast second one.

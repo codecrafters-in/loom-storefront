@@ -54,13 +54,27 @@ Re-run `npm run images:force` to replace them with your own product photography.
 | `products/cashmere-crew-1.jpg` | mk. s | [u7bDk4SXVjI](https://unsplash.com/photos/u7bDk4SXVjI) |
 | `products/cashmere-crew-2.jpg` | Natalia Blauth | [TVLtAeDX0OM](https://unsplash.com/photos/TVLtAeDX0OM) |
 | `categories/shirts.jpg` | Andrej Lišakov | [2xxxl5-0Wvs](https://unsplash.com/photos/2xxxl5-0Wvs) |
+| `categories/shirts-oxford.jpg` | JSB Co. | [BrPofeAEDZA](https://unsplash.com/photos/BrPofeAEDZA) |
+| `categories/shirts-linen.jpg` | Toa Heftiba | [2XM9WVPmlfg](https://unsplash.com/photos/2XM9WVPmlfg) |
+| `categories/shirts-flannel.jpg` | Ramsés Cervantes | [m6KHFCK6XE8](https://unsplash.com/photos/m6KHFCK6XE8) |
 | `categories/knitwear.jpg` | Mathilde Langevin | [42_oWby6q_k](https://unsplash.com/photos/42_oWby6q_k) |
+| `categories/knitwear-sweaters.jpg` | Jason Hawke 🇨🇦 | [BE8WQ-pi8_A](https://unsplash.com/photos/BE8WQ-pi8_A) |
+| `categories/knitwear-cashmere.jpg` | mk. s | [u7bDk4SXVjI](https://unsplash.com/photos/u7bDk4SXVjI) |
+| `categories/knitwear-tees.jpg` | Mariia Berezovsky | [YUHTurnH7To](https://unsplash.com/photos/YUHTurnH7To) |
 | `categories/outerwear.jpg` | Hrant Khachatryan | [BSpC6OzxbvY](https://unsplash.com/photos/BSpC6OzxbvY) |
+| `categories/outerwear-coats.jpg` | Hrant Khachatryan | [BSpC6OzxbvY](https://unsplash.com/photos/BSpC6OzxbvY) |
+| `categories/outerwear-jackets.jpg` | Roberta Sant'Anna | [ujsAK_1ZVoA](https://unsplash.com/photos/ujsAK_1ZVoA) |
 | `categories/trousers.jpg` | Jason Hawke 🇨🇦 | [LK5Ud5yRuz4](https://unsplash.com/photos/LK5Ud5yRuz4) |
+| `categories/trousers-denim.jpg` | Jason Hawke 🇨🇦 | [LK5Ud5yRuz4](https://unsplash.com/photos/LK5Ud5yRuz4) |
+| `categories/trousers-tailored.jpg` | Ben Iwara | [4F8sABzb_7U](https://unsplash.com/photos/4F8sABzb_7U) |
+| `categories/trousers-casual.jpg` | JSB Co. | [HVUeGIvKao4](https://unsplash.com/photos/HVUeGIvKao4) |
 | `categories/dresses.jpg` | Karolina Grabowska | [LcgY2PQM6Kk](https://unsplash.com/photos/LcgY2PQM6Kk) |
 | `categories/accessories.jpg` | Karolina Grabowska | [YvLGVj-TckM](https://unsplash.com/photos/YvLGVj-TckM) |
-| `collections/new-season.jpg` | Natalia Blauth | [Ou_qAxGXgAw](https://unsplash.com/photos/Ou_qAxGXgAw) |
-| `collections/the-linen-edit.jpg` | Polina | [pUnZs0QlMc4](https://unsplash.com/photos/pUnZs0QlMc4) |
-| `collections/built-to-last.jpg` | Natalia Blauth | [0rU5RgM2PO8](https://unsplash.com/photos/0rU5RgM2PO8) |
-| `editorial/hero.jpg` | Leire Cavia | [5OPl5lGrI-I](https://unsplash.com/photos/5OPl5lGrI-I) |
-| `editorial/craft.jpg` | A. C. | [agCabGmmVgY](https://unsplash.com/photos/agCabGmmVgY) |
+| `categories/accessories-leather.jpg` | Kateryna Hliznitsova | [KhtAQVSt8c8](https://unsplash.com/photos/KhtAQVSt8c8) |
+| `categories/accessories-bags.jpg` | Alexander Mils | [AL9mw5tM3l8](https://unsplash.com/photos/AL9mw5tM3l8) |
+| `categories/accessories-cold.jpg` | mk. s | [u7bDk4SXVjI](https://unsplash.com/photos/u7bDk4SXVjI) |
+| `collections/new-season.jpg` | Pablo Merchán Montes | [OigjkRUIuGE](https://unsplash.com/photos/OigjkRUIuGE) |
+| `collections/the-linen-edit.jpg` | Andrej Lišakov | [yjt4n79iC5I](https://unsplash.com/photos/yjt4n79iC5I) |
+| `collections/built-to-last.jpg` | Getty Images | [rDwakev8tgU](https://unsplash.com/photos/rDwakev8tgU) |
+| `editorial/hero.jpg` | Getty Images | [hnDwVvHC4hU](https://unsplash.com/photos/hnDwVvHC4hU) |
+| `editorial/craft.jpg` | Getty Images | [6rzMUSoZO1o](https://unsplash.com/photos/6rzMUSoZO1o) |

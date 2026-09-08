@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from '../ui/index.jsx'
-import { site } from '../../data/site.js'
 import { useCart } from '../../store/CartContext.jsx'
 import { useWishlist } from '../../store/WishlistContext.jsx'
 import { useAuth } from '../../store/AuthContext.jsx'
+import { useStorefront } from '../../store/StorefrontContext.jsx'
+import Logo from '../ui/Logo.jsx'
+import useAsync from '../../hooks/useAsync.js'
+import api from '../../lib/api/index.js'
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -17,6 +20,24 @@ export default function Header() {
   const { count, setOpen } = useCart()
   const { count: savedCount } = useWishlist()
   const { signedIn } = useAuth()
+  const config = useStorefront()
+  const { data: cats } = useAsync(() => api.listCategories(), [])
+  const [openMenu, setOpenMenu] = useState(null)
+
+  const features = config.features || {}
+  // A nav entry with `categorySlug` pulls that category's children in as a
+  // submenu, so the menu never has to restate the category tree.
+  const primary = (config.navigation?.primary?.length
+    ? config.navigation.primary
+    : (cats?.items || []).map((c) => ({ label: c.name, categorySlug: c.slug }))
+  ).map((item) => {
+    const cat = item.categorySlug ? cats?.items.find((c) => c.slug === item.categorySlug) : null
+    return {
+      ...item,
+      to: item.to || (cat ? `/shop/${cat.slug}` : '/shop'),
+      children: item.children || cat?.children || [],
+    }
+  })
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -54,13 +75,18 @@ export default function Header() {
     <>
       {/* The demo needs to say it is a demo. On a real store this strip is where
           shipping or promo messaging goes. */}
-      <div className="bg-ink text-page">
-        <div className="wrap flex h-9 items-center justify-center gap-2 text-center font-mono text-[10px] uppercase tracking-[0.16em]">
-          <span className="hidden sm:inline">Free shipping over $150</span>
-          <span className="hidden sm:inline text-page/40">·</span>
-          <span>Demo store — no real orders are placed</span>
+      {config.navigation?.announcement?.messages?.length > 0 && (
+        <div className="bg-ink text-page">
+          <div className="wrap flex h-9 items-center justify-center gap-2 text-center font-mono text-[10px] uppercase tracking-[0.16em]">
+            {config.navigation.announcement.messages.map((m, i) => (
+              <span key={m} className={i > 0 ? 'hidden sm:flex sm:items-center sm:gap-2' : ''}>
+                {i > 0 && <span className="text-page/40">·</span>}
+                {m}
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <header
         className={`sticky top-0 z-30 border-b bg-page/90 backdrop-blur transition-shadow ${scrolled ? 'border-line shadow-[0_1px_0_rgb(var(--line))]' : 'border-transparent'}`}
@@ -75,25 +101,53 @@ export default function Header() {
             <Icon name="menu" size={20} />
           </button>
 
-          <Link to="/" className="font-display text-xl tracking-tight lg:text-2xl" aria-label={`${site.name} home`}>
-            {site.name}
+          <Link to="/" aria-label={`${config.store?.name} home`}>
+            <Logo config={config} />
           </Link>
 
-          <nav className="ml-8 hidden items-center gap-6 lg:flex" aria-label="Main">
-            {site.nav.map((item) => (
-              <NavLink
+          <nav className="ml-8 hidden items-center gap-1 lg:flex" aria-label="Main">
+            {primary.map((item) => (
+              <div
                 key={item.label}
-                to={item.to}
-                className={({ isActive }) =>
-                  `text-sm transition-colors hover:text-accent ${isActive ? 'text-accent' : 'text-ink'}`
-                }
+                className="relative"
+                onMouseEnter={() => setOpenMenu(item.label)}
+                onMouseLeave={() => setOpenMenu(null)}
               >
-                {item.label}
-              </NavLink>
+                <NavLink
+                  to={item.to}
+                  className={({ isActive }) =>
+                    `flex items-center gap-1 rounded-xs px-3 py-2 text-sm transition-colors hover:text-accent ${isActive ? 'text-accent' : 'text-ink'}`
+                  }
+                >
+                  {item.label}
+                  {item.children.length > 0 && <Icon name="chevron-down" size={13} className="text-faint" />}
+                </NavLink>
+
+                {item.children.length > 0 && openMenu === item.label && (
+                  <div className="absolute left-0 top-full w-56 pt-1">
+                    <ul className="rounded-xs border border-line bg-surface p-1.5 shadow-card">
+                      <li>
+                        <Link to={item.to} className="block rounded-xs px-3 py-2 text-[13px] font-medium hover:bg-sunken">
+                          All {item.label.toLowerCase()}
+                        </Link>
+                      </li>
+                      {item.children.map((c) => (
+                        <li key={c.slug}>
+                          <Link to={`/shop/${c.slug}`} className="flex items-baseline justify-between rounded-xs px-3 py-2 text-[13px] text-muted hover:bg-sunken hover:text-ink">
+                            {c.name}
+                            <span className="text-[11px] text-faint tabular-nums">{c.count}</span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             ))}
           </nav>
 
           <div className="ml-auto flex items-center gap-0.5">
+            {features.search !== false && (
             <form onSubmit={submit} className="hidden items-center md:flex">
               <label className="sr-only" htmlFor="site-search">Search products</label>
               <div className="relative">
@@ -108,19 +162,26 @@ export default function Header() {
                 />
               </div>
             </form>
+            )}
 
-            <button type="button" onClick={() => setSearchOpen((v) => !v)} aria-label="Search" className={`${iconBtn} md:hidden`}>
-              <Icon name="search" size={19} />
-            </button>
+            {features.search !== false && (
+              <button type="button" onClick={() => setSearchOpen((v) => !v)} aria-label="Search" className={`${iconBtn} md:hidden`}>
+                <Icon name="search" size={19} />
+              </button>
+            )}
 
-            <Link to="/wishlist" aria-label={`Saved items (${savedCount})`} className={iconBtn}>
-              <Icon name="heart" size={19} />
-              {savedCount > 0 && <Dot>{savedCount}</Dot>}
-            </Link>
+            {features.wishlist !== false && (
+              <Link to="/wishlist" aria-label={`Saved items (${savedCount})`} className={iconBtn}>
+                <Icon name="heart" size={19} />
+                {savedCount > 0 && <Dot>{savedCount}</Dot>}
+              </Link>
+            )}
 
-            <Link to={signedIn ? '/account' : '/login'} aria-label={signedIn ? 'Your account' : 'Sign in'} className={`${iconBtn} hidden sm:grid`}>
-              <Icon name="user" size={19} />
-            </Link>
+            {features.accounts !== false && (
+              <Link to={signedIn ? '/account' : '/login'} aria-label={signedIn ? 'Your account' : 'Sign in'} className={`${iconBtn} hidden sm:grid`}>
+                <Icon name="user" size={19} />
+              </Link>
+            )}
 
             <button type="button" onClick={() => setOpen(true)} aria-label={`Your bag (${count})`} className={iconBtn}>
               <Icon name="bag" size={19} />
@@ -156,17 +217,24 @@ export default function Header() {
         className={`fixed left-0 top-0 z-50 h-[100dvh] w-[min(84vw,20rem)] bg-page shadow-panel transition-transform lg:hidden ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <span className="font-display text-xl">{site.name}</span>
+          <Logo config={config} size={20} />
           <button type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu" className="text-muted hover:text-ink">
             <Icon name="close" size={20} />
           </button>
         </div>
-        <ul className="px-5 py-3">
-          {site.nav.map((item) => (
-            <li key={item.label}>
-              <Link to={item.to} className="block border-b border-line py-3.5 text-[15px]">
-                {item.label}
-              </Link>
+        <ul className="max-h-[calc(100dvh-8rem)] overflow-y-auto px-5 py-3">
+          {primary.map((item) => (
+            <li key={item.label} className="border-b border-line py-1">
+              <Link to={item.to} className="block py-3 text-[15px]">{item.label}</Link>
+              {item.children.length > 0 && (
+                <ul className="pb-2 pl-3">
+                  {item.children.map((c) => (
+                    <li key={c.slug}>
+                      <Link to={`/shop/${c.slug}`} className="block py-2 text-[13px] text-muted">{c.name}</Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
           <li>

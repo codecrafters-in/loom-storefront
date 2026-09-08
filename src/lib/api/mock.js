@@ -16,6 +16,7 @@
  *    will see later.
  */
 import { products, categories, collections } from '../../data/catalog.js'
+import { storefront } from '../../data/storefront.js'
 import { config } from '../config.js'
 import { ApiError } from './contracts.js'
 
@@ -85,7 +86,12 @@ export async function listProducts(query = {}) {
 
   let items = products.slice()
 
-  if (category) items = items.filter((p) => p.categories.includes(category))
+  if (category) {
+    // Filtering by a parent has to include its children, or /shop/shirts is
+    // empty while /shop/shirts-linen is not.
+    const scope = new Set(descendants(category))
+    items = items.filter((p) => p.categories.some((c) => scope.has(c)))
+  }
   if (collection) {
     const c = collections.find((x) => x.slug === collection)
     items = c ? items.filter((p) => c.productSlugs.includes(p.slug)) : []
@@ -108,6 +114,13 @@ export async function listProducts(query = {}) {
   const total = items.length
   const start = (page - 1) * perPage
 
+  const facetScope = category
+    ? products.filter((p) => {
+        const scope = new Set(descendants(category))
+        return p.categories.some((c) => scope.has(c))
+      })
+    : products
+
   return {
     items: items.slice(start, start + perPage).map(publicProduct),
     total,
@@ -115,7 +128,7 @@ export async function listProducts(query = {}) {
     perPage,
     // Facets are computed from the *unfiltered* set so a filter panel never
     // hides the option you would need to widen your own search.
-    facets: buildFacets(category ? products.filter((p) => p.categories.includes(category)) : products),
+    facets: buildFacets(facetScope),
   }
 }
 
@@ -148,33 +161,116 @@ export async function getProduct(slug) {
   return publicProduct(p)
 }
 
-export async function getRelated(slug, limit = 4) {
+/**
+ * Recommendations, by strategy.
+ *
+ * The strategy is configuration, not code — `storefront.recommendations` picks
+ * one, so a merchant can move from "same category" to a scored feed without a
+ * deploy. Every strategy falls back to best-sellers rather than returning an
+ * empty rail, because an empty rail looks broken and a slightly-off rail does
+ * not.
+ */
+export async function getRelated(slug, { limit = 4, strategy = 'automatic' } = {}) {
   await latency()
   const p = products.find((x) => x.slug === slug)
-  if (!p) return { items: [], total: 0 }
-  const scored = products
-    .filter((x) => x.slug !== slug)
-    .map((x) => ({
-      x,
-      score:
-        (x.categories.some((c) => p.categories.includes(c)) ? 3 : 0) +
-        x.tags.filter((t) => p.tags.includes(t)).length,
-    }))
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score || b.x.rating.count - a.x.rating.count)
-  return { items: scored.slice(0, limit).map((s) => publicProduct(s.x)), total: scored.length }
+  if (!p) return { items: [], total: 0, strategy }
+
+  const others = products.filter((x) => x.slug !== slug)
+  let ranked = []
+
+  switch (strategy) {
+    case 'off':
+      return { items: [], total: 0, strategy }
+
+    case 'manual':
+      ranked = (p.relatedSlugs || []).map((s) => others.find((x) => x.slug === s)).filter(Boolean)
+      break
+
+    case 'same-category':
+      ranked = others
+        .filter((x) => x.categories.some((c) => p.categories.includes(c)))
+        .sort((a, b) => b.rating.count - a.rating.count)
+      break
+
+    case 'best-sellers':
+      ranked = others.slice().sort((a, b) => b.rating.count - a.rating.count)
+      break
+
+    case 'automatic':
+    default: {
+      // Shared leaf category counts for more than a shared top-level one, and a
+      // shared fabric tag counts for more than either — "another merino thing"
+      // is a better suggestion than "another knit".
+      const scored = others
+        .map((x) => {
+          const shared = x.categories.filter((c) => p.categories.includes(c))
+          const leaf = shared.some((c) => categories.find((k) => k.slug === c)?.parent)
+          return {
+            x,
+            score:
+              (shared.length ? 2 : 0) +
+              (leaf ? 3 : 0) +
+              x.tags.filter((t) => p.tags.includes(t)).length * 2 +
+              (Math.abs(x.price.amount - p.price.amount) < 5000 ? 1 : 0),
+          }
+        })
+        .filter((s) => s.score > 0)
+        .sort((a, b) => b.score - a.score || b.x.rating.count - a.x.rating.count)
+      ranked = scored.map((s) => s.x)
+      break
+    }
+  }
+
+  if (ranked.length < limit) {
+    const seen = new Set([slug, ...ranked.map((x) => x.slug)])
+    ranked = ranked.concat(
+      others.filter((x) => !seen.has(x.slug)).sort((a, b) => b.rating.count - a.rating.count),
+    )
+  }
+
+  return { items: ranked.slice(0, limit).map(publicProduct), total: ranked.length, strategy }
 }
 
-export async function listCategories() {
+/**
+ * Categories come back as a tree. The source is flat with a `parent` pointer —
+ * which is what a database stores and an admin panel edits — and the nesting is
+ * built here, once, on read.
+ */
+export async function listCategories({ tree = true } = {}) {
   await latency()
-  return {
-    items: categories.map((c) => ({
-      ...c,
-      image: { url: `/images/categories/${c.slug}.jpg`, alt: c.name },
-      count: products.filter((p) => p.categories.includes(c.slug)).length,
-    })),
-    total: categories.length,
-  }
+  const decorate = (c) => ({
+    slug: c.slug,
+    name: c.name,
+    parent: c.parent ?? null,
+    blurb: c.blurb,
+    image: { url: `/images/categories/${c.slug}.jpg`, alt: c.name },
+    count: countIn(c.slug),
+  })
+
+  if (!tree) return { items: categories.map(decorate), total: categories.length }
+
+  const roots = categories.filter((c) => !c.parent)
+  const items = roots.map((r) => ({
+    ...decorate(r),
+    children: categories.filter((c) => c.parent === r.slug).map(decorate),
+  }))
+  return { items, total: items.length }
+}
+
+/** A parent's count includes everything filed under its children. */
+function descendants(slug) {
+  const kids = categories.filter((c) => c.parent === slug).map((c) => c.slug)
+  return [slug, ...kids.flatMap(descendants)]
+}
+const countIn = (slug) => {
+  const scope = new Set(descendants(slug))
+  return products.filter((p) => p.categories.some((c) => scope.has(c))).length
+}
+
+/** The whole theme configuration. Mock mode serves the bundled document. */
+export async function getStorefront() {
+  await latency()
+  return storefront
 }
 
 export async function listCollections() {
@@ -201,13 +297,18 @@ const BODIES = [
   'Fabric is genuinely lovely. Took one star off because delivery took a week longer than quoted.',
   'Sized up for a looser fit and it worked well. Would buy in another colour.',
   'Worth the money, which is not something I say often about a shirt.',
+  'Ordered two sizes and kept this one. The measurements on the size chart were accurate.',
+  'Washed it three times and it has not pilled. That is the whole reason I bought it.',
 ]
+const HEIGHTS = ['5\'4"', '5\'7"', '5\'9"', '5\'11"', '6\'0"', '6\'2"']
+const FIT_WORDS = ['small', 'true', 'large']
 
 export async function getReviews(slug, { page = 1, perPage = 5 } = {}) {
   await latency()
   const p = products.find((x) => x.slug === slug)
   if (!p) throw new ApiError('Unknown product.', { status: 404, code: 'not_found' })
   const n = Math.min(p.rating.count, 12)
+  const sizes = p.options.find((o) => o.name === 'Size')?.values || ['M']
   const items = Array.from({ length: n }, (_, i) => ({
     id: `rev_${slug}_${i}`,
     author: NAMES[(i * 3) % NAMES.length],
@@ -216,6 +317,12 @@ export async function getReviews(slug, { page = 1, perPage = 5 } = {}) {
     body: BODIES[(i * 5) % BODIES.length],
     createdAt: new Date(2026, 7, 28 - i * 3).toISOString(),
     verified: i % 4 !== 0,
+    // The fields that make a review useful on an apparel page rather than
+    // decorative: what they bought, how tall they are, how it fitted.
+    size: sizes[i % sizes.length],
+    height: p.fit?.model ? HEIGHTS[i % HEIGHTS.length] : null,
+    fit: FIT_WORDS[i % 9 === 0 ? 0 : i % 7 === 0 ? 2 : 1],
+    photos: i % 5 === 0 ? [p.images[1]] : [],
   }))
   const start = (page - 1) * perPage
   return {
@@ -228,6 +335,9 @@ export async function getReviews(slug, { page = 1, perPage = 5 } = {}) {
         stars,
         count: Math.round(p.rating.count * [0.72, 0.19, 0.05, 0.02, 0.02][5 - stars]),
       })),
+      // Aggregated from purchasers, not from the brand's own view of its cut.
+      fit: p.fit?.feedback || null,
+      withPhotos: items.filter((r) => r.photos.length).length,
     },
   }
 }
@@ -523,6 +633,38 @@ export async function removeFromWishlist(slug) {
 }
 
 /* ── misc ──────────────────────────────────────────────────────────────── */
+
+/**
+ * A concrete delivery date, not a range.
+ *
+ * "Arrives Thursday 12 September" is a commitment a shopper can plan around;
+ * "2–4 working days" is arithmetic they have to do themselves, and doing it is
+ * a moment to abandon. Working days only, skipping weekends.
+ */
+export async function getDeliveryEstimate({ method = 'standard', country = 'US' } = {}) {
+  await latency()
+  const days = method === 'express' ? 1 : 3
+  const cutoffHour = 14
+  const now = new Date()
+  const shipsToday = now.getHours() < cutoffHour
+
+  const arrive = new Date(now)
+  arrive.setDate(arrive.getDate() + (shipsToday ? 0 : 1))
+  let added = 0
+  while (added < days) {
+    arrive.setDate(arrive.getDate() + 1)
+    if (arrive.getDay() !== 0 && arrive.getDay() !== 6) added += 1
+  }
+
+  return {
+    method,
+    country,
+    arrivesAt: arrive.toISOString(),
+    cutoff: shipsToday ? `${cutoffHour}:00 today` : `${cutoffHour}:00 tomorrow`,
+    shipsToday,
+    guaranteed: false,
+  }
+}
 
 export async function subscribe(email) {
   await latency()

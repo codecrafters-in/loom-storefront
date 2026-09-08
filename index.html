@@ -3,21 +3,43 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#FAF8F5" />
+
     <title>LOOM — Considered clothing</title>
-    <meta
-      name="description"
-      content="A clothing storefront theme by CodeCrafters. Runs on bundled demo data, or on your own API by changing one environment variable."
-    />
+    <meta name="description" content="A clothing storefront theme by CodeCrafters. Runs on bundled demo data, or on your own API by changing one environment variable." />
+
+    <!-- Icons. The SVG is what modern browsers use; the PNGs are the fallback
+         path and the one iOS and Android launchers actually read. -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#FAF8F5" />
+    <meta name="color-scheme" content="light" />
+    <meta name="apple-mobile-web-app-title" content="LOOM" />
+
+    <!-- A shared link with no card gets a grey box. This is thirty seconds of
+         markup on every share, forever. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="LOOM" />
+    <meta property="og:title" content="LOOM — Considered clothing" />
+    <meta property="og:description" content="An open-source clothing storefront theme. Demo data out of the box, your API when you are ready." />
+    <meta property="og:image" content="/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-    />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="padding:3rem;font-family:system-ui;max-width:32rem;margin:auto;text-align:center">
+        <h1 style="font-size:1.5rem">LOOM</h1>
+        <p style="color:#6B645A">This storefront needs JavaScript enabled.</p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

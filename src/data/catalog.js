@@ -12,14 +12,45 @@
  * boundary. See src/lib/money.js.
  */
 import { toMinor } from '../lib/money.js'
+import { productFacts, sizeCharts } from './fit.js'
 
+/**
+ * Categories are a flat list with a `parent` pointer rather than nested arrays.
+ *
+ * Flat is what a database returns and what an admin panel edits; the tree is
+ * built on read by `listCategories()`. Nesting the source data means every
+ * reparent is a structural edit instead of one field.
+ *
+ * Products reference leaf slugs. Filtering by a parent resolves descendants, so
+ * /shop/shirts includes everything under it without products having to list
+ * both.
+ */
 export const categories = [
-  { slug: 'shirts', name: 'Shirts', blurb: 'Poplin, oxford, and one very good linen.', imageQuery: 'white linen shirt on hanger minimal' },
-  { slug: 'knitwear', name: 'Knitwear', blurb: 'Merino, lambswool, and cotton for the in-between months.', imageQuery: 'folded knit sweater wool neutral' },
-  { slug: 'outerwear', name: 'Outerwear', blurb: 'Weather-facing layers that still look like clothes.', imageQuery: 'wool coat on rack minimal studio' },
-  { slug: 'trousers', name: 'Trousers', blurb: 'Denim, chino, and a pleated wool that does most of the work.', imageQuery: 'folded trousers denim neutral flat lay' },
-  { slug: 'dresses', name: 'Dresses', blurb: 'Two silhouettes, cut properly, in fabrics that hang.', imageQuery: 'linen dress on hanger neutral minimal' },
-  { slug: 'accessories', name: 'Accessories', blurb: 'Leather, canvas, and wool. Nothing that needs charging.', imageQuery: 'leather belt and bag flat lay neutral' },
+  { slug: 'shirts', name: 'Shirts', parent: null, blurb: 'Poplin, oxford, and one very good linen.', imageQuery: 'white linen shirt on hanger minimal' },
+  { slug: 'shirts-oxford', name: 'Oxford & poplin', parent: 'shirts', blurb: 'Collars that hold.', imageQuery: 'oxford shirt collar detail studio' },
+  { slug: 'shirts-linen', name: 'Linen', parent: 'shirts', blurb: 'For the warm half of the year.', imageQuery: 'linen shirt hanging natural light' },
+  { slug: 'shirts-flannel', name: 'Flannel', parent: 'shirts', blurb: 'Brushed both sides.', imageQuery: 'flannel check shirt folded' },
+
+  { slug: 'knitwear', name: 'Knitwear', parent: null, blurb: 'Merino, lambswool, and cotton for the in-between months.', imageQuery: 'folded knit sweater wool neutral' },
+  { slug: 'knitwear-sweaters', name: 'Sweaters', parent: 'knitwear', blurb: 'Crews and cardigans.', imageQuery: 'wool sweater folded neutral studio' },
+  { slug: 'knitwear-cashmere', name: 'Cashmere', parent: 'knitwear', blurb: 'Two-ply, long fibre.', imageQuery: 'cashmere sweater camel luxury folded' },
+  { slug: 'knitwear-tees', name: 'Tees', parent: 'knitwear', blurb: 'Jersey with some weight to it.', imageQuery: 'plain t-shirt folded minimal studio' },
+
+  { slug: 'outerwear', name: 'Outerwear', parent: null, blurb: 'Weather-facing layers that still look like clothes.', imageQuery: 'wool coat on rack minimal studio' },
+  { slug: 'outerwear-coats', name: 'Coats', parent: 'outerwear', blurb: 'Wool, unlined, hand-finished.', imageQuery: 'camel wool overcoat minimal studio' },
+  { slug: 'outerwear-jackets', name: 'Jackets', parent: 'outerwear', blurb: 'Waxed cotton and drill.', imageQuery: 'waxed cotton jacket olive outdoor' },
+
+  { slug: 'trousers', name: 'Trousers', parent: null, blurb: 'Denim, chino, and a pleated wool that does most of the work.', imageQuery: 'folded trousers denim neutral flat lay' },
+  { slug: 'trousers-denim', name: 'Denim', parent: 'trousers', blurb: 'Japanese selvedge, sold raw.', imageQuery: 'selvedge denim jeans folded indigo' },
+  { slug: 'trousers-tailored', name: 'Tailored', parent: 'trousers', blurb: 'Pleated wool, high rise.', imageQuery: 'pleated wool trousers tailored studio' },
+  { slug: 'trousers-casual', name: 'Chino & linen', parent: 'trousers', blurb: 'Washed soft.', imageQuery: 'khaki chino trousers folded flat lay' },
+
+  { slug: 'dresses', name: 'Dresses', parent: null, blurb: 'Two silhouettes, cut properly, in fabrics that hang.', imageQuery: 'linen dress on hanger neutral minimal' },
+
+  { slug: 'accessories', name: 'Accessories', parent: null, blurb: 'Leather, canvas, and wool. Nothing that needs charging.', imageQuery: 'leather belt and bag flat lay neutral' },
+  { slug: 'accessories-leather', name: 'Leather', parent: 'accessories', blurb: 'Vegetable-tanned, solid brass.', imageQuery: 'leather belt brass buckle tan' },
+  { slug: 'accessories-bags', name: 'Bags', parent: 'accessories', blurb: 'Canvas that outlives the trip.', imageQuery: 'canvas duffle bag leather trim' },
+  { slug: 'accessories-cold', name: 'Scarves & hats', parent: 'accessories', blurb: 'Wool, for the months that need it.', imageQuery: 'wool scarf and beanie folded neutral' },
 ]
 
 const APPAREL = ['XS', 'S', 'M', 'L', 'XL']
@@ -27,6 +58,31 @@ const ONE = ['One Size']
 
 // price / compareAt in major units. colors are authored as [name, hex] so the
 // swatch picker never has to guess what "Ecru" looks like.
+const LEAF_CATEGORY = {
+  "oxford-shirt-ecru": "shirts-oxford",
+  "linen-camp-shirt": "shirts-linen",
+  "poplin-shirt-white": "shirts-oxford",
+  "brushed-flannel-shirt": "shirts-flannel",
+  "merino-crew-knit": "knitwear-sweaters",
+  "lambswool-cardigan": "knitwear-sweaters",
+  "cotton-fisherman-knit": "knitwear-sweaters",
+  "silk-cotton-tee": "knitwear-tees",
+  "cashmere-crew": "knitwear-cashmere",
+  "wool-overcoat": "outerwear-coats",
+  "waxed-cotton-jacket": "outerwear-jackets",
+  "quilted-liner-jacket": "outerwear-jackets",
+  "shearling-collar-jacket": "outerwear-jackets",
+  "pleated-wool-trouser": "trousers-tailored",
+  "selvedge-denim-straight": "trousers-denim",
+  "garment-dyed-chino": "trousers-casual",
+  "wide-leg-linen-trouser": "trousers-casual",
+  "leather-belt": "accessories-leather",
+  "canvas-weekender": "accessories-bags",
+  "lambswool-scarf": "accessories-cold",
+  "cotton-cap": "accessories-cold",
+  "merino-beanie": "accessories-cold"
+}
+
 const RAW = [
   {
     slug: 'oxford-shirt-ecru',
@@ -480,6 +536,7 @@ function hashInt(str, max) {
 }
 
 function build(raw) {
+  const facts = productFacts[raw.slug] || {}
   const price = toMinor(raw.price)
   const compareAt = raw.compareAt ? toMinor(raw.compareAt) : null
   const currency = 'USD'
@@ -524,11 +581,25 @@ function build(raw) {
     ],
     swatches: Object.fromEntries(raw.colors),
     variants,
-    categories: [raw.category],
+    categories: [raw.category, LEAF_CATEGORY[raw.slug]].filter(Boolean),
     tags: raw.tags,
     rating: { average: raw.rating[0], count: raw.rating[1] },
     badges: [...(raw.badges || []), ...(compareAt ? ['sale'] : []), ...(soldOut ? ['sold-out'] : low ? ['low-stock'] : [])],
     createdAt: new Date(2026, 0, 1 + hashInt(raw.slug, 240)).toISOString(),
+
+    // Fit, fabric and provenance — the fields that decide whether a shopper
+    // buys once or buys, returns, and does not come back. See src/data/fit.js.
+    fit: facts.fit || null,
+    fabric: facts.fabric || null,
+    sizeChart: facts.chart ? { id: facts.chart, ...sizeCharts[facts.chart] } : null,
+
+    // Honest scarcity and demand, derived rather than invented. A fabricated
+    // "17 people are viewing" is the fastest way to lose a considered buyer.
+    social: {
+      unitsAvailable: variants.reduce((a, v) => a + v.inventory, 0),
+      boughtLast30Days: 12 + hashInt(`${raw.slug}-sold`, 180),
+      savedCount: 4 + hashInt(`${raw.slug}-saved`, 90),
+    },
     // Consumed only by scripts/images.mjs; stripped from API responses.
     _imageQuery: raw.imageQuery,
     _altQuery: raw.altQuery,

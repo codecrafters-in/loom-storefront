@@ -269,29 +269,99 @@
     "credit": "Karolina Grabowska",
     "query": "leather belt and bag flat lay neutral"
   },
+  "categories/shirts-oxford": {
+    "id": "BrPofeAEDZA",
+    "credit": "JSB Co.",
+    "query": "oxford shirt collar detail studio"
+  },
+  "categories/shirts-linen": {
+    "id": "2XM9WVPmlfg",
+    "credit": "Toa Heftiba",
+    "query": "linen shirt hanging natural light"
+  },
+  "categories/shirts-flannel": {
+    "id": "m6KHFCK6XE8",
+    "credit": "Ramsés Cervantes",
+    "query": "flannel check shirt folded"
+  },
+  "categories/knitwear-sweaters": {
+    "id": "BE8WQ-pi8_A",
+    "credit": "Jason Hawke 🇨🇦",
+    "query": "wool sweater folded neutral studio"
+  },
+  "categories/knitwear-cashmere": {
+    "id": "u7bDk4SXVjI",
+    "credit": "mk. s",
+    "query": "cashmere sweater camel luxury folded"
+  },
+  "categories/knitwear-tees": {
+    "id": "YUHTurnH7To",
+    "credit": "Mariia Berezovsky",
+    "query": "plain t-shirt folded minimal studio"
+  },
+  "categories/outerwear-coats": {
+    "id": "BSpC6OzxbvY",
+    "credit": "Hrant Khachatryan",
+    "query": "camel wool overcoat minimal studio"
+  },
+  "categories/outerwear-jackets": {
+    "id": "ujsAK_1ZVoA",
+    "credit": "Roberta Sant'Anna",
+    "query": "waxed cotton jacket olive outdoor"
+  },
+  "categories/trousers-denim": {
+    "id": "LK5Ud5yRuz4",
+    "credit": "Jason Hawke 🇨🇦",
+    "query": "selvedge denim jeans folded indigo"
+  },
+  "categories/trousers-tailored": {
+    "id": "4F8sABzb_7U",
+    "credit": "Ben Iwara",
+    "query": "pleated wool trousers tailored studio"
+  },
+  "categories/trousers-casual": {
+    "id": "HVUeGIvKao4",
+    "credit": "JSB Co.",
+    "query": "khaki chino trousers folded flat lay"
+  },
+  "categories/accessories-leather": {
+    "id": "KhtAQVSt8c8",
+    "credit": "Kateryna Hliznitsova",
+    "query": "leather belt brass buckle tan"
+  },
+  "categories/accessories-bags": {
+    "id": "AL9mw5tM3l8",
+    "credit": "Alexander Mils",
+    "query": "canvas duffle bag leather trim"
+  },
+  "categories/accessories-cold": {
+    "id": "u7bDk4SXVjI",
+    "credit": "mk. s",
+    "query": "wool scarf and beanie folded neutral"
+  },
   "collections/new-season": {
-    "id": "Ou_qAxGXgAw",
-    "credit": "Natalia Blauth",
+    "id": "OigjkRUIuGE",
+    "credit": "Pablo Merchán Montes",
     "query": "autumn fashion editorial neutral tones model coat"
   },
   "collections/the-linen-edit": {
-    "id": "pUnZs0QlMc4",
-    "credit": "Polina",
+    "id": "yjt4n79iC5I",
+    "credit": "Andrej Lišakov",
     "query": "linen clothing editorial natural light neutral"
   },
   "collections/built-to-last": {
-    "id": "0rU5RgM2PO8",
-    "credit": "Natalia Blauth",
+    "id": "rDwakev8tgU",
+    "credit": "Getty Images",
     "query": "workwear durable clothing detail stitching editorial"
   },
-  "editorial/hero": {
-    "id": "5OPl5lGrI-I",
-    "credit": "Leire Cavia",
-    "query": "fashion editorial two models neutral tones autumn coat"
-  },
   "editorial/craft": {
-    "id": "agCabGmmVgY",
-    "credit": "A. C.",
+    "id": "6rzMUSoZO1o",
+    "credit": "Getty Images",
     "query": "tailor sewing machine workshop hands fabric"
+  },
+  "editorial/hero": {
+    "id": "hnDwVvHC4hU",
+    "credit": "Getty Images",
+    "query": "fashion lookbook woman wool coat autumn street editorial wide"
   }
 }

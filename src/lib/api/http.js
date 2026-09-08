@@ -122,13 +122,22 @@ export async function getProduct(slug) {
   return assertProduct(await get(`/products/${encodeURIComponent(slug)}`), `GET /products/${slug}`)
 }
 
-export async function getRelated(slug, limit = 4) {
-  const res = await get(`/products/${encodeURIComponent(slug)}/related`, { limit })
+export async function getRelated(slug, { limit = 4, strategy = 'automatic' } = {}) {
+  const res = await get(`/products/${encodeURIComponent(slug)}/related`, { limit, strategy })
   return assertList(res, `GET /products/${slug}/related`)
 }
 
-export async function listCategories() {
-  return assertList(await get('/categories'), 'GET /categories')
+export async function listCategories({ tree = true } = {}) {
+  return assertList(await get('/categories', { tree: tree ? 1 : 0 }), 'GET /categories')
+}
+
+/**
+ * The theme configuration. A store that cannot answer this still works — the
+ * caller falls back to the bundled defaults — so it is safe to add last when
+ * wiring up a backend.
+ */
+export async function getStorefront() {
+  return get('/storefront')
 }
 
 export async function listCollections() {
@@ -269,3 +278,7 @@ export const removeFromWishlist = (slug) => del(`/me/wishlist/${encodeURICompone
 /* ── misc ──────────────────────────────────────────────────────────────── */
 
 export const subscribe = (email) => post('/newsletter', { email })
+
+/** Optional. If the endpoint 404s the caller falls back to the shipping copy. */
+export const getDeliveryEstimate = ({ method = 'standard', country = 'US' } = {}) =>
+  get('/delivery-estimate', { method, country })
