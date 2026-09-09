@@ -43,6 +43,61 @@ export function ProductHighlights({ enrichment, limit = 6 }) {
 }
 
 /**
+ * Two or three key facts, laid over the first photograph.
+ *
+ * The cheapest trust signal on the page: a shopper who has looked at nothing
+ * but the picture has still read "Pure cotton · 140 gsm · Relaxed". It costs no
+ * scroll, no tab and no click, and it reaches the visitors who never make it
+ * past the image — which on a product page is a large share of them.
+ *
+ * Three constraints keep it from being a sticker on the product:
+ *
+ *  - **First image only.** Shots two onward are usually the detail crops — the
+ *    collar, the weave, the hem — and covering those is covering the answer the
+ *    shopper opened them for.
+ *  - **Opaque chips, not text on the photo.** White text needs a scrim, a scrim
+ *    darkens the garment, and the garment is what is being sold. A chip in the
+ *    page colour is legible over any photograph without touching it.
+ *  - **`aria-hidden` and `pointer-events-none`.** Every fact here is also in the
+ *    highlights list a few lines below, so a screen reader should hear it once,
+ *    and nothing decorative should intercept a click meant for the image.
+ */
+const CHIP_MAX = 24
+
+export function ImageKeyFacts({ enrichment, limit = 3 }) {
+  // Filter before slicing, not after. A composition like "Recycled polyester
+  // shell, Recycled polyester fill" wraps the strip onto a second row and turns
+  // a glanceable overlay into a caption block over the garment — so a value too
+  // long to be a chip is skipped and the next fact takes its place, rather than
+  // the whole overlay being sacrificed for it.
+  const rows = (enrichment?.highlights || [])
+    .filter((r) => r?.value && String(r.value).length <= CHIP_MAX)
+    .slice(0, limit)
+  if (!rows.length) return null
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap gap-1.5 p-3"
+    >
+      {rows.map((row) => (
+        <span
+          key={row.key}
+          className="rounded-xs bg-page/90 px-2.5 py-1.5 shadow-sm backdrop-blur-sm"
+        >
+          <span className="block font-mono text-[9px] uppercase tracking-[0.12em] text-faint">
+            {label(row.key)}
+          </span>
+          <span className="mt-0.5 block text-[12px] font-medium leading-none text-ink">
+            {row.value}
+          </span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/**
  * The services block — what comes with the piece, not what it is made of.
  *
  * Modelled on the row of assurances a marketplace listing carries directly

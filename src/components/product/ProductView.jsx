@@ -12,6 +12,7 @@ import { FitBlock, FabricBlock, SizeChartModal } from './FitBlock.jsx'
 import TrustRow, { PaymentsRow, SocialProof } from './TrustRow.jsx'
 import {
   ProductHighlights,
+  ImageKeyFacts,
   ProductAssurances,
   DetailTabs,
   FeatureCarousel,
@@ -281,7 +282,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                 shoot to, and every image in this theme is produced at 900×1125.
               */}
               <div
-                className="w-full overflow-hidden rounded-xs bg-sunken"
+                className="relative w-full overflow-hidden rounded-xs bg-sunken"
                 style={{ aspectRatio: '4 / 5', maxHeight: '78vh' }}
               >
                 {/* A short viewport crops the panel. Biasing the crop above
@@ -300,6 +301,10 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                   className="h-full w-full object-cover"
                   style={{ objectPosition: '50% 38%' }}
                 />
+
+                {/* Only over the first shot — the rest are detail crops, and
+                    the crop is the answer somebody opened them for. */}
+                {shot === 0 && <ImageKeyFacts enrichment={product.enrichment} />}
               </div>
             </div>
           </div>
@@ -335,6 +340,88 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           <p className="mt-5 text-[15px] leading-relaxed text-muted">{product.description}</p>
 
           <ProductHighlights enrichment={product.enrichment} />
+
+          {/*
+            Straight after the highlights, and above the picker.
+
+            This sat under the buy button, which put the whole reason a shopper
+            trusts the piece — what it is made of, how it is finished, who wove
+            it — a screen and a half below where they start reading. Detail that
+            arrives after the decision is detail that did not help make it.
+
+            The cost is that "Add to bag" moves down, and that is the right
+            trade here: the sticky bar already covers it, and the observer that
+            drives it fires on "not visible" rather than "was visible and left",
+            so a button below the fold on arrival means the bar is there from
+            the first paint. There is never a moment with no way to buy.
+
+            Tab order is the order the questions arrive: what is it made of,
+            what are the numbers, what is different about it, how is it built,
+            who made it.
+          */}
+          <DetailTabs
+            tabs={[
+              {
+                id: 'fabric',
+                label: 'Fabric & care',
+                when: Boolean(product.fabric) || product.care?.length > 0,
+                render: () => (
+                  <>
+                    <FabricBlock product={product} flat />
+                    {product.care?.length > 0 && (
+                      <ul className="mt-5 space-y-2.5">
+                        {product.care.map((c) => (
+                          <li key={c} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
+                            <Icon name="sparkle" size={15} className="mt-0.5 shrink-0 text-accent" />
+                            {c}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                ),
+              },
+              {
+                id: 'specs',
+                label: 'Specifications',
+                when: Object.keys(product.enrichment?.specs || {}).length > 0,
+                render: () => <SpecCarousel specs={product.enrichment.specs} />,
+              },
+              {
+                id: 'features',
+                label: 'Features',
+                when: product.enrichment?.features?.length > 0,
+                render: () => <FeatureCarousel items={product.enrichment.features} />,
+              },
+              {
+                id: 'details',
+                label: 'Construction',
+                when: product.details?.length > 0,
+                render: () => (
+                  <ul className="space-y-2.5">
+                    {product.details.map((d) => (
+                      <li key={d} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
+                        <Icon name="check" size={15} className="mt-0.5 shrink-0 text-accent" />
+                        {d}
+                      </li>
+                    ))}
+                  </ul>
+                ),
+              },
+              {
+                id: 'manufacturer',
+                label: 'Manufacturer info',
+                when: Boolean(product.enrichment?.manufacturer),
+                render: () => (
+                  <ManufacturerRows
+                    info={product.enrichment.manufacturer}
+                    maker={product.enrichment.maker}
+                  />
+                ),
+              },
+            ]}
+          />
+
 
           {/* colour */}
           <fieldset className="mt-8">
@@ -500,74 +587,6 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               </div>
             </Accordion>
           </div>
-
-          {/*
-            Everything else is one open block. Five accordions meant five clicks
-            to read what the product is made of, and the shopper willing to make
-            all five was not the one being lost.
-          */}
-          <DetailTabs
-            tabs={[
-              {
-                id: 'features',
-                label: 'Features',
-                when: product.enrichment?.features?.length > 0,
-                render: () => <FeatureCarousel items={product.enrichment.features} />,
-              },
-              {
-                id: 'fabric',
-                label: 'Fabric & care',
-                when: Boolean(product.fabric) || product.care?.length > 0,
-                render: () => (
-                  <>
-                    <FabricBlock product={product} flat />
-                    {product.care?.length > 0 && (
-                      <ul className="mt-5 space-y-2.5">
-                        {product.care.map((c) => (
-                          <li key={c} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
-                            <Icon name="sparkle" size={15} className="mt-0.5 shrink-0 text-accent" />
-                            {c}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </>
-                ),
-              },
-              {
-                id: 'specs',
-                label: 'Specifications',
-                when: Object.keys(product.enrichment?.specs || {}).length > 0,
-                render: () => <SpecCarousel specs={product.enrichment.specs} />,
-              },
-              {
-                id: 'details',
-                label: 'Construction',
-                when: product.details?.length > 0,
-                render: () => (
-                  <ul className="space-y-2.5">
-                    {product.details.map((d) => (
-                      <li key={d} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
-                        <Icon name="check" size={15} className="mt-0.5 shrink-0 text-accent" />
-                        {d}
-                      </li>
-                    ))}
-                  </ul>
-                ),
-              },
-              {
-                id: 'manufacturer',
-                label: 'Manufacturer info',
-                when: Boolean(product.enrichment?.manufacturer),
-                render: () => (
-                  <ManufacturerRows
-                    info={product.enrichment.manufacturer}
-                    maker={product.enrichment.maker}
-                  />
-                ),
-              },
-            ]}
-          />
 
           {/* Last, not fourth. "Secure checkout" answers a question a shopper
               has once they have decided, so it closes the column rather than

@@ -222,9 +222,13 @@ Rules on Product:
   resolve ancestors server-side when filtering.
 
 `enrichment` is several blocks on purpose, and all of them render in the column
-beside the buy button — `highlights` above it (six pairs, the two-second scan),
-`assurances` under it, and `features`, `specs` and `manufacturer` (which carries
-`maker`) in an "All details" tab block below that, open by default. The secure
+beside the buy button. `highlights` sits under the price (six pairs, the
+two-second scan) and its **first three also render as chips over the main
+photograph**, which is the only enrichment a visitor who never scrolls will see.
+`features`, `specs` and `manufacturer` (which carries `maker`) follow
+immediately in an "All details" tab block that is open by default and sits
+*above* the colour picker, in the order `fabric → specs → features → details →
+manufacturer`. `assurances` sits under the buy button. The secure
 checkout and payment marks close the column *after* that block rather than
 sitting under the button — they answer a question a shopper has once they have
 decided, not while they are deciding. None of it is a full-width section below the

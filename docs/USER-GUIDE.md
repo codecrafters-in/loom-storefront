@@ -251,18 +251,25 @@ see what you are writing as you write it.
 
 | Section | Where a shopper sees it | Keep it to |
 | --- | --- | --- |
-| **Highlights** | Above the buy button | Six pairs |
+| **Highlights** | Under the price — **and the first three over the main photo** | Six pairs |
 | **Comes with** | Under the buy button | Three or four rows |
-| **Features** | "All details" → first tab, cards you swipe through | Two or three |
-| **Specifications** | "All details" → swipes through one group at a time | As much as you like |
+| **Features** | "All details" → third tab, cards you swipe through | Two or three |
+| **Specifications** | "All details" → second tab, one group at a time | As much as you like |
 | **Manufacturer info** | "All details" → last tab | Whatever the law asks for, plus the mill |
 
 > All of it sits in the column beside the buy button, and all of it previews at
 > that width. Nothing lives in a full-width section below the fold, and nothing
-> is hidden behind a closed panel: **"All details" opens with the Features tab
-> already showing.** Anything that costs a click before it can be read is
+> is hidden behind a closed panel: **"All details" sits directly under the
+> highlights, above the colour picker, already open on Fabric & care.** Anything that costs a click before it can be read is
 > enrichment that mostly does not get read — the shopper willing to open four
 > panels was already going to buy.
+
+> **Order the highlights carefully — the first three go over the photograph.**
+> They appear as small chips in the corner of the main image, which is the only
+> enrichment a visitor who never scrolls will ever read. Put the most decisive
+> three first. A value longer than about 24 characters is skipped there (it
+> would wrap the strip across the garment) and the next one takes its place; it
+> still shows in full in the list below.
 
 **Highlights** are the two-second scan — fabric, fit, weight, the things
 somebody checks before deciding to keep reading. Start typing in the key box and

@@ -130,18 +130,31 @@ looking for" before anyone commits to reading a paragraph — and the full table
 one group at a time in the detail stack, still catches the person who wants to
 check the leg opening.
 
-**All of it lives beside the buy button, and none of it is closed.** Two
-mistakes worth naming, because they are the obvious designs and they are both
-wrong in the same way:
+**It sits between the highlights and the picker, and none of it is closed.**
+Three placements were tried and two were wrong in the same way:
 
 - A *full-width section below the fold* asks a shopper to scroll the buy button
   off the screen to find the fabric weight. Most do not go looking, and the ones
   who would have were not the ones you were losing.
 - A *stack of accordions* asks for a click per section. Same failure, smaller
   scale: the shopper willing to open four panels was already going to buy.
+- *Under the buy button* still put the reason a shopper trusts the piece a
+  screen and a half below where they start reading. Detail that arrives after
+  the decision is detail that did not help make it.
 
-So it is one open block with tabs. The first tab renders on arrival; the others
-cost one click each rather than one click per section. The cost of moving into
+So it is one open block with tabs, directly under the highlights and above the
+colour picker. The first tab renders on arrival; the others cost one click each
+rather than one click per section.
+
+**Yes, this moves "Add to bag" down, and that is the right trade.** The sticky
+buy bar covers it, and the observer driving that bar fires on *not visible*
+rather than *was visible and left* — so a button below the fold on arrival means
+the bar is present from the first paint. There is never a moment with no way to
+buy. Trading button position for detail position is only safe *because* that bar
+exists; on a page without one, do not make this move.
+
+Tab order follows the order the questions arrive: what is it made of → what are
+the numbers → what is different about it → how is it built → who made it. The cost of moving into
 the column is width, which is why the specification table pages by group instead
 of laying out two columns — the groups are the units a shopper thinks in, so a
 slide is a complete answer rather than an arbitrary slice.
@@ -167,7 +180,33 @@ listing in several markets, India included under the Legal Metrology rules. It
 is compliance, not conversion, and it belongs in a labelled block rather than
 buried in a description.
 
-### 11. The services block — `product.enrichment.assurances`
+### 11. Key facts over the first photograph — `ImageKeyFacts`
+
+Two or three chips in the corner of the main image: `Pure cotton · 140 gsm ·
+Relaxed`.
+
+The cheapest trust signal on the page. A visitor who has looked at nothing but
+the picture has still read the three facts that decide whether this is the right
+kind of garment — no scroll, no tab, no click. On a product page that is a large
+share of the traffic, and it is the share least likely to be reached by anything
+below the fold.
+
+Three constraints stop it becoming a sticker on the product:
+
+- **First image only.** Shots two onward are the detail crops — collar, weave,
+  hem — and covering those covers the answer somebody opened them for.
+- **Opaque chips, not text on the photo.** White text needs a scrim, a scrim
+  darkens the garment, and the garment is what is being sold.
+- **Values longer than 24 characters are skipped, not truncated.** A composition
+  like "Recycled polyester shell, Recycled polyester fill" wraps the strip onto
+  a second row and turns a glance into a caption block. The next fact takes its
+  place instead.
+
+It is `aria-hidden` and `pointer-events-none`: every fact is also in the
+highlights list, so a screen reader hears it once, and nothing decorative
+intercepts a click meant for the image.
+
+### 12. The services block — `product.enrichment.assurances`
 
 Returns, exchange, repair and payment, in a short list under the buy button.
 
@@ -187,7 +226,7 @@ Two details that matter more than the copy:
   ten-year structural guarantee must not also advertise the store's two-year
   one. Omitting the field inherits; an empty array means *this product has none*.
 
-### 12. Who made it — `product.enrichment.maker`
+### 13. Who made it — `product.enrichment.maker`
 
 This started as a marketplace seller card — name, rating, years with us — and it
 was the wrong shape twice over. On a marketplace the seller is the variable and
@@ -205,7 +244,7 @@ The same instinct applies to `countryOfOrigin`. It is legally mandated in severa
 markets, and answering it with "see product specifications" is a shrug on a
 required field when the answer is one field away in the fabric data.
 
-### 13. Fit warnings in the grid — `ProductCard`
+### 14. Fit warnings in the grid — `ProductCard`
 
 "Runs small" appears on the card, not just the product page. Someone comparing
 eight products decides which two to open from the grid, and that is the fact
@@ -230,6 +269,7 @@ Everything above is data. Nothing needs a code change.
 | Demand counts | `product.social` | Hidden below threshold |
 | Payment marks | `storefront.trust.payments` | Row hidden |
 | Highlights grid | `product.enrichment.highlights` | Block hidden |
+| Key facts over the image | first 3 of `enrichment.highlights` | Overlay hidden |
 | Services block | `product.enrichment.assurances` | Falls back to `storefront.trust.assurances` |
 | Mill name and location | `product.enrichment.maker` | Rows hidden |
 | Feature cards | `product.enrichment.features` | Tab hidden |

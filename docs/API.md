@@ -284,17 +284,22 @@ have scrolled, and they are the majority.
 
 | Block | Where it renders | What it is for |
 | --- | --- | --- |
-| `highlights` | Above the buy button | The scan. Six pairs read in two seconds |
+| `highlights` | Under the price, and the first three over the main image | The scan. Six pairs read in two seconds |
 | `assurances` | Under the buy button | What happens after the sale — returns, exchange, repair, payment |
 | `maker` | First two rows of Manufacturer info | Who wove the cloth, and where |
 | `features` | "All details" → Features, a swipeable card row | Two or three things a competitor could not copy-paste |
 | `specs` | "All details" → Specifications, one group per slide | The reference table. Nobody reads it end to end |
-| `manufacturer` | "All details" → Manufacturer info | Compliance |
+| `manufacturer` | "All details" → Manufacturer info, with `maker` on top | Compliance |
 
-"All details" is a tab block, **open by default with the first tab rendered**.
-Tabs rather than accordions on purpose: a tab shows something on arrival and an
+"All details" sits **between the highlights and the colour picker** — above the
+buy button, not below it — and is **open with the first tab rendered**. Tabs
+rather than accordions on purpose: a tab shows something on arrival and an
 accordion shows nothing, and enrichment that costs an interaction before it can
 be read is mostly enrichment that does not get read.
+
+Tab order is `fabric → specs → features → details → manufacturer`, which is the
+order the questions arrive: what is it made of, what are the numbers, what is
+different about it, how is it built, who made it.
 
 The specification table is paged **by group**, not by row. The groups are already
 the units a shopper thinks in, so a slide is a complete answer rather than an
