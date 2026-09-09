@@ -1,0 +1,13 @@
+{
+  "name": "loom-payments-server",
+  "private": true,
+  "type": "module",
+  "description": "Reference payments and email server for the LOOM storefront.",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "dev": "node --env-file-if-exists=.env --watch server.mjs"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.14"
+  }
+}

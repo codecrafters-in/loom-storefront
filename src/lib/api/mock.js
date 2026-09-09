@@ -54,6 +54,7 @@ db.subscribe((_next, origin) => {
 })
 
 const CURRENCY = config.store.currency
+const nowIso = () => new Date().toISOString()
 const KEY = {
   discounts: 'loom.discounts',
   cart: 'loom.cart',
@@ -65,6 +66,8 @@ const KEY = {
   // the confirmation page for the order they just placed, and an order id is
   // the only thing they have.
   placed: 'loom.placed',
+  // Status only. See `saveCredentials` for why there is no value in here.
+  credentials: 'loom.credentials',
 }
 
 async function latency() {
@@ -612,6 +615,37 @@ export async function checkout({ email, shippingAddress, shippingMethod = 'stand
   if (!cart.lines.length) throw new ApiError('Your bag is empty.', { status: 422, code: 'empty_cart' })
   if (!email) throw new ApiError('An email address is required.', { status: 422, code: 'email_required' })
 
+  /**
+   * Re-check stock against the catalogue, not against the cart.
+   *
+   * Availability was last checked when the line was added, which may have been
+   * yesterday. Without this, two shoppers who both add the last unit both get a
+   * confirmed order and one of them gets an email nobody can fulfil — and
+   * because the decrement below clamps at zero, nothing anywhere records that
+   * it happened.
+   */
+  const short = []
+  for (const line of cart.lines) {
+    const variant = products.flatMap((p) => p.variants).find((v) => v.id === line.variantId)
+    if (!variant || variant.inventory < line.quantity) {
+      short.push({
+        variantId: line.variantId,
+        title: line.title,
+        options: line.options,
+        wanted: line.quantity,
+        available: variant?.inventory ?? 0,
+      })
+    }
+  }
+  if (short.length) {
+    throw new ApiError(
+      short.length === 1
+        ? `${short[0].title} — only ${short[0].available} left.`
+        : `${short.length} items in your bag are no longer available in that quantity.`,
+      { status: 409, code: 'out_of_stock', detail: { lines: short } },
+    )
+  }
+
   const orders = read(KEY.orders, [])
   const order = {
     id: id('order'),
@@ -628,6 +662,24 @@ export async function checkout({ email, shippingAddress, shippingMethod = 'stand
     shippingMethod,
     email,
     tracking: null,
+    /**
+     * What happened to the money.
+     *
+     * Separate from `status`, which is about the parcel. An order can be paid
+     * and unshipped, shipped and refunded, or placed and never captured, and
+     * collapsing the two into one field is how a refund ends up looking like a
+     * delivery.
+     */
+    payment: {
+      provider: storefront.checkout?.provider || 'demo',
+      status: 'captured',
+      reference: null,
+      method: null,
+      amount: cart.total,
+      capturedAt: nowIso(),
+    },
+    refunds: [],
+    refundedTotal: { amount: 0, currency: CURRENCY },
   }
   // Decrement what was sold. A checkout that leaves inventory alone lets the
   // same last unit be bought indefinitely, which hides every stock bug there is.
@@ -640,7 +692,187 @@ export async function checkout({ email, shippingAddress, shippingMethod = 'stand
   return order
 }
 
-const ORDER_STATUSES = ['placed', 'paid', 'fulfilled', 'delivered', 'cancelled']
+const ORDER_STATUSES = ['placed', 'paid', 'fulfilled', 'delivered', 'cancelled', 'refunded']
+
+/* ── refunds ───────────────────────────────────────────────────────────── */
+
+/**
+ * Refund some or all of an order.
+ *
+ * Modelled as a list rather than a flag, because a partial refund is the common
+ * case — one item back from a three-item order — and a boolean cannot express
+ * "refunded £40 of £120, twice, for two different reasons". The list is also
+ * the only shape that reconciles against a payment provider's own records,
+ * which is what anyone doing the books will actually need.
+ *
+ * Real money moves on the server. This records the intent and the result; the
+ * reference server calls Razorpay and posts the outcome back.
+ */
+export async function adminRefundOrder(orderId, { amount, reason = '', restock } = {}) {
+  await latency()
+  const orders = read(KEY.orders, [])
+  const i = orders.findIndex((o) => o.id === orderId || o.number === orderId)
+  if (i < 0) throw new ApiError('Order not found.', { status: 404, code: 'not_found' })
+
+  const order = orders[i]
+  const paid = order.total?.amount ?? 0
+  const already = order.refundedTotal?.amount ?? 0
+  const remaining = paid - already
+
+  if (remaining <= 0) {
+    throw new ApiError('This order is already fully refunded.', { status: 409, code: 'already_refunded' })
+  }
+
+  // Default to the rest of it, which is what "Refund" means when nobody typed
+  // a number. An explicit amount is still checked — a refund larger than the
+  // payment is a chargeback waiting to happen, and providers reject it anyway.
+  const value = amount === undefined || amount === null ? remaining : Math.round(Number(amount))
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new ApiError('A refund needs a positive amount.', { status: 422, code: 'invalid_amount' })
+  }
+  if (value > remaining) {
+    throw new ApiError(
+      `That is more than the ${formatMinor(remaining)} still refundable on this order.`,
+      { status: 422, code: 'amount_too_large', detail: { remaining } },
+    )
+  }
+
+  const putBack = restock ?? storefront.checkout?.restockOnRefund !== false
+  const full = value === remaining
+
+  // Only a full refund restocks automatically. Guessing which line a partial
+  // refund refers to would put the wrong variant back, and a phantom unit in
+  // stock is worse than a missing one — it sells.
+  if (putBack && full) {
+    for (const line of order.lines) db.adjustInventory(line.variantId, line.quantity)
+    adopt()
+  }
+
+  const refund = {
+    id: id('refund'),
+    amount: money(value),
+    reason: reason.trim(),
+    createdAt: nowIso(),
+    reference: null,
+    restocked: Boolean(putBack && full),
+  }
+
+  const refundedTotal = already + value
+  orders[i] = {
+    ...order,
+    refunds: [...(order.refunds || []), refund],
+    refundedTotal: money(refundedTotal),
+    status: refundedTotal >= paid ? 'refunded' : order.status,
+    payment: {
+      ...(order.payment || {}),
+      status: refundedTotal >= paid ? 'refunded' : 'partially_refunded',
+    },
+    updatedAt: nowIso(),
+  }
+  write(KEY.orders, orders)
+  return orders[i]
+}
+
+const formatMinor = (amount) => `${(amount / 100).toFixed(2)} ${CURRENCY}`
+
+/* ── notifications ─────────────────────────────────────────────────────── */
+
+/**
+ * What the store would send, and when.
+ *
+ * The browser cannot send email — SMTP needs a socket and an app password needs
+ * somewhere to hide — so mock mode reports the message it *would* have sent
+ * rather than pretending. That is more useful than a fake success: a merchant
+ * checking their setup wants to see the recipient, the subject and which event
+ * fired, and to be told plainly that nothing left the building.
+ */
+export async function adminSendTestNotification({ event = 'orderPlaced', to } = {}) {
+  await latency()
+  const settings = storefront.notifications || {}
+  const recipient = to || settings.from
+
+  if (settings.enabled === false) {
+    throw new ApiError('Notifications are switched off in settings.', { status: 409, code: 'notifications_disabled' })
+  }
+  if (!recipient) {
+    throw new ApiError('Set a from-address before sending a test.', { status: 422, code: 'missing_from' })
+  }
+  if (settings.transport === 'smtp' && !settings.smtp?.host) {
+    throw new ApiError('Set an SMTP host before sending a test.', { status: 422, code: 'missing_smtp_host' })
+  }
+
+  return {
+    delivered: false,
+    reason: 'no_server',
+    message:
+      'The demo backend runs in your browser and cannot open an SMTP connection. Point VITE_DATA_SOURCE at a server — examples/server implements this — and the same call sends for real.',
+    preview: {
+      event,
+      to: recipient,
+      from: settings.from,
+      replyTo: settings.replyTo || null,
+      transport: settings.transport,
+      subject: NOTIFICATION_SUBJECTS[event] || 'Notification',
+      via: settings.transport === 'smtp' ? `${settings.smtp?.host}:${settings.smtp?.port}` : settings.endpoint,
+    },
+  }
+}
+
+const NOTIFICATION_SUBJECTS = {
+  orderPlaced: 'Your order is confirmed',
+  paymentCaptured: 'Payment received',
+  shipped: 'Your order is on its way',
+  refunded: 'Your refund is on its way',
+  cancelled: 'Your order was cancelled',
+}
+
+/* ── credentials ───────────────────────────────────────────────────────── */
+
+/**
+ * Secrets go in, nothing comes out.
+ *
+ * A Razorpay `key_secret` or a Gmail app password in the storefront settings
+ * would be served to every visitor by `GET /storefront`, which is not a
+ * hardening question — it is the whole secret, published. So they take a
+ * separate write-only path, and the read returns whether each one is set and
+ * when, never the value.
+ *
+ * In this demo there is no server to hold one, so nothing is stored at all: the
+ * marker is written and the value is dropped on the floor. That is deliberate.
+ * A demo that accepts a live key is a demo that will eventually be handed one.
+ */
+const CREDENTIALS = ['razorpayKeySecret', 'razorpayWebhookSecret', 'smtpPassword', 'stripeSecretKey']
+
+export async function adminGetCredentials() {
+  await latency()
+  const stored = read(KEY.credentials, {})
+  return {
+    items: CREDENTIALS.map((key) => ({
+      key,
+      set: Boolean(stored[key]?.set),
+      updatedAt: stored[key]?.updatedAt || null,
+    })),
+    // The storefront is a browser app. Saying so here is what stops somebody
+    // pasting a live secret into a preview and assuming it went somewhere.
+    storesSecrets: false,
+  }
+}
+
+export async function adminSaveCredentials(patch = {}) {
+  await latency()
+  const unknown = Object.keys(patch).filter((k) => !CREDENTIALS.includes(k))
+  if (unknown.length) {
+    throw new ApiError(`Unknown credential: ${unknown.join(', ')}.`, { status: 422, code: 'unknown_credential' })
+  }
+
+  const stored = read(KEY.credentials, {})
+  for (const [key, value] of Object.entries(patch)) {
+    if (!String(value || '').trim()) delete stored[key]
+    else stored[key] = { set: true, updatedAt: nowIso() } // the value is not kept
+  }
+  write(KEY.credentials, stored)
+  return adminGetCredentials()
+}
 
 export async function adminUpdateOrder(orderId, patch) {
   await latency()

@@ -990,6 +990,66 @@ CREATE TABLE makers (
   location text
 );
 
+-- What happened to the money, separately from what happened to the parcel.
+--
+-- An order can be paid and unshipped, shipped and refunded, or placed and never
+-- captured. Collapsing the two into one `status` is how a refund ends up
+-- looking like a delivery.
+CREATE TABLE payments (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id      uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  provider      text NOT NULL,                       -- razorpay, stripe, manual
+  status        text NOT NULL,                       -- pending | authorized | captured | failed | refunded | partially_refunded
+  reference     text,                                -- the provider's payment id
+  method        text,                                -- card, upi, netbanking…
+  amount        bigint NOT NULL,
+  currency      char(3) NOT NULL,
+  captured_at   timestamptz,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  -- A provider retries its webhook, and a retry must not create a second
+  -- payment for the same money. This is what makes the handler idempotent.
+  UNIQUE (provider, reference)
+);
+
+-- Refunds are a list, not a flag on the order.
+--
+-- A partial refund is the common case — one item back from a three-item order —
+-- and a boolean cannot express "refunded twice, for two different reasons". It
+-- is also the only shape that reconciles against the provider's own records,
+-- which is what anyone doing the books needs.
+CREATE TABLE refunds (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  payment_id uuid NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+  amount     bigint NOT NULL CHECK (amount > 0),
+  currency   char(3) NOT NULL,
+  reason     text,
+  reference  text,                                   -- the provider's refund id
+  restocked  boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX ON payments (order_id);
+CREATE INDEX ON refunds (payment_id);
+
+-- Every message the store sent, and to whom.
+--
+-- Kept because "did the customer get their confirmation?" is the first question
+-- in every support conversation, and an answer of "probably" is not one. It
+-- also makes the send idempotent: a retried webhook must not send a second
+-- confirmation for the same order.
+CREATE TABLE notifications (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id     uuid REFERENCES orders(id) ON DELETE SET NULL,
+  event        text NOT NULL,                        -- orderPlaced, shipped, refunded…
+  recipient    text NOT NULL,
+  subject      text,
+  status       text NOT NULL DEFAULT 'queued',       -- queued | sent | failed
+  error        text,
+  sent_at      timestamptz,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (order_id, event)
+);
+
 -- The store's own vocabulary, learned as it describes products.
 --
 -- `attributes` is a starting point, not a catalogue. A merchant listing a
@@ -1053,6 +1113,18 @@ ALTER TABLE products ADD COLUMN maker_id uuid REFERENCES makers(id) ON DELETE SE
 
 `ON DELETE SET NULL`, not `CASCADE` — dropping a supplier from the directory must
 not delete the products they made.
+
+## Where secrets are not
+
+There is no `credentials` table above, and that is deliberate. A `key_secret` or
+an SMTP password belongs in your platform's secret store — environment
+variables, AWS Secrets Manager, Doppler — not in the same database your
+application queries with a user that can run `SELECT *`.
+
+If you must store them, store them encrypted with a key that is **not** in the
+database, and make the read path return `(key, is_set, updated_at)` and nothing
+else. The moment an endpoint can return a secret, that secret is in every log
+and cache between the database and the browser.
 
 **Keep `makers.location` and `product_compliance.country_of_origin` in
 agreement.** They render four rows apart on the page, and derive from the same

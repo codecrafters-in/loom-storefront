@@ -218,14 +218,65 @@ export const storefront = {
    *   api      — POST to `createUrl` and expect an Order back. For merchants
    *              who take payment elsewhere (invoice, COD, wholesale terms).
    */
+  /**
+   * Checkout, in four modes. Which one runs is configuration, not code.
+   *
+   *   demo      Places a fake order through the bundled adapter. Previews only.
+   *   redirect  POSTs the cart to `createUrl`, expects { url }, sends the
+   *             browser to the provider's hosted page. No card field ever
+   *             renders in this app, which keeps the whole frontend out of
+   *             PCI DSS scope. The right default for a real store.
+   *   razorpay  Opens Razorpay's own modal over the page. The order is still
+   *             created server-side — the browser only ever sees `publicKey`.
+   *   api       POSTs and expects an Order back. For merchants settling
+   *             elsewhere: invoice, cash on delivery, wholesale terms.
+   *
+   * `publicKey` is safe here and only here. Razorpay's `key_id` and Stripe's
+   * publishable key are designed to be readable by anyone; their secret
+   * counterparts are not, and there is no version of this file that can hold
+   * one — see `POST /admin/credentials`.
+   */
   checkout: {
     mode: 'demo',
+    provider: null,
+    publicKey: '',
     createUrl: '/carts/:cartId/checkout',
+    verifyUrl: '/payments/verify',
     successUrl: '/order/:orderId',
     cancelUrl: '/cart',
     collectPhone: true,
     requireAccount: false,
     termsUrl: '/pages/shipping',
+    /** Put the stock back when an order is refunded or cancelled. */
+    restockOnRefund: true,
+  },
+
+  /**
+   * Transactional email.
+   *
+   * A store that takes money and sends nothing is broken, so this is not an
+   * optional extra. It cannot run in the browser either — SMTP needs a socket
+   * and an app password needs somewhere to hide — so the storefront's whole job
+   * is to say *when* to send and the server's is to send it.
+   *
+   * `smtp.password` is deliberately absent. Gmail app passwords go to
+   * `POST /admin/credentials` and never come back out.
+   */
+  notifications: {
+    enabled: true,
+    from: 'orders@loom.example',
+    replyTo: '',
+    /** smtp — the server sends it. endpoint — POST the payload somewhere else. */
+    transport: 'smtp',
+    smtp: { host: 'smtp.gmail.com', port: 465, secure: true, user: '' },
+    endpoint: '',
+    events: {
+      orderPlaced: true,
+      paymentCaptured: true,
+      shipped: true,
+      refunded: true,
+      cancelled: true,
+    },
   },
 
   /**

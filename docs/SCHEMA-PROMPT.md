@@ -170,6 +170,30 @@ catalogue — size and fit cause roughly two thirds of fashion returns:
   review is a number somebody typed, and a shopper who works that out stops
   believing the review count and the stock level too
 
+**Money** — payments, refunds and the messages sent about them:
+- `payments` — order_id, provider, status (`pending | authorized | captured |
+  failed | refunded | partially_refunded`), reference (the provider's payment
+  id), method, amount, currency, captured_at. Put a **unique constraint on
+  (provider, reference)**: providers retry their webhooks, and a retry must not
+  create a second payment for the same money
+- `refunds` — payment_id, amount, currency, reason, reference, restocked,
+  created_at. A **list, not a flag on the order**: a partial refund is the
+  common case, a boolean cannot express "refunded twice for two reasons", and a
+  list is the only shape that reconciles against the provider's records
+- `notifications` — order_id, event, recipient, subject, status, error, sent_at,
+  unique on (order_id, event). "Did the customer get their confirmation?" is the
+  first question in every support conversation and "probably" is not an answer
+
+Keep `payments.status` separate from `orders.status`. One is about the money and
+one is about the parcel; an order can be paid and unshipped, or shipped and
+refunded, and collapsing them makes a refund look like a delivery.
+
+**Do not add a credentials table.** A `key_secret` or an SMTP password belongs
+in the platform's secret store, not in the database the application queries with
+a user that can run `SELECT *`. If you propose one anyway, explain how the read
+path returns `(key, is_set, updated_at)` and never a value — the moment an
+endpoint can return a secret, it is in every log and cache downstream.
+
 **The reuse library** — the store's own vocabulary, as distinct from the one the
 theme ships:
 - `library_attributes` — key (unique), label, group_id, values (array),

@@ -345,6 +345,33 @@ Two consequences worth implementing on the real backend too:
   write purges precisely, a foreign one purges broadly, because nothing local
   can describe it.
 
+### Payments, refunds and secrets
+
+```
+POST /carts/:cartId/checkout      create a payment (see CHECKOUT.md)
+POST /payments/verify             check a signature, place the order
+POST /admin/orders/:id/refunds    { amount?, reason?, restock? } → the Order
+GET  /admin/credentials           which secrets are set, and when — never values
+POST /admin/credentials           write-only
+POST /admin/notifications/test    send one email to prove the wiring
+```
+
+**`GET /admin/credentials` must not return a value.** A secret that can be read
+back is a secret in every log, cache and browser history between the server and
+the page:
+
+```json
+{ "items": [{ "key": "razorpayKeySecret", "set": true, "updatedAt": "…" }],
+  "storesSecrets": true }
+```
+
+`storesSecrets: false` tells the admin panel to say so — the bundled demo has no
+server, so it records the marker and discards the value.
+
+**`POST /checkout` re-checks stock** and fails `409 out_of_stock` with the
+shortfall named per line. See [CHECKOUT.md](CHECKOUT.md) for why, and for the
+refund shape.
+
 ### Order visibility
 
 `GET /orders` requires a session and returns only that customer's orders.

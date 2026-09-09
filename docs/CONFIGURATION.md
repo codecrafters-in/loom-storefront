@@ -321,6 +321,36 @@ Three modes. Full guide with provider examples: **[CHECKOUT.md](CHECKOUT.md)**.
 
 `createUrl` may be a full URL or a path on your API. `:cartId` is substituted.
 
+### `notifications`
+
+```json
+{
+  "notifications": {
+    "enabled": true,
+    "from": "orders@yourshop.com",
+    "replyTo": "",
+    "transport": "smtp",
+    "smtp": { "host": "smtp.gmail.com", "port": 465, "secure": true, "user": "you@gmail.com" },
+    "endpoint": "",
+    "events": { "orderPlaced": true, "paymentCaptured": true, "shipped": true,
+                "refunded": true, "cancelled": true }
+  }
+}
+```
+
+A store that takes money and sends nothing is broken, so this is not an optional
+extra. It cannot run in the browser either — SMTP needs a socket — so the
+storefront's whole job is to say *when* to send and the server's is to send it.
+
+**There is no `smtp.password` and there never will be.** It goes to
+`POST /admin/credentials`; see [CHECKOUT.md](CHECKOUT.md). For Gmail that is an
+App Password, not your account password: Google refuses the latter, and an App
+Password can be revoked on its own.
+
+Turning an event off stops that message without touching the others — a store
+that ships from a warehouse with its own tracking emails wants `shipped` off and
+the rest on.
+
 ### `trust`
 
 ```json

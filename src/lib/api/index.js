@@ -30,6 +30,7 @@ const SURFACE = [
   'adminSetInventory', 'adminAdjustInventory',
   'adminSaveCategory', 'adminDeleteCategory',
   'listLibrary', 'saveLibraryItem', 'deleteLibraryItem',
+  'adminRefundOrder', 'adminGetCredentials', 'adminSaveCredentials', 'adminSendTestNotification',
   'adminUpdateSettings', 'adminImport', 'adminExport', 'adminReset',
   'listSizeCharts', 'listAttributes', 'adminSaveSizeChart', 'adminGetProduct',
   'adminUpdateOrder', 'adminListDiscounts', 'adminSaveDiscount', 'adminDeleteDiscount',
@@ -75,6 +76,9 @@ const PURGES = {
   deleteLibraryItem: ['listAttributes', 'listLibrary'],
   adminSaveSizeChart: ['listSizeCharts', 'getProduct', 'adminGetProduct'],
   adminUpdateOrder: ['listOrders', 'getOrder', 'listProducts', 'getProduct'],
+  // A refund can put stock back, so the catalogue is stale too.
+  adminRefundOrder: ['listOrders', 'getOrder', 'listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
+  adminSaveCredentials: ['adminGetCredentials'],
   adminSaveDiscount: ['adminListDiscounts'],
   uploadMedia: ['listMedia'],
   deleteMedia: ['listMedia'],

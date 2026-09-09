@@ -327,6 +327,20 @@ export const adminSaveSizeChart = (chart) => post('/admin/size-charts', chart)
  * `GET /attributes` already folds the attribute half into its response; these
  * are for managing it.
  */
+/**
+ * Money and mail.
+ *
+ * `adminSaveCredentials` is the only write in this file whose response
+ * deliberately carries less than it was given: a secret that can be read back
+ * is a secret in every log, cache and browser history between here and the
+ * server. The read returns whether each one is set and when.
+ */
+export const adminRefundOrder = (orderId, body) =>
+  post(`/admin/orders/${encodeURIComponent(orderId)}/refunds`, body)
+export const adminGetCredentials = () => get('/admin/credentials')
+export const adminSaveCredentials = (body) => post('/admin/credentials', body)
+export const adminSendTestNotification = (body) => post('/admin/notifications/test', body)
+
 export const listLibrary = () => get('/admin/library')
 export const saveLibraryItem = ({ kind, item }) => post(`/admin/library/${encodeURIComponent(kind)}`, item)
 export const deleteLibraryItem = ({ kind, id }) =>

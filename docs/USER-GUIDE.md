@@ -367,6 +367,62 @@ own colour if there is one.
 
 ---
 
+## Take real payments
+
+**Admin → Storefront → Payments.**
+
+Pick a mode. `Demo` places fake orders and charges nothing — fine for a preview,
+change it before anyone can reach the shop.
+
+For Razorpay: put your **key_id** in Payments (it is public and ships in the
+page, which is what it is for), and your **key_secret** in Secrets below. The
+secret is written and never read back — the field shows `Set · replace`.
+
+> **The demo has no server, so it stores nothing.** It records that you set
+> something and discards the value. Do not paste a live key into a preview.
+> `examples/server` in the repo is a deployable server that does hold them.
+
+Point **Create-order endpoint** at that server. It prices the cart itself rather
+than trusting the browser, which is what stops somebody buying a coat for a
+penny.
+
+---
+
+## Send order emails
+
+**Admin → Storefront → Email.**
+
+For Gmail: `smtp.gmail.com`, port 465, your full address as the username, and a
+**16-character App Password** in Secrets — not your account password, which
+Google will refuse.
+
+Get one at `myaccount.google.com` → Security → 2-Step Verification → App
+passwords. It can be revoked on its own without changing your login.
+
+Then **Send a test**. In the demo it tells you plainly that a browser cannot
+open an SMTP connection and shows what it *would* have sent; against a real
+server the same button sends.
+
+> Gmail stops after a few hundred a day. Fine for a new shop, not for an
+> established one — move to a transactional provider when confirmations start
+> bouncing, not before.
+
+---
+
+## Refund an order
+
+**Admin → Orders → Refund.**
+
+It defaults to whatever is still outstanding. Enter less for a partial refund —
+the order stays open and the amounts add up, so a second refund is not issued
+from memory.
+
+> **Only a full refund offers to put the stock back.** A partial refund does not
+> say which item came back, and a phantom unit on the shelf is worse than a
+> missing one — it sells.
+
+---
+
 ## Change the delivery and returns wording
 
 **Admin → Storefront → Delivery & returns.**

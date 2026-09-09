@@ -639,3 +639,52 @@ assemble `options` and `variants` yourself.
 
 **Nothing yet** — ask for a schema. A single `products` table with a `variants`
 table and a `carts`/`cart_lines` pair is enough to open a store.
+
+
+## Payments, refunds and email
+
+Four endpoints, and three rules that matter more than the endpoints.
+
+```
+POST /carts/:cartId/checkout      create the payment
+POST /payments/verify             verify the signature, place the order
+POST /webhooks/<provider>         the truth, when the browser closed early
+POST /admin/orders/:id/refunds    { amount?, reason?, restock? } → the Order
+```
+
+**Never charge an amount the browser sent you.** This is the vulnerability in
+almost every hand-rolled checkout: the page posts `{ amount: 24900 }` and the
+server bills it, so anyone with a console open buys a coat for a penny. Re-price
+the cart server-side from your own catalogue. If you cannot, refuse — a checkout
+that quietly trusts the client is worse than one that does not start.
+
+**Verify signatures in constant time, over the raw bytes.** The provider's
+success handler runs in the page, so anything it reports can be forged; the HMAC
+check is the only thing that makes a payment real. Comparing hashes with `===`
+leaks their contents one character at a time — use `crypto.timingSafeEqual`. And
+compute a webhook signature over the exact request body, not a re-stringified
+parse, or verification will pass for a payload that was tampered with.
+
+**Treat the webhook as the truth.** A shopper who pays and closes the tab before
+the redirect has still paid; without a webhook the money is taken and no order
+exists. Key order creation on the payment id, because providers retry.
+
+**Re-check stock inside checkout** and fail `409 out_of_stock` naming the
+shortfall per line (`wanted`, `available`). Availability was last checked when
+the line was added. Do not empty the bag on failure.
+
+**Refunds are a list on the order**, with `refundedTotal`; `payment.status` stays
+separate from `status`. Only a full refund restocks — guessing which line a
+partial refund refers to puts the wrong variant back, and a phantom unit in
+stock sells.
+
+**Send email but never await it in the payment path.** A failing mail server
+must not fail a payment that already succeeded.
+
+**No endpoint may return a secret.** `GET /admin/credentials` returns
+`(key, is_set, updated_at)`. The storefront config is served to every visitor,
+so a `key_secret` in it is not a weak setting — it is the whole secret
+published.
+
+`examples/server` in this repo implements all of the above in about 450 lines
+against Razorpay and Gmail, if you want something to read or deploy.

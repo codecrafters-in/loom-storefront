@@ -263,7 +263,7 @@ export function SizeCharts() {
 
 /* ── orders ────────────────────────────────────────────────────────────── */
 
-const STATUSES = ['placed', 'paid', 'fulfilled', 'delivered', 'cancelled']
+const STATUSES = ['placed', 'paid', 'fulfilled', 'delivered', 'cancelled', 'refunded']
 
 export function Orders() {
   const { data, loading, reload } = useAsync(() => api.listOrders(), [])
@@ -286,6 +286,8 @@ export function Orders() {
     return items.slice().sort(by[sort] || by.newest)
   }, [data, q, statusFilter, sort])
 
+  const [refunding, setRefunding] = useState(null)
+
   const setStatus = async (id, status) => {
     try {
       await api.adminUpdateOrder(id, { status })
@@ -304,7 +306,8 @@ export function Orders() {
       <h1 className="text-display-md">Orders</h1>
       <p className="mt-3 text-[13px] text-muted">
         Cancelling returns the stock. An order that disappears without giving its units back is how
-        a catalogue quietly loses inventory nobody can account for.
+        a catalogue quietly loses inventory nobody can account for. Refunds are recorded per order,
+        because a partial refund is the common case and a flag cannot express one.
       </p>
 
       <ListToolbar
@@ -346,6 +349,8 @@ export function Orders() {
               <th className="p-3 font-medium">Status</th>
               <th className="p-3 font-medium">Tracking</th>
               <th className="p-3 font-medium text-right">Total</th>
+              <th className="p-3 font-medium text-right">Refunded</th>
+              <th className="p-3" />
             </tr>
           </thead>
           <tbody>
@@ -367,12 +372,138 @@ export function Orders() {
                 </td>
                 <td className="p-3 font-mono text-[11px] text-faint">{o.tracking?.code || '—'}</td>
                 <td className="p-3 text-right tabular-nums">{formatMoney(o.total)}</td>
+                <td className="p-3 text-right tabular-nums text-muted">
+                  {o.refundedTotal?.amount ? formatMoney(o.refundedTotal) : '—'}
+                </td>
+                <td className="p-3 text-right">
+                  {(o.refundedTotal?.amount ?? 0) < o.total.amount && (
+                    <Button size="sm" variant="quiet" onClick={() => setRefunding(o)}>
+                      Refund
+                    </Button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {refunding && (
+        <RefundDialog
+          order={refunding}
+          onClose={() => setRefunding(null)}
+          onDone={(message) => {
+            setRefunding(null)
+            push(message)
+            reload()
+          }}
+          onError={(message) => push(message, { tone: 'error' })}
+        />
+      )}
     </>
+  )
+}
+
+/**
+ * Refund some or all of an order.
+ *
+ * Defaults to the outstanding amount, because that is what "Refund" means when
+ * nobody has typed a number, and shows what has already gone back so a second
+ * refund is not issued from memory.
+ *
+ * Only a full refund offers to restock. Guessing which line a partial refund
+ * refers to would put the wrong variant back on the shelf, and a phantom unit
+ * in stock is worse than a missing one — it sells.
+ */
+function RefundDialog({ order, onClose, onDone, onError }) {
+  const already = order.refundedTotal?.amount ?? 0
+  const remaining = order.total.amount - already
+  const currency = order.total.currency
+
+  const [amount, setAmount] = useState((remaining / 100).toFixed(2))
+  const [reason, setReason] = useState('')
+  const [restock, setRestock] = useState(true)
+  const [busy, setBusy] = useState(false)
+
+  const minor = Math.round(Number(amount) * 100)
+  const full = minor === remaining
+  const invalid = !Number.isFinite(minor) || minor <= 0 || minor > remaining
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await api.adminRefundOrder(order.id, { amount: minor, reason, restock: restock && full })
+      onDone(full ? 'Refunded in full' : `Refunded ${formatMoney({ amount: minor, currency })}`)
+    } catch (err) {
+      onError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-label="Refund order">
+      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-ink/40" />
+      <form onSubmit={submit} className="relative w-full max-w-md rounded-xs border border-line bg-page p-5">
+        <h2 className="text-[15px] font-medium">Refund {order.number}</h2>
+        <p className="mt-1.5 text-[12px] text-faint">
+          {formatMoney(order.total)} paid
+          {already > 0 && ` · ${formatMoney(order.refundedTotal)} already refunded`}
+        </p>
+
+        <label htmlFor="refund-amount" className="mb-1.5 mt-4 block text-[13px] font-medium">Amount</label>
+        <input
+          id="refund-amount"
+          type="number"
+          step="0.01"
+          min="0.01"
+          max={(remaining / 100).toFixed(2)}
+          className="field tabular-nums"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+        <p className={`mt-1 text-[11px] ${invalid ? 'text-sale' : 'text-faint'}`}>
+          {invalid
+            ? `Enter between 0.01 and ${(remaining / 100).toFixed(2)}`
+            : `${formatMoney({ amount: remaining, currency })} outstanding`}
+        </p>
+
+        <label htmlFor="refund-reason" className="mb-1.5 mt-4 block text-[13px] font-medium">
+          Reason <span className="font-normal text-faint">— for your records</span>
+        </label>
+        <input
+          id="refund-reason"
+          className="field"
+          placeholder="Returned, wrong size"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+
+        <label className={`mt-4 flex items-center gap-2.5 text-[13px] ${full ? '' : 'text-faint'}`}>
+          <input
+            type="checkbox"
+            checked={restock && full}
+            disabled={!full}
+            onChange={(e) => setRestock(e.target.checked)}
+            className="h-4 w-4 accent-[rgb(var(--accent))]"
+          />
+          Put the stock back
+        </label>
+        {!full && (
+          <p className="mt-1 text-[11px] text-faint">
+            Only on a full refund — a partial one does not say which item came back.
+          </p>
+        )}
+
+        <div className="mt-6 flex justify-end gap-2">
+          <Button type="button" variant="quiet" onClick={onClose}>Cancel</Button>
+          <Button as="button" type="submit" disabled={invalid || busy}>
+            {busy ? 'Refunding…' : 'Refund'}
+          </Button>
+        </div>
+      </form>
+    </div>
   )
 }
 
@@ -667,6 +798,10 @@ export function Storefront() {
           <Row label="How many" type="number" value={cfg.recommendations?.limit ?? 4} onChange={(e) => patch('recommendations.limit', Number(e.target.value))} />
         </Group>
 
+        <PaymentsGroup cfg={cfg} patch={patch} />
+        <EmailGroup cfg={cfg} patch={patch} />
+        <CredentialsGroup />
+
         <Group title="Checkout" note="redirect hands off to a payment provider — no card data ever enters the storefront.">
           <div>
             <label htmlFor="mode" className="mb-1.5 block text-[13px] font-medium">Mode</label>
@@ -762,6 +897,271 @@ export function Data() {
 }
 
 /* ── bits ──────────────────────────────────────────────────────────────── */
+
+/* ── payments, email and the things that must never reach a browser ────── */
+
+const MODES = [
+  ['demo', 'Demo — fake orders, no money'],
+  ['redirect', 'Redirect — the provider hosts the payment page'],
+  ['razorpay', 'Razorpay — their modal, over your page'],
+  ['api', 'Your endpoint — you settle payment elsewhere'],
+]
+
+function PaymentsGroup({ cfg, patch }) {
+  const mode = cfg.checkout?.mode || 'demo'
+  return (
+    <Group
+      title="Payments"
+      note="Which of these runs is configuration, not code — you can move from a demo to a live provider without a rebuild."
+    >
+      <div>
+        <label htmlFor="pay-mode" className="mb-1.5 block text-[13px] font-medium">Mode</label>
+        <select id="pay-mode" className="field" value={mode} onChange={(e) => patch('checkout.mode', e.target.value)}>
+          {MODES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      </div>
+
+      {mode === 'demo' && (
+        <p className="rounded-xs border border-line bg-surface p-3 text-[12px] leading-relaxed text-muted">
+          Orders are placed against the bundled demo backend. Nothing is charged and no email is
+          sent. Fine for a preview; switch before anyone can reach the shop.
+        </p>
+      )}
+
+      {mode !== 'demo' && (
+        <>
+          <Row
+            label={mode === 'razorpay' ? 'Razorpay key_id' : 'Publishable key'}
+            mono
+            placeholder="rzp_live_…"
+            value={cfg.checkout?.publicKey || ''}
+            onChange={(e) => patch('checkout.publicKey', e.target.value)}
+          />
+          <p className="-mt-2 text-[12px] leading-relaxed text-faint">
+            Public by design — it ships in the page and is meant to. Its secret counterpart goes
+            below and is never stored here.
+          </p>
+
+          <Row
+            label="Create-order endpoint"
+            mono
+            placeholder="/carts/:cartId/checkout"
+            value={cfg.checkout?.createUrl || ''}
+            onChange={(e) => patch('checkout.createUrl', e.target.value)}
+          />
+          {mode === 'razorpay' && (
+            <Row
+              label="Verify endpoint"
+              mono
+              placeholder="/payments/verify"
+              value={cfg.checkout?.verifyUrl || ''}
+              onChange={(e) => patch('checkout.verifyUrl', e.target.value)}
+            />
+          )}
+          <p className="-mt-2 text-[12px] leading-relaxed text-faint">
+            {mode === 'razorpay'
+              ? 'Your server creates the Razorpay order with its secret and verifies the signature afterwards. The browser only ever holds the key_id — a browser that could create the order could create one for a penny.'
+              : 'Your server returns { "url": "…" } and the browser is sent there.'}
+          </p>
+        </>
+      )}
+
+      <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
+        <input
+          type="checkbox"
+          checked={cfg.checkout?.restockOnRefund !== false}
+          onChange={(e) => patch('checkout.restockOnRefund', e.target.checked)}
+          className="h-4 w-4 accent-[rgb(var(--accent))]"
+        />
+        Put stock back on a full refund
+      </label>
+    </Group>
+  )
+}
+
+function EmailGroup({ cfg, patch }) {
+  const notifications = cfg.notifications || {}
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState(null)
+  const { push } = useToast()
+
+  const sendTest = async () => {
+    setSending(true)
+    try {
+      setResult(await api.adminSendTestNotification({ event: 'orderPlaced' }))
+    } catch (err) {
+      push(err.message, { tone: 'error' })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <Group
+      title="Email"
+      note="A store that takes money and sends nothing is broken. The storefront decides when to send; your server does the sending — SMTP needs a socket, and an app password needs somewhere to hide."
+    >
+      <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
+        <input
+          type="checkbox"
+          checked={notifications.enabled !== false}
+          onChange={(e) => patch('notifications.enabled', e.target.checked)}
+          className="h-4 w-4 accent-[rgb(var(--accent))]"
+        />
+        Send transactional email
+      </label>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Row label="From" mono placeholder="orders@yourshop.com" value={notifications.from || ''} onChange={(e) => patch('notifications.from', e.target.value)} />
+        <Row label="Reply-to" mono placeholder="help@yourshop.com" value={notifications.replyTo || ''} onChange={(e) => patch('notifications.replyTo', e.target.value)} />
+      </div>
+
+      <div>
+        <label htmlFor="mail-transport" className="mb-1.5 block text-[13px] font-medium">Transport</label>
+        <select
+          id="mail-transport"
+          className="field"
+          value={notifications.transport || 'smtp'}
+          onChange={(e) => patch('notifications.transport', e.target.value)}
+        >
+          <option value="smtp">SMTP — Gmail, Fastmail, your own</option>
+          <option value="endpoint">Endpoint — POST it somewhere else</option>
+          <option value="none">Off</option>
+        </select>
+      </div>
+
+      {notifications.transport === 'endpoint' ? (
+        <Row label="Endpoint" mono placeholder="https://…/notify" value={notifications.endpoint || ''} onChange={(e) => patch('notifications.endpoint', e.target.value)} />
+      ) : notifications.transport !== 'none' ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Row label="Host" mono value={notifications.smtp?.host || ''} onChange={(e) => patch('notifications.smtp.host', e.target.value)} />
+            <Row label="Port" type="number" value={notifications.smtp?.port ?? 465} onChange={(e) => patch('notifications.smtp.port', Number(e.target.value))} />
+            <Row label="Username" mono value={notifications.smtp?.user || ''} onChange={(e) => patch('notifications.smtp.user', e.target.value)} />
+          </div>
+          <p className="-mt-2 text-[12px] leading-relaxed text-faint">
+            For Gmail: <code className="font-mono">smtp.gmail.com</code>, port 465, your full address
+            as the username, and a 16-character <strong>app password</strong> below — not your
+            account password, which Google will refuse.
+          </p>
+        </>
+      ) : null}
+
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {[
+          ['orderPlaced', 'Order confirmed'],
+          ['paymentCaptured', 'Payment received'],
+          ['shipped', 'Shipped, with tracking'],
+          ['refunded', 'Refunded'],
+          ['cancelled', 'Cancelled'],
+        ].map(([key, label]) => (
+          <li key={key}>
+            <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
+              <input
+                type="checkbox"
+                checked={notifications.events?.[key] !== false}
+                onChange={(e) => patch(`notifications.events.${key}`, e.target.checked)}
+                className="h-4 w-4 accent-[rgb(var(--accent))]"
+              />
+              {label}
+            </label>
+          </li>
+        ))}
+      </ul>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button size="sm" variant="quiet" onClick={sendTest} disabled={sending}>
+          {sending ? 'Sending…' : 'Send a test'}
+        </Button>
+        {result && (
+          <span className={`text-[12px] ${result.delivered ? 'text-good' : 'text-muted'}`}>
+            {result.delivered
+              ? `Sent to ${result.preview?.to}`
+              : `Not sent — ${result.message}`}
+          </span>
+        )}
+      </div>
+    </Group>
+  )
+}
+
+const CREDENTIAL_LABELS = {
+  razorpayKeySecret: 'Razorpay key_secret',
+  razorpayWebhookSecret: 'Razorpay webhook secret',
+  stripeSecretKey: 'Stripe secret key',
+  smtpPassword: 'SMTP / Gmail app password',
+}
+
+/**
+ * Secrets go in; nothing comes out.
+ *
+ * These fields post to a write-only endpoint and the page never reads a value
+ * back — it shows whether each one is set and when. A secret that can be read
+ * back is a secret in every log, cache and browser history between here and the
+ * server, and one served by `GET /storefront` is a secret published to every
+ * shopper.
+ */
+function CredentialsGroup() {
+  const { data, reload } = useAsync(() => api.adminGetCredentials(), [])
+  const [drafts, setDrafts] = useState({})
+  const { push } = useToast()
+
+  const save = async (key) => {
+    try {
+      await api.adminSaveCredentials({ [key]: drafts[key] })
+      setDrafts((d) => ({ ...d, [key]: '' }))
+      push(drafts[key] ? 'Stored' : 'Cleared')
+      reload()
+    } catch (err) {
+      push(err.message, { tone: 'error' })
+    }
+  }
+
+  return (
+    <Group
+      title="Secrets"
+      note="Written, never read back. These never appear in storefront settings, because those are served to every visitor — a key_secret there is not a weak setting, it is the whole secret published."
+    >
+      {data?.storesSecrets === false && (
+        <p className="rounded-xs border border-sale/30 bg-sale/5 p-3 text-[12px] leading-relaxed text-muted">
+          <strong className="text-ink">This demo has no server, so nothing is stored.</strong> The
+          field records that you set something and discards the value. Do not paste a live key into
+          a preview — point <code className="font-mono">VITE_DATA_SOURCE</code> at a real backend
+          first.
+        </p>
+      )}
+
+      <ul className="space-y-3">
+        {(data?.items || []).map((item) => (
+          <li key={item.key} className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[14rem] flex-1">
+              <label htmlFor={`cred-${item.key}`} className="mb-1.5 block text-[13px] font-medium">
+                {CREDENTIAL_LABELS[item.key] || item.key}
+              </label>
+              <input
+                id={`cred-${item.key}`}
+                type="password"
+                autoComplete="off"
+                className="field font-mono text-[13px]"
+                placeholder={item.set ? '•••••••••••• — set, type to replace' : 'Not set'}
+                value={drafts[item.key] || ''}
+                onChange={(e) => setDrafts((d) => ({ ...d, [item.key]: e.target.value }))}
+              />
+              {item.set && (
+                <p className="mt-1 text-[11px] text-faint">
+                  Set {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : ''}
+                </p>
+              )}
+            </div>
+            <Button size="sm" variant="quiet" onClick={() => save(item.key)} disabled={!drafts[item.key]}>
+              Save
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </Group>
+  )
+}
 
 function Group({ title, note, children }) {
   return (

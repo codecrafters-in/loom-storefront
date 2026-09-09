@@ -40,6 +40,51 @@ client reviewing a preview is never confused about whether it is live.
 
 Use for: previews, design review, the public demo.
 
+## Where secrets live
+
+**A `key_secret`, a webhook secret or a Gmail app password cannot go in
+storefront settings.** Not "should not" — cannot. The admin panel is a browser
+app and `GET /storefront` is served to every visitor, so a secret there is not a
+weak setting, it is the whole secret published.
+
+| Settings, and served to everyone | Your server only |
+| --- | --- |
+| Razorpay `key_id` | `key_secret` |
+| Stripe publishable key | Stripe secret key |
+| Checkout mode, endpoint URLs | webhook signing secret |
+| SMTP host, port, username, from-address | SMTP / Gmail app password |
+
+The admin panel still collects the right-hand column — it posts to
+`POST /admin/credentials`, which is write-only. The read returns whether each
+one is set and when, never the value, so the field shows `Set · replace`.
+
+In mock mode nothing is stored at all: the marker is written and the value is
+dropped. A demo that accepts a live key is a demo that will eventually be handed
+one.
+
+### `razorpay` — their modal, over your page
+
+```json
+{ "checkout": { "mode": "razorpay", "publicKey": "rzp_live_…",
+  "createUrl": "/carts/:cartId/checkout", "verifyUrl": "/payments/verify" } }
+```
+
+Three steps, and the middle one is the point:
+
+1. Your server creates the Razorpay order **with its secret** and returns
+   `{ "razorpay_order_id": "order_…", "amount": 24900, "currency": "INR" }`.
+2. The browser opens Razorpay's modal with only `publicKey`. Card fields belong
+   to their iframe, never to this app.
+3. Your server verifies the signature and returns the Order.
+
+A browser that could create the order could create one for a penny, which is
+why step 1 is not optional. And Razorpay's success handler runs *in the page*,
+so anything it reports can be forged — step 3 is the only thing that makes a
+payment real, which is why the storefront returns the server's order and never
+the handler's payload.
+
+`examples/server` implements all three in about 450 lines.
+
 ### `redirect` — recommended for real stores
 
 ```json
@@ -226,3 +271,57 @@ The last three are configuration mistakes and say so explicitly. See
 
 Do this before wiring the provider. It separates "my redirect contract works"
 from "my Stripe keys work", and those fail differently.
+
+
+## Refunds
+
+```
+POST /admin/orders/:id/refunds  { amount?, reason?, restock? }  → the Order
+```
+
+Omit `amount` to refund whatever is outstanding, which is what "Refund" means
+when nobody has typed a number.
+
+Refunds are **a list on the order**, not a flag:
+
+```json
+{
+  "status": "refunded",
+  "refundedTotal": { "amount": 24900, "currency": "INR" },
+  "refunds": [
+    { "id": "refund_1", "amount": { "amount": 4900, "currency": "INR" },
+      "reason": "Returned one item", "createdAt": "…", "reference": "rfnd_…",
+      "restocked": false }
+  ]
+}
+```
+
+A partial refund is the common case — one item back from a three-item order —
+and a boolean cannot express "refunded ₹400 of ₹1,200, twice, for two different
+reasons". The list is also the only shape that reconciles against the payment
+provider's own records, which is what anyone doing the books actually needs.
+
+**Only a full refund restocks.** Guessing which line a partial refund refers to
+would put the wrong variant back, and a phantom unit in stock is worse than a
+missing one — it sells. `checkout.restockOnRefund` turns even that off.
+
+`payment.status` and `status` are deliberately separate. An order can be paid
+and unshipped, shipped and refunded, or placed and never captured; collapsing
+the two is how a refund ends up looking like a delivery.
+
+## Overselling
+
+`POST /checkout` **must re-check stock against the catalogue**, not against the
+cart. Availability was last checked when the line was added, which may have been
+yesterday. Without it, two shoppers who both add the last unit both get a
+confirmed order and one of them gets an email nobody can fulfil.
+
+```json
+{ "code": "out_of_stock", "status": 409,
+  "detail": { "lines": [{ "variantId": "…", "title": "…", "wanted": 3, "available": 1 }] } }
+```
+
+Name the shortfall. "Something in your bag is unavailable" sends a shopper
+through five lines looking for it; `wanted` and `available` let the page fix the
+quantity in place. And do not empty the bag — that loses them the thing they
+were trying to buy.
