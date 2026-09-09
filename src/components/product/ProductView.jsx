@@ -210,8 +210,8 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
         than its share and the column overflows the page.
       */}
       <div
-        className={`mx-auto grid max-w-[1240px] gap-10 pb-16 lg:grid-cols-[minmax(0,1fr)_28rem] lg:gap-12 ${
-          preview ? '' : 'wrap mt-8'
+        className={`grid gap-10 pb-16 lg:grid-cols-[minmax(0,1fr)_30rem] lg:gap-12 ${
+          preview ? '' : 'wrap wrap-tight mt-8'
         }`}
       >
         {/* gallery */}
@@ -530,7 +530,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           showSticky ? 'translate-y-0' : 'translate-y-full'
         }`}
       >
-        <div className="wrap flex items-center gap-3 py-3">
+        <div className="wrap wrap-tight flex items-center gap-3 py-3">
           <div className="hidden w-12 shrink-0 sm:block">
             <div className="shot rounded-xs">
               <Media src={product.images[shot]?.url} type={product.images[shot]?.type} alt="" loading="lazy" className="h-full w-full object-cover" />

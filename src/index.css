@@ -90,6 +90,15 @@
     .wrap { padding-inline: 3rem; }
   }
 
+  /* A narrower measure for pages built around one large image.
+     Declared after .wrap so it wins on equal specificity, and applied to every
+     section of such a page — a narrower box nested inside the normal one makes
+     the content start further in than the breadcrumb above it, which reads as a
+     margin on one side and a mistake on both. */
+  .wrap-tight {
+    max-width: 1320px;
+  }
+
   .eyebrow {
     font-family: theme('fontFamily.mono');
     font-size: 10px;

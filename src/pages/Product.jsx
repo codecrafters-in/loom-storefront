@@ -25,7 +25,7 @@ export default function Product() {
   if (loading) return <ProductSkeleton />
   if (error) {
     return (
-      <div className="wrap py-24">
+      <div className="wrap wrap-tight py-24">
         {error.status === 404 ? (
           <Empty
             icon="search"
@@ -49,7 +49,7 @@ export default function Product() {
         type="product"
         product={product}
       />
-      <div className="wrap pt-8">
+      <div className="wrap wrap-tight pt-8">
         <Breadcrumbs
           trail={[
             { label: 'Home', to: '/' },
@@ -67,7 +67,7 @@ export default function Product() {
       {/* reviews */}
       {config.features?.reviews !== false && (
       <section id="reviews" className="border-t border-line bg-surface">
-        <div className="wrap grid gap-10 py-16 md:grid-cols-[18rem_1fr]">
+        <div className="wrap wrap-tight grid gap-10 py-16 md:grid-cols-[18rem_1fr]">
           <div>
             <h2 className="text-display-md">Reviews</h2>
             {reviews.data?.summary && (
@@ -146,7 +146,7 @@ export default function Product() {
 
       {/* related */}
       {related.data?.items?.length > 0 && (
-        <section className="wrap py-16">
+        <section className="wrap wrap-tight py-16">
           <h2 className="text-display-md">{recs.title || 'You might also like'}</h2>
           <div className="mt-8">
             <ProductGrid products={related.data.items} />
@@ -162,7 +162,7 @@ export default function Product() {
 
 function ProductSkeleton() {
   return (
-    <div className="wrap mt-12 grid gap-10 pb-20 lg:grid-cols-2 lg:gap-16">
+    <div className="wrap wrap-tight mt-12 grid gap-10 pb-20 lg:grid-cols-[minmax(0,1fr)_30rem] lg:gap-12">
       <Skeleton className="aspect-[4/5] w-full" />
       <div>
         <Skeleton className="h-10 w-2/3" />

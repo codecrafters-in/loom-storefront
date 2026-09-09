@@ -132,9 +132,19 @@ the ratios and nothing else needs to change.
 The rules the product page follows, and the reasoning, because these are the
 ones that get undone first when someone adds a section.
 
+**One container per page.** `.wrap` is 1440px; `.wrap-tight` narrows it to 1320
+for pages built around one large image. Apply it to **every** section of such a
+page — breadcrumbs, the grid, reviews, related, the loading skeleton and the
+sticky bar.
+
+Nesting a narrower box inside `.wrap` for one section is the mistake to avoid:
+the content starts 100px further in than the breadcrumb above it, which reads as
+a margin on one side and as a mistake on both. The skeleton matters too — put it
+on a different container and the page shifts sideways the moment it loads.
+
 **Unequal columns, on a container narrow enough to fill.** The product page is
-`minmax(0,1fr)` and a fixed `28rem` inside a `1240px` container — about 57/39 on
-a desktop.
+`minmax(0,1fr)` and a fixed `30rem` inside `.wrap-tight` — about 57/39 on a
+desktop, with a 480px measure for the buy column.
 
 Two numbers have to agree here, and getting one right while the other is wrong
 is what produces a page that looks empty:
@@ -144,10 +154,14 @@ is what produces a page that looks empty:
 | Container `1440px`, right column `26rem` | image resolves to 564px in a 764px track — **186px of dead space** beside it |
 | Container `1240px`, right column `28rem` | image resolves to 564px in a 564px track — **none** |
 
-A 4:5 image bounded by viewport height has a fixed size on any given screen. If
-the column it sits in is wider than that, the surplus is a gap — and the fix is
-to narrow the container, not to widen the image, because the image is already as
-tall as the screen allows.
+A 4:5 image bounded by viewport height has a fixed size on any given screen, so
+the column has to be sized around it rather than the other way round. Going
+wider does not gain anything: the extra either becomes surplus beside the image,
+or it grows the panel until the shot crops. At 1440 with a 30rem buy column the
+crop reaches 15%, which is a head or a hem.
+
+The buy column absorbs what is left, and it has its own ceiling — much past
+30rem the measure stops being comfortable to read.
 
 A 50/50 split fails for the other reason: it gives the buy column a ~600px
 measure, roughly twice a comfortable reading width, so every line of trust copy
