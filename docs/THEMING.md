@@ -167,17 +167,42 @@ contrast thing in the column. Fit, fabric, details, care and delivery used to be
 five separate bordered cards; five competing boxes in a 26rem column is no
 hierarchy at all. They are one accordion with hairline dividers now.
 
-**Bound the image by both, drive it by neither.** `width: auto` plus
-`aspect-ratio: 4/5` plus `max-height: 78vh` lets the browser satisfy the column
-and the viewport together while keeping the ratio.
+**Size the panel, not the image.** The gallery is a tinted panel that always
+fills the column — `w-full`, `aspect-ratio: 4/5`, `max-height: 78vh` — with the
+shot inside it under `object-cover`.
 
-Setting an explicit `height` instead is a trap worth naming: it pins the box
-below its track on every wide screen and leaves a gap beside it, and it looks
-correct in the one window you happened to test in.
+Sizing the *image* instead means any surplus becomes page background beside it,
+which reads as a hole. Sizing the panel puts the surplus inside the frame: a
+short viewport crops a few percent off a full-bleed shot rather than leaving a
+gap in the layout. Dead space is zero at every viewport width and height.
 
-**Thumbnails beside the image on desktop**, underneath on mobile. Below a shot
-that already fills the screen, they are out of view; beside it, both stay
-visible.
+Two traps worth naming:
+
+- Setting an explicit `height` pins the box below its track on every wide screen
+  and leaves a gap beside it. It looks correct in whichever window you tested in.
+- The crop is biased to `50% 38%`, above centre. A centred crop takes from both
+  ends, and on a garment that is the collar and the hem — the two things that
+  identify it. Costs nothing on a screen tall enough not to crop.
+
+**4:5, not square.** Square is right for shoes, which are wider than they are
+tall, and it is what most shoe storefronts use. On a garment it takes the head
+and the hem. 4:5 is what Zara, COS, Uniqlo and Everlane shoot to, and every
+image `scripts/images.mjs` produces is 900×1125.
+
+The ratio decides when the height cap starts to bite, in a 564px column:
+
+| Ratio | Height at full width | Crops below a viewport of |
+| --- | --- | --- |
+| 1:1 | 564px | 723px |
+| **4:5** | **705px** | **904px** |
+| 3:4 | 752px | 964px |
+| 2:3 | 846px | 1085px |
+
+**Thumbnails beside the image on desktop, not below.** Below costs 100px of
+vertical room, which for a portrait ratio is the dimension already under
+pressure — the image gets shorter and the crop gets worse. A shoe store can put
+them underneath because a square image has height to spare. Five, then a `+N`:
+a rail longer than the image beside it stops reading as a control.
 
 **Type scale follows the column.** The product title is `display-md`, not
 `display-lg` — the larger step tops out near 52px, which in a 26rem column is

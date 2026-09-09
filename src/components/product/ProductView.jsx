@@ -55,6 +55,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
   const [qty, setQty] = useState(1)
   const [shot, setShot] = useState(0)
   const [chartOpen, setChartOpen] = useState(false)
+  const [showAllThumbs, setShowAllThumbs] = useState(false)
   const [showSticky, setShowSticky] = useState(false)
   const buyRef = useRef(null)
 
@@ -225,7 +226,10 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           <div className="flex flex-col-reverse gap-3 lg:flex-row">
             {gallery.length > 1 && (
               <ul className="flex gap-3 overflow-x-auto no-scrollbar lg:w-[4.5rem] lg:shrink-0 lg:flex-col lg:overflow-visible">
-                {gallery.map((img, i) => (
+                {/* Five, then a count. A rail longer than the image it sits
+                    beside stops looking like a control and starts looking like
+                    a second gallery. */}
+                {gallery.slice(0, showAllThumbs ? gallery.length : 5).map((img, i) => (
                   <li key={img.id || img.url} className="w-[4.5rem] shrink-0">
                     <button
                       type="button"
@@ -240,21 +244,42 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                     </button>
                   </li>
                 ))}
+                {!showAllThumbs && gallery.length > 5 && (
+                  <li className="w-[4.5rem] shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllThumbs(true)}
+                      className="shot grid w-full place-items-center rounded-xs border border-line text-[12px] text-muted transition-colors hover:border-ink hover:text-ink"
+                    >
+                      +{gallery.length - 5}
+                    </button>
+                  </li>
+                )}
               </ul>
             )}
 
             <div className="min-w-0 flex-1">
               {/*
-                Bounded by both, driven by neither.
-                `width: auto` with an aspect ratio lets the browser satisfy the
-                column width and the viewport height together and keep 4:5. A
-                fixed height pins the box below its track and leaves a gap beside
-                it; a fixed width overruns a short screen.
+                A tinted panel that always fills the column, with the shot inside
+                it.
+                Sizing the image itself meant any surplus became page background
+                beside it — a gap. Sizing the panel means the surplus is inside
+                the frame, so a short viewport crops a few pixels off a
+                full-bleed shot instead of leaving a hole in the layout.
+
+                4:5 rather than square, deliberately. Square is right for shoes,
+                which are wider than they are tall; on a garment it takes the
+                head and the hem. 4:5 is what Zara, COS, Uniqlo and Everlane all
+                shoot to, and every image in this theme is produced at 900×1125.
               */}
               <div
-                className="shot mx-auto rounded-xs"
-                style={{ maxHeight: '78vh', width: 'auto', maxWidth: '100%' }}
+                className="w-full overflow-hidden rounded-xs bg-sunken"
+                style={{ aspectRatio: '4 / 5', maxHeight: '78vh' }}
               >
+                {/* A short viewport crops the panel. Biasing the crop above
+                    centre keeps the collar and the face; a centred crop takes
+                    from both ends and a garment loses the half that identifies
+                    it. Costs nothing on a screen tall enough not to crop. */}
                 <Media
                   src={gallery[shot]?.url}
                   type={gallery[shot]?.type}
@@ -265,6 +290,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                   fetchPriority="high"
                   decoding="async"
                   className="h-full w-full object-cover"
+                  style={{ objectPosition: '50% 38%' }}
                 />
               </div>
             </div>
