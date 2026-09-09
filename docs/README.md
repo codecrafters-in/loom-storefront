@@ -137,3 +137,5 @@ scripts/
 | `npm run images` | Fetch any missing photography |
 | `npm run images:force` | Re-roll every image |
 | `npm run brand` | Regenerate favicons, icons, OG card |
+
+- [TESTING.md](TESTING.md) — the suite, what it covers, and what it deliberately does not

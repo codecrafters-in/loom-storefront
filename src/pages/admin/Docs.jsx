@@ -27,6 +27,7 @@ const PAGES = [
   { slug: 'admin', file: 'ADMIN.md', title: 'Write API', group: 'Build' },
   { slug: 'checkout', file: 'CHECKOUT.md', title: 'Checkout & payments', group: 'Build' },
   { slug: 'errors', file: 'ERRORS.md', title: 'Errors', group: 'Build' },
+  { slug: 'testing', file: 'TESTING.md', title: 'Testing', group: 'Build' },
 
   { slug: 'integration-prompt', file: 'INTEGRATION-PROMPT.md', title: 'Backend prompt', group: 'AI prompts' },
   { slug: 'schema-prompt', file: 'SCHEMA-PROMPT.md', title: 'Database prompt', group: 'AI prompts' },

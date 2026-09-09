@@ -27,4 +27,17 @@ export default [
     files: ['scripts/**/*.mjs'],
     languageOptions: { ecmaVersion: 2022, globals: globals.node, sourceType: 'module' },
   },
+  {
+    // Tests install a browser onto `globalThis` before importing the app, so
+    // they legitimately touch both environments.
+    files: ['test/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: { ...globals.node, ...globals.browser },
+      sourceType: 'module',
+    },
+    rules: {
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    },
+  },
 ]

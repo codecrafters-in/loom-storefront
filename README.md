@@ -82,6 +82,7 @@ files, rendered, with copy buttons on every prompt.
 | [USER-GUIDE.md](docs/USER-GUIDE.md) | For whoever runs the shop — ten tasks, one screen each |
 | [DATABASE.md](docs/DATABASE.md) | PostgreSQL schema for running your own backend |
 | [ERRORS.md](docs/ERRORS.md) | Error codes and a debugging checklist |
+| [TESTING.md](docs/TESTING.md) | The suite, what it covers, and what it deliberately does not |
 | **[INTEGRATION-PROMPT.md](docs/INTEGRATION-PROMPT.md)** | **Copy-paste prompt that has an AI build your backend** |
 | **[SCHEMA-PROMPT.md](docs/SCHEMA-PROMPT.md)** | **Copy-paste prompt that has an AI design your database** |
 

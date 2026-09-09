@@ -7,14 +7,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/check-docs.mjs && node scripts/brand.mjs && vite build && node scripts/sitemap.mjs",
+    "build": "node scripts/check-docs.mjs && node --test test/ && node scripts/brand.mjs && vite build && node scripts/sitemap.mjs",
     "preview": "vite preview",
-    "lint": "eslint src scripts",
+    "lint": "eslint src scripts test",
     "images": "node scripts/images.mjs",
     "images:force": "node scripts/images.mjs --force",
     "brand": "node scripts/brand.mjs",
     "sitemap": "node scripts/sitemap.mjs",
-    "check:docs": "node scripts/check-docs.mjs"
+    "check:docs": "node scripts/check-docs.mjs",
+    "test": "node --test test/",
+    "test:watch": "node --test --watch test/"
   },
   "dependencies": {
     "react": "^18.3.1",
