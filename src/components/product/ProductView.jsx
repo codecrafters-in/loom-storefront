@@ -208,7 +208,11 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
         min-width:auto, so one long unbreakable string pushes the track wider
         than its share and the column overflows the page.
       */}
-      <div className={`grid gap-10 pb-16 lg:grid-cols-[minmax(0,1fr)_26rem] lg:gap-14 xl:gap-20 ${preview ? '' : 'wrap mt-8'}`}>
+      <div
+        className={`mx-auto grid max-w-[1240px] gap-10 pb-16 lg:grid-cols-[minmax(0,1fr)_28rem] lg:gap-12 ${
+          preview ? '' : 'wrap mt-8'
+        }`}
+      >
         {/* gallery */}
         <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
           {/*
@@ -240,9 +244,16 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             )}
 
             <div className="min-w-0 flex-1">
+              {/*
+                Bounded by both, driven by neither.
+                `width: auto` with an aspect ratio lets the browser satisfy the
+                column width and the viewport height together and keep 4:5. A
+                fixed height pins the box below its track and leaves a gap beside
+                it; a fixed width overruns a short screen.
+              */}
               <div
                 className="shot mx-auto rounded-xs"
-                style={{ maxHeight: '76vh', width: 'auto', maxWidth: '100%' }}
+                style={{ maxHeight: '78vh', width: 'auto', maxWidth: '100%' }}
               >
                 <Media
                   src={gallery[shot]?.url}

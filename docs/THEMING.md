@@ -132,11 +132,30 @@ the ratios and nothing else needs to change.
 The rules the product page follows, and the reasoning, because these are the
 ones that get undone first when someone adds a section.
 
-**Unequal columns.** The product page is `minmax(0,1fr)` and a fixed `26rem`,
-not two halves. A 50/50 split on a 1440px screen gives the buy column a 600px
-measure — roughly twice a comfortable reading width — so every line of trust
-copy runs the full track and the page reads as two walls of text. Pinning the
-right column at 24–28rem is what every apparel storefront worth copying does.
+**Unequal columns, on a container narrow enough to fill.** The product page is
+`minmax(0,1fr)` and a fixed `28rem` inside a `1240px` container — about 57/39 on
+a desktop.
+
+Two numbers have to agree here, and getting one right while the other is wrong
+is what produces a page that looks empty:
+
+| | |
+| --- | --- |
+| Container `1440px`, right column `26rem` | image resolves to 564px in a 764px track — **186px of dead space** beside it |
+| Container `1240px`, right column `28rem` | image resolves to 564px in a 564px track — **none** |
+
+A 4:5 image bounded by viewport height has a fixed size on any given screen. If
+the column it sits in is wider than that, the surplus is a gap — and the fix is
+to narrow the container, not to widen the image, because the image is already as
+tall as the screen allows.
+
+A 50/50 split fails for the other reason: it gives the buy column a ~600px
+measure, roughly twice a comfortable reading width, so every line of trust copy
+runs the full track.
+
+On a viewport under about 900px tall the height cap binds first and 60–80px of
+slack returns. That is the deliberate trade: the alternative is a taller image
+that pushes the size picker below the fold.
 
 **`min-w-0` on grid and flex children that hold text.** A grid item defaults to
 `min-width: auto`, which means one long unbreakable string widens its track past
@@ -148,10 +167,13 @@ contrast thing in the column. Fit, fabric, details, care and delivery used to be
 five separate bordered cards; five competing boxes in a 26rem column is no
 hierarchy at all. They are one accordion with hairline dividers now.
 
-**Bound the image by height, not width.** A 4:5 shot at full column width is
-taller than the viewport, so the thumbnails land below the fold and the control
-that changes what you are looking at is the one you have to hunt for. Cap the
-height (`76vh`) and let width derive from the ratio.
+**Bound the image by both, drive it by neither.** `width: auto` plus
+`aspect-ratio: 4/5` plus `max-height: 78vh` lets the browser satisfy the column
+and the viewport together while keeping the ratio.
+
+Setting an explicit `height` instead is a trap worth naming: it pins the box
+below its track on every wide screen and leaves a gap beside it, and it looks
+correct in the one window you happened to test in.
 
 **Thumbnails beside the image on desktop**, underneath on mobile. Below a shot
 that already fills the screen, they are out of view; beside it, both stay

@@ -106,13 +106,12 @@
     overflow: hidden;
   }
 
-  /* When a caller caps the height, the ratio has to derive width from height
-     rather than the other way round — otherwise the box goes letterbox-wide
-     and the shot inside it gets cropped to a strip. */
+  /* A capped shot fills its column and only shrinks when the viewport is too
+     short for it. `width: auto` plus `aspect-ratio` lets the browser satisfy
+     both bounds and keep the ratio — setting an explicit height here instead
+     pinned the box below its track and left dead space beside it. */
   .shot[style*='max-height'] {
-    height: 68vh;
     aspect-ratio: 4 / 5;
-    width: auto;
   }
   .shot img {
     width: 100%;
