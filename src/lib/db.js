@@ -167,6 +167,39 @@ function cascadePrice(next, previous) {
   }
 }
 
+/**
+ * Fill in what a caller left out.
+ *
+ * A write from an integrator will omit half of these — nobody posting their
+ * first product sends `rating`, `tags` and `social`. Defaulting here, once, is
+ * what stops a missing field surfacing as a crash inside a sort comparator on
+ * a page nobody connected to the write.
+ */
+function normalise(product) {
+  return {
+    tags: [],
+    badges: [],
+    details: [],
+    care: [],
+    categories: [],
+    images: [],
+    variants: [],
+    options: [],
+    swatches: {},
+    social: null,
+    fit: null,
+    fabric: null,
+    sizeChartId: null,
+    compareAtPrice: null,
+    published: true,
+    createdAt: nowIso(),
+    ...product,
+    // Nested shapes need their own defaults; a spread would accept a partial.
+    rating: { average: 0, count: 0, ...(product.rating || {}) },
+    price: product.price || { amount: 0, currency: 'USD' },
+  }
+}
+
 export function upsertProduct(patch) {
   const products = getProducts().slice()
   const byId = patch.id ? products.findIndex((p) => p.id === patch.id) : -1
@@ -187,9 +220,8 @@ export function upsertProduct(patch) {
 
   const i = byId !== -1 ? byId : bySlug
   const previous = i >= 0 ? products[i] : null
-  let next = { ...(previous || {}), ...patch, updatedAt: nowIso() }
+  let next = normalise({ ...(previous || {}), ...patch, updatedAt: nowIso() })
   if (!next.id) next.id = uid('prod')
-  if (!next.createdAt) next.createdAt = nowIso()
   next = cascadePrice(next, previous)
   next.badges = deriveBadges(next)
 

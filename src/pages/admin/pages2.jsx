@@ -3,6 +3,7 @@ import api from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
 import { Button, Empty, Icon, Skeleton, Badge } from '../../components/ui/index.jsx'
 import { useToast } from '../../store/ToastContext.jsx'
+import RecordRow, { RowAction } from '../../components/admin/RecordRow.jsx'
 import { formatMoney } from '../../lib/money.js'
 
 /* ── categories ────────────────────────────────────────────────────────── */
@@ -66,28 +67,23 @@ export function Categories() {
       ) : loading ? (
         <Skeleton className="mt-8 h-64 w-full" />
       ) : (
-        <ul className="mt-8 space-y-3">
+        <ul className="mt-8 space-y-2">
           {roots.map((r) => (
-            <li key={r.slug} className="rounded-xs border border-line bg-surface p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-medium">{r.name} <span className="ml-1.5 text-[12px] text-faint">{r.count}</span></p>
-                  <p className="font-mono text-[11px] text-faint">{r.slug}</p>
-                </div>
-                <button type="button" onClick={() => setEditing(r)} className="text-[13px] text-accent link-underline">Edit</button>
-              </div>
-              {r.children?.length > 0 && (
-                <ul className="mt-3 space-y-1.5 border-t border-line pt-3">
-                  {r.children.map((c) => (
-                    <li key={c.slug} className="flex items-center justify-between gap-3 pl-4 text-[13px]">
-                      <span className="text-muted">
-                        {c.name} <span className="ml-1 text-faint">{c.count}</span>
-                      </span>
-                      <button type="button" onClick={() => setEditing(c)} className="text-accent link-underline">Edit</button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <li key={r.slug} className="space-y-2">
+              <RecordRow onOpen={() => setEditing({ ...r })} label={`Edit ${r.name}`}>
+                <p className="font-medium">
+                  {r.name} <span className="ml-1.5 text-[12px] text-faint tabular-nums">{r.count}</span>
+                </p>
+                <p className="font-mono text-[11px] text-faint">{r.slug}</p>
+              </RecordRow>
+              {r.children?.map((c) => (
+                <RecordRow key={c.slug} indent onOpen={() => setEditing({ ...c })} label={`Edit ${c.name}`}>
+                  <p className="text-[14px] text-muted">
+                    {c.name} <span className="ml-1.5 text-[12px] text-faint tabular-nums">{c.count}</span>
+                  </p>
+                  <p className="font-mono text-[11px] text-faint">{c.slug}</p>
+                </RecordRow>
+              ))}
             </li>
           ))}
         </ul>
@@ -209,16 +205,15 @@ export function SizeCharts() {
         copies of the same table drifting apart.
       </p>
 
-      <ul className="mt-8 grid gap-4 sm:grid-cols-2">
+      <ul className="mt-8 space-y-2">
         {(data?.items || []).map((c) => (
           <li key={c.id}>
-            <button type="button" onClick={() => setEditing(structuredClone(c))}
-              className="w-full rounded-xs border border-line bg-surface p-5 text-left transition-colors hover:border-ink">
-              <p className="font-mono text-[13px] text-ink">{c.id}</p>
-              <p className="mt-1.5 text-[12px] text-faint">
+            <RecordRow onOpen={() => setEditing(structuredClone(c))} label={`Edit ${c.id}`}>
+              <p className="font-mono text-[14px] text-ink">{c.id}</p>
+              <p className="mt-1 text-[12px] text-faint">
                 {c.rows.length} sizes · {c.columns.slice(1).join(', ')} · {c.unit}
               </p>
-            </button>
+            </RecordRow>
           </li>
         ))}
       </ul>
@@ -366,18 +361,28 @@ export function Discounts() {
           </div>
         </form>
       ) : (
-        <ul className="mt-8 space-y-3">
+        <ul className="mt-8 space-y-2">
           {(data?.items || []).map((d) => (
-            <li key={d.code} className="flex flex-wrap items-center gap-4 rounded-xs border border-line bg-surface p-4">
-              <code className="font-mono text-[14px] text-ink">{d.code}</code>
-              <span className="text-[13px] text-muted">{d.label}</span>
-              <Badge kind={d.active === false ? 'sold-out' : 'bestseller'}>
-                {d.active === false ? 'inactive' : d.kind === 'percent' ? `${d.value}% off` : d.kind === 'fixed' ? 'fixed' : 'free shipping'}
-              </Badge>
-              <span className="ml-auto flex gap-4 text-[13px]">
-                <button type="button" onClick={() => setEditing({ ...d })} className="text-accent link-underline">Edit</button>
-                <button type="button" onClick={() => remove(d.code)} className="text-faint link-underline hover:text-sale">Remove</button>
-              </span>
+            <li key={d.code}>
+              <RecordRow
+                onOpen={() => setEditing({ ...d })}
+                label={`Edit ${d.code}`}
+                actions={<RowAction label={`Delete ${d.code}`} onClick={() => remove(d.code)} />}
+              >
+                <div className="flex flex-wrap items-center gap-3">
+                  <code className="font-mono text-[14px] text-ink">{d.code}</code>
+                  <Badge kind={d.active === false ? 'sold-out' : 'bestseller'}>
+                    {d.active === false
+                      ? 'inactive'
+                      : d.kind === 'percent'
+                        ? `${d.value}% off`
+                        : d.kind === 'fixed'
+                          ? 'fixed amount'
+                          : 'free shipping'}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-[13px] text-muted">{d.label}</p>
+              </RecordRow>
             </li>
           ))}
         </ul>

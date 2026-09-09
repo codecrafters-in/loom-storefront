@@ -32,6 +32,7 @@ const SURFACE = [
   'adminUpdateSettings', 'adminImport', 'adminExport', 'adminReset',
   'listSizeCharts', 'adminSaveSizeChart', 'adminGetProduct',
   'adminUpdateOrder', 'adminListDiscounts', 'adminSaveDiscount', 'adminDeleteDiscount',
+  'uploadMedia', 'listMedia', 'deleteMedia',
 ]
 
 const missing = SURFACE.filter((name) => typeof adapter[name] !== 'function')
@@ -69,6 +70,8 @@ const PURGES = {
   adminSaveSizeChart: ['listSizeCharts', 'getProduct', 'adminGetProduct'],
   adminUpdateOrder: ['listOrders', 'getOrder', 'listProducts', 'getProduct'],
   adminSaveDiscount: ['adminListDiscounts'],
+  uploadMedia: ['listMedia'],
+  deleteMedia: ['listMedia'],
   adminDeleteDiscount: ['adminListDiscounts'],
   adminDeleteProduct: ['listProducts', 'getProduct', 'getRelated', 'getBootstrap', 'adminListProducts'],
   adminSetInventory: ['listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],

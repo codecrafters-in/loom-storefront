@@ -320,6 +320,41 @@ export const adminExport = () => get('/admin/export')
 export const listSizeCharts = () => get('/size-charts').then((r) => assertList(r, 'GET /size-charts'))
 export const adminSaveSizeChart = (chart) => post('/admin/size-charts', chart)
 export const adminGetProduct = (id) => get(`/admin/products/${encodeURIComponent(id)}`)
+
+/**
+ * Multipart, not JSON — a base64 body is a third larger and holds the whole
+ * file in memory twice. Respond `{ id, url, type, width, height, duration }`.
+ */
+export async function uploadMedia(file) {
+  const body = new FormData()
+  body.append('file', file)
+  let session = ''
+  try {
+    session = JSON.parse(localStorage.getItem('loom.session') || 'null')?.token || ''
+  } catch {
+    /* no session */
+  }
+  const res = await fetch(`${config.api.baseUrl}/admin/media`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      accept: 'application/json',
+      ...(config.api.token || session ? { authorization: `Bearer ${config.api.token || session}` } : {}),
+    },
+    body,
+  })
+  const json = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new ApiError(json?.message || `Upload failed with ${res.status}.`, {
+      status: res.status,
+      code: json?.code || 'upload_failed',
+    })
+  }
+  return json
+}
+
+export const listMedia = () => get('/admin/media').then((r) => assertList(r, 'GET /admin/media'))
+export const deleteMedia = (id) => del(`/admin/media/${encodeURIComponent(id)}`)
 export const adminUpdateOrder = (id, body) => patch_(`/admin/orders/${encodeURIComponent(id)}`, body)
 export const adminListDiscounts = () => get('/admin/discounts').then((r) => assertList(r, 'GET /admin/discounts'))
 export const adminSaveDiscount = (body) => post('/admin/discounts', body)

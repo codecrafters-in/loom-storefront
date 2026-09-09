@@ -9,6 +9,7 @@ import {
 } from '../components/ui/index.jsx'
 import { formatMoney } from '../lib/money.js'
 import Seo from '../components/Seo.jsx'
+import Media from '../components/ui/Media.jsx'
 import { useCart } from '../store/CartContext.jsx'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import { useWishlist } from '../store/WishlistContext.jsx'
@@ -203,13 +204,16 @@ export default function Product() {
         {/* gallery */}
         <div className="lg:sticky lg:top-24 lg:self-start">
           <div className="shot rounded-xs">
-            <img
+            <Media
               src={product.images[shot]?.url}
+              type={product.images[shot]?.type}
               alt={product.images[shot]?.alt}
               width={product.images[shot]?.width}
               height={product.images[shot]?.height}
+              controls={product.images[shot]?.type === 'video'}
               fetchPriority="high"
               decoding="async"
+              className="h-full w-full object-cover"
             />
           </div>
           {product.images.length > 1 && (
@@ -223,7 +227,7 @@ export default function Product() {
                   aria-current={i === shot}
                   className={`shot w-20 rounded-xs ring-1 transition-shadow ${i === shot ? 'ring-ink' : 'ring-line hover:ring-muted'}`}
                 >
-                  <img src={img.url} alt="" loading="lazy" />
+                  <Media src={img.url} type={img.type} alt="" loading="lazy" className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>
@@ -529,7 +533,7 @@ export default function Product() {
         <div className="wrap flex items-center gap-3 py-3">
           <div className="hidden w-12 shrink-0 sm:block">
             <div className="shot rounded-xs">
-              <img src={product.images[shot]?.url} alt="" loading="lazy" />
+              <Media src={product.images[shot]?.url} type={product.images[shot]?.type} alt="" loading="lazy" className="h-full w-full object-cover" />
             </div>
           </div>
           <div className="min-w-0 flex-1">

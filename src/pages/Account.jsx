@@ -226,7 +226,7 @@ function Addresses() {
                 {a.country}
               </address>
               <div className="mt-4 flex gap-4 text-[13px]">
-                <button type="button" onClick={() => setEditing(a)} className="text-muted link-underline">Edit</button>
+                <button type="button" onClick={() => setEditing(a)} className="text-accent link-underline">Edit</button>
                 <button type="button" onClick={() => deleteAddress(a.id)} className="text-faint link-underline hover:text-sale">Remove</button>
               </div>
             </li>

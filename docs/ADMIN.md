@@ -126,6 +126,45 @@ PATCH /admin/storefront   → the storefront document
 Deep-merged, except arrays which replace wholesale — see
 [CONFIGURATION.md](CONFIGURATION.md#where-settings-come-from).
 
+### Media
+
+```
+POST   /admin/media      multipart/form-data, field name "file"
+                         → { id, url, type, width, height, duration?, bytes }
+GET    /admin/media      → { items, total }
+DELETE /admin/media/:id
+```
+
+**Multipart, not JSON.** A base64 body is a third larger and holds the whole
+file in memory twice.
+
+`type` is `image` or `video`. Return `width` and `height` — the storefront puts
+them on the element so the grid does not reflow while a shot decodes, which is
+the main source of layout shift on a catalogue page.
+
+The product then stores whatever `url` you returned. Nothing downstream cares
+where it points.
+
+In mock mode uploads go to IndexedDB, images are re-encoded to a 1600px WebP,
+and the product stores a `media:<id>` reference. That is right for a demo — it
+survives a reload and holds a few dozen files — and wrong for a shop, which is
+why the same button posts to your endpoint the moment `VITE_DATA_SOURCE=api`.
+
+### Normalise on write
+
+A first integration will POST a product with a title, a slug and a price and
+nothing else. Fill the rest in:
+
+```
+tags []   badges []   details []   care []   categories []
+images [] variants [] options []   swatches {}
+rating { average: 0, count: 0 }     published true     createdAt now()
+```
+
+Defaulting once at the write boundary is what stops a missing `rating` surfacing
+three screens away as a crash inside a sort comparator — which takes down the
+whole listing rather than one card.
+
 ### Bulk
 
 ```

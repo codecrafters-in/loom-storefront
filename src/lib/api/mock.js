@@ -17,6 +17,7 @@
  */
 import * as db from '../db.js'
 import { railKey } from './railKey.js'
+import * as mediaStore from '../media.js'
 import { config } from '../config.js'
 import { ApiError } from './contracts.js'
 
@@ -90,12 +91,23 @@ const publicProduct = (p) => {
 
 /* ── catalogue ─────────────────────────────────────────────────────────── */
 
+/**
+ * Sorts read through accessors rather than dotting into the record.
+ *
+ * Writes are normalised, but an imported catalogue or a hand-edited store can
+ * still hold a product missing `rating` — and a comparator is a bad place to
+ * find that out, because it takes down the whole listing rather than one card.
+ */
+const count = (p) => p.rating?.count ?? 0
+const average = (p) => p.rating?.average ?? 0
+const amount = (p) => p.price?.amount ?? 0
+
 const SORTS = {
-  featured: (a, b) => b.rating.count - a.rating.count,
-  newest: (a, b) => (a.createdAt < b.createdAt ? 1 : -1),
-  'price-asc': (a, b) => a.price.amount - b.price.amount,
-  'price-desc': (a, b) => b.price.amount - a.price.amount,
-  rating: (a, b) => b.rating.average - a.rating.average,
+  featured: (a, b) => count(b) - count(a),
+  newest: (a, b) => ((a.createdAt || '') < (b.createdAt || '') ? 1 : -1),
+  'price-asc': (a, b) => amount(a) - amount(b),
+  'price-desc': (a, b) => amount(b) - amount(a),
+  rating: (a, b) => average(b) - average(a),
 }
 
 export async function listProducts(query = {}) {
@@ -137,15 +149,18 @@ function listProductsSync(query = {}) {
   if (q) {
     const needle = q.toLowerCase()
     items = items.filter((p) =>
-      [p.title, p.subtitle, p.description, ...p.tags, ...p.categories].join(' ').toLowerCase().includes(needle),
+      [p.title, p.subtitle, p.description, ...(p.tags || []), ...(p.categories || [])]
+        .join(' ')
+        .toLowerCase()
+        .includes(needle),
     )
   }
-  if (sizes.length) items = items.filter((p) => p.variants.some((v) => sizes.includes(v.options.Size) && v.available))
-  if (colors.length) items = items.filter((p) => p.options.find((o) => o.name === 'Color')?.values.some((c) => colors.includes(c)))
-  if (tags.length) items = items.filter((p) => tags.some((t) => p.tags.includes(t)))
-  if (Number.isFinite(minPrice)) items = items.filter((p) => p.price.amount >= minPrice)
-  if (Number.isFinite(maxPrice)) items = items.filter((p) => p.price.amount <= maxPrice)
-  if (inStock) items = items.filter((p) => p.variants.some((v) => v.available))
+  if (sizes.length) items = items.filter((p) => (p.variants || []).some((v) => sizes.includes(v.options.Size) && v.available))
+  if (colors.length) items = items.filter((p) => (p.options || []).find((o) => o.name === 'Color')?.values.some((c) => colors.includes(c)))
+  if (tags.length) items = items.filter((p) => tags.some((t) => (p.tags || []).includes(t)))
+  if (Number.isFinite(minPrice)) items = items.filter((p) => amount(p) >= minPrice)
+  if (Number.isFinite(maxPrice)) items = items.filter((p) => amount(p) <= maxPrice)
+  if (inStock) items = items.filter((p) => (p.variants || []).some((v) => v.available))
 
   items.sort(SORTS[sort] || SORTS.featured)
 
@@ -177,11 +192,11 @@ function buildFacets(scope) {
   let min = Infinity
   let max = 0
   for (const p of scope) {
-    p.options.find((o) => o.name === 'Size')?.values.forEach((s) => sizes.add(s))
-    p.options.find((o) => o.name === 'Color')?.values.forEach((c) => colors.set(c, p.swatches?.[c] || '#ccc'))
-    p.tags.forEach((t) => tags.add(t))
-    min = Math.min(min, p.price.amount)
-    max = Math.max(max, p.price.amount)
+    ;(p.options || []).find((o) => o.name === 'Size')?.values.forEach((s) => sizes.add(s))
+    ;(p.options || []).find((o) => o.name === 'Color')?.values.forEach((c) => colors.set(c, p.swatches?.[c] || '#ccc'))
+    ;(p.tags || []).forEach((t) => tags.add(t))
+    min = Math.min(min, amount(p))
+    max = Math.max(max, amount(p))
   }
   const order = ['XS', 'S', 'M', 'L', 'XL', 'One Size']
   return {
@@ -877,6 +892,40 @@ export async function adminDeleteDiscount(code) {
   await latency()
   write(KEY.discounts, discounts().filter((d) => d.code !== code))
   return { ok: true }
+}
+
+/* ── media ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Uploads go to a browser-local binary store, and the product keeps a
+ * `media:<id>` reference. In api mode this posts to your endpoint instead and
+ * the product keeps whatever URL comes back — see docs/ADMIN.md.
+ */
+export async function uploadMedia(file) {
+  const record = await mediaStore.upload(file)
+  return record
+}
+
+export async function listMedia() {
+  const items = await mediaStore.list()
+  return {
+    items: items.map((m) => ({
+      id: m.id,
+      url: `media:${m.id}`,
+      type: m.type,
+      name: m.name,
+      width: m.width,
+      height: m.height,
+      duration: m.duration ?? null,
+      bytes: m.bytes,
+      createdAt: m.createdAt,
+    })),
+    total: items.length,
+  }
+}
+
+export async function deleteMedia(id) {
+  return mediaStore.remove(id)
 }
 
 export async function listSizeCharts() {

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useCart } from '../../store/CartContext.jsx'
 import { Button, Icon, QuantityStepper, Empty } from '../ui/index.jsx'
+import Media from '../ui/Media.jsx'
 import { formatMoney } from '../../lib/money.js'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import api from '../../lib/api/index.js'
@@ -80,7 +81,7 @@ export default function CartDrawer() {
                 <li key={line.id} className="flex gap-4 py-5">
                   <Link to={`/product/${line.productSlug}`} onClick={() => setOpen(false)} className="w-20 shrink-0">
                     <div className="shot rounded-xs">
-                      <img src={line.image?.url} alt={line.image?.alt || line.title} loading="lazy" />
+                      <Media src={line.image?.url} type={line.image?.type} alt={line.image?.alt || line.title} loading="lazy" className="h-full w-full object-cover" />
                     </div>
                   </Link>
                   <div className="min-w-0 flex-1">
@@ -117,7 +118,7 @@ export default function CartDrawer() {
                     <li key={p.slug} className="w-24 shrink-0">
                       <Link to={`/product/${p.slug}`} onClick={() => setOpen(false)}>
                         <div className="shot rounded-xs">
-                          <img src={p.images[0]?.url} alt={p.images[0]?.alt || p.title} loading="lazy" />
+                          <Media src={p.images[0]?.url} type={p.images[0]?.type} alt={p.images[0]?.alt || p.title} loading="lazy" className="h-full w-full object-cover" />
                         </div>
                         <p className="mt-1.5 truncate text-[11px] leading-snug">{p.title}</p>
                         <p className="text-[11px] text-faint">{formatMoney(p.price)}</p>

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Badge, Icon, Price } from '../ui/index.jsx'
+import Media from '../ui/Media.jsx'
 import { useWishlist } from '../../store/WishlistContext.jsx'
 
 /**
@@ -20,19 +21,21 @@ export default function ProductCard({ product, priority = false, className = '' 
     <article className={`group relative ${className}`}>
       <Link to={`/product/${product.slug}`} className="block">
         <div className="shot relative rounded-xs">
-          <img
+          <Media
             src={product.images[0]?.url}
+            type={product.images[0]?.type}
             alt={product.images[0]?.alt || product.title}
             loading={priority ? 'eager' : 'lazy'}
             fetchPriority={priority ? 'high' : 'auto'}
             decoding="async"
             width={product.images[0]?.width}
             height={product.images[0]?.height}
-            className="transition-opacity duration-500 group-hover:opacity-0"
+            className="h-full w-full object-cover transition-opacity duration-500 group-hover:opacity-0"
           />
           {product.images[1] && (
-            <img
+            <Media
               src={product.images[1].url}
+              type={product.images[1].type}
               alt=""
               loading="lazy"
               decoding="async"

@@ -160,9 +160,48 @@ For **redirect**, paste the address your developer gives you into **Create URL**
 
 ---
 
+## Add photos and video
+
+**Open the product → Media**
+
+Drag files onto the panel, or **Choose files** — as many at once as you like.
+Photos are resized automatically; video up to 25MB plays with controls on the
+product page.
+
+- **Drag a tile** to reorder. The first is the card image; the second is what
+  the grid swaps to when someone hovers, so make it different — a fabric detail
+  works well.
+- **Alt text** goes under each tile. Describe the garment, not the photo.
+- **Assign to a colour**: tick several tiles, choose the colour, **Assign**. The
+  gallery then jumps to those shots when a shopper picks that colour.
+
+> The tile shows each file's dimensions and warns if it is not 4:5, which is the
+> shape the site is built around.
+
+---
+
+## Set stock or prices in bulk
+
+**Open the product → Variants**
+
+The bar above the table does one thing to many rows:
+
+| Choose | Then |
+| --- | --- |
+| **Set stock to** / **Add to stock** | a number, and *every variant* or *all M* |
+| **Set price to** / **Adjust price by** | `3.00` for *all XL* adds three pounds to every XL |
+| **Use image** | a shot, for a colour or a hand-picked selection |
+
+Tick individual rows first and the scope list gains **the N selected**.
+
+> A price with an amber border differs from the product price. Changing the
+> product price leaves it alone, so a size surcharge survives a repricing.
+
+---
+
 ## Stage a product before it goes live
 
-**Open the product → Details → Visibility → untick Published**
+**Open the product → click the green Published button at the top**
 
 A draft is invisible: it does not appear in the shop, in search or in
 recommendations, and its own web address returns "not found". You can still see

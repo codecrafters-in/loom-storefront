@@ -6,6 +6,7 @@ import { Button, Empty, Icon, Skeleton, Badge } from '../../components/ui/index.
 import { useToast } from '../../store/ToastContext.jsx'
 import { formatMoney } from '../../lib/money.js'
 import Tour, { Hint } from '../../components/admin/Tour.jsx'
+import Media from '../../components/ui/Media.jsx'
 
 /* ── overview ──────────────────────────────────────────────────────────── */
 
@@ -131,7 +132,7 @@ export function Products() {
                     <td className="p-3">
                       <div className="flex items-center gap-3">
                         <div className="w-10 shrink-0">
-                          <div className="shot rounded-xs"><img src={p.images[0]?.url} alt="" loading="lazy" /></div>
+                          <div className="shot rounded-xs"><Media src={p.images[0]?.url} type={p.images[0]?.type} alt="" loading="lazy" className="h-full w-full object-cover" /></div>
                         </div>
                         <div className="min-w-0">
                           <p className="truncate font-medium">{p.title}</p>

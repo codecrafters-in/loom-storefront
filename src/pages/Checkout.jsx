@@ -3,6 +3,7 @@ import Seo from '../components/Seo.jsx'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { startCheckout } from '../lib/checkout.js'
 import { useStorefront } from '../store/StorefrontContext.jsx'
+import Media from '../components/ui/Media.jsx'
 import { useCart } from '../store/CartContext.jsx'
 import { useAuth } from '../store/AuthContext.jsx'
 import { Button, Empty, Icon } from '../components/ui/index.jsx'
@@ -189,7 +190,7 @@ export default function Checkout() {
               <li key={l.id} className="flex gap-3.5">
                 <div className="relative w-14 shrink-0">
                   <div className="shot rounded-xs">
-                    <img src={l.image?.url} alt="" loading="lazy" />
+                    <Media src={l.image?.url} type={l.image?.type} alt="" loading="lazy" className="h-full w-full object-cover" />
                   </div>
                   <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1 font-mono text-[10px] text-page tabular-nums">
                     {l.quantity}

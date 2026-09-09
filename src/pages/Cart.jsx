@@ -6,6 +6,7 @@ import { Button, Empty, Icon, QuantityStepper, Skeleton } from '../components/ui
 import Promises from '../components/layout/Promises.jsx'
 import { formatMoney } from '../lib/money.js'
 import { useStorefront } from '../store/StorefrontContext.jsx'
+import Media from '../components/ui/Media.jsx'
 
 export default function Cart() {
   const { cart, loading, busy, update, remove, applyDiscount } = useCart()
@@ -56,7 +57,7 @@ export default function Cart() {
             <li key={line.id} className="flex gap-5 py-6">
               <Link to={`/product/${line.productSlug}`} className="w-24 shrink-0 sm:w-28">
                 <div className="shot rounded-xs">
-                  <img src={line.image?.url} alt={line.image?.alt || line.title} loading="lazy" />
+                  <Media src={line.image?.url} type={line.image?.type} alt={line.image?.alt || line.title} loading="lazy" className="h-full w-full object-cover" />
                 </div>
               </Link>
               <div className="flex min-w-0 flex-1 flex-col">

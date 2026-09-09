@@ -448,10 +448,18 @@ PATCH  /admin/orders/:id              { status, tracking }
 GET    /admin/discounts                                  → { items, total }
 POST   /admin/discounts               { code, label, kind, value, active }
 DELETE /admin/discounts/:code
+POST   /admin/media       multipart, field "file"  → { id, url, type, width, height, duration? }
+GET    /admin/media                                 → { items, total }
+DELETE /admin/media/:id
 PATCH  /admin/storefront
 POST   /admin/import   { mode: "merge"|"replace", products, categories, collections, sizeCharts, settings }
 GET    /admin/export
 ```
+
+Media is multipart, not JSON — a base64 body is a third larger and holds the
+file in memory twice. Return `width` and `height`; the storefront puts them on
+the element so a catalogue page does not reflow while shots decode. `type` is
+`image` or `video`.
 
 `discounts.kind` is `percent`, `fixed` (minor units) or `shipping`.
 `orders.status` is `placed` `paid` `fulfilled` `delivered` `cancelled`.
@@ -473,6 +481,11 @@ Six rules on writes:
    not mutate a counter.
 6. **`published: false` hides a product everywhere** — list, search,
    recommendations — and makes its own URL 404. Admin still lists it.
+7. **Normalise on write.** My first POST will send a title, a slug and a price
+   and nothing else. Default `tags` `badges` `details` `care` `categories`
+   `images` `variants` `options` to empty, `rating` to `{average:0,count:0}`,
+   `published` to true. A missing `rating` that reaches a sort comparator takes
+   down a whole listing rather than one card.
 
 `POST /admin/import` is what a nightly dump from my system should use. A
 thousand individual writes is a thousand transactions and a rate limit I will
