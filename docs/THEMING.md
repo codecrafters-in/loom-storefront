@@ -127,6 +127,41 @@ lookbook.
 Replace `public/images/` wholesale when you have real product photography. Keep
 the ratios and nothing else needs to change.
 
+## Layout balance
+
+The rules the product page follows, and the reasoning, because these are the
+ones that get undone first when someone adds a section.
+
+**Unequal columns.** The product page is `minmax(0,1fr)` and a fixed `26rem`,
+not two halves. A 50/50 split on a 1440px screen gives the buy column a 600px
+measure — roughly twice a comfortable reading width — so every line of trust
+copy runs the full track and the page reads as two walls of text. Pinning the
+right column at 24–28rem is what every apparel storefront worth copying does.
+
+**`min-w-0` on grid and flex children that hold text.** A grid item defaults to
+`min-width: auto`, which means one long unbreakable string widens its track past
+its share and pushes the layout off the page. This is the single most common
+cause of "the right column is cut off".
+
+**One heavy element per screen.** The buy button is the only filled, high-
+contrast thing in the column. Fit, fabric, details, care and delivery used to be
+five separate bordered cards; five competing boxes in a 26rem column is no
+hierarchy at all. They are one accordion with hairline dividers now.
+
+**Bound the image by height, not width.** A 4:5 shot at full column width is
+taller than the viewport, so the thumbnails land below the fold and the control
+that changes what you are looking at is the one you have to hunt for. Cap the
+height (`76vh`) and let width derive from the ratio.
+
+**Thumbnails beside the image on desktop**, underneath on mobile. Below a shot
+that already fills the screen, they are out of view; beside it, both stay
+visible.
+
+**Type scale follows the column.** The product title is `display-md`, not
+`display-lg` — the larger step tops out near 52px, which in a 26rem column is
+three words a line and a heading taller than the price, the picker and the
+button combined.
+
 ## Spacing and shape
 
 - `rounded-xs` is 2px. Almost everything uses it. Fashion retail reads as

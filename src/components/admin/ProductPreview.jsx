@@ -76,7 +76,7 @@ export default function ProductPreview({ draft, charts = [], open, onClose }) {
       <div className="min-h-0 flex-1 overflow-y-auto">
         {problems.length > 0 && (
           <div className="border-b border-line bg-accent-soft/50">
-            <div className="mx-auto max-w-[1440px] px-5 py-3">
+            <div className="wrap py-3">
               <ul className="flex flex-wrap gap-x-6 gap-y-1.5">
                 {problems.map((p) => (
                   <li key={p} className="flex items-center gap-1.5 text-[12px] text-accent">
@@ -89,7 +89,9 @@ export default function ProductPreview({ draft, charts = [], open, onClose }) {
           </div>
         )}
 
-        <div className="mx-auto max-w-[1440px] px-5 py-8">
+        {/* The site's own container, so the preview is the real geometry
+            rather than an approximation of it. */}
+        <div className="wrap py-8">
           <ProductView product={product} preview />
 
           <section className="mt-4 border-t border-line pt-10">

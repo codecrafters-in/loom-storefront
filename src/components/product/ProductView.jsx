@@ -24,6 +24,29 @@ import TrustRow, { SocialProof } from './TrustRow.jsx'
  * no route to sync) or do something genuinely wrong (adding an unsaved product
  * to a shopper's bag).
  */
+/** One row of the details stack. Hairline dividers, no box. */
+function Accordion({ title, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="border-b border-line">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-4 py-4 text-left"
+      >
+        <span className="text-[14px] font-medium">{title}</span>
+        <Icon
+          name="chevron-down"
+          size={16}
+          className={`shrink-0 text-faint transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && <div className="pb-6">{children}</div>}
+    </div>
+  )
+}
+
 export default function ProductView({ product, preview = false, onOpenChart }) {
   const config = useStorefront()
   const [params, setParams] = useSearchParams()
@@ -31,7 +54,6 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
   const [size, setSize] = useState(null)
   const [qty, setQty] = useState(1)
   const [shot, setShot] = useState(0)
-  const [tab, setTab] = useState('details')
   const [chartOpen, setChartOpen] = useState(false)
   const [showSticky, setShowSticky] = useState(false)
   const buyRef = useRef(null)
@@ -176,59 +198,81 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
 
   return (
     <>
-      <div className={`grid gap-10 pb-16 lg:grid-cols-2 lg:gap-16 ${preview ? "" : "wrap mt-8"}`}>
+      {/*
+        Two unequal columns, not two halves.
+        A 50/50 split gives the buy box a 600px measure — twice the comfortable
+        reading width — so every line of trust copy runs the full track and the
+        page reads as two walls of content. Every apparel storefront worth
+        copying pins the right column at 24–28rem and gives the rest to the
+        image. `min-w-0` on both is load-bearing: a grid item defaults to
+        min-width:auto, so one long unbreakable string pushes the track wider
+        than its share and the column overflows the page.
+      */}
+      <div className={`grid gap-10 pb-16 lg:grid-cols-[minmax(0,1fr)_26rem] lg:gap-14 xl:gap-20 ${preview ? '' : 'wrap mt-8'}`}>
         {/* gallery */}
-        <div className="lg:sticky lg:top-24 lg:self-start">
-          {/* Capped by height, not width.
-              A 4:5 shot at full column width is taller than the viewport, which
-              pushes the thumbnails below the fold — so the one control that
-              changes what you are looking at is the one you have to go hunting
-              for. Bounding the height keeps the picker and the buy box in the
-              same screen. */}
-          <div
-            className="shot mx-auto rounded-xs"
-            style={{ maxHeight: '68vh', width: 'auto', maxWidth: '100%' }}
-          >
-            <Media
-              src={gallery[shot]?.url}
-              type={gallery[shot]?.type}
-              alt={gallery[shot]?.alt}
-              width={gallery[shot]?.width}
-              height={gallery[shot]?.height}
-              controls={gallery[shot]?.type === 'video'}
-              fetchPriority="high"
-              decoding="async"
-              className="h-full w-full object-cover"
-            />
-          </div>
-          {gallery.length > 1 && (
-            <div className="mt-3 flex flex-wrap gap-3">
-              {gallery.map((img, i) => (
-                <button
-                  key={img.id || img.url}
-                  type="button"
-                  onClick={() => setShot(i)}
-                  aria-label={`View image ${i + 1} of ${gallery.length}`}
-                  aria-current={i === shot}
-                  className={`shot w-20 rounded-xs ring-1 transition-shadow ${i === shot ? 'ring-ink' : 'ring-line hover:ring-muted'}`}
-                >
-                  <Media src={img.url} type={img.type} alt="" loading="lazy" className="h-full w-full object-cover" />
-                </button>
-              ))}
+        <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+          {/*
+            Thumbnails beside the image on desktop, underneath on mobile.
+            Stacked below, they sit under a shot that is already most of the
+            viewport, so the one control that changes what you are looking at
+            is the one you have to scroll for. Beside it, both stay in view and
+            the image can be as tall as the screen allows.
+          */}
+          <div className="flex flex-col-reverse gap-3 lg:flex-row">
+            {gallery.length > 1 && (
+              <ul className="flex gap-3 overflow-x-auto no-scrollbar lg:w-[4.5rem] lg:shrink-0 lg:flex-col lg:overflow-visible">
+                {gallery.map((img, i) => (
+                  <li key={img.id || img.url} className="w-[4.5rem] shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShot(i)}
+                      aria-label={`View image ${i + 1} of ${gallery.length}`}
+                      aria-current={i === shot}
+                      className={`shot w-full rounded-xs ring-1 transition-shadow ${
+                        i === shot ? 'ring-ink' : 'ring-line hover:ring-muted'
+                      }`}
+                    >
+                      <Media src={img.url} type={img.type} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="min-w-0 flex-1">
+              <div
+                className="shot mx-auto rounded-xs"
+                style={{ maxHeight: '76vh', width: 'auto', maxWidth: '100%' }}
+              >
+                <Media
+                  src={gallery[shot]?.url}
+                  type={gallery[shot]?.type}
+                  alt={gallery[shot]?.alt}
+                  width={gallery[shot]?.width}
+                  height={gallery[shot]?.height}
+                  controls={gallery[shot]?.type === 'video'}
+                  fetchPriority="high"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
+              </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* buy box */}
-        <div>
+        <div className="min-w-0">
           {product.badges?.length > 0 && (
             <div className="mb-4 flex flex-wrap gap-2">
               {product.badges.map((b) => <Badge key={b} kind={b} />)}
             </div>
           )}
 
-          <h1 className="text-display-lg">{product.title}</h1>
-          <p className="mt-2 text-[15px] text-muted">{product.subtitle}</p>
+          {/* display-md, not display-lg. The larger step tops out around 52px,
+              which in a 26rem column is three words a line and a title taller
+              than the price, the picker and the button put together. */}
+          <h1 className="text-display-md">{product.title}</h1>
+          <p className="mt-2 text-[15px] leading-snug text-muted">{product.subtitle}</p>
 
           <div className="mt-5 flex flex-wrap items-center gap-4">
             <Price
@@ -241,10 +285,12 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             </a>
           </div>
 
-          <p className="mt-6 text-[15px] leading-relaxed text-muted">{product.description}</p>
+          {/* A lede, not the whole description. The rest lives in Details,
+              where someone who wants it will look for it. */}
+          <p className="mt-5 text-[15px] leading-relaxed text-muted">{product.description}</p>
 
           {/* colour */}
-          <fieldset className="mt-9">
+          <fieldset className="mt-8">
             <legend className="text-[13px] font-medium">
               Colour: <span className="text-muted">{activeColor}</span>
             </legend>
@@ -274,7 +320,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           </fieldset>
 
           {/* size */}
-          <fieldset className="mt-7">
+          <fieldset className="mt-8">
             <div className="flex items-baseline justify-between">
               <legend className="text-[13px] font-medium">Size</legend>
               {product.sizeChart ? (
@@ -361,43 +407,33 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             )}
           </div>
 
-          <TrustRow />
+          <TrustRow flat />
           {config.trust?.showSocialProof !== false && <SocialProof product={product} />}
 
-          {config.trust?.showFitFeedback !== false && (
-            <FitBlock product={product} onOpenChart={() => (onOpenChart ? onOpenChart() : setChartOpen(true))} />
-          )}
-          <FabricBlock product={product} />
+          {/*
+            One accordion, not five bordered cards.
+            Fit, fabric, details, care and delivery were each their own panel,
+            which is five competing boxes in a 26rem column and no hierarchy at
+            all — everything shouts, so nothing reads. A single stack of
+            hairline rows gives the buy button the only heavy weight on the
+            page, which is what it should have.
 
-          {/* details */}
-          <div className="mt-10 border-t border-line">
-            <div className="flex gap-6 border-b border-line" role="tablist">
-              {[['details', 'Details'], ['care', 'Care'], ['shipping', 'Shipping']].map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === id}
-                  onClick={() => setTab(id)}
-                  className={`-mb-px border-b-2 py-3.5 text-[13px] transition-colors ${tab === id ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="py-6">
-              {tab === 'details' && (
-                <ul className="space-y-2.5">
-                  {product.details.map((d) => (
-                    <li key={d} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
-                      <Icon name="check" size={15} className="mt-0.5 shrink-0 text-accent" />
-                      {d}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {tab === 'care' && (
-                <ul className="space-y-2.5">
+            Fit is open by default because it is the field that decides whether
+            an apparel order gets kept.
+          */}
+          <div className="mt-8 border-t border-line">
+            <Accordion title="Fit & sizing" defaultOpen>
+              <FitBlock
+                product={product}
+                flat
+                onOpenChart={() => (onOpenChart ? onOpenChart() : setChartOpen(true))}
+              />
+            </Accordion>
+
+            <Accordion title="Fabric & care">
+              <FabricBlock product={product} flat />
+              {product.care?.length > 0 && (
+                <ul className="mt-5 space-y-2.5">
                   {product.care.map((c) => (
                     <li key={c} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
                       <Icon name="sparkle" size={15} className="mt-0.5 shrink-0 text-accent" />
@@ -406,29 +442,43 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                   ))}
                 </ul>
               )}
-              {tab === 'shipping' && (
-                <div className="space-y-3 text-[14px] leading-relaxed text-muted">
-                  <p>
-                    Standard shipping is{' '}
-                    {formatMoney({
-                      amount: config.commerce?.shippingMethods?.[0]?.price ?? 1200,
-                      currency: config.pricing?.currency || 'USD',
-                    })}
-                    , free over{' '}
-                    {formatMoney({
-                      amount: config.commerce?.freeShippingOver ?? 15000,
-                      currency: config.pricing?.currency || 'USD',
-                    })}
-                    . Orders placed before 2pm ship the same working day.
-                  </p>
-                  <p>
-                    Returns are free within {config.commerce?.returnsWindowDays ?? 30} days, unworn and
-                    with tags attached. A prepaid label is in every parcel.
-                  </p>
-                  <p>We repair anything we made. Send it back and we will quote before doing the work.</p>
-                </div>
-              )}
-            </div>
+            </Accordion>
+
+            {product.details?.length > 0 && (
+              <Accordion title="Details">
+                <ul className="space-y-2.5">
+                  {product.details.map((d) => (
+                    <li key={d} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
+                      <Icon name="check" size={15} className="mt-0.5 shrink-0 text-accent" />
+                      {d}
+                    </li>
+                  ))}
+                </ul>
+              </Accordion>
+            )}
+
+            <Accordion title="Delivery & returns">
+              <div className="space-y-3 text-[14px] leading-relaxed text-muted">
+                <p>
+                  Standard shipping is{' '}
+                  {formatMoney({
+                    amount: config.commerce?.shippingMethods?.[0]?.price ?? 1200,
+                    currency: config.pricing?.currency || 'USD',
+                  })}
+                  , free over{' '}
+                  {formatMoney({
+                    amount: config.commerce?.freeShippingOver ?? 15000,
+                    currency: config.pricing?.currency || 'USD',
+                  })}
+                  . Orders placed before 2pm ship the same working day.
+                </p>
+                <p>
+                  Returns are free within {config.commerce?.returnsWindowDays ?? 30} days, unworn and
+                  with tags attached. A prepaid label is in every parcel.
+                </p>
+                <p>We repair anything we made. Send it back and we will quote before doing the work.</p>
+              </div>
+            </Accordion>
           </div>
         </div>
       </div>

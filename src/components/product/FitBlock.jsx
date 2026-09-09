@@ -21,21 +21,23 @@ const VERDICT = {
   'runs-large': { label: 'Runs large', tone: 'text-sale', icon: 'info' },
 }
 
-export function FitBlock({ product, onOpenChart }) {
+export function FitBlock({ product, onOpenChart, flat = false }) {
   const fit = product.fit
   if (!fit) return null
   const v = VERDICT[fit.verdict]
   const fb = fit.feedback
 
+  // `flat` drops the card. Inside an accordion the border would be a box in a
+  // box, which is the fastest way to make a column look cluttered.
   return (
-    <section className="mt-8 rounded-xs border border-line bg-surface p-5">
+    <section className={flat ? '' : 'mt-8 rounded-xs border border-line bg-surface p-5'}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-[13px] font-medium">Fit</h2>
+        {!flat && <h2 className="text-[13px] font-medium">Fit</h2>}
         {product.sizeChart && (
           <button
             type="button"
             onClick={onOpenChart}
-            className="inline-flex items-center gap-1.5 text-[13px] text-accent link-underline"
+            className="ml-auto inline-flex items-center gap-1.5 text-[13px] text-accent link-underline"
           >
             <Icon name="filter" size={14} />
             Size chart & measurements
@@ -44,7 +46,7 @@ export function FitBlock({ product, onOpenChart }) {
       </div>
 
       {v && (
-        <p className={`mt-3 inline-flex items-center gap-1.5 text-[14px] font-medium ${v.tone}`}>
+        <p className={`${flat ? 'mt-1' : 'mt-3'} inline-flex items-center gap-1.5 text-[14px] font-medium ${v.tone}`}>
           <Icon name={v.icon} size={15} />
           {v.label}
         </p>
@@ -81,13 +83,13 @@ export function FitBlock({ product, onOpenChart }) {
   )
 }
 
-export function FabricBlock({ product }) {
+export function FabricBlock({ product, flat = false }) {
   const f = product.fabric
   if (!f) return null
   return (
-    <section className="mt-4 rounded-xs border border-line bg-surface p-5">
-      <h2 className="text-[13px] font-medium">Fabric</h2>
-      <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+    <section className={flat ? '' : 'mt-4 rounded-xs border border-line bg-surface p-5'}>
+      {!flat && <h2 className="text-[13px] font-medium">Fabric</h2>}
+      <dl className={`grid gap-x-6 gap-y-3 sm:grid-cols-2 ${flat ? '' : 'mt-3'}`}>
         <Fact label="Composition" value={f.composition.map(([m, pct]) => `${pct}% ${m}`).join(', ')} />
         {f.weight && <Fact label="Weight" value={`${f.weight} gsm`} />}
         {f.weave && <Fact label="Construction" value={f.weave} />}

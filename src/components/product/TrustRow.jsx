@@ -16,7 +16,7 @@ import { formatMoney } from '../../lib/money.js'
  * Thursday" is a fact to plan around, "2–4 working days" is arithmetic the
  * shopper has to do, and doing it is a moment to leave.
  */
-export default function TrustRow() {
+export default function TrustRow({ flat = false }) {
   const config = useStorefront()
   const trust = config.trust || {}
   const { data: eta } = useAsync(() => api.getDeliveryEstimate({ method: 'standard' }), [])
@@ -52,12 +52,13 @@ export default function TrustRow() {
   ].filter(Boolean)
 
   return (
-    <div className="mt-6 rounded-xs border border-line bg-surface p-4">
+    <div className={flat ? 'mt-7 border-t border-line pt-6' : 'mt-6 rounded-xs border border-line bg-surface p-4'}>
       <ul className="space-y-2.5">
         {rows.map((r) => (
           <li key={r.strong} className="flex gap-2.5 text-[13px] leading-snug">
             <Icon name={r.icon} size={16} className="mt-px shrink-0 text-accent" />
-            <span>
+            {/* min-w-0 so a long line wraps instead of widening the column. */}
+            <span className="min-w-0">
               <span className="text-ink">{r.strong}</span>{' '}
               <span className="text-muted">— {r.rest}</span>
             </span>
