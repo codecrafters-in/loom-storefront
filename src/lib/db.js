@@ -17,7 +17,7 @@
  */
 
 const KEY = 'loom.db'
-const VERSION = 5
+const VERSION = 6
 
 const listeners = new Set()
 let cache = null
@@ -93,6 +93,31 @@ export function ready() {
 }
 
 /**
+ * Fill gaps from `seeded` into `existing`, at every depth.
+ *
+ * A top-level-only merge was enough while the seed only ever gained whole
+ * fields. It stops being enough the moment it gains a field *inside* one that
+ * already exists — a store holding `enrichment` from an earlier version has the
+ * key, so a shallow merge skips it, and the new sub-blocks never arrive. That
+ * failure is silent and looks exactly like the feature not working.
+ *
+ * Arrays are left alone rather than merged: a shopper-facing list the user has
+ * emptied on purpose must stay empty, and there is no sane way to reconcile two
+ * orderings of rows nobody asked us to reconcile.
+ */
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
+
+function fillMissing(existing, seeded) {
+  if (!isPlainObject(existing) || !isPlainObject(seeded)) return existing
+  const out = { ...existing }
+  for (const [key, value] of Object.entries(seeded)) {
+    if (out[key] === undefined || out[key] === null) out[key] = value
+    else if (isPlainObject(out[key]) && isPlainObject(value)) out[key] = fillMissing(out[key], value)
+  }
+  return out
+}
+
+/**
  * Bring an older store up to the current shape.
  *
  * Seed values fill gaps; anything already present wins, because it is either
@@ -111,13 +136,9 @@ async function backfill(stored) {
     const existing = bySlug.get(seeded.slug)
     if (!existing) return seeded
     bySlug.delete(seeded.slug)
-    // Only fill what is missing. A key the user has edited keeps its value even
-    // when the seed has since changed it.
-    const merged = { ...existing }
-    for (const [key, value] of Object.entries(seeded)) {
-      if (merged[key] === undefined || merged[key] === null) merged[key] = value
-    }
-    return merged
+    // Only fill what is missing, at every depth. A key the user has edited
+    // keeps its value even when the seed has since changed it.
+    return fillMissing(existing, seeded)
   })
 
   // Anything the user added that the seed does not know about.

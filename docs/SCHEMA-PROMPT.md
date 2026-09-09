@@ -159,6 +159,17 @@ catalogue — size and fit cause roughly two thirds of fashion returns:
   importer, net_quantity, pack_of. Legally mandated in several markets — India's
   Legal Metrology rules require the manufacturer and packer address, the country
   of origin and the net quantity on a listing
+- `product_assurances` — product_id, icon, label, note (nullable), position. The
+  services block: returns, exchange, repair, payment. A product with no rows
+  inherits the store's, so *no rows* and *an empty explicit set* have to be
+  distinguishable — say how you would model that
+- `makers` — name, location, partner_since, rating, rating_count, note, joined
+  from `products.maker_id` (`ON DELETE SET NULL`, never CASCADE — dropping a
+  supplier must not delete their products). One mill supplies many products, so
+  a rating stored per product goes stale in thirty-nine rows out of forty the
+  first time it changes. Add a constraint that a rating cannot exist without a
+  count: a supplier score with no denominator is a number somebody typed, and a
+  shopper who works that out stops believing the review count too
 
 Three things I want you to get right here and explain:
 

@@ -145,6 +145,15 @@ see [CONFIGURATION.md](CONFIGURATION.md#trust).
 {
   highlights: { key: string, value: string }[]     // ordered; first 6 render
   features: { icon: string, title: string, body: string }[]
+  assurances?: { icon: string, label: string, note?: string }[]
+  maker?: {
+    name: string                                    // required, or the block hides
+    location?: string
+    since?: string | number
+    rating?: number                                 // out of 5
+    ratingCount?: number
+    note?: string
+  }
   specs: Record<string, string>                     // flat; grouped on read
   manufacturer?: {
     genericName?, countryOfOrigin?, manufacturer?,
@@ -162,6 +171,27 @@ attribute vocabulary on read — a backend never stores presentation order.
 `manufacturer` is compliance rather than marketing: India's Legal Metrology rules
 require the manufacturer and packer address, the country of origin and the net
 quantity on an e-commerce listing.
+
+`assurances` is the services block under the buy button — returns, exchange,
+repair, payment. It answers *what happens if this is wrong*, which for apparel is
+usually the last question standing between a considered shopper and the button;
+the specification table answers *is this the right thing*, and the two are not
+interchangeable. `note` renders behind an (i) rather than in the row, because a
+returns policy printed in full is four lines of prose next to a call to action.
+
+**Omit it and the product inherits `storefront.trust.assurances`.** Most stores
+have one returns policy. Sending an empty array is not the same thing — an empty
+array means *this product has none*, and the block renders nothing.
+
+`maker` is the marketplace seller block, adapted. On a marketplace the seller is
+the variable and the rating is the reassurance; on an own-brand store the seller
+is never in doubt and the mill is the unknown a shopper paying a premium is
+actually buying. `name` is required — without it nothing renders, which is the
+right default for a store that does not disclose its supply chain.
+
+A `rating` here is a claim about a third party. Publish one only where you can
+point at what it averages; an invented supplier score makes every other number on
+the page look invented too.
 
 ## Attribute
 

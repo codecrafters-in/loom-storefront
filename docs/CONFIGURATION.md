@@ -331,7 +331,15 @@ Three modes. Full guide with provider examples: **[CHECKOUT.md](CHECKOUT.md)**.
     "showCertifications": true,
     "showFitFeedback": true,
     "showSocialProof": true,
-    "socialProofThresholds": { "bought": 25, "saved": 20 }
+    "socialProofThresholds": { "bought": 25, "saved": 20 },
+    "assurances": [
+      {
+        "icon": "refresh",
+        "label": "30-day returns, no reason needed",
+        "note": "Unworn, tags attached. A prepaid label is in every parcel."
+      },
+      { "icon": "shield", "label": "Two-year seam and hardware guarantee" }
+    ]
   }
 }
 ```
@@ -346,6 +354,13 @@ See [CRO.md](CRO.md).
 | `showFitFeedback` | The fit verdict and purchaser distribution |
 | `showSocialProof` | Demand counts under the buy button |
 | `socialProofThresholds` | Below these, the block renders **nothing** rather than advertising low demand |
+| `assurances` | The services rows under the buy button, for every product that has none of its own |
+
+`assurances` is a fallback, not a default that gets copied. A product with its
+own `enrichment.assurances` replaces these outright rather than merging — a coat
+with a ten-year structural guarantee should not also advertise the two-year one.
+An **empty array on the product** means *this product has none* and hides the
+block; **omitting the field** is what inherits these rows.
 
 ### `promises`
 

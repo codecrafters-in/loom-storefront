@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Button, Icon } from '../ui/index.jsx'
-import { ProductHighlights, ProductDetails } from '../product/Enrichment.jsx'
+import { ProductHighlights, ProductDetails, ProductAssurances, ProductMaker } from '../product/Enrichment.jsx'
 import { attributeByKey, attributeGroups } from '../../data/attributes.js'
 
 /**
@@ -17,11 +17,23 @@ import { attributeByKey, attributeGroups } from '../../data/attributes.js'
  * they are selling, and no list at all produces "Fabric", "fabric", "Material"
  * and "Composition" as four separate attributes nobody can filter on.
  */
-export default function EnrichmentTab({ draft, set, attributes = [], icons = [] }) {
+/**
+ * Sections that live in the 30rem buy column on the real page, and sections
+ * that live full-width below it.
+ *
+ * The preview has to match, and until now it did not: a full-width block shown
+ * inside a 26rem rail produced three feature cards at about 100px each, one
+ * word per line. That is not what ships, so previewing it that way is worse
+ * than not previewing it — it invites a merchant to rewrite copy that was fine.
+ */
+const NARROW = new Set(['highlights', 'comes-with'])
+
+export default function EnrichmentTab({ draft, set, attributes = [], icons = [], assuranceTemplates = [] }) {
   const e = useMemo(() => draft.enrichment || {}, [draft.enrichment])
   const [section, setSection] = useState('highlights')
 
   const setE = (key, value) => set(`enrichment.${key}`, value)
+  const setMaker = (key, value) => setE('maker', { ...(e.maker || {}), [key]: value })
 
   const specRows = useMemo(() => Object.entries(e.specs || {}), [e.specs])
 
@@ -30,13 +42,16 @@ export default function EnrichmentTab({ draft, set, attributes = [], icons = [] 
     [draft, e],
   )
 
+  const narrow = NARROW.has(section)
+
   return (
-    <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_26rem]">
+    <div className={narrow ? 'grid gap-8 xl:grid-cols-[minmax(0,1fr)_26rem]' : 'space-y-10'}>
       <div className="min-w-0 space-y-8">
         <div className="flex flex-wrap gap-2">
           {[
             ['highlights', 'Highlights'],
             ['features', 'Features'],
+            ['comes-with', 'Comes with'],
             ['specs', 'Specifications'],
             ['manufacturer', 'Manufacturer info'],
           ].map(([id, label]) => (
@@ -75,6 +90,51 @@ export default function EnrichmentTab({ draft, set, attributes = [], icons = [] 
           >
             <FeatureEditor items={e.features || []} icons={icons} onChange={(items) => setE('features', items)} />
           </Panel>
+        )}
+
+        {section === 'comes-with' && (
+          <div className="space-y-8">
+            <Panel
+              title="Comes with"
+              note="What happens after the sale — returns, exchange, repair, payment. It sits under the buy button because that is where the doubt arrives. Leave it empty and the product falls back to the store-wide rows in Settings, which is usually what you want; add rows here only where this piece differs."
+            >
+              <AssuranceEditor
+                rows={e.assurances || []}
+                icons={icons}
+                templates={assuranceTemplates}
+                onChange={(rows) => setE('assurances', rows)}
+              />
+            </Panel>
+
+            <Panel
+              title="Made by"
+              note="The mill, workshop or supplier, where they are happy to be named. On a marketplace this block is the seller and their rating; on an own-brand store the seller is never in doubt and the mill is the thing a shopper paying a premium is actually buying. Leave the name empty and the block does not render."
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Name" placeholder="Veshti Mills" value={e.maker?.name || ''} onChange={(v) => setMaker('name', v)} />
+                <Field label="Location" placeholder="Erode, Tamil Nadu" value={e.maker?.location || ''} onChange={(v) => setMaker('location', v)} />
+                <Field label="Working with us since" placeholder="2019" value={e.maker?.since || ''} onChange={(v) => setMaker('since', v)} />
+                <Field label="Rating out of 5" placeholder="4.7" value={e.maker?.rating || ''} onChange={(v) => setMaker('rating', v)} />
+                <Field label="Number of ratings" placeholder="312" value={e.maker?.ratingCount || ''} onChange={(v) => setMaker('ratingCount', v)} />
+              </div>
+              <div className="mt-4">
+                <label htmlFor="maker-note" className="mb-1.5 block text-[13px] font-medium">Note</label>
+                <textarea
+                  id="maker-note"
+                  rows={3}
+                  className="field"
+                  placeholder="A 90-loom weaving house that has been making oxford cloth since 1978."
+                  value={e.maker?.note || ''}
+                  onChange={(ev) => setMaker('note', ev.target.value)}
+                />
+              </div>
+              <p className="mt-3 text-[12px] leading-relaxed text-faint">
+                A rating here is a claim about a third party. Publish one only if you can point at
+                what it is averaged from — an invented supplier score is the fastest way to make
+                every other number on the page look invented too.
+              </p>
+            </Panel>
+          </div>
         )}
 
         {section === 'specs' && (
@@ -118,32 +178,54 @@ export default function EnrichmentTab({ draft, set, attributes = [], icons = [] 
         )}
       </div>
 
-      {/* The real components, not an approximation of them. */}
-      <aside className="min-w-0 xl:sticky xl:top-24 xl:self-start">
+      {/* The real components, not an approximation of them — and at the width
+          they actually ship at, which is the half of "what you see is what
+          ships" that is easy to get wrong. */}
+      <aside className={narrow ? 'min-w-0 xl:sticky xl:top-24 xl:self-start' : 'min-w-0'}>
         <p className="eyebrow">Live preview</p>
-        <div className="mt-3 overflow-hidden rounded-xs border border-line bg-page">
-          {section === 'highlights' && (
-            <div className="p-5">
-              {e.highlights?.length ? (
+        <div
+          className={`mt-3 overflow-hidden rounded-xs border border-line bg-page ${
+            narrow ? '' : 'overflow-x-auto'
+          }`}
+        >
+          {section === 'highlights' &&
+            (e.highlights?.length ? (
+              <div className="p-5">
                 <ProductHighlights enrichment={e} />
-              ) : (
+              </div>
+            ) : (
+              <div className="p-5">
                 <Blank>Add a pair and it appears here, exactly as a shopper sees it.</Blank>
-              )}
-            </div>
-          )}
+              </div>
+            ))}
 
-          {section !== 'highlights' && (
-            <div className="max-h-[70vh] overflow-y-auto">
-              {(e.features?.length || specRows.length || e.manufacturer) ? (
-                <ProductDetails product={preview} />
-              ) : (
-                <div className="p-5"><Blank>Nothing to show yet.</Blank></div>
-              )}
-            </div>
-          )}
+          {section === 'comes-with' &&
+            (e.assurances?.length || e.maker?.name ? (
+              <div className="p-5">
+                <ProductAssurances product={preview} />
+                <ProductMaker enrichment={e} />
+              </div>
+            ) : (
+              <div className="p-5">
+                <Blank>
+                  Nothing product-specific yet — the storefront falls back to the store-wide rows
+                  from Settings.
+                </Blank>
+              </div>
+            ))}
+
+          {!narrow &&
+            (e.features?.length || specRows.length || e.manufacturer ? (
+              <ProductDetails product={preview} />
+            ) : (
+              <div className="p-5">
+                <Blank>Nothing to show yet.</Blank>
+              </div>
+            ))}
         </div>
         <p className="mt-3 text-[12px] leading-relaxed text-faint">
-          Rendered with the storefront&rsquo;s own components, so what you see is what ships.
+          Rendered with the storefront&rsquo;s own components at the width they ship at
+          {narrow ? ' — the column beside the buy button.' : ' — the full page, below the fold.'}
         </p>
       </aside>
     </div>
@@ -308,6 +390,91 @@ function FeatureEditor({ items, icons, onChange }) {
           <span className="text-[12px] text-sale">{items.length} cards is a lot to read. Three is usually the right number.</span>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * The services rows.
+ *
+ * Templates first, free text after. Almost every store wants some version of
+ * the same four promises, and typing a returns policy from memory on the
+ * fortieth product is how a catalogue ends up offering three different windows.
+ */
+function AssuranceEditor({ rows, icons, templates, onChange }) {
+  const patch = (i, key, value) => onChange(rows.map((r, k) => (k === i ? { ...r, [key]: value } : r)))
+
+  return (
+    <div className="space-y-3">
+      {rows.map((row, i) => (
+        <div key={i} className="rounded-xs border border-line p-4">
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="w-32 shrink-0">
+              <label className="mb-1.5 block text-[12px] font-medium">Icon</label>
+              <select
+                className="field h-9 py-0 text-[12px]"
+                value={icons.includes(row.icon) ? row.icon : 'check'}
+                onChange={(ev) => patch(i, 'icon', ev.target.value)}
+              >
+                {icons.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </div>
+            <div className="min-w-[12rem] flex-1">
+              <Field
+                label="Label"
+                placeholder="30-day returns, no reason needed"
+                value={row.label || ''}
+                onChange={(v) => patch(i, 'label', v)}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => onChange(rows.filter((_, k) => k !== i))}
+              aria-label="Remove row"
+              className="mt-6 grid h-9 w-9 shrink-0 place-items-center rounded-xs text-faint transition-colors hover:bg-sale/10 hover:text-sale"
+            >
+              <Icon name="trash" size={14} />
+            </button>
+          </div>
+          <div className="mt-3">
+            <label className="mb-1.5 block text-[13px] font-medium">
+              Note <span className="font-normal text-faint">— behind the (i), optional</span>
+            </label>
+            <textarea
+              rows={2}
+              className="field"
+              placeholder="Unworn, tags attached. A prepaid label is in every parcel."
+              value={row.note || ''}
+              onChange={(ev) => patch(i, 'note', ev.target.value)}
+            />
+          </div>
+        </div>
+      ))}
+
+      <Button size="sm" variant="quiet" icon="plus" onClick={() => onChange([...rows, { icon: 'check', label: '', note: '' }])}>
+        Add row
+      </Button>
+
+      {templates.length > 0 && (
+        <div className="border-t border-line pt-3">
+          <p className="text-[12px] text-faint">Common for apparel</p>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {templates
+              .filter((t) => !rows.some((r) => r.label === t.label))
+              .map((t) => (
+                <li key={t.label}>
+                  <button
+                    type="button"
+                    onClick={() => onChange([...rows, { ...t }])}
+                    className="inline-flex items-center gap-1.5 rounded-xs border border-line px-2 py-1 text-[11px] text-faint transition-colors hover:border-ink hover:text-ink"
+                  >
+                    <Icon name={t.icon} size={12} /> {t.label}
+                  </button>
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

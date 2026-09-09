@@ -145,7 +145,38 @@ listing in several markets, India included under the Legal Metrology rules. It
 is compliance, not conversion, and it belongs in a labelled block rather than
 buried in a description.
 
-### 11. Fit warnings in the grid — `ProductCard`
+### 11. The services block — `product.enrichment.assurances`
+
+Returns, exchange, repair and payment, in a short list under the buy button.
+
+This is the block a marketplace listing puts directly under the price, and it is
+doing different work from everything above it. The specification table answers
+*is this the right thing*. This answers *what happens if it is not* — and in
+apparel, where the shopper cannot try it on and knows it, that is usually the
+last question standing between a considered buyer and the button.
+
+Two details that matter more than the copy:
+
+- **The explanation is behind a disclosure, not printed.** A returns policy set
+  out in full is four lines of legal prose beside a call to action. The label is
+  the reassurance; the wording is there for the one shopper in twenty who checks
+  it before committing.
+- **Product rows replace the store's, they do not merge.** A coat with a
+  ten-year structural guarantee must not also advertise the store's two-year
+  one. Omitting the field inherits; an empty array means *this product has none*.
+
+### 12. Who made it — `product.enrichment.maker`
+
+A marketplace names the seller and shows their rating, because on a marketplace
+the seller is the variable. On an own-brand store the seller is never in doubt
+and the same block is dead weight — unless it names the mill, which is the
+equivalent unknown and, at a premium price, part of what is being bought.
+
+**Publish a rating only where you can point at what it averages.** An invented
+supplier score is the fastest way to make the review count, the stock level and
+every other number on the page look invented too. The block renders without one.
+
+### 13. Fit warnings in the grid — `ProductCard`
 
 "Runs small" appears on the card, not just the product page. Someone comparing
 eight products decides which two to open from the grid, and that is the fact
@@ -170,6 +201,8 @@ Everything above is data. Nothing needs a code change.
 | Demand counts | `product.social` | Hidden below threshold |
 | Payment marks | `storefront.trust.payments` | Row hidden |
 | Highlights grid | `product.enrichment.highlights` | Block hidden |
+| Services block | `product.enrichment.assurances` | Falls back to `storefront.trust.assurances` |
+| Maker block | `product.enrichment.maker` | Block hidden |
 | Feature cards | `product.enrichment.features` | Tab hidden |
 | Specifications | `product.enrichment.specs` | Tab hidden |
 | Manufacturer info | `product.enrichment.manufacturer` | Tab hidden |

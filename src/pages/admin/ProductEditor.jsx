@@ -274,6 +274,7 @@ export default function ProductEditor() {
             set={set}
             attributes={vocab.data?.items || []}
             icons={vocab.data?.icons || []}
+            assuranceTemplates={vocab.data?.assurances || []}
           />
         )}
         {tab === 'organise' && <OrganiseTab {...props} />}

@@ -10,7 +10,7 @@ import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { useWishlist } from '../../store/WishlistContext.jsx'
 import { FitBlock, FabricBlock, SizeChartModal } from './FitBlock.jsx'
 import TrustRow, { SocialProof } from './TrustRow.jsx'
-import { ProductHighlights } from './Enrichment.jsx'
+import { ProductHighlights, ProductAssurances, ProductMaker } from './Enrichment.jsx'
 
 /**
  * The gallery and the buy box — everything above the reviews on a product page.
@@ -449,6 +449,13 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
 
           <TrustRow flat />
           {config.trust?.showSocialProof !== false && <SocialProof product={product} />}
+
+          {/* Store-wide promises above (TrustRow), per-product ones here. The
+              split matters: shipping and returns are the same on everything, so
+              they belong to the store; a repair guarantee on a coat and not on
+              a t-shirt belongs to the product. */}
+          <ProductAssurances product={product} />
+          <ProductMaker enrichment={product.enrichment} />
 
           {/*
             One accordion, not five bordered cards.

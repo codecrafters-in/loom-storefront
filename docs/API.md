@@ -251,6 +251,22 @@ Cache it hard — it changes when a merchant saves settings, not per request.
         "body": "Anything above about 22 micron is the wool people remember itching."
       }
     ],
+    "assurances": [
+      {
+        "icon": "refresh",
+        "label": "30-day returns, no reason needed",
+        "note": "Unworn, tags attached. A prepaid label is in every parcel."
+      },
+      { "icon": "ruler", "label": "Free size exchange, once per order" }
+    ],
+    "maker": {
+      "name": "Todd & Duncan",
+      "location": "Kinross, Scotland",
+      "since": 2018,
+      "rating": 4.9,
+      "ratingCount": 204,
+      "note": "Spinning on the shore of Loch Leven since 1867."
+    },
     "specs": { "sleeve": "Full sleeve", "pattern": "Solid", "care": "Hand wash cool" },
     "manufacturer": {
       "genericName": "Apparel",
@@ -271,6 +287,8 @@ Three blocks, deliberately not one:
 | Block | Where it renders | What it is for |
 | --- | --- | --- |
 | `highlights` | Above the fold, beside the buy button | The scan. Six pairs read in two seconds |
+| `assurances` | Under the buy button | What happens after the sale — returns, exchange, repair, payment |
+| `maker` | Under the assurances | Who made it. The marketplace seller block, adapted |
 | `features` | Below the fold, in "All details" | Two or three things a competitor could not copy-paste |
 | `specs` | Below the fold, grouped, expandable | The reference table. Nobody reads it end to end |
 | `manufacturer` | Below the fold | Compliance, not marketing — see below |
@@ -309,9 +327,18 @@ The suggested vocabulary behind `highlights` and `specs`.
   ],
   "groups": [{ "id": "general", "label": "General" }],
   "icons": ["sparkle", "shield", "leaf", "award"],
+  "assurances": [
+    { "icon": "refresh", "label": "30-day returns, no reason needed",
+      "note": "Unworn, tags attached. A prepaid label is in every parcel." }
+  ],
   "total": 31
 }
 ```
+
+`assurances` are starting points for `enrichment.assurances`, offered as one
+click in the admin panel. Same reasoning as the attribute list: retyping a
+returns policy from memory on the fortieth product is how a catalogue ends up
+promising three different windows.
 
 **Suggestions, not a schema.** The admin combobox offers these and accepts
 anything typed over them. A closed list produces a merchandiser who cannot

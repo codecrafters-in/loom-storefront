@@ -957,6 +957,38 @@ CREATE TABLE product_features (
   position   integer NOT NULL DEFAULT 0
 );
 
+-- The services block: what happens after the sale. Rows are per product, and a
+-- product with none inherits the store's from `storefront_settings`.
+--
+-- `note` is nullable because most rows do not need one — the label is the
+-- reassurance and the note is the wording for the one shopper in twenty who
+-- wants to check it before committing.
+CREATE TABLE product_assurances (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  icon       text NOT NULL DEFAULT 'check',
+  label      text NOT NULL,
+  note       text,
+  position   integer NOT NULL DEFAULT 0
+);
+
+-- Who made it. A marketplace stores this as a seller with a rating; an
+-- own-brand store stores the mill. Same shape either way.
+--
+-- Modelled as its own table rather than columns on `products` because one mill
+-- supplies many products, and a rating repeated across forty rows goes stale in
+-- thirty-nine of them the first time it is updated.
+CREATE TABLE makers (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name         text NOT NULL,
+  location     text,
+  partner_since integer,
+  rating       numeric(2,1) CHECK (rating IS NULL OR rating BETWEEN 0 AND 5),
+  rating_count integer NOT NULL DEFAULT 0,
+  note         text,
+  CONSTRAINT rating_needs_a_count CHECK (rating IS NULL OR rating_count > 0)
+);
+
 -- Compliance. Separate from the rest because it is legally mandated in several
 -- markets and is audited as a unit.
 CREATE TABLE product_compliance (
@@ -972,7 +1004,22 @@ CREATE TABLE product_compliance (
 
 CREATE INDEX ON product_attributes (attribute_key, value);
 CREATE INDEX ON product_features (product_id, position);
+CREATE INDEX ON product_assurances (product_id, position);
 ```
+
+`products` gains one nullable column for the join:
+
+```sql
+ALTER TABLE products ADD COLUMN maker_id uuid REFERENCES makers(id) ON DELETE SET NULL;
+```
+
+`ON DELETE SET NULL`, not `CASCADE` — dropping a supplier from the directory must
+not delete the products they made.
+
+The `rating_needs_a_count` constraint is the interesting one. A supplier rating
+with nothing behind it is a number somebody typed, and a shopper who works that
+out stops believing the review count and the stock level too. The constraint
+makes publishing one without a denominator a write error rather than a habit.
 
 Three decisions worth defending:
 

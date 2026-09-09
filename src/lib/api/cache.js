@@ -24,6 +24,36 @@ const inflight = new Map()
 const memory = new Map()
 const STORE_KEY = 'loom.cache'
 
+/**
+ * Listeners woken when a background revalidation actually changed something.
+ *
+ * Stale-while-revalidate without this is a quiet correctness bug rather than an
+ * optimisation: the caller is handed the stale copy, the refresh lands in the
+ * cache a moment later, and the screen keeps showing the old data until
+ * something else happens to remount it. That is exactly how a product edited in
+ * the admin panel — or a demo store migrated to a newer shape on load — reads
+ * correctly in one place and wrongly in another.
+ *
+ * Only fired when the refreshed value differs, so an unchanged response costs a
+ * comparison and nothing else.
+ */
+const watchers = new Set()
+
+export function onRevalidated(fn) {
+  watchers.add(fn)
+  return () => watchers.delete(fn)
+}
+
+function announce(key) {
+  for (const fn of watchers) {
+    try {
+      fn(key)
+    } catch {
+      /* one bad listener must not stop the others */
+    }
+  }
+}
+
 /** How long a response stays fresh, by namespace. Milliseconds. */
 export const TTL = {
   bootstrap: 5 * 60_000,
@@ -86,9 +116,14 @@ export async function cached(key, fn, ttl = TTL.catalog) {
   if (entry && age < entry.ttl) return entry.value
 
   if (entry) {
-    // Stale: hand back what we have, refresh behind it.
+    // Stale: hand back what we have, refresh behind it, and say so if the
+    // refresh disagreed with what we just served.
+    const served = JSON.stringify(entry.value)
     dedupe(key, fn)
-      .then((fresh) => writeEntry(key, fresh, ttl))
+      .then((fresh) => {
+        writeEntry(key, fresh, ttl)
+        if (JSON.stringify(fresh) !== served) announce(key)
+      })
       .catch(() => {
         /* keep serving the stale copy — a failed refresh is not a broken page */
       })

@@ -81,6 +81,28 @@ export const attributes = [
 export const attributeByKey = Object.fromEntries(attributes.map((a) => [a.key, a]))
 
 /** Icons a feature card can use. Anything else is an image URL. */
+/**
+ * Ready-made service rows for the assurances block.
+ *
+ * Offered as one-click starting points in the admin panel, not as a fixed list.
+ * Nearly every apparel store promises some version of these four, and retyping
+ * a returns policy per product is how three products end up promising three
+ * different windows.
+ */
+export const assuranceTemplates = [
+  { icon: 'refresh', label: '30-day returns, no reason needed',
+    note: 'Unworn, tags attached. A prepaid label is in every parcel.' },
+  { icon: 'ruler', label: 'Free size exchange, once per order',
+    note: 'While the size you want is in stock.' },
+  { icon: 'shield', label: 'Two-year seam and hardware guarantee',
+    note: 'A seam that fails, a zip that stops running — we repair it or replace the piece.' },
+  { icon: 'package', label: 'Pay on delivery available',
+    note: 'Offered at checkout on domestic orders under the threshold you set.' },
+  { icon: 'truck', label: 'Free insured delivery, signature required' },
+  { icon: 'leaf', label: 'Certified supply chain, audited annually' },
+  { icon: 'award', label: 'Free repairs for the life of the piece' },
+]
+
 export const featureIcons = [
   'sparkle', 'shield', 'refresh', 'truck', 'package', 'check', 'star',
   'heart', 'droplet', 'sun', 'wind', 'leaf', 'award', 'ruler', 'recycle', 'thermometer',

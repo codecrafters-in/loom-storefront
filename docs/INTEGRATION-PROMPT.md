@@ -189,6 +189,13 @@ GET /collections                → { items: Collection[], total }
   "enrichment": {
     "highlights": [{ "key": "fabric", "value": "Merino wool" }],
     "features": [{ "icon": "thermometer", "title": "…", "body": "…" }],
+    "assurances": [
+      { "icon": "refresh", "label": "30-day returns, no reason needed", "note": "…" }
+    ],
+    "maker": {
+      "name": "Todd & Duncan", "location": "Kinross, Scotland",
+      "since": 2018, "rating": 4.9, "ratingCount": 204, "note": "…"
+    },
     "specs": { "sleeve": "Full sleeve", "care": "Hand wash cool" },
     "manufacturer": {
       "genericName": "Apparel", "countryOfOrigin": "Italy",
@@ -217,10 +224,11 @@ Rules on Product:
 - **`categories`** lists the leaf and its ancestors, or just the leaf if you
   resolve ancestors server-side when filtering.
 
-`enrichment` is three blocks on purpose, and they render in different places:
+`enrichment` is several blocks on purpose, and they render in different places:
 `highlights` above the fold beside the buy button (six pairs, the two-second
-scan), `features` and `specs` below it. All of one long table means most people
-read none of it; all of it above the fold pushes the buy button off screen.
+scan), `assurances` and `maker` under the buy button, `features` and `specs`
+below it. All of one long table means most people read none of it; all of it
+above the fold pushes the buy button off screen.
 
 - `highlights` is an **ordered array**, not an object — order is editorial and a
   JSON object does not guarantee it
@@ -230,6 +238,17 @@ read none of it; all of it above the fold pushes the buy button off screen.
 - `manufacturer` is compliance, not marketing. India's Legal Metrology rules
   require the manufacturer and packer address, the country of origin and the net
   quantity on an e-commerce listing
+- `assurances` is the services block — returns, exchange, repair, payment. It
+  answers *what happens if this is wrong*, which for apparel is usually the last
+  question before the button; the specification table answers *is this the right
+  thing*, and the two are not interchangeable. **Omit the field** and the
+  product inherits `storefront.trust.assurances`; **send an empty array** and it
+  renders nothing, which is a different statement. Do not merge the two — a coat
+  with a ten-year guarantee must not also advertise the store's two-year one
+- `maker` is the marketplace seller block, adapted: on a marketplace the seller
+  is the variable and the rating is the reassurance, on an own-brand store it is
+  the mill. `name` is required or nothing renders. Send `rating` only where you
+  can point at what it averages — `ratingCount` alongside it, always
 
 Also expose the vocabulary behind it:
 

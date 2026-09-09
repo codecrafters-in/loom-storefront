@@ -31,6 +31,20 @@ const shirtSpecs = (extra = {}) => ({
 
 export const productEnrichment = {
   'oxford-shirt-ecru': {
+    assurances: [
+      { icon: 'ruler', label: 'Free size exchange, once per order', note: 'Oxford runs a half size roomier than a dress shirt. If you sized on that assumption and got it wrong, the exchange is on us.' },
+      { icon: 'refresh', label: '30-day returns, no reason needed', note: 'Unworn, tags attached, prepaid label in the parcel.' },
+      { icon: 'shield', label: 'Free collar and cuff replacement, five years', note: 'Collars and cuffs go long before the body does. Send it back and we re-cut them from the same bolt, which we hold for five years for exactly this.' },
+      { icon: 'package', label: 'Pay on delivery available', note: 'Offered at checkout on domestic orders under $400.' },
+    ],
+    maker: {
+      name: 'Veshti Mills',
+      location: 'Erode, Tamil Nadu',
+      since: 2019,
+      rating: 4.7,
+      ratingCount: 312,
+      note: 'A 90-loom weaving house that has been making oxford cloth since 1978. They weave our cotton, and they are the reason we can hold the same bolt for five years.',
+    },
     highlights: [
       { key: 'fabric', value: 'Pure cotton' },
       { key: 'weave', value: 'Oxford' },
@@ -60,6 +74,20 @@ export const productEnrichment = {
   },
 
   'linen-camp-shirt': {
+    assurances: [
+      { icon: 'refresh', label: '30-day returns, no reason needed', note: 'Linen relaxes with wear. If it feels stiff out of the parcel that is normal — but the window is thirty days either way.' },
+      { icon: 'ruler', label: 'Free size exchange, once per order' },
+      { icon: 'shield', label: 'Two-year seam and hardware guarantee', note: 'Linen is stronger wet than dry and rarely fails at the seam. If ours does, we repair it.' },
+      { icon: 'leaf', label: 'European Flax certified, farm to yarn', note: 'Traceable to the field in Normandy. Flax needs no irrigation and no defoliant, and the certification is what makes that checkable rather than a claim.' },
+    ],
+    maker: {
+      name: 'Atelier Libeco',
+      location: 'Meulebeke, Belgium',
+      since: 2021,
+      rating: 4.8,
+      ratingCount: 148,
+      note: 'Fourth-generation linen weavers working flax grown within 200km of the mill.',
+    },
     highlights: [
       { key: 'fabric', value: 'Linen' },
       { key: 'weight', value: '190 gsm' },
@@ -89,6 +117,20 @@ export const productEnrichment = {
   },
 
   'merino-crew-knit': {
+    assurances: [
+      { icon: 'refresh', label: '30-day returns, no reason needed' },
+      { icon: 'shield', label: 'Free darning for life', note: 'Moth holes, snags, a worn elbow — post it to us and we darn it in matching yarn, which we keep in stock for every colour we have ever sold.' },
+      { icon: 'ruler', label: 'Free size exchange, once per order' },
+      { icon: 'award', label: 'Non-mulesed wool, certified', note: 'RWS-certified through the grower, so the welfare claim is audited at the farm rather than asserted at the label.' },
+    ],
+    maker: {
+      name: 'Todd & Duncan',
+      location: 'Kinross, Scotland',
+      since: 2018,
+      rating: 4.9,
+      ratingCount: 204,
+      note: 'Spinning on the shore of Loch Leven since 1867 — the soft water is the reason the mill is there at all.',
+    },
     highlights: [
       { key: 'fabric', value: 'Merino wool' },
       { key: 'weight', value: '260 gsm' },
@@ -121,6 +163,20 @@ export const productEnrichment = {
   },
 
   'selvedge-denim-straight': {
+    assurances: [
+      { icon: 'ruler', label: 'Free hemming, done before dispatch', note: 'Tell us your inseam at checkout and we chain-stitch it on a Union Special 43200G, which is what gives the hem its roping as it fades.' },
+      { icon: 'refresh', label: '30-day returns — unworn and unwashed', note: 'Raw denim is dyed, not washed, and it marks whatever it touches for the first month. We cannot resell a worn pair, so this window is stricter than the rest of the store.' },
+      { icon: 'shield', label: 'Free repairs for the life of the jean', note: 'Crotch blowouts, knee holes, a torn back pocket. We darn them on a chain-stitch machine and return them inside three weeks.' },
+      { icon: 'package', label: 'Pay on delivery available' },
+    ],
+    maker: {
+      name: 'Kaihara Denim',
+      location: 'Fukuyama, Hiroshima',
+      since: 2017,
+      rating: 4.9,
+      ratingCount: 421,
+      note: 'Rope-dyes its own yarn and weaves on shuttle looms from the 1960s. Slow, narrow, and the reason the selvedge ID is straight.',
+    },
     highlights: [
       { key: 'fabric', value: 'Denim' },
       { key: 'weight', value: '460 gsm' },
@@ -153,6 +209,20 @@ export const productEnrichment = {
   },
 
   'wool-overcoat': {
+    assurances: [
+      { icon: 'shield', label: 'Ten-year structural guarantee', note: 'Canvas, shoulder, lining and buttonholes. A coat is the one thing here built to outlast a decade, so the guarantee says so in years rather than in adjectives.' },
+      { icon: 'refresh', label: '30-day returns, no reason needed' },
+      { icon: 'ruler', label: 'Free sleeve shortening', note: 'Working cuffs are finished but not buttoned through, so a tailor — ours or yours — can take up to 4cm off the sleeve without touching the shoulder.' },
+      { icon: 'truck', label: 'Free insured delivery, signature required', note: 'Anything over $400 ships insured to its full value and needs a signature. We would rather ask you to be in than replace a coat.' },
+    ],
+    maker: {
+      name: 'Abraham Moon & Sons',
+      location: 'Guiseley, West Yorkshire',
+      since: 2016,
+      rating: 4.8,
+      ratingCount: 96,
+      note: 'One of the last vertical mills in Britain — the fleece arrives raw and leaves as finished cloth without going anywhere else.',
+    },
     highlights: [
       { key: 'fabric', value: 'Virgin wool' },
       { key: 'weight', value: '750 gsm' },
@@ -185,6 +255,20 @@ export const productEnrichment = {
   },
 
   'cashmere-crew': {
+    assurances: [
+      { icon: 'shield', label: 'Free de-pilling and re-blocking, every winter', note: 'Send it in over the summer and it comes back combed, washed and blocked back to its original measurements. There is no limit on how many times.' },
+      { icon: 'refresh', label: '30-day returns, no reason needed' },
+      { icon: 'ruler', label: 'Free size exchange, once per order' },
+      { icon: 'award', label: 'Grade-A fibre, 34mm and longer', note: 'Fibre length is what decides whether cashmere pills for a season or softens for a decade, and it is the one number a cashmere label almost never prints.' },
+    ],
+    maker: {
+      name: 'Johnstons of Elgin',
+      location: 'Hawick, Scottish Borders',
+      since: 2015,
+      rating: 4.9,
+      ratingCount: 267,
+      note: 'Knitting cashmere in the Borders since 1797. Our yarn is two-ply, spun and knitted under the same roof.',
+    },
     highlights: [
       { key: 'fabric', value: 'Cashmere' },
       { key: 'weight', value: '300 gsm' },

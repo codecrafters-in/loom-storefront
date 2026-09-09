@@ -18,7 +18,7 @@
 import * as db from '../db.js'
 import { railKey } from './railKey.js'
 import * as mediaStore from '../media.js'
-import { attributes, attributeGroups, featureIcons } from '../../data/attributes.js'
+import { attributes, attributeGroups, assuranceTemplates, featureIcons } from '../../data/attributes.js'
 import { config } from '../config.js'
 import { ApiError } from './contracts.js'
 
@@ -939,7 +939,13 @@ export async function deleteMedia(id) {
  */
 export async function listAttributes() {
   await latency()
-  return { items: attributes, groups: attributeGroups, icons: featureIcons, total: attributes.length }
+  return {
+    items: attributes,
+    groups: attributeGroups,
+    icons: featureIcons,
+    assurances: assuranceTemplates,
+    total: attributes.length,
+  }
 }
 
 export async function listSizeCharts() {

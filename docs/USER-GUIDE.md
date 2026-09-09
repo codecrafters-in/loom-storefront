@@ -22,6 +22,7 @@ Five tabs, filled in the order you would think about them:
 | **Media** | Images. First is the card, second is the hover shot |
 | **Variants** | Colours with swatches, sizes, then **Rebuild matrix** |
 | **Fit & fabric** | Fit verdict, model, size chart, composition, certifications |
+| **Highlights & specs** | Highlights, features, what it comes with, who made it, the spec table |
 | **Organise** | Categories, tags, rating |
 
 Colours and sizes come first, then **Rebuild matrix** creates one row per
@@ -245,21 +246,48 @@ Tick individual rows first and the scope list gains **the N selected**.
 
 **Open the product → Highlights & specs**
 
-Four sections, and the storefront's own rendering sits beside them so you can
+Five sections, and the storefront's own rendering sits beside them so you can
 see what you are writing as you write it.
 
 | Section | Where a shopper sees it | Keep it to |
 | --- | --- | --- |
 | **Highlights** | Beside the buy button, above the fold | Six pairs |
+| **Comes with** | Under the buy button | Three or four rows, plus the maker |
 | **Features** | Below, in "All details" | Two or three |
 | **Specifications** | Below, grouped, expandable | As much as you like |
 | **Manufacturer info** | Below | Whatever the law asks for |
+
+> The preview changes width with the section, because the page does. Highlights
+> and Comes with preview in a narrow column, because that is the column they
+> ship in beside the buy button; the rest preview full width. A full-width block
+> shown in a narrow rail is not what ships, and it will talk you into rewriting
+> copy that was fine.
 
 **Highlights** are the two-second scan — fabric, fit, weight, the things
 somebody checks before deciding to keep reading. Start typing in the key box and
 it suggests `fabric`, `fit`, `sleeve` and the rest, with common values for
 each. Type something else and it takes it. Only the first six show, and it tells
 you if you have added more.
+
+**Comes with** is what happens after the sale — returns, exchange, repair,
+payment. It sits under the buy button because that is where the doubt arrives:
+the specifications answer *is this the right thing*, and these answer *what
+happens if it is not*.
+
+Pick from the common apparel rows with one click, then edit the wording. The
+**note** is the paragraph behind the small (i) — put the caveats there and keep
+the label short enough to scan.
+
+> Leave this section empty and the product uses the store-wide rows from
+> **Settings → Trust**, which is usually what you want. Add rows here only where
+> this piece genuinely differs — a coat with a ten-year guarantee, a raw denim
+> with a stricter returns window. Product rows *replace* the store's rather than
+> adding to them, so list everything the piece comes with, not just the extra.
+
+**Made by**, in the same section, names the mill or workshop. Leave the name
+empty and the block does not appear. If you publish a rating, publish the number
+of ratings with it — a score with nothing behind it makes every other number on
+the page look made up too.
 
 **Features** are the two or three things a competitor could not copy-paste. Pick
 an icon or paste your own image, write a title and a sentence. It counts the

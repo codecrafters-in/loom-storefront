@@ -234,6 +234,37 @@ export const storefront = {
    */
   trust: {
     payments: ['Visa', 'Mastercard', 'Amex', 'PayPal', 'Apple Pay', 'UPI'],
+
+    /**
+     * The services block under the buy button, when a product has none of its
+     * own. One policy, written once — three products promising three different
+     * return windows is how a support inbox fills up.
+     *
+     * `note` is the disclosure behind the (i). Keep the label short enough to
+     * scan and put the caveats in the note, not in brackets after the label.
+     */
+    assurances: [
+      {
+        icon: 'refresh',
+        label: '30-day returns, no reason needed',
+        note: 'Unworn, tags attached. A prepaid label is in every parcel — drop it at any collection point and the refund goes back to your original payment method within five working days of it reaching us.',
+      },
+      {
+        icon: 'ruler',
+        label: 'Free size exchange, once per order',
+        note: 'If the fit is wrong we send the replacement before the first piece is back with us, so you are not waiting twice. Available while the size you want is in stock.',
+      },
+      {
+        icon: 'shield',
+        label: 'Two-year seam and hardware guarantee',
+        note: 'A seam that fails, a zip that stops running, a button band that pulls — we repair it or replace the piece. Fair wear and accidental damage are repaired at cost, not refused.',
+      },
+      {
+        icon: 'package',
+        label: 'Pay on delivery available',
+        note: 'Offered at checkout on orders under $400 shipping within the country. Card, UPI and wallet payments are taken on our own checkout; we never see or store the card number.',
+      },
+    ],
     repairs: true,
     showCertifications: true,
     showFitFeedback: true,

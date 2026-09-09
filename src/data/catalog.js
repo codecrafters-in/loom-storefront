@@ -593,9 +593,52 @@ function enrichmentFor(raw, facts) {
     },
   ].filter(Boolean).slice(0, 3)
 
+  /**
+   * Services, derived from what is actually true of this piece.
+   *
+   * The store's own policy rows live in `storefront.trust.assurances` and are
+   * what a product falls back to. These add the two that are per-product rather
+   * than per-store — a repair promise only holds where the piece is repairable,
+   * and a certification is only worth a row where one exists — so the block
+   * says something specific instead of repeating the footer.
+   */
+  const assurances = [
+    { icon: 'refresh', label: '30-day returns, no reason needed',
+      note: 'Unworn, tags attached. A prepaid label is in every parcel and the refund goes back to your original payment method within five working days of it reaching us.' },
+    { icon: 'ruler', label: 'Free size exchange, once per order',
+      note: 'One exchange per order, while the size you want is in stock. We send the replacement before the first piece is back with us.' },
+    fabric.certifications?.length && {
+      icon: 'leaf', label: `${fabric.certifications[0]} certified`,
+      note: `Audited at the supplier rather than declared on the label. Certificate numbers on request.`,
+    },
+    { icon: 'shield', label: 'Two-year seam and hardware guarantee',
+      note: 'A seam that fails, a zip that stops running, a button band that pulls — we repair it or replace the piece.' },
+  ].filter(Boolean)
+
+  /**
+   * Who made it, without inventing who made it.
+   *
+   * Six products name their mill because those partners agreed to be named. For
+   * the rest the honest disclosure is the region, which the fabric data already
+   * carries — so this block names a place and omits the rating, rather than
+   * fabricating a supplier and a score for it. A store filling this in properly
+   * replaces it in the admin panel; the shape is identical either way.
+   */
+  const maker = fabric.origin
+    ? {
+        name: `Our mill in ${fabric.origin}`,
+        location: fabric.origin,
+        note: `We name the region on every piece and the mill wherever the partner is happy to be named. This one is woven and finished in ${fabric.origin}${
+          fabric.certifications?.length ? `, under ${fabric.certifications.join(' and ')}` : ''
+        }.`,
+      }
+    : null
+
   return {
     highlights,
     features,
+    assurances,
+    maker,
     specs: {
       ...(fabric.composition?.length ? { composition: fabric.composition.map(([m, pct]) => `${pct}% ${m}`).join(', ') } : {}),
       ...(fabric.weight ? { weight: String(fabric.weight) } : {}),
