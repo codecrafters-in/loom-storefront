@@ -990,6 +990,16 @@ CREATE TABLE makers (
   location text
 );
 
+-- `orders` gains one column for replay safety:
+--
+--   ALTER TABLE orders ADD COLUMN idempotency_key text;
+--   ALTER TABLE orders ADD CONSTRAINT orders_idempotency_unique
+--     UNIQUE (idempotency_key);
+--
+-- Insert with `ON CONFLICT (idempotency_key) DO NOTHING RETURNING *`. Returning
+-- no row *is* the replay: look the original up and answer `created: false`.
+-- A provider retries, and a retry must not sell the stock twice.
+
 -- What happened to the money, separately from what happened to the parcel.
 --
 -- An order can be paid and unshipped, shipped and refunded, or placed and never

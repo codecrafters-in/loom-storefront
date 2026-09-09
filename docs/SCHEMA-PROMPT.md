@@ -170,6 +170,12 @@ catalogue — size and fit cause roughly two thirds of fashion returns:
   review is a number somebody typed, and a shopper who works that out stops
   believing the review count and the stock level too
 
+`orders` needs an `idempotency_key text UNIQUE`. Order placement from a payment
+webhook inserts with `ON CONFLICT DO NOTHING RETURNING`, and returning no row is
+how a replay is detected — the caller then answers with the original order and
+`created: false`. Providers retry; without this one column a retry sells the
+stock twice and emails the customer again.
+
 **Money** — payments, refunds and the messages sent about them:
 - `payments` — order_id, provider, status (`pending | authorized | captured |
   failed | refunded | partially_refunded`), reference (the provider's payment

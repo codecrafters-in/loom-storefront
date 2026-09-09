@@ -24,7 +24,7 @@ The address form in this theme is exactly the part that is safe to own.
 
 ---
 
-## The three modes
+## The four modes
 
 Set `checkout.mode` in your storefront config.
 

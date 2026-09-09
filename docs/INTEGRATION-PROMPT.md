@@ -665,6 +665,12 @@ leaks their contents one character at a time — use `crypto.timingSafeEqual`. A
 compute a webhook signature over the exact request body, not a re-stringified
 parse, or verification will pass for a payload that was tampered with.
 
+**`POST /admin/orders` must be idempotent on `idempotency_key`** and return
+`created: false` on a replay. Providers retry; without that flag every retry
+sends another confirmation email and decrements the stock again. Pair it with
+`GET /admin/orders/:id`, which is admin-scoped rather than owner-scoped and must
+not redact `payment.reference` — the refund path reads it.
+
 **Treat the webhook as the truth.** A shopper who pays and closes the tab before
 the redirect has still paid; without a webhook the money is taken and no order
 exists. Key order creation on the payment id, because providers retry.

@@ -68,6 +68,9 @@ const KEY = {
   placed: 'loom.placed',
   // Status only. See `saveCredentials` for why there is no value in here.
   credentials: 'loom.credentials',
+  // idempotency_key → order id. A provider retrying a webhook must not place a
+  // second order for the same money.
+  idempotency: 'loom.idempotency',
 }
 
 async function latency() {
@@ -609,9 +612,16 @@ export async function clearCart() {
 
 /* ── checkout and orders ───────────────────────────────────────────────── */
 
-export async function checkout({ email, shippingAddress, shippingMethod = 'standard' }) {
-  await latency()
-  const cart = priceCart(loadCart())
+/**
+ * Turn a priced cart into an order.
+ *
+ * Shared by `checkout()` — a shopper pressing the button — and
+ * `adminPlaceOrder()` — a payment webhook reporting money that has already
+ * moved. Extracted rather than copied because the stock re-check below is the
+ * only thing standing between two shoppers and the same last unit, and a second
+ * copy of it is a copy that will eventually stop matching the first.
+ */
+function placeOrderFromCart(cart, { email, shippingAddress, shippingMethod = 'standard', payment }) {
   if (!cart.lines.length) throw new ApiError('Your bag is empty.', { status: 422, code: 'empty_cart' })
   if (!email) throw new ApiError('An email address is required.', { status: 422, code: 'email_required' })
 
@@ -677,19 +687,77 @@ export async function checkout({ email, shippingAddress, shippingMethod = 'stand
       method: null,
       amount: cart.total,
       capturedAt: nowIso(),
+      ...payment,
     },
     refunds: [],
     refundedTotal: { amount: 0, currency: CURRENCY },
   }
+
   // Decrement what was sold. A checkout that leaves inventory alone lets the
   // same last unit be bought indefinitely, which hides every stock bug there is.
   for (const line of cart.lines) db.adjustInventory(line.variantId, -line.quantity)
   adopt()
 
   write(KEY.orders, [order, ...orders])
+  return order
+}
+
+export async function checkout({ email, shippingAddress, shippingMethod = 'standard' }) {
+  await latency()
+  const order = placeOrderFromCart(priceCart(loadCart()), { email, shippingAddress, shippingMethod })
+
+  // Only a browser checkout does these two: the placing browser earns the right
+  // to reopen its own confirmation page, and the bag it just bought is emptied.
   write(KEY.placed, [order.id, ...read(KEY.placed, [])].slice(0, 50))
   saveCart(emptyCart())
   return order
+}
+
+/**
+ * Place an order on behalf of a payment that has already been taken.
+ *
+ * This is how `examples/server/server.mjs` turns a captured Razorpay payment
+ * into an order, and it existed as an undocumented dependency for a while: the
+ * reference server called `POST /admin/orders` and nothing in the contract said
+ * the route was meant to be there, so a backend built from the docs would 502
+ * the first time somebody paid.
+ *
+ * **Idempotent on `idempotencyKey`.** Providers retry their webhooks, and a
+ * retry must not place a second order for the same money. A replay returns the
+ * original order with `created: false`, which is the flag the reference server
+ * uses to decide whether to send a confirmation email — without it, every retry
+ * emails the customer again.
+ */
+export async function adminPlaceOrder({ cartId, email, payment, idempotencyKey } = {}) {
+  await latency()
+
+  if (idempotencyKey) {
+    const seen = read(KEY.idempotency, {})[idempotencyKey]
+    const existing = seen && read(KEY.orders, []).find((o) => o.id === seen)
+    if (existing) return { ...existing, created: false }
+  }
+
+  const cart = loadCart()
+  if (!cartId || cart.id !== cartId) {
+    throw new ApiError(`No cart with id "${cartId}".`, { status: 404, code: 'cart_not_found' })
+  }
+
+  const order = placeOrderFromCart(priceCart(cart), {
+    email,
+    shippingAddress: cart.shippingAddress,
+    shippingMethod: cart.shippingMethod,
+    payment,
+  })
+
+  if (idempotencyKey) {
+    write(KEY.idempotency, { ...read(KEY.idempotency, {}), [idempotencyKey]: order.id })
+  }
+  // The lines were sold, so the bag is spent. `KEY.placed` is deliberately not
+  // written: an order placed by a server on a webhook's behalf is not this
+  // browser's order, and granting it the guest-confirmation capability would
+  // hand the shop's own tab access to somebody else's purchase.
+  saveCart(emptyCart())
+  return { ...order, created: true }
 }
 
 const ORDER_STATUSES = ['placed', 'paid', 'fulfilled', 'delivered', 'cancelled', 'refunded']
@@ -981,6 +1049,26 @@ export async function lookupOrder({ number, email } = {}) {
   // Remembering it means the confirmation page works from here on, which is
   // what somebody looking their order up actually wanted.
   write(KEY.placed, [...new Set([order.id, ...read(KEY.placed, [])])].slice(0, 50))
+  return order
+}
+
+/**
+ * One order, for an admin token.
+ *
+ * Deliberately not owner-scoped, unlike `getOrder` above — that one gates on
+ * the customer session or on the browser that placed the order, which is
+ * exactly right for a shopper and useless for a back office. The refund route
+ * in `examples/server/server.mjs` reads `payment.reference` through here to
+ * call the provider, so this must also never redact it.
+ *
+ * In this demo there is no server to check a token against, so it simply
+ * returns the record — the same position `adminListProducts` takes. The
+ * enforcement is the backend's, and the docs say so.
+ */
+export async function adminGetOrder(idOrNumber) {
+  await latency()
+  const order = read(KEY.orders, []).find((o) => o.id === idOrNumber || o.number === idOrNumber)
+  if (!order) throw new ApiError('Order not found.', { status: 404, code: 'not_found' })
   return order
 }
 

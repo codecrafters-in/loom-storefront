@@ -395,6 +395,35 @@ their browser, or opens the confirmation email on a different phone, has no way
 back to their own order — so they email support, or assume the order failed and
 order again.
 
+### Placing an order from a server
+
+```
+POST /admin/orders   { cart_id, email, payment, idempotency_key }  → Order + created
+GET  /admin/orders/:id                                             → Order
+```
+
+The route a payment webhook uses to turn money that has already moved into an
+order. `examples/server/server.mjs` calls it after verifying a Razorpay
+signature — and for a while this section did not exist, so a backend built from
+these docs would 502 the first time somebody paid.
+
+**`created` is not cosmetic.** A provider retries its webhook, so the same
+`idempotency_key` must return the *original* order with `created: false` and
+place nothing:
+
+```json
+{ "id": "order_…", "number": "LM-10428", "created": false, "…": "…" }
+```
+
+Without it, a retry sends a second confirmation email and sells the stock twice.
+The reference server branches on exactly this field.
+
+**`GET /admin/orders/:id` is not owner-scoped**, unlike `GET /orders/:id`. That
+one gates on the customer session or the browser that placed the order, which is
+right for a shopper and useless for a back office. This one gates on the admin
+token and returns any order — and it must never redact `payment.reference`,
+because the refund route reads it to call the provider.
+
 ### Order visibility
 
 `GET /orders` requires a session and returns only that customer's orders.

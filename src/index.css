@@ -18,7 +18,9 @@
 
     --ink: 26 24 21;
     --muted: 107 100 90;
-    --faint: 125 117 106;
+    /* 5.02 on --page. Was 125 117 106, which is 4.28 and fails WCAG AA on the
+       141 elements using text-faint. See scripts/contrast.mjs. */
+    --faint: 114 106 96;
     --line: 227 221 210;
 
     --accent: 124 74 45;

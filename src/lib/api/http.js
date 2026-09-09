@@ -342,6 +342,18 @@ export const adminSaveSizeChart = (chart) => post('/admin/size-charts', chart)
  */
 export const lookupOrder = (body) => post('/orders/lookup', body)
 
+/**
+ * Place an order for money that has already been taken, and read one back.
+ *
+ * The body keys are snake_case because that is what the reference payments
+ * server sends and what a backend built from the docs will expect. `created` in
+ * the response is what tells a webhook handler whether this was the first
+ * delivery or a retry — without it, every retry sends another confirmation.
+ */
+export const adminPlaceOrder = ({ cartId, email, payment, idempotencyKey }) =>
+  post('/admin/orders', { cart_id: cartId, email, payment, idempotency_key: idempotencyKey })
+export const adminGetOrder = (id) => get(`/admin/orders/${encodeURIComponent(id)}`)
+
 export const adminRefundOrder = (orderId, body) =>
   post(`/admin/orders/${encodeURIComponent(orderId)}/refunds`, body)
 export const adminGetCredentials = () => get('/admin/credentials')

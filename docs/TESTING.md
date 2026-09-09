@@ -51,6 +51,8 @@ to change the code rather than the wait.
 | `order-lookup` | Both fields matching, and failing identically when they do not |
 | `seo` | robots.txt and the sitemap, by running the scripts for real |
 | `recently-viewed` | Per-customer scoping, the sign-in merge, corrupt storage |
+| `orders` | Server-side placement, idempotent replays, admin vs owner scoping |
+| `gates` | The contrast formula, and the budget measuring the real initial download |
 
 ## Two rules that make it worth having
 

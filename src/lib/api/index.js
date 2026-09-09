@@ -23,6 +23,7 @@ const SURFACE = [
   'listProducts', 'getProduct', 'getRelated', 'listCategories', 'listCollections', 'getReviews',
   'getCart', 'addToCart', 'updateCartLine', 'removeCartLine', 'applyDiscount', 'clearCart',
   'checkout', 'listOrders', 'getOrder', 'lookupOrder',
+  'adminPlaceOrder', 'adminGetOrder',
   'login', 'register', 'logout', 'getMe', 'updateMe', 'saveAddress', 'deleteAddress',
   'getWishlist', 'addToWishlist', 'removeFromWishlist',
   'subscribe', 'getDeliveryEstimate',
@@ -75,9 +76,12 @@ const PURGES = {
   saveLibraryItem: ['listAttributes', 'listLibrary'],
   deleteLibraryItem: ['listAttributes', 'listLibrary'],
   adminSaveSizeChart: ['listSizeCharts', 'getProduct', 'adminGetProduct'],
-  adminUpdateOrder: ['listOrders', 'getOrder', 'listProducts', 'getProduct'],
+  adminUpdateOrder: ['listOrders', 'getOrder', 'adminGetOrder', 'listProducts', 'getProduct'],
+  // Placing an order sells stock, so the catalogue is stale as well as the
+  // order lists.
+  adminPlaceOrder: ['listOrders', 'getOrder', 'adminGetOrder', 'getCart', 'listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
   // A refund can put stock back, so the catalogue is stale too.
-  adminRefundOrder: ['listOrders', 'getOrder', 'listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
+  adminRefundOrder: ['listOrders', 'getOrder', 'adminGetOrder', 'listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
   adminSaveCredentials: ['adminGetCredentials'],
   // A successful lookup grants this browser access to that order.
   lookupOrder: ['getOrder'],
