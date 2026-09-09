@@ -237,9 +237,98 @@ Cache it hard — it changes when a merchant saves settings, not per request.
     "columns": ["Size", "Chest", "Length", "Shoulder", "Sleeve"],
     "rows": [["XS", 96, 68, 43, 61], ["S", 102, 70, 45, 62]]
   },
-  "social": { "unitsAvailable": 57, "boughtLast30Days": 168, "savedCount": 27 }
+  "social": { "unitsAvailable": 57, "boughtLast30Days": 168, "savedCount": 27 },
+
+  "enrichment": {
+    "highlights": [
+      { "key": "fabric", "value": "Merino wool" },
+      { "key": "weight", "value": "260 gsm" }
+    ],
+    "features": [
+      {
+        "icon": "thermometer",
+        "title": "19.5 micron, so it can go against skin",
+        "body": "Anything above about 22 micron is the wool people remember itching."
+      }
+    ],
+    "specs": { "sleeve": "Full sleeve", "pattern": "Solid", "care": "Hand wash cool" },
+    "manufacturer": {
+      "genericName": "Apparel",
+      "countryOfOrigin": "Italy",
+      "manufacturer": "LOOM Studio, Ahmedabad 382405, India",
+      "packer": "LOOM Studio, Ahmedabad 382405, India",
+      "netQuantity": "1",
+      "packOf": "1"
+    }
+  }
 }
 ```
+
+### Enrichment
+
+Three blocks, deliberately not one:
+
+| Block | Where it renders | What it is for |
+| --- | --- | --- |
+| `highlights` | Above the fold, beside the buy button | The scan. Six pairs read in two seconds |
+| `features` | Below the fold, in "All details" | Two or three things a competitor could not copy-paste |
+| `specs` | Below the fold, grouped, expandable | The reference table. Nobody reads it end to end |
+| `manufacturer` | Below the fold | Compliance, not marketing — see below |
+
+Putting all of it in one long table means most shoppers read none of it and the
+rest hunt for the two facts that would have decided the purchase. Putting all of
+it above the fold pushes the buy button off the screen.
+
+- **`highlights`** is an *ordered array*, not an object — order is editorial and
+  a JSON object does not guarantee it. Only the first six render.
+- **`specs`** is a flat `{ key: value }` map. Grouping happens on read, from the
+  attribute vocabulary, so a backend never has to store presentation order.
+- **`features[].icon`** is either a name from `GET /attributes` → `icons`, or a
+  URL. Brands with their own iconography should not be forced into ours.
+- **`manufacturer`** is a legal requirement in several markets. India's Legal
+  Metrology rules mandate the manufacturer and packer address, the country of
+  origin and the net quantity on an e-commerce listing. Treat it as compliance.
+
+Every block is optional and renders nothing when absent, so a thin product is a
+shorter page rather than a set of empty headings.
+
+---
+
+## Attributes
+
+### `GET /attributes`
+
+The suggested vocabulary behind `highlights` and `specs`.
+
+```json
+{
+  "items": [
+    { "key": "fabric", "label": "Fabric", "group": "general", "highlight": true,
+      "values": ["Pure cotton", "Linen", "Merino wool"] },
+    { "key": "weight", "label": "Weight", "group": "fabric", "unit": "gsm", "highlight": true }
+  ],
+  "groups": [{ "id": "general", "label": "General" }],
+  "icons": ["sparkle", "shield", "leaf", "award"],
+  "total": 31
+}
+```
+
+**Suggestions, not a schema.** The admin combobox offers these and accepts
+anything typed over them. A closed list produces a merchandiser who cannot
+describe what they are selling; no list at all produces `Fabric`, `fabric`,
+`Material` and `Composition` as four separate attributes that can never be
+filtered or compared.
+
+| Field | Does |
+| --- | --- |
+| `key` | What is stored on the product |
+| `label` | What a shopper sees |
+| `group` | Which section of the specifications table it lands in |
+| `unit` | Appended to the label in brackets |
+| `highlight` | Offered first when editing highlights |
+| `values` | Suggested values for that key |
+
+Cache it hard. It changes when a merchant adds an attribute, not per request.
 
 ### The apparel blocks
 

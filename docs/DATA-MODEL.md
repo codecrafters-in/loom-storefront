@@ -57,6 +57,7 @@ picker. `id` is what `Variant.imageId` references as the fallback.
   sizeChartId?: string | null       // reference to a shared chart
   sizeChart?: SizeChart             // resolved from sizeChartId on read
   social?: Social
+  enrichment?: Enrichment
 }
 ```
 
@@ -137,6 +138,45 @@ transfer between brands; a chest measurement does.
 
 Real counts. Below `trust.socialProofThresholds` the theme renders nothing —
 see [CONFIGURATION.md](CONFIGURATION.md#trust).
+
+## Enrichment
+
+```ts
+{
+  highlights: { key: string, value: string }[]     // ordered; first 6 render
+  features: { icon: string, title: string, body: string }[]
+  specs: Record<string, string>                     // flat; grouped on read
+  manufacturer?: {
+    genericName?, countryOfOrigin?, manufacturer?,
+    packer?, importer?, netQuantity?, packOf?: string
+  }
+}
+```
+
+`highlights` is an array because order is editorial and a JSON object does not
+guarantee it. `specs` is a map because grouping and ordering are derived from the
+attribute vocabulary on read — a backend never stores presentation order.
+
+`features[].icon` is a name from `GET /attributes` → `icons`, or a URL.
+
+`manufacturer` is compliance rather than marketing: India's Legal Metrology rules
+require the manufacturer and packer address, the country of origin and the net
+quantity on an e-commerce listing.
+
+## Attribute
+
+```ts
+{
+  key: string                       // stored on the product
+  label: string                     // shown to a shopper
+  group: string                     // which specifications section
+  unit?: string                     // appended to the label in brackets
+  highlight?: boolean               // offered first when editing highlights
+  values?: string[]                 // suggested values
+}
+```
+
+Suggestions, not a schema. See [API.md](API.md#attributes).
 
 ## Cart and CartLine
 

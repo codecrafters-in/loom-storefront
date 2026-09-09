@@ -13,6 +13,7 @@
  */
 import { toMinor } from '../lib/money.js'
 import { productFacts } from './fit.js'
+import { productEnrichment, manufacturerInfo } from './enrichment.js'
 
 /**
  * Categories are a flat list with a `parent` pointer rather than nested arrays.
@@ -535,6 +536,46 @@ function hashInt(str, max) {
   return Math.abs(h) % max
 }
 
+/**
+ * Every product gets enrichment, hand-authored or derived.
+ *
+ * Half a catalogue with a rich highlights grid and half with nothing looks like
+ * a bug rather than an editorial choice, and it is the state a real migration
+ * arrives in. So anything without authored copy gets highlights and specs
+ * derived from the fabric and fit data it already has — thinner, but present
+ * and true.
+ */
+function enrichmentFor(raw, facts) {
+  const authored = productEnrichment[raw.slug]
+  if (authored) return { ...authored, manufacturer: manufacturerInfo }
+
+  const fabric = facts.fabric || {}
+  const highlights = [
+    fabric.composition?.length && { key: 'fabric', value: fabric.composition.map(([m]) => m).join(', ') },
+    fabric.weight && { key: 'weight', value: `${fabric.weight} gsm` },
+    fabric.weave && { key: 'weave', value: fabric.weave },
+    facts.fit?.verdict && {
+      key: 'fit',
+      value: { 'true-to-size': 'Regular', 'runs-small': 'Slim', 'runs-large': 'Relaxed' }[facts.fit.verdict],
+    },
+    fabric.origin && { key: 'countryOfOrigin', value: fabric.origin },
+  ].filter(Boolean)
+
+  return {
+    highlights,
+    features: [],
+    specs: {
+      ...(fabric.composition?.length ? { composition: fabric.composition.map(([m, pct]) => `${pct}% ${m}`).join(', ') } : {}),
+      ...(fabric.weight ? { weight: String(fabric.weight) } : {}),
+      ...(fabric.weave ? { weave: fabric.weave } : {}),
+      ...(fabric.origin ? { countryOfOrigin: fabric.origin } : {}),
+      ...(fabric.certifications?.length ? { certifications: fabric.certifications.join(', ') } : {}),
+      ...(raw.care?.length ? { care: raw.care[0] } : {}),
+    },
+    manufacturer: manufacturerInfo,
+  }
+}
+
 function build(raw) {
   const facts = productFacts[raw.slug] || {}
   const price = toMinor(raw.price)
@@ -600,6 +641,10 @@ function build(raw) {
     // A reference, not a copy. Editing the shared "tops" chart has to change
     // every product using it — a snapshot per product silently drifts.
     sizeChartId: facts.chart || null,
+
+    // Highlights, feature cards and the specifications table. See
+    // src/data/enrichment.js for why they are three blocks and not one.
+    enrichment: enrichmentFor(raw, facts),
 
     // Honest scarcity and demand, derived rather than invented. A fabricated
     // "17 people are viewing" is the fastest way to lose a considered buyer.

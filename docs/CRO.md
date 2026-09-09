@@ -119,7 +119,33 @@ footer.
 ([CrazyEgg](https://www.crazyegg.com/blog/trust-signals/),
 [Metricuno](https://www.metricuno.com/ecommerce-trust-signals))
 
-### 10. Fit warnings in the grid — `ProductCard`
+### 10. Structured enrichment — `product.enrichment`
+
+Highlights, features and a specification table, in three places rather than one.
+
+The split is the point. A single long table gets read by almost nobody, and the
+shopper who does want one fact has to hunt for it. Six key/value pairs beside
+the buy button is a two-second scan that answers "is this the kind of thing I am
+looking for" before anyone commits to reading a paragraph — and the full table
+below still catches the person who wants to check the leg opening.
+
+Two rules that keep it useful rather than decorative:
+
+- **Highlights are capped at six.** More and it stops being a scan and becomes
+  the specifications table with delusions, which is worse than either.
+- **Attributes come from a shared vocabulary.** Free text everywhere produces
+  `Fabric`, `fabric`, `Material` and `Composition` as four attributes across four
+  products, and nothing can ever be filtered or compared. The vocabulary is
+  suggested rather than enforced, so nobody is stopped from describing what they
+  actually sell.
+
+`manufacturer` is a separate matter: the manufacturer and packer address, the
+country of origin and the net quantity are **legally required** on an e-commerce
+listing in several markets, India included under the Legal Metrology rules. It
+is compliance, not conversion, and it belongs in a labelled block rather than
+buried in a description.
+
+### 11. Fit warnings in the grid — `ProductCard`
 
 "Runs small" appears on the card, not just the product page. Someone comparing
 eight products decides which two to open from the grid, and that is the fact
@@ -143,6 +169,10 @@ Everything above is data. Nothing needs a code change.
 | Customer photos | `review.photos` | Row hidden |
 | Demand counts | `product.social` | Hidden below threshold |
 | Payment marks | `storefront.trust.payments` | Row hidden |
+| Highlights grid | `product.enrichment.highlights` | Block hidden |
+| Feature cards | `product.enrichment.features` | Tab hidden |
+| Specifications | `product.enrichment.specs` | Tab hidden |
+| Manufacturer info | `product.enrichment.manufacturer` | Tab hidden |
 
 Feature switches live in `storefront.trust`:
 

@@ -31,7 +31,7 @@ anything else.
 | --- | --- |
 | Overview | Counts, low and out-of-stock, orders, revenue |
 | Products | Search; click a row to open the full record |
-| Product record | Five tabs: details, media, variants, fit and fabric, organise. Create and delete |
+| Product record | Six tabs: details, media, variants, fit and fabric, highlights and specs, organise. Create and delete |
 | Inventory | Every variant, filterable to low or out, adjust by delta |
 | Categories | Tree with parents and children, create and re-parent |
 | Size charts | Shared measurement tables |

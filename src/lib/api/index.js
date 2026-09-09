@@ -30,7 +30,7 @@ const SURFACE = [
   'adminSetInventory', 'adminAdjustInventory',
   'adminSaveCategory', 'adminDeleteCategory',
   'adminUpdateSettings', 'adminImport', 'adminExport', 'adminReset',
-  'listSizeCharts', 'adminSaveSizeChart', 'adminGetProduct',
+  'listSizeCharts', 'listAttributes', 'adminSaveSizeChart', 'adminGetProduct',
   'adminUpdateOrder', 'adminListDiscounts', 'adminSaveDiscount', 'adminDeleteDiscount',
   'uploadMedia', 'listMedia', 'deleteMedia',
 ]
@@ -60,6 +60,7 @@ const CACHEABLE = {
   getReviews: TTL.reviews,
   getDeliveryEstimate: TTL.catalog,
   listSizeCharts: TTL.catalog,
+  listAttributes: TTL.catalog,
 }
 
 /** A write to any of these drops the read namespaces it could have invalidated. */

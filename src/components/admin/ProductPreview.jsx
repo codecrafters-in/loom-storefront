@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import ProductView from '../product/ProductView.jsx'
+import { ProductDetails } from '../product/Enrichment.jsx'
 import ProductCard from '../product/ProductCard.jsx'
 import { Icon } from '../ui/index.jsx'
 
@@ -93,6 +94,10 @@ export default function ProductPreview({ draft, charts = [], open, onClose }) {
             rather than an approximation of it. */}
         <div className="wrap wrap-tight py-8">
           <ProductView product={product} preview />
+
+          <div className="-mx-5 mt-4">
+            <ProductDetails product={product} />
+          </div>
 
           <section className="mt-4 border-t border-line pt-10">
             <p className="eyebrow">On a listing page</p>

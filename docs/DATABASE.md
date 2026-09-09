@@ -906,6 +906,97 @@ table the storefront can write to is a catastrophic single point of failure.
 
 ---
 
+## Enrichment
+
+Highlights, features and the specifications table. Three blocks on the product,
+one storage shape for two of them.
+
+```sql
+-- The suggested vocabulary. Seeded, then owned by the merchant.
+CREATE TABLE attributes (
+  key         text PRIMARY KEY,
+  label       text NOT NULL,
+  group_id    text NOT NULL REFERENCES attribute_groups(id),
+  unit        text,
+  highlight   boolean NOT NULL DEFAULT false,
+  position    integer NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE attribute_values (
+  attribute_key text NOT NULL REFERENCES attributes(key) ON DELETE CASCADE,
+  value         text NOT NULL,
+  position      integer NOT NULL DEFAULT 0,
+  PRIMARY KEY (attribute_key, value)
+);
+
+CREATE TABLE attribute_groups (
+  id       text PRIMARY KEY,
+  label    text NOT NULL,
+  position integer NOT NULL DEFAULT 0
+);
+
+-- Highlights and specs are the same row shape. `is_highlight` decides which of
+-- the two blocks a row belongs to, and `position` only matters for highlights
+-- because specs are grouped and ordered from the vocabulary on read.
+CREATE TABLE product_attributes (
+  product_id    uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  attribute_key text NOT NULL,
+  value         text NOT NULL,
+  is_highlight  boolean NOT NULL DEFAULT false,
+  position      integer NOT NULL DEFAULT 0,
+  PRIMARY KEY (product_id, attribute_key, is_highlight)
+);
+
+CREATE TABLE product_features (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  icon       text NOT NULL,          -- an icon name, or a URL
+  title      text NOT NULL,
+  body       text NOT NULL,
+  position   integer NOT NULL DEFAULT 0
+);
+
+-- Compliance. Separate from the rest because it is legally mandated in several
+-- markets and is audited as a unit.
+CREATE TABLE product_compliance (
+  product_id       uuid PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+  generic_name     text,
+  country_of_origin text,
+  manufacturer     text,
+  packer           text,
+  importer         text,
+  net_quantity     text,
+  pack_of          text
+);
+
+CREATE INDEX ON product_attributes (attribute_key, value);
+CREATE INDEX ON product_features (product_id, position);
+```
+
+Three decisions worth defending:
+
+**`attributes.key` is not enforced by a foreign key on `product_attributes`.**
+Deliberately. A merchant entering `neckline` before anyone has added it to the
+vocabulary should get a saved product, not a constraint violation — and a
+nightly job can promote unrecognised keys into `attributes` for review. A
+foreign key here turns "describe your product" into "file a ticket".
+
+**Highlights and specs share a table.** They are the same `(key, value)` pair
+shown in two places; splitting them means the same fact stored twice and going
+stale in one of them. `is_highlight` is part of the primary key so a product can
+carry `fabric` in both.
+
+**`product_attributes.value` is `text`, not typed.** A weight is `260`, a care
+instruction is a sentence, a certification list is comma-separated. Typing the
+column means a `value_text`/`value_number`/`value_json` triple and a `CASE` in
+every read, for a table nobody aggregates over. The index on
+`(attribute_key, value)` is what makes faceting on it fast enough.
+
+Because the value is untyped, **normalise units at the write boundary**: store
+`260` with `attributes.unit = 'gsm'` rather than `260gsm` in one row and
+`260 GSM` in the next. The label renders the unit.
+
 ## Indexes
 
 All of these are load-bearing. Add them with the schema, not after the first

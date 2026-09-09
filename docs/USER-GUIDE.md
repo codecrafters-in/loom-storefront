@@ -241,6 +241,39 @@ Tick individual rows first and the scope list gains **the N selected**.
 
 ---
 
+## Fill in highlights, features and specifications
+
+**Open the product → Highlights & specs**
+
+Four sections, and the storefront's own rendering sits beside them so you can
+see what you are writing as you write it.
+
+| Section | Where a shopper sees it | Keep it to |
+| --- | --- | --- |
+| **Highlights** | Beside the buy button, above the fold | Six pairs |
+| **Features** | Below, in "All details" | Two or three |
+| **Specifications** | Below, grouped, expandable | As much as you like |
+| **Manufacturer info** | Below | Whatever the law asks for |
+
+**Highlights** are the two-second scan — fabric, fit, weight, the things
+somebody checks before deciding to keep reading. Start typing in the key box and
+it suggests `fabric`, `fit`, `sleeve` and the rest, with common values for
+each. Type something else and it takes it. Only the first six show, and it tells
+you if you have added more.
+
+**Features** are the two or three things a competitor could not copy-paste. Pick
+an icon or paste your own image, write a title and a sentence. It counts the
+characters and warns before the card starts truncating.
+
+**Specifications** is the full table. Rows sort themselves into General, Fabric
+& care, Fit, Sustainability and Packaging by their key, so the order you type
+them in does not matter.
+
+> Every block disappears when it is empty. A product with nothing filled in is a
+> shorter page, not a set of blank headings.
+
+---
+
 ## Sell a colour in only some sizes
 
 Ordinary — white might come in S and M only.

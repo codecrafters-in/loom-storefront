@@ -6,6 +6,7 @@ import Promises from '../components/layout/Promises.jsx'
 import { Breadcrumbs, Button, Empty, ErrorState, Icon, Rating, Skeleton } from '../components/ui/index.jsx'
 import Seo from '../components/Seo.jsx'
 import ProductView from '../components/product/ProductView.jsx'
+import { ProductDetails } from '../components/product/Enrichment.jsx'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 
 export default function Product() {
@@ -63,6 +64,8 @@ export default function Product() {
       </div>
 
       <ProductView product={product} />
+
+      <ProductDetails product={product} />
 
       {/* reviews */}
       {config.features?.reviews !== false && (

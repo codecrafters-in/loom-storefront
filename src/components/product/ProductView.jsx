@@ -10,6 +10,7 @@ import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { useWishlist } from '../../store/WishlistContext.jsx'
 import { FitBlock, FabricBlock, SizeChartModal } from './FitBlock.jsx'
 import TrustRow, { SocialProof } from './TrustRow.jsx'
+import { ProductHighlights } from './Enrichment.jsx'
 
 /**
  * The gallery and the buy box — everything above the reviews on a product page.
@@ -325,6 +326,8 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           {/* A lede, not the whole description. The rest lives in Details,
               where someone who wants it will look for it. */}
           <p className="mt-5 text-[15px] leading-relaxed text-muted">{product.description}</p>
+
+          <ProductHighlights enrichment={product.enrichment} />
 
           {/* colour */}
           <fieldset className="mt-8">

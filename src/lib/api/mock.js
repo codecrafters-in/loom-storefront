@@ -18,6 +18,7 @@
 import * as db from '../db.js'
 import { railKey } from './railKey.js'
 import * as mediaStore from '../media.js'
+import { attributes, attributeGroups, featureIcons } from '../../data/attributes.js'
 import { config } from '../config.js'
 import { ApiError } from './contracts.js'
 
@@ -926,6 +927,19 @@ export async function listMedia() {
 
 export async function deleteMedia(id) {
   return mediaStore.remove(id)
+}
+
+/**
+ * The suggested attribute vocabulary.
+ *
+ * Suggestions, not a schema. The admin combobox offers these and accepts
+ * anything typed over them — a closed list produces a merchandiser who cannot
+ * describe what they are selling, and no list at all produces "Fabric",
+ * "fabric", "Material" and "Composition" as four different attributes.
+ */
+export async function listAttributes() {
+  await latency()
+  return { items: attributes, groups: attributeGroups, icons: featureIcons, total: attributes.length }
 }
 
 export async function listSizeCharts() {

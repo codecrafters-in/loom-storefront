@@ -184,7 +184,17 @@ GET /collections                → { items: Collection[], total }
     "columns": ["Size", "Chest", "Length", "Shoulder", "Sleeve"],
     "rows": [["XS", 96, 68, 43, 61], ["S", 102, 70, 45, 62]]
   },
-  "social": { "unitsAvailable": 57, "boughtLast30Days": 168, "savedCount": 27 }
+  "social": { "unitsAvailable": 57, "boughtLast30Days": 168, "savedCount": 27 },
+
+  "enrichment": {
+    "highlights": [{ "key": "fabric", "value": "Merino wool" }],
+    "features": [{ "icon": "thermometer", "title": "…", "body": "…" }],
+    "specs": { "sleeve": "Full sleeve", "care": "Hand wash cool" },
+    "manufacturer": {
+      "genericName": "Apparel", "countryOfOrigin": "Italy",
+      "manufacturer": "…", "packer": "…", "netQuantity": "1", "packOf": "1"
+    }
+  }
 }
 ```
 
@@ -206,6 +216,37 @@ Rules on Product:
 - **`badges`** — any of `new` `sale` `bestseller` `low-stock` `sold-out`.
 - **`categories`** lists the leaf and its ancestors, or just the leaf if you
   resolve ancestors server-side when filtering.
+
+`enrichment` is three blocks on purpose, and they render in different places:
+`highlights` above the fold beside the buy button (six pairs, the two-second
+scan), `features` and `specs` below it. All of one long table means most people
+read none of it; all of it above the fold pushes the buy button off screen.
+
+- `highlights` is an **ordered array**, not an object — order is editorial and a
+  JSON object does not guarantee it
+- `specs` is a **flat map**; grouping and ordering come from `GET /attributes` on
+  read, so you never store presentation order
+- `features[].icon` is an icon name or a URL
+- `manufacturer` is compliance, not marketing. India's Legal Metrology rules
+  require the manufacturer and packer address, the country of origin and the net
+  quantity on an e-commerce listing
+
+Also expose the vocabulary behind it:
+
+```
+GET /attributes
+→ {
+    items: [{ key, label, group, unit?, highlight?, values?[] }],
+    groups: [{ id, label }],
+    icons: ["sparkle", "leaf", …],
+    total
+  }
+```
+
+**Suggestions, not a schema.** The admin offers these and accepts anything typed
+over them — a closed list produces a merchandiser who cannot describe what they
+are selling, and no list at all produces "Fabric", "fabric", "Material" and
+"Composition" as four separate attributes nobody can filter on.
 
 The `fit`, `fabric`, `sizeChart` and `social` blocks are optional but they are
 the highest-value fields in an apparel catalogue. Size and fit cause roughly two

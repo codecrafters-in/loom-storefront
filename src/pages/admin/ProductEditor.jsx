@@ -8,6 +8,7 @@ import * as media from '../../lib/media.js'
 import { Hint } from '../../components/admin/Tour.jsx'
 import { useToast } from '../../store/ToastContext.jsx'
 import ProductPreview from '../../components/admin/ProductPreview.jsx'
+import EnrichmentTab from '../../components/admin/EnrichmentTab.jsx'
 import { formatMoney, toMinor, toMajor } from '../../lib/money.js'
 
 /**
@@ -61,6 +62,7 @@ const TABS = [
   ['media', 'Media'],
   ['variants', 'Variants'],
   ['fit', 'Fit & fabric'],
+  ['enrichment', 'Highlights & specs'],
   ['organise', 'Organise'],
 ]
 
@@ -72,6 +74,7 @@ export default function ProductEditor() {
 
   const loaded = useAsync(() => api.adminGetProduct(id), [id], { skip: isNew })
   const charts = useAsync(() => api.listSizeCharts(), [])
+  const vocab = useAsync(() => api.listAttributes(), [])
   const cats = useAsync(() => api.listCategories(), [])
 
   const [draft, setDraft] = useState(isNew ? BLANK() : null)
@@ -260,11 +263,19 @@ export default function ProductEditor() {
         ))}
       </div>
 
-      <div className="mt-8 max-w-3xl">
+      <div className={`mt-8 ${tab === 'enrichment' ? '' : 'max-w-3xl'}`}>
         {tab === 'details' && <DetailsTab {...props} isNew={isNew} />}
         {tab === 'media' && <MediaTab {...props} />}
         {tab === 'variants' && <VariantsTab {...props} />}
         {tab === 'fit' && <FitTab {...props} />}
+        {tab === 'enrichment' && (
+          <EnrichmentTab
+            draft={draft}
+            set={set}
+            attributes={vocab.data?.items || []}
+            icons={vocab.data?.icons || []}
+          />
+        )}
         {tab === 'organise' && <OrganiseTab {...props} />}
       </div>
 

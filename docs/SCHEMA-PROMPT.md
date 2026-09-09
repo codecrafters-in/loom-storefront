@@ -144,6 +144,36 @@ catalogue — size and fit cause roughly two thirds of fashion returns:
   height, fit (`small` | `true` | `large`), created_at
 - `review_photos`
 
+**Product enrichment** — highlights, features, the specification table:
+- `attribute_groups` — id, label, position
+- `attributes` — key (PK), label, group_id, unit, highlight (boolean), position.
+  A *suggested* vocabulary, not a schema
+- `attribute_values` — suggested values per key
+- `product_attributes` — product_id, attribute_key, value (text), is_highlight,
+  position. **Highlights and specs share this table**: they are the same
+  (key, value) pair shown in two places, and splitting them means the same fact
+  stored twice and going stale in one of them
+- `product_features` — product_id, icon (an icon name or a URL), title, body,
+  position
+- `product_compliance` — generic_name, country_of_origin, manufacturer, packer,
+  importer, net_quantity, pack_of. Legally mandated in several markets — India's
+  Legal Metrology rules require the manufacturer and packer address, the country
+  of origin and the net quantity on a listing
+
+Three things I want you to get right here and explain:
+
+1. **Do not put a foreign key from `product_attributes.attribute_key` to
+   `attributes.key`.** A merchant entering `neckline` before it exists in the
+   vocabulary should get a saved product, not a constraint violation. Suggest a
+   job that promotes unrecognised keys for review instead.
+2. **`value` is `text`.** A weight is `260`, a care instruction is a sentence, a
+   certification list is comma-separated. Typing it means a
+   value_text/value_number/value_json triple and a CASE in every read. Index
+   `(attribute_key, value)` so faceting on it is still fast.
+3. **Normalise units at the write boundary** — store `260` with
+   `attributes.unit = 'gsm'`, never `260gsm` in one row and `260 GSM` in the
+   next. The label renders the unit.
+
 **Derived, not stored by a client**
 
 Say explicitly in your API layer which fields the server computes:
