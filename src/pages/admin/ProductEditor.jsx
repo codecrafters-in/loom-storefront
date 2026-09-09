@@ -362,7 +362,12 @@ function MediaTab({ draft, set }) {
   const colors = draft.options?.find((o) => o.name === 'Color')?.values || []
   const images = useMemo(() => draft.images || [], [draft.images])
   const [busy, setBusy] = useState(false)
-  const [dragging, setDragging] = useState(null)
+  // Two separate drags happen in this panel: files arriving from the desktop,
+  // and tiles being reordered within it. Sharing one state meant dragging a
+  // tile across the drop zone replaced the index and the reorder silently did
+  // nothing.
+  const [dragIndex, setDragIndex] = useState(null)
+  const [dropActive, setDropActive] = useState(false)
   const [selected, setSelected] = useState([])
   const [assignTo, setAssignTo] = useState('')
   const { push } = useToast()
@@ -462,17 +467,20 @@ function MediaTab({ draft, set }) {
             click is a drop target half the people who need it will miss. */}
         <div
           onDragOver={(e) => {
+            // Only light up for files from outside. A tile being dragged past
+            // on its way somewhere else is not a drop.
+            if (!e.dataTransfer.types.includes('Files')) return
             e.preventDefault()
-            setDragging('zone')
+            setDropActive(true)
           }}
-          onDragLeave={() => setDragging(null)}
+          onDragLeave={() => setDropActive(false)}
           onDrop={(e) => {
             e.preventDefault()
-            setDragging(null)
-            onFiles(e.dataTransfer.files)
+            setDropActive(false)
+            if (e.dataTransfer.files?.length) onFiles(e.dataTransfer.files)
           }}
           className={`rounded-xs border-2 border-dashed p-8 text-center transition-colors ${
-            dragging === 'zone' ? 'border-accent bg-accent-soft/40' : 'border-line'
+            dropActive ? 'border-accent bg-accent-soft/40' : 'border-line'
           }`}
         >
           <Icon name="package" size={22} className="mx-auto text-faint" />
@@ -535,15 +543,20 @@ function MediaTab({ draft, set }) {
                 <li
                   key={img.id || i}
                   draggable
-                  onDragStart={() => setDragging(i)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => {
-                    if (dragging !== null && dragging !== 'zone') move(dragging, i)
-                    setDragging(null)
+                  onDragStart={(e) => {
+                    setDragIndex(i)
+                    e.dataTransfer.effectAllowed = 'move'
                   }}
-                  className={`rounded-xs border bg-surface transition-colors ${
-                    selected.includes(img.id) ? 'border-accent ring-1 ring-accent' : 'border-line'
-                  }`}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDragEnd={() => setDragIndex(null)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    if (dragIndex !== null) move(dragIndex, i)
+                    setDragIndex(null)
+                  }}
+                  className={`rounded-xs border bg-surface transition-all ${
+                    dragIndex === i ? 'opacity-40' : ''
+                  } ${selected.includes(img.id) ? 'border-accent ring-1 ring-accent' : 'border-line'}`}
                 >
                   <div className="relative">
                     <button
@@ -670,8 +683,8 @@ function TileBtn({ label, icon, onClick, tone }) {
 function VariantsTab({ draft, set }) {
   const colorOpt = draft.options?.find((o) => o.name === 'Color') || { name: 'Color', values: [] }
   const sizeOpt = draft.options?.find((o) => o.name === 'Size') || { name: 'Size', values: [] }
-  const variants = draft.variants || []
-  const images = draft.images || []
+  const variants = useMemo(() => draft.variants || [], [draft.variants])
+  const images = useMemo(() => draft.images || [], [draft.images])
   const [picked, setPicked] = useState([])
   const [bulk, setBulk] = useState({ mode: 'set-stock', value: '', scopeKey: 'all', scopeValue: '' })
   const { push } = useToast()
@@ -682,39 +695,52 @@ function VariantsTab({ draft, set }) {
       { name: 'Size', values: name === 'Size' ? values : sizeOpt.values },
     ])
 
+  const makeVariant = (c, sz) => ({
+    id: `var_${draft.slug || 'new'}_${c}_${sz}`.toLowerCase().replace(/[^a-z0-9_]+/g, '-'),
+    sku: `${(draft.slug || 'SKU').slice(0, 6).toUpperCase()}-${c.slice(0, 3).toUpperCase()}-${sz}`,
+    options: { Color: c, Size: sz },
+    price: draft.price,
+    compareAtPrice: draft.compareAtPrice,
+    inventory: 0,
+    available: false,
+    // Prefer a shot tagged with this colour, so a store with per-colour
+    // photography wires itself up without anyone picking image ids.
+    imageId: images.find((img) => img.color === c)?.id || images[0]?.id || null,
+  })
+
+  const key = (v) => `${v.options.Color}|${v.options.Size}`
+  const present = useMemo(() => new Set(variants.map(key)), [variants])
+
   /**
-   * Regenerate the matrix, preserving anything already entered.
+   * Combinations that exist as options but have no row.
    *
-   * Rebuilding from scratch would wipe stock counts and SKUs every time someone
-   * adds a colour, which is the kind of data loss you only notice at stocktake.
+   * Not every colour comes in every size — a white shirt in S and M and nothing
+   * else is ordinary. So the matrix is deliberately allowed to be sparse, and
+   * this is a list of what is missing rather than a warning that something is
+   * wrong. Adding is explicit; nothing is resurrected behind your back.
    */
-  const rebuild = () => {
-    const existing = new Map(variants.map((v) => [`${v.options.Color}|${v.options.Size}`, v]))
-    const next = []
+  const missing = useMemo(() => {
+    const out = []
     for (const c of colorOpt.values) {
-      for (const s of sizeOpt.values) {
-        const prev = existing.get(`${c}|${s}`)
-        next.push(
-          prev || {
-            id: `var_${draft.slug || 'new'}_${c}_${s}`.toLowerCase().replace(/[^a-z0-9_]+/g, '-'),
-            sku: `${(draft.slug || 'SKU').slice(0, 6).toUpperCase()}-${c.slice(0, 3).toUpperCase()}-${s}`,
-            options: { Color: c, Size: s },
-            price: draft.price,
-            compareAtPrice: draft.compareAtPrice,
-            inventory: 0,
-            available: false,
-            // Prefer a shot tagged with this colour, so a store with per-colour
-            // photography wires itself up without anyone picking image ids.
-            imageId: images.find((img) => img.color === c)?.id || images[0]?.id || null,
-          },
-        )
+      for (const sz of sizeOpt.values) {
+        if (!present.has(`${c}|${sz}`)) out.push({ color: c, size: sz })
       }
     }
-    set('variants', next)
+    return out
+  }, [colorOpt.values, sizeOpt.values, present])
+
+  /** Add every missing combination, keeping the rows that already exist. */
+  const addAllMissing = () => {
+    set('variants', [...variants, ...missing.map((m) => makeVariant(m.color, m.size))])
   }
 
-  const expected = colorOpt.values.length * sizeOpt.values.length
-  const stale = expected !== variants.length
+  const addOne = (c, sz) => set('variants', [...variants, makeVariant(c, sz)])
+
+  const removeVariants = (ids) => {
+    const drop = new Set(ids)
+    set('variants', variants.filter((v) => !drop.has(v.id)))
+    setPicked((sel) => sel.filter((id) => !drop.has(id)))
+  }
 
   const patchVariant = (id, key, value) =>
     set(
@@ -796,14 +822,35 @@ function VariantsTab({ draft, set }) {
         title="Variants"
         note="One row per colour and size. Stock lives here, not on the product — which is what lets the size picker grey out only the sizes that are gone in the colour a shopper has chosen."
       >
-        {stale && (
-          <div className="flex flex-wrap items-center gap-3 rounded-xs border border-accent/30 bg-accent-soft/50 p-3.5">
-            <p className="text-[13px] text-accent">
-              {expected} combinations, {variants.length} rows. Rebuild to match.
+        {missing.length > 0 && (
+          <div className="rounded-xs border border-line bg-sunken/40 p-3.5">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-[13px] text-muted">
+                {missing.length} combination{missing.length === 1 ? '' : 's'} not created
+              </p>
+              <Button size="sm" variant="quiet" onClick={addAllMissing} className="ml-auto">
+                Add all
+              </Button>
+            </div>
+            <ul className="mt-2.5 flex flex-wrap gap-1.5">
+              {missing.slice(0, 24).map((m) => (
+                <li key={`${m.color}|${m.size}`}>
+                  <button
+                    type="button"
+                    onClick={() => addOne(m.color, m.size)}
+                    className="inline-flex items-center gap-1 rounded-xs border border-line px-2 py-1 text-[11px] text-faint transition-colors hover:border-ink hover:text-ink"
+                  >
+                    <Icon name="plus" size={10} />
+                    {m.color} · {m.size}
+                  </button>
+                </li>
+              ))}
+              {missing.length > 24 && <li className="self-center text-[11px] text-faint">+{missing.length - 24} more</li>}
+            </ul>
+            <p className="mt-2.5 text-[12px] leading-relaxed text-faint">
+              A sparse matrix is normal — not every colour comes in every size. Nothing is added
+              until you ask for it.
             </p>
-            <Button size="sm" variant="quiet" onClick={rebuild} className="ml-auto">
-              Rebuild matrix
-            </Button>
           </div>
         )}
 
@@ -881,6 +928,19 @@ function VariantsTab({ draft, set }) {
                 <Button size="sm" onClick={applyBulk} disabled={!scoped.length}>
                   Apply to {scoped.length}
                 </Button>
+
+                {/* Destructive, so it is its own control rather than an option
+                    in the same dropdown as "set stock to". */}
+                {scoped.length > 0 && scoped.length < variants.length && (
+                  <button
+                    type="button"
+                    onClick={() => removeVariants(scoped.map((v) => v.id))}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xs border border-line px-3 text-[13px] text-faint transition-colors hover:border-sale hover:text-sale"
+                  >
+                    <Icon name="trash" size={14} />
+                    Remove {scoped.length}
+                  </button>
+                )}
               </div>
               <p className="text-[12px] text-faint">
                 Prices are in major units here — <span className="text-muted">3.00</span> on
@@ -907,6 +967,7 @@ function VariantsTab({ draft, set }) {
                     <th className="p-2.5 font-medium">Stock</th>
                     <th className="p-2.5 font-medium">Price</th>
                     <th className="p-2.5 font-medium">Image</th>
+                    <th className="w-10 p-2.5" />
                   </tr>
                 </thead>
                 <tbody>
@@ -955,19 +1016,40 @@ function VariantsTab({ draft, set }) {
                         />
                       </td>
                       <td className="p-2.5">
-                        <select
-                          aria-label={`Image for ${v.options.Color} ${v.options.Size}`}
-                          className="field h-8 w-28 py-0 text-[12px]"
-                          value={v.imageId || ''}
-                          onChange={(e) => patchVariant(v.id, 'imageId', e.target.value || null)}
+                        <VariantImagePicker
+                          variant={v}
+                          images={images}
+                          onPick={(id) => patchVariant(v.id, 'imageId', id)}
+                          onUpload={async (file) => {
+                            const m = await api.uploadMedia(file)
+                            const img = {
+                              id: m.id,
+                              url: m.url,
+                              type: m.type,
+                              alt: `${draft.title} in ${v.options.Color}`,
+                              color: v.options.Color,
+                              width: m.width,
+                              height: m.height,
+                            }
+                            // Added to the product's media and pointed at from
+                            // this row in one action — uploading, scrolling up
+                            // to tag it, then coming back is three steps for
+                            // one intention.
+                            set('images', [...images, img])
+                            patchVariant(v.id, 'imageId', m.id)
+                          }}
+                        />
+                      </td>
+                      <td className="p-2.5">
+                        <button
+                          type="button"
+                          onClick={() => removeVariants([v.id])}
+                          aria-label={`Remove ${v.options.Color} ${v.options.Size}`}
+                          title={`Remove ${v.options.Color} ${v.options.Size}`}
+                          className="grid h-8 w-8 place-items-center rounded-xs text-faint transition-colors hover:bg-sale/10 hover:text-sale"
                         >
-                          <option value="">—</option>
-                          {images.map((img, i) => (
-                            <option key={img.id} value={img.id}>
-                              {i + 1}{img.color ? ` ${img.color}` : ''}
-                            </option>
-                          ))}
-                        </select>
+                          <Icon name="trash" size={14} />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -981,6 +1063,118 @@ function VariantsTab({ draft, set }) {
           </>
         )}
       </Panel>
+    </div>
+  )
+}
+
+/**
+ * The image for one variant.
+ *
+ * A dropdown of "1, 2, 3" is unusable once a product has eight shots — nobody
+ * remembers which number is the charcoal one. This shows the actual thumbnail,
+ * opens a grid of the product's media, and can upload straight into the row so
+ * a colourway that arrives late does not mean scrolling back up to the Media
+ * tab and tagging it by hand.
+ */
+function VariantImagePicker({ variant, images, onPick, onUpload }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const fileRef = useRef(null)
+  const current = images.find((img) => img.id === variant.imageId)
+
+  const upload = async (file) => {
+    if (!file) return
+    setBusy(true)
+    try {
+      await onUpload(file)
+      setOpen(false)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label={`Image for ${variant.options.Color} ${variant.options.Size}`}
+        className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xs border border-line transition-colors hover:border-ink"
+      >
+        {current ? (
+          <Media src={current.url} type={current.type} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <Icon name="plus" size={14} className="text-faint" />
+        )}
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} role="presentation" />
+          <div className="absolute right-0 z-30 mt-1 w-64 rounded-xs border border-line bg-surface p-3 shadow-card">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-faint">
+              {variant.options.Color} · {variant.options.Size}
+            </p>
+            {images.length > 0 && (
+              <ul className="mt-2.5 grid grid-cols-4 gap-1.5">
+                {images.map((img) => (
+                  <li key={img.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onPick(img.id)
+                        setOpen(false)
+                      }}
+                      aria-label={img.alt || 'Use this shot'}
+                      className={`block w-full overflow-hidden rounded-xs border transition-colors ${
+                        img.id === variant.imageId ? 'border-accent ring-1 ring-accent' : 'border-line hover:border-ink'
+                      }`}
+                    >
+                      <span className="shot block">
+                        <Media src={img.url} type={img.type} alt="" className="h-full w-full object-cover" />
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 text-[12px] text-accent link-underline disabled:opacity-50"
+              >
+                <Icon name="plus" size={12} />
+                {busy ? 'Uploading…' : 'Upload for this colour'}
+              </button>
+              {variant.imageId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onPick(null)
+                    setOpen(false)
+                  }}
+                  className="ml-auto text-[12px] text-faint link-underline hover:text-sale"
+                >
+                  Clear
+                </button>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*,video/*"
+                className="sr-only"
+                onChange={(e) => {
+                  upload(e.target.files?.[0])
+                  e.target.value = ''
+                }}
+              />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

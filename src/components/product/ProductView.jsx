@@ -64,15 +64,23 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
   }, [product, colors])
   const activeColor = color ?? firstInStock
 
-  /** Which sizes are actually buyable in the chosen colour — greying these out
-   *  is the difference between a picker and a guessing game. */
-  const sizeAvailability = useMemo(() => {
+  /**
+   * The state of every size in the chosen colour.
+   *
+   * Three states, not two. "Sold out" and "we never made it in this colour" look
+   * identical if you only track stock, and they are different answers to the
+   * question a shopper is asking — one is worth waiting for, the other is not.
+   * A white shirt offered only in S and M is ordinary, and the picker should say
+   * so rather than implying the large sold out.
+   */
+  const sizeState = useMemo(() => {
     if (!product) return {}
     return Object.fromEntries(
-      sizes.map((s) => [
-        s,
-        product.variants.find((v) => v.options.Color === activeColor && v.options.Size === s)?.inventory ?? 0,
-      ]),
+      sizes.map((s) => {
+        const v = product.variants.find((x) => x.options.Color === activeColor && x.options.Size === s)
+        if (!v) return [s, { state: 'absent', inventory: 0 }]
+        return [s, { state: v.available ? 'available' : 'sold-out', inventory: v.inventory }]
+      }),
     )
   }, [product, sizes, activeColor])
 
@@ -261,25 +269,39 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {sizes.map((s) => {
-                const stock = sizeAvailability[s]
-                const out = stock === 0
+                const { state } = sizeState[s] || { state: 'absent' }
+                const unavailable = state !== 'available'
                 return (
                   <button
                     key={s}
                     type="button"
-                    disabled={out}
+                    disabled={unavailable}
                     onClick={() => setSize(s)}
                     aria-pressed={s === size}
+                    title={
+                      state === 'sold-out'
+                        ? `${s} is sold out in ${activeColor}`
+                        : state === 'absent'
+                          ? `${s} is not made in ${activeColor}`
+                          : undefined
+                    }
                     className={`relative h-12 min-w-[3.5rem] rounded-xs border px-3.5 text-sm transition-colors ${
-                      out
-                        ? 'cursor-not-allowed border-line text-faint'
-                        : s === size
-                          ? 'border-ink bg-ink text-page'
-                          : 'border-line text-ink hover:border-ink'
+                      state === 'absent'
+                        ? 'cursor-not-allowed border-dashed border-line text-faint/60'
+                        : state === 'sold-out'
+                          ? 'cursor-not-allowed border-line text-faint'
+                          : s === size
+                            ? 'border-ink bg-ink text-page'
+                            : 'border-line text-ink hover:border-ink'
                     }`}
                   >
                     {s}
-                    {out && (
+                    <span className="sr-only">
+                      {state === 'sold-out' ? ' — sold out' : state === 'absent' ? ' — not available in this colour' : ''}
+                    </span>
+                    {/* A struck-through size reads as "gone"; a dashed outline
+                        reads as "not offered". Only the first gets the line. */}
+                    {state === 'sold-out' && (
                       <span aria-hidden="true" className="absolute inset-x-2 top-1/2 h-px -rotate-[18deg] bg-line" />
                     )}
                   </button>
@@ -288,6 +310,11 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             </div>
             {size && lowStock && (
               <p className="mt-3 text-[13px] text-sale">Only {variant.inventory} left in {activeColor}, size {size}.</p>
+            )}
+            {sizes.some((s) => sizeState[s]?.state === 'absent') && (
+              <p className="mt-3 text-[12px] text-faint">
+                Dashed sizes are not made in {activeColor}.
+              </p>
             )}
           </fieldset>
 

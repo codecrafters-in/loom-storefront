@@ -80,6 +80,13 @@ out of stock **in the selected colour**, which is only expressible per variant.
 A sold-out product returns its variants with `available: false` — never an empty
 array, or the page has no picker and nothing to add.
 
+**The matrix is allowed to be sparse.** Not every colour comes in every size, so
+a product with four colours and four sizes may legitimately have fewer than
+sixteen variants. The storefront renders three states per size in the selected
+colour: available, sold out (struck through), and not made (dashed outline).
+Collapsing the last two into one is a common mistake and it answers a shopper's
+question wrongly — one is worth waiting for, the other is not.
+
 ## Fit
 
 ```ts

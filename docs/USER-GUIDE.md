@@ -193,8 +193,25 @@ product page.
 - **Assign to a colour**: tick several tiles, choose the colour, **Assign**. The
   gallery then jumps to those shots when a shopper picks that colour.
 
+**Reordering:** drag a tile onto another, or use the arrows on it. The order you
+see is the order on the product page.
+
 > The tile shows each file's dimensions and warns if it is not 4:5, which is the
 > shape the site is built around.
+
+---
+
+## Give a colour its own photo
+
+Two ways, both fine:
+
+- **Media tab** — tick the shots, choose the colour, **Assign**. That tags them
+  and points every variant of that colour at the first one.
+- **Variants tab** — click the little thumbnail on any row. Pick from the
+  product's shots, or **Upload for this colour** to add one and attach it in the
+  same action.
+
+The gallery then jumps to that shot when a shopper picks the colour.
 
 ---
 
@@ -214,6 +231,23 @@ Tick individual rows first and the scope list gains **the N selected**.
 
 > A price with an amber border differs from the product price. Changing the
 > product price leaves it alone, so a size surcharge survives a repricing.
+
+---
+
+## Sell a colour in only some sizes
+
+Ordinary — white might come in S and M only.
+
+**Open the product → Variants → the bin icon on the row you do not sell.**
+
+Tick several rows first and a **Remove** button appears next to the bulk bar.
+
+Combinations you have removed are listed under **not created** with a plus, so
+you can add them back later. Nothing is put back automatically.
+
+> On the product page an unmade size is shown with a dashed outline and a
+> tooltip; a sold-out one is struck through. Those are different answers — one
+> is worth waiting for, the other is not.
 
 ---
 

@@ -196,6 +196,11 @@ Rules on Product:
   picker greys out sizes with `inventory: 0` *in the selected colour*, which is
   only possible per variant. A product with no stock returns its variants with
   `available: false` — never an empty array, or the page has nothing to sell.
+- **The matrix may be sparse.** Four colours and four sizes does not mean
+  sixteen variants; white might be made in S and M only. Do not generate the
+  cartesian product and do not treat a missing combination as an error. The
+  storefront distinguishes "sold out" from "not made in this colour", and they
+  are different answers to what a shopper is asking.
 - **`swatches`** maps colour name to hex, so the picker does not have to guess
   what "Ecru" looks like.
 - **`badges`** — any of `new` `sale` `bestseller` `low-stock` `sold-out`.
