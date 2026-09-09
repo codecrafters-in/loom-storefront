@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import api from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
 import { Button, Empty, Icon, Skeleton, Badge } from '../../components/ui/index.jsx'
 import { useToast } from '../../store/ToastContext.jsx'
 import RecordRow, { RowAction } from '../../components/admin/RecordRow.jsx'
+import ListToolbar, { matches } from '../../components/admin/ListToolbar.jsx'
 import { formatMoney } from '../../lib/money.js'
 
 /* ── categories ────────────────────────────────────────────────────────── */
@@ -11,6 +12,7 @@ import { formatMoney } from '../../lib/money.js'
 export function Categories() {
   const { data, loading, reload } = useAsync(() => api.listCategories(), [])
   const [editing, setEditing] = useState(null)
+  const [q, setQ] = useState('')
   const { push } = useToast()
 
   const save = async (e) => {
@@ -25,7 +27,20 @@ export function Categories() {
     }
   }
 
-  const roots = data?.items || []
+  const allRoots = useMemo(() => data?.items || [], [data])
+  const roots = useMemo(() => {
+    if (!q.trim()) return allRoots
+    // A search that hides a matching child because its parent did not match is
+    // a search that appears broken. Keep the parent as context.
+    return allRoots
+      .map((r) => {
+        const rootHit = matches(q, r.name, r.slug)
+        const kids = (r.children || []).filter((c) => matches(q, c.name, c.slug))
+        if (!rootHit && !kids.length) return null
+        return { ...r, children: rootHit ? r.children : kids }
+      })
+      .filter(Boolean)
+  }, [allRoots, q])
   const set = (k) => (e) => setEditing((c) => ({ ...c, [k]: e.target.value }))
 
   return (
@@ -52,7 +67,7 @@ export function Categories() {
               onChange={(e) => setEditing((c) => ({ ...c, parent: e.target.value || null }))}
             >
               <option value="">— top level —</option>
-              {roots.map((r) => <option key={r.slug} value={r.slug}>{r.name}</option>)}
+              {allRoots.map((r) => <option key={r.slug} value={r.slug}>{r.name}</option>)}
             </select>
             <p className="mt-1.5 text-[12px] text-faint">
               A parent&rsquo;s product count and filters include everything under it.
@@ -67,7 +82,16 @@ export function Categories() {
       ) : loading ? (
         <Skeleton className="mt-8 h-64 w-full" />
       ) : (
-        <ul className="mt-8 space-y-2">
+        <>
+        <ListToolbar
+          className="mt-6"
+          query={q}
+          onQuery={setQ}
+          placeholder="Search category name or slug"
+          count={roots.reduce((a, r) => a + 1 + (r.children?.length || 0), 0)}
+          total={allRoots.reduce((a, r) => a + 1 + (r.children?.length || 0), 0)}
+        />
+        <ul className="mt-6 space-y-2">
           {roots.map((r) => (
             <li key={r.slug} className="space-y-2">
               <RecordRow onOpen={() => setEditing({ ...r })} label={`Edit ${r.name}`}>
@@ -87,6 +111,7 @@ export function Categories() {
             </li>
           ))}
         </ul>
+        </>
       )}
     </>
   )
@@ -97,7 +122,13 @@ export function Categories() {
 export function SizeCharts() {
   const { data, loading, reload } = useAsync(() => api.listSizeCharts(), [])
   const [editing, setEditing] = useState(null)
+  const [q, setQ] = useState('')
   const { push } = useToast()
+
+  const rows = useMemo(
+    () => (data?.items || []).filter((c) => matches(q, c.id, c.columns.join(' '), c.note)),
+    [data, q],
+  )
 
   const save = async (e) => {
     e.preventDefault()
@@ -205,8 +236,17 @@ export function SizeCharts() {
         copies of the same table drifting apart.
       </p>
 
-      <ul className="mt-8 space-y-2">
-        {(data?.items || []).map((c) => (
+      <ListToolbar
+        className="mt-6"
+        query={q}
+        onQuery={setQ}
+        placeholder="Search chart name or column"
+        count={rows.length}
+        total={data?.items?.length ?? 0}
+      />
+
+      <ul className="mt-6 space-y-2">
+        {rows.map((c) => (
           <li key={c.id}>
             <RecordRow onOpen={() => setEditing(structuredClone(c))} label={`Edit ${c.id}`}>
               <p className="font-mono text-[14px] text-ink">{c.id}</p>
@@ -228,6 +268,23 @@ const STATUSES = ['placed', 'paid', 'fulfilled', 'delivered', 'cancelled']
 export function Orders() {
   const { data, loading, reload } = useAsync(() => api.listOrders(), [])
   const { push } = useToast()
+  const [q, setQ] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sort, setSort] = useState('newest')
+
+  const rows = useMemo(() => {
+    let items = (data?.items || []).filter((o) =>
+      matches(q, o.number, o.email, o.shippingAddress?.name, o.tracking?.code),
+    )
+    if (statusFilter !== 'all') items = items.filter((o) => o.status === statusFilter)
+    const by = {
+      newest: (a, b) => (a.placedAt < b.placedAt ? 1 : -1),
+      oldest: (a, b) => (a.placedAt > b.placedAt ? 1 : -1),
+      'total-desc': (a, b) => b.total.amount - a.total.amount,
+      'total-asc': (a, b) => a.total.amount - b.total.amount,
+    }
+    return items.slice().sort(by[sort] || by.newest)
+  }, [data, q, statusFilter, sort])
 
   const setStatus = async (id, status) => {
     try {
@@ -249,7 +306,36 @@ export function Orders() {
         Cancelling returns the stock. An order that disappears without giving its units back is how
         a catalogue quietly loses inventory nobody can account for.
       </p>
-      <div className="mt-8 overflow-x-auto rounded-xs border border-line bg-surface">
+
+      <ListToolbar
+        className="mt-6"
+        query={q}
+        onQuery={setQ}
+        placeholder="Search order number, email or tracking"
+        filters={[
+          {
+            label: 'Status',
+            value: statusFilter,
+            onChange: setStatusFilter,
+            options: [
+              { value: 'all', label: 'All statuses' },
+              ...STATUSES.map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })),
+            ],
+          },
+        ]}
+        sorts={[
+          { value: 'newest', label: 'Newest first' },
+          { value: 'oldest', label: 'Oldest first' },
+          { value: 'total-desc', label: 'Highest value' },
+          { value: 'total-asc', label: 'Lowest value' },
+        ]}
+        sort={sort}
+        onSort={setSort}
+        count={rows.length}
+        total={data?.items?.length ?? 0}
+      />
+
+      <div className="mt-6 overflow-x-auto rounded-xs border border-line bg-surface">
         <table className="w-full border-collapse text-[14px]">
           <thead>
             <tr className="border-b border-line text-left">
@@ -263,7 +349,7 @@ export function Orders() {
             </tr>
           </thead>
           <tbody>
-            {data.items.map((o) => (
+            {rows.map((o) => (
               <tr key={o.id} className="border-b border-line last:border-0">
                 <td className="p-3 font-mono text-[12px]">{o.number}</td>
                 <td className="p-3 text-muted">{new Date(o.placedAt).toLocaleDateString()}</td>
@@ -295,7 +381,16 @@ export function Orders() {
 export function Discounts() {
   const { data, loading, reload } = useAsync(() => api.adminListDiscounts(), [])
   const [editing, setEditing] = useState(null)
+  const [q, setQ] = useState('')
+  const [state, setState] = useState('all')
   const { push } = useToast()
+
+  const rows = useMemo(() => {
+    let items = (data?.items || []).filter((d) => matches(q, d.code, d.label, d.kind))
+    if (state === 'active') items = items.filter((d) => d.active !== false)
+    if (state === 'inactive') items = items.filter((d) => d.active === false)
+    return items
+  }, [data, q, state])
 
   const save = async (e) => {
     e.preventDefault()
@@ -361,8 +456,29 @@ export function Discounts() {
           </div>
         </form>
       ) : (
-        <ul className="mt-8 space-y-2">
-          {(data?.items || []).map((d) => (
+        <>
+        <ListToolbar
+          className="mt-6"
+          query={q}
+          onQuery={setQ}
+          placeholder="Search code or label"
+          filters={[
+            {
+              label: 'State',
+              value: state,
+              onChange: setState,
+              options: [
+                { value: 'all', label: 'All codes' },
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+              ],
+            },
+          ]}
+          count={rows.length}
+          total={data?.items?.length ?? 0}
+        />
+        <ul className="mt-6 space-y-2">
+          {rows.map((d) => (
             <li key={d.code}>
               <RecordRow
                 onOpen={() => setEditing({ ...d })}
@@ -386,6 +502,7 @@ export function Discounts() {
             </li>
           ))}
         </ul>
+        </>
       )}
     </>
   )

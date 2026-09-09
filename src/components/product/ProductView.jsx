@@ -132,24 +132,33 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
   }, [preview, product, params, color, size])
 
   /**
-   * The gallery follows the colour picker.
+   * The gallery is scoped to the chosen colour.
    *
-   * An image tagged with the chosen colour wins; failing that, the variant's
-   * own `imageId`. Both are optional, so a store with one set of photography
-   * behaves exactly as before.
+   * Showing every shot of every colourway under a pink jacket is noise — the
+   * thumbnails stop being a way to see this product and become a contact sheet
+   * of the whole range. Images tagged with the active colour, plus any untagged
+   * ones (packshots, fabric details, the size guide) which belong to all of
+   * them. A store that tags nothing sees exactly what it saw before.
    */
+  const gallery = useMemo(() => {
+    if (!product?.images?.length) return []
+    const tagged = product.images.filter((img) => img.color === activeColor)
+    const shared = product.images.filter((img) => !img.color)
+    const scoped = [...tagged, ...shared]
+    return scoped.length ? scoped : product.images
+  }, [product, activeColor])
+
+  // Changing colour resets to that colour's first shot rather than leaving the
+  // index pointing at whatever happened to be in that slot before.
   useEffect(() => {
-    if (!product) return
-    const byColor = product.images.findIndex((img) => img.color && img.color === activeColor)
-    if (byColor >= 0) {
-      setShot(byColor)
-      return
-    }
-    if (variant?.imageId) {
-      const i = product.images.findIndex((img) => img.id === variant.imageId)
-      if (i >= 0) setShot(i)
-    }
-  }, [variant, product, activeColor])
+    setShot(0)
+  }, [activeColor])
+
+  useEffect(() => {
+    if (!variant?.imageId) return
+    const i = gallery.findIndex((img) => img.id === variant.imageId)
+    if (i >= 0) setShot(i)
+  }, [variant, gallery])
 
   // A sticky buy bar once the real one scrolls away — on a long product page
   // the decision often happens next to the reviews, and walking back up to a
@@ -170,27 +179,36 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
       <div className={`grid gap-10 pb-16 lg:grid-cols-2 lg:gap-16 ${preview ? "" : "wrap mt-8"}`}>
         {/* gallery */}
         <div className="lg:sticky lg:top-24 lg:self-start">
-          <div className="shot rounded-xs">
+          {/* Capped by height, not width.
+              A 4:5 shot at full column width is taller than the viewport, which
+              pushes the thumbnails below the fold — so the one control that
+              changes what you are looking at is the one you have to go hunting
+              for. Bounding the height keeps the picker and the buy box in the
+              same screen. */}
+          <div
+            className="shot mx-auto rounded-xs"
+            style={{ maxHeight: '68vh', width: 'auto', maxWidth: '100%' }}
+          >
             <Media
-              src={product.images[shot]?.url}
-              type={product.images[shot]?.type}
-              alt={product.images[shot]?.alt}
-              width={product.images[shot]?.width}
-              height={product.images[shot]?.height}
-              controls={product.images[shot]?.type === 'video'}
+              src={gallery[shot]?.url}
+              type={gallery[shot]?.type}
+              alt={gallery[shot]?.alt}
+              width={gallery[shot]?.width}
+              height={gallery[shot]?.height}
+              controls={gallery[shot]?.type === 'video'}
               fetchPriority="high"
               decoding="async"
               className="h-full w-full object-cover"
             />
           </div>
-          {product.images.length > 1 && (
-            <div className="mt-3 flex gap-3">
-              {product.images.map((img, i) => (
+          {gallery.length > 1 && (
+            <div className="mt-3 flex flex-wrap gap-3">
+              {gallery.map((img, i) => (
                 <button
-                  key={img.url}
+                  key={img.id || img.url}
                   type="button"
                   onClick={() => setShot(i)}
-                  aria-label={`View image ${i + 1}`}
+                  aria-label={`View image ${i + 1} of ${gallery.length}`}
                   aria-current={i === shot}
                   className={`shot w-20 rounded-xs ring-1 transition-shadow ${i === shot ? 'ring-ink' : 'ring-line hover:ring-muted'}`}
                 >

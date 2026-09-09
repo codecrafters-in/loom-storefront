@@ -105,6 +105,15 @@
     background: rgb(var(--sunken));
     overflow: hidden;
   }
+
+  /* When a caller caps the height, the ratio has to derive width from height
+     rather than the other way round — otherwise the box goes letterbox-wide
+     and the shot inside it gets cropped to a strip. */
+  .shot[style*='max-height'] {
+    height: 68vh;
+    aspect-ratio: 4 / 5;
+    width: auto;
+  }
   .shot img {
     width: 100%;
     height: 100%;

@@ -7,6 +7,7 @@ import { useToast } from '../../store/ToastContext.jsx'
 import { formatMoney } from '../../lib/money.js'
 import Tour, { Hint } from '../../components/admin/Tour.jsx'
 import Media from '../../components/ui/Media.jsx'
+import ListToolbar, { matches } from '../../components/admin/ListToolbar.jsx'
 
 /* ── overview ──────────────────────────────────────────────────────────── */
 
@@ -74,30 +75,83 @@ export function Overview() {
 
 /* ── products ──────────────────────────────────────────────────────────── */
 
+const PRODUCT_SORTS = [
+  { value: 'updated', label: 'Recently updated' },
+  { value: 'title', label: 'Name, A–Z' },
+  { value: 'price-desc', label: 'Price, high to low' },
+  { value: 'price-asc', label: 'Price, low to high' },
+  { value: 'stock-asc', label: 'Stock, lowest first' },
+]
+
 export function Products() {
   const [q, setQ] = useState('')
-  const { data, loading } = useAsync(() => api.adminListProducts({ q, perPage: 200 }), [q])
+  const [status, setStatus] = useState('all')
+  const [sort, setSort] = useState('updated')
+  const { data, loading } = useAsync(() => api.adminListProducts({ perPage: 500 }), [])
   const navigate = useNavigate()
+
+  const stockOf = (p) => p.variants.reduce((a, v) => a + v.inventory, 0)
+
+  const rows = useMemo(() => {
+    let items = (data?.items || []).filter((p) =>
+      matches(q, p.title, p.slug, (p.tags || []).join(' '), (p.categories || []).join(' ')),
+    )
+    if (status === 'published') items = items.filter((p) => p.published !== false)
+    if (status === 'draft') items = items.filter((p) => p.published === false)
+    if (status === 'out') items = items.filter((p) => stockOf(p) === 0)
+    if (status === 'low') items = items.filter((p) => stockOf(p) > 0 && stockOf(p) <= 5)
+    if (status === 'sale') items = items.filter((p) => p.compareAtPrice)
+
+    const by = {
+      updated: (a, b) => ((a.updatedAt || '') < (b.updatedAt || '') ? 1 : -1),
+      title: (a, b) => a.title.localeCompare(b.title),
+      'price-desc': (a, b) => b.price.amount - a.price.amount,
+      'price-asc': (a, b) => a.price.amount - b.price.amount,
+      'stock-asc': (a, b) => stockOf(a) - stockOf(b),
+    }
+    return items.slice().sort(by[sort] || by.updated)
+  }, [data, q, status, sort])
 
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-display-md">Products</h1>
-        <div className="flex gap-3">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search products"
-            className="field h-10 max-w-xs"
-          />
-          <Button size="md" icon="plus" to="/admin/products/new" className="shrink-0">New</Button>
-        </div>
+        <Button size="md" icon="plus" to="/admin/products/new" className="shrink-0">New</Button>
       </div>
 
+      <ListToolbar
+        className="mt-6"
+        query={q}
+        onQuery={setQ}
+        placeholder="Search name, slug, tag or category"
+        filters={[
+          {
+            label: 'Status',
+            value: status,
+            onChange: setStatus,
+            options: [
+              { value: 'all', label: 'All products' },
+              { value: 'published', label: 'Published' },
+              { value: 'draft', label: 'Drafts' },
+              { value: 'low', label: 'Low stock' },
+              { value: 'out', label: 'Out of stock' },
+              { value: 'sale', label: 'On sale' },
+            ],
+          },
+        ]}
+        sorts={PRODUCT_SORTS}
+        sort={sort}
+        onSort={setSort}
+        count={rows.length}
+        total={data?.items?.length ?? 0}
+      />
+
       {loading ? (
-        <Skeleton className="mt-8 h-64 w-full" />
+        <Skeleton className="mt-6 h-64 w-full" />
+      ) : rows.length === 0 ? (
+        <Empty icon="search" title="Nothing matches" body="Try a different search, or clear the filters." className="mt-6" />
       ) : (
-        <div className="mt-8 overflow-x-auto rounded-xs border border-line bg-surface">
+        <div className="mt-6 overflow-x-auto rounded-xs border border-line bg-surface">
           <table className="w-full border-collapse text-[14px]">
             <thead>
               <tr className="border-b border-line text-left">
@@ -109,8 +163,8 @@ export function Products() {
               </tr>
             </thead>
             <tbody>
-              {(data?.items || []).map((p) => {
-                const stock = p.variants.reduce((a, v) => a + v.inventory, 0)
+              {rows.map((p) => {
+                const stock = stockOf(p)
                 return (
                   // The whole row opens the record. An Edit link at the end of a
                   // row is a small target for something that is the only thing
@@ -168,16 +222,30 @@ export function Products() {
 export function Inventory() {
   const { data, loading, reload } = useAsync(() => api.adminListProducts({ perPage: 500 }), [])
   const [filter, setFilter] = useState('all')
+  const [q, setQ] = useState('')
+  const [sort, setSort] = useState('stock-asc')
   const { push } = useToast()
 
+  const all = useMemo(
+    () => (data?.items || []).flatMap((p) => p.variants.map((v) => ({ product: p, variant: v }))),
+    [data],
+  )
+
   const rows = useMemo(() => {
-    const all = (data?.items || []).flatMap((p) =>
-      p.variants.map((v) => ({ product: p, variant: v })),
+    let items = all.filter((r) =>
+      matches(q, r.product.title, r.variant.sku, r.variant.options.Color, r.variant.options.Size),
     )
-    if (filter === 'out') return all.filter((r) => !r.variant.available)
-    if (filter === 'low') return all.filter((r) => r.variant.available && r.variant.inventory <= 2)
-    return all
-  }, [data, filter])
+    if (filter === 'out') items = items.filter((r) => !r.variant.available)
+    if (filter === 'low') items = items.filter((r) => r.variant.available && r.variant.inventory <= 2)
+
+    const by = {
+      'stock-asc': (a, b) => a.variant.inventory - b.variant.inventory,
+      'stock-desc': (a, b) => b.variant.inventory - a.variant.inventory,
+      product: (a, b) => a.product.title.localeCompare(b.product.title) || a.variant.sku.localeCompare(b.variant.sku),
+      sku: (a, b) => a.variant.sku.localeCompare(b.variant.sku),
+    }
+    return items.slice().sort(by[sort] || by['stock-asc'])
+  }, [all, q, filter, sort])
 
   const adjust = async (variantId, delta) => {
     try {
@@ -190,22 +258,7 @@ export function Inventory() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-display-md">Inventory</h1>
-        <div className="flex gap-2">
-          {[['all', 'All'], ['low', 'Low'], ['out', 'Out of stock']].map(([k, l]) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setFilter(k)}
-              className={`rounded-xs border px-3 py-1.5 text-[13px] ${filter === k ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:border-ink'}`}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
-      </div>
-
+      <h1 className="text-display-md">Inventory</h1>
       <p className="mt-3 text-[13px] text-muted">
         Adjust with + and −, not by typing a number.
         <Hint>
@@ -214,10 +267,39 @@ export function Inventory() {
         </Hint>
       </p>
 
+      <ListToolbar
+        className="mt-6"
+        query={q}
+        onQuery={setQ}
+        placeholder="Search product, SKU, colour or size"
+        filters={[
+          {
+            label: 'Availability',
+            value: filter,
+            onChange: setFilter,
+            options: [
+              { value: 'all', label: 'All variants' },
+              { value: 'low', label: 'Low stock' },
+              { value: 'out', label: 'Out of stock' },
+            ],
+          },
+        ]}
+        sorts={[
+          { value: 'stock-asc', label: 'Stock, lowest first' },
+          { value: 'stock-desc', label: 'Stock, highest first' },
+          { value: 'product', label: 'Product, A–Z' },
+          { value: 'sku', label: 'SKU' },
+        ]}
+        sort={sort}
+        onSort={setSort}
+        count={rows.length}
+        total={all.length}
+      />
+
       {loading ? (
-        <Skeleton className="mt-8 h-64 w-full" />
+        <Skeleton className="mt-6 h-64 w-full" />
       ) : rows.length === 0 ? (
-        <Empty icon="package" title="Nothing here" body="No variants match that filter." />
+        <Empty icon="package" title="Nothing here" body="No variants match that filter." className="mt-6" />
       ) : (
         <div className="mt-6 overflow-x-auto rounded-xs border border-line bg-surface">
           <table className="w-full border-collapse text-[14px]">

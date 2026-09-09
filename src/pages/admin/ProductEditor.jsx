@@ -84,6 +84,14 @@ export default function ProductEditor() {
     if (loaded.data && !draft) setDraft(structuredClone(loaded.data))
   }, [loaded.data, draft])
 
+  // Saving a new product replaces `new` in the URL with its id. The draft in
+  // hand is already correct, so adopting the refetch would only throw away
+  // anything typed since — keep what is on screen.
+  useEffect(() => {
+    if (!isNew) return
+    setDraft((d) => d)
+  }, [isNew])
+
   const set = useCallback((path, value) => {
     setDirty(true)
     setDraft((d) => {
@@ -110,23 +118,50 @@ export default function ProductEditor() {
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
 
-  const save = async () => {
+  /**
+   * Commit the draft. `then` decides where we go afterwards.
+   *
+   * Preview goes through here too. A preview that does not persist is a way to
+   * lose an hour's work to a stray reload, and "look at it" is not a reason to
+   * risk that — a new product saved this way is created as a draft, so nothing
+   * reaches a shopper before you mean it to.
+   */
+  const commit = async ({ then = 'list' } = {}) => {
     if (!draft.slug || !draft.title) {
-      push('A title and a slug are required.', { tone: 'error' })
+      push('A title and a slug are required before this can be saved.', { tone: 'error' })
       setTab('details')
-      return
+      return false
     }
     setBusy(true)
     try {
-      await api.adminSaveProduct(draft)
+      const saved = await api.adminSaveProduct(draft)
       setDirty(false)
-      push(isNew ? 'Product created' : 'Saved')
-      navigate('/admin/products')
+      if (then === 'list') {
+        push(isNew ? 'Product created' : 'Saved')
+        navigate('/admin/products')
+      } else {
+        push(isNew ? 'Created as a draft' : 'Saved')
+        // A new product now has an id, so the URL has to stop saying "new" —
+        // otherwise the next save creates a second product.
+        if (isNew && saved?.id) navigate(`/admin/products/${saved.id}`, { replace: true })
+      }
+      return true
     } catch (err) {
       push(err.message, { tone: 'error' })
+      return false
     } finally {
       setBusy(false)
     }
+  }
+
+  const save = () => commit({ then: 'list' })
+
+  const preview = async () => {
+    if (!dirty) {
+      setPreviewing(true)
+      return
+    }
+    if (await commit({ then: 'stay' })) setPreviewing(true)
   }
 
   const remove = async () => {
@@ -185,11 +220,12 @@ export default function ProductEditor() {
 
           <button
             type="button"
-            onClick={() => setPreviewing(true)}
-            className="inline-flex items-center gap-1.5 rounded-xs border border-line px-3 py-1.5 text-[12px] text-muted transition-colors hover:border-ink hover:text-ink"
+            onClick={preview}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-xs border border-line px-3 py-1.5 text-[12px] text-muted transition-colors hover:border-ink hover:text-ink disabled:opacity-50"
           >
             <Icon name="search" size={13} />
-            Preview
+            {dirty ? 'Save & preview' : 'Preview'}
           </button>
 
           {/* The live page, for comparison. Only exists once something is

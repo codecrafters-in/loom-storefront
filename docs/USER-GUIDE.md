@@ -162,11 +162,14 @@ For **redirect**, paste the address your developer gives you into **Create URL**
 
 ## See how it will look before you save
 
-**Preview**, at the top of the product editor.
+**Save & preview**, at the top of the product editor.
 
-It works on a brand-new product before you have saved anything, and it shows
-your unsaved edits — it renders the same components the shop does, so what you
-see is what a shopper gets. You also get the listing card, because that is where
+It saves first — a new product is created as a **draft**, so nothing reaches a
+shopper before you mean it to — and then shows you the page. Previewing can
+never lose what you have typed.
+
+It renders the same components the shop does, so what you see is what a shopper
+gets. You also get the listing card, because that is where
 most people meet a product and a shot that works in the gallery can still be
 wrong at thumbnail size.
 
@@ -195,6 +198,10 @@ product page.
 
 **Reordering:** drag a tile onto another, or use the arrows on it. The order you
 see is the order on the product page.
+
+**Shoppers only see the shots for the colour they picked.** A photo tagged Pink
+appears when Pink is selected; an untagged one — a fabric detail, a packshot —
+appears for every colour. Tag nothing and everyone sees everything, as before.
 
 > The tile shows each file's dimensions and warns if it is not 4:5, which is the
 > shape the site is built around.
@@ -296,6 +303,24 @@ Charts are shared. Nine products pointing at **tops** all update together, rathe
 than nine copies of the same table drifting apart.
 
 Attach one on a product under **Fit & fabric → Use chart**.
+
+---
+
+## Finding things
+
+Every list has the same three controls in the same place: **search**, one or two
+**filters**, and a **sort**.
+
+| Screen | Filter by | Sort by |
+| --- | --- | --- |
+| Products | Published, drafts, low stock, out of stock, on sale | Updated, name, price, stock |
+| Inventory | All, low, out of stock | Stock, product, SKU |
+| Orders | Status | Date, order value |
+| Discounts | Active, inactive | — |
+| Categories, Size charts | — | — |
+
+A count under the controls tells you how much you are looking at. **Clear**
+appears as soon as anything is set.
 
 ---
 
