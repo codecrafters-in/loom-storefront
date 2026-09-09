@@ -9,11 +9,10 @@ import { useCart } from '../../store/CartContext.jsx'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { useWishlist } from '../../store/WishlistContext.jsx'
 import { FitBlock, FabricBlock, SizeChartModal } from './FitBlock.jsx'
-import TrustRow, { SocialProof } from './TrustRow.jsx'
+import TrustRow, { PaymentsRow, SocialProof } from './TrustRow.jsx'
 import {
   ProductHighlights,
   ProductAssurances,
-  ProductMaker,
   DetailTabs,
   FeatureCarousel,
   SpecCarousel,
@@ -463,7 +462,6 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               they belong to the store; a repair guarantee on a coat and not on
               a t-shirt belongs to the product. */}
           <ProductAssurances product={product} />
-          <ProductMaker enrichment={product.enrichment} />
 
           {/*
             Fit stays an accordion and stays open: it is the field that decides
@@ -561,10 +559,20 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                 id: 'manufacturer',
                 label: 'Manufacturer info',
                 when: Boolean(product.enrichment?.manufacturer),
-                render: () => <ManufacturerRows info={product.enrichment.manufacturer} />,
+                render: () => (
+                  <ManufacturerRows
+                    info={product.enrichment.manufacturer}
+                    maker={product.enrichment.maker}
+                  />
+                ),
               },
             ]}
           />
+
+          {/* Last, not fourth. "Secure checkout" answers a question a shopper
+              has once they have decided, so it closes the column rather than
+              interrupting the part where they are still deciding. */}
+          <PaymentsRow />
         </div>
       </div>
 

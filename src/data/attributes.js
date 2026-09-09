@@ -69,6 +69,8 @@ export const attributes = [
   // Packaging and origin — several of these are legally required in some
   // markets. India's Legal Metrology rules, for one, mandate the manufacturer
   // and packer address and the country of origin on an e-commerce listing.
+  { key: 'madeBy', label: 'Woven by', group: 'packaging' },
+  { key: 'millLocation', label: 'Mill location', group: 'packaging' },
   { key: 'genericName', label: 'Generic name', group: 'packaging' },
   { key: 'countryOfOrigin', label: 'Country of origin', group: 'packaging' },
   { key: 'manufacturer', label: 'Manufacturer name and address', group: 'packaging' },

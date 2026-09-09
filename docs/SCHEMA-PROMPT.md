@@ -163,13 +163,12 @@ catalogue — size and fit cause roughly two thirds of fashion returns:
   services block: returns, exchange, repair, payment. A product with no rows
   inherits the store's, so *no rows* and *an empty explicit set* have to be
   distinguishable — say how you would model that
-- `makers` — name, location, partner_since, rating, rating_count, note, joined
-  from `products.maker_id` (`ON DELETE SET NULL`, never CASCADE — dropping a
-  supplier must not delete their products). One mill supplies many products, so
-  a rating stored per product goes stale in thirty-nine rows out of forty the
-  first time it changes. Add a constraint that a rating cannot exist without a
-  count: a supplier score with no denominator is a number somebody typed, and a
-  shopper who works that out stops believing the review count too
+- `makers` — name, location, joined from `products.maker_id` (`ON DELETE SET
+  NULL`, never CASCADE — dropping a supplier must not delete their products).
+  One mill supplies many products, which is the whole reason it is a table and
+  not two columns. Deliberately **no rating**: a score for a supplier nobody can
+  review is a number somebody typed, and a shopper who works that out stops
+  believing the review count and the stock level too
 
 Three things I want you to get right here and explain:
 

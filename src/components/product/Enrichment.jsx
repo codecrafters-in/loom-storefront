@@ -102,43 +102,6 @@ export function ProductAssurances({ product, className = '' }) {
 }
 
 /**
- * Who actually made it.
- *
- * A marketplace names the seller and shows their rating, because on a
- * marketplace the seller is the variable. On an own-brand store the seller is
- * never in doubt and the same block is dead weight — unless it names the mill
- * or the workshop, which is the equivalent unknown and the one a shopper
- * paying a premium is actually buying.
- *
- * Renders nothing without a name, so a store that does not want to disclose its
- * supply chain simply does not have this section.
- */
-export function ProductMaker({ enrichment, className = '' }) {
-  const m = enrichment?.maker
-  if (!m?.name) return null
-
-  const line = [m.location, m.since && `working with us since ${m.since}`].filter(Boolean).join(' · ')
-
-  return (
-    <section className={`mt-6 rounded-xs border border-line bg-surface p-4 ${className}`}>
-      <p className="eyebrow">Made by</p>
-      <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-        <span className="text-[14px] font-medium text-ink">{m.name}</span>
-        {m.rating && (
-          <span className="inline-flex items-center gap-1 rounded-xs bg-good/10 px-1.5 py-0.5 text-[11px] font-medium text-good">
-            <Icon name="star" size={11} filled strokeWidth={0} />
-            {m.rating}
-            {m.ratingCount ? <span className="text-faint">({m.ratingCount})</span> : null}
-          </span>
-        )}
-      </div>
-      {line && <p className="mt-1.5 text-[12px] text-faint">{line}</p>}
-      {m.note && <p className="mt-2.5 text-[13px] leading-relaxed text-muted">{m.note}</p>}
-    </section>
-  )
-}
-
-/**
  * The detail blocks, in the column beside the buy button.
  *
  * These were a full-width tabbed section below the fold, then a stack of
@@ -465,14 +428,30 @@ function CarouselButton({ label: text, icon, disabled, onClick }) {
   )
 }
 
-/** Compliance rows. Single column — the column is 30rem, not a page. */
-export function ManufacturerRows({ info }) {
-  if (!info) return null
-  return <Manufacturer info={info} />
+/**
+ * Compliance rows, plus who actually wove the cloth.
+ *
+ * The mill used to be its own "Made by" block with a rating and a relationship
+ * note beside it — a marketplace seller card, adapted. It reads better here.
+ * The compliance block is already the place a shopper looks for real
+ * manufacturing facts, and the address on it is the *brand's*, so the mill is
+ * genuinely new information rather than a second version of the same thing.
+ *
+ * The rating went with the block, deliberately. A score for a supplier nobody
+ * can review is a number somebody typed, and a shopper who works that out stops
+ * believing the review count and the stock level too.
+ */
+export function ManufacturerRows({ info, maker }) {
+  if (!info && !maker?.name) return null
+  return <Manufacturer info={info} maker={maker} />
 }
 
-function Manufacturer({ info }) {
+function Manufacturer({ info = {}, maker }) {
   const rows = [
+    // The mill first: it is the one line here that is about this product rather
+    // than about the company that sells it.
+    ['madeBy', maker?.name],
+    ['millLocation', maker?.location],
     ['genericName', info.genericName],
     ['countryOfOrigin', info.countryOfOrigin],
     ['manufacturer', info.manufacturer],

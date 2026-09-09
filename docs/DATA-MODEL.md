@@ -146,14 +146,7 @@ see [CONFIGURATION.md](CONFIGURATION.md#trust).
   highlights: { key: string, value: string }[]     // ordered; first 6 render
   features: { icon: string, title: string, body: string }[]
   assurances?: { icon: string, label: string, note?: string }[]
-  maker?: {
-    name: string                                    // required, or the block hides
-    location?: string
-    since?: string | number
-    rating?: number                                 // out of 5
-    ratingCount?: number
-    note?: string
-  }
+  maker?: { name: string, location?: string }       // renders inside `manufacturer`
   specs: Record<string, string>                     // flat; grouped on read
   manufacturer?: {
     genericName?, countryOfOrigin?, manufacturer?,
@@ -183,15 +176,22 @@ returns policy printed in full is four lines of prose next to a call to action.
 have one returns policy. Sending an empty array is not the same thing — an empty
 array means *this product has none*, and the block renders nothing.
 
-`maker` is the marketplace seller block, adapted. On a marketplace the seller is
-the variable and the rating is the reassurance; on an own-brand store the seller
-is never in doubt and the mill is the unknown a shopper paying a premium is
-actually buying. `name` is required — without it nothing renders, which is the
-right default for a store that does not disclose its supply chain.
+`maker` names the mill, and renders as the first two rows of `manufacturer`
+rather than as a block of its own. It started as a marketplace seller card —
+name, rating, years — and that was the wrong shape twice over. On an own-brand
+store the seller is never in doubt, so the card had nothing to reassure anyone
+about; and a rating for a supplier nobody can review is a number somebody typed,
+which makes the review count and the stock level look typed too.
 
-A `rating` here is a claim about a third party. Publish one only where you can
-point at what it averages; an invented supplier score makes every other number on
-the page look invented too.
+What is left is the part that was actually information: who wove the cloth and
+where. It sits with the compliance rows because that is where a shopper already
+looks for manufacturing facts, and because the address on those rows is the
+*brand's* — so the mill is new information rather than a second version of the
+same one.
+
+**Keep `maker.location` consistent with `fabric.origin`.** They render four rows
+apart. A mill in one country beside a country of origin in another is the kind of
+contradiction a shopper only has to notice once.
 
 ## Attribute
 

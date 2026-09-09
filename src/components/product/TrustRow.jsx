@@ -66,19 +66,35 @@ export default function TrustRow({ flat = false }) {
         ))}
       </ul>
 
-      {trust.payments?.length > 0 && (
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-3.5">
-          <span className="inline-flex items-center gap-1.5 text-[11px] text-faint">
-            <Icon name="shield" size={13} className="text-good" />
-            Secure checkout
-          </span>
-          {trust.payments.map((p) => (
-            <span key={p} className="rounded-xs border border-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
-              {p}
-            </span>
-          ))}
-        </div>
-      )}
+    </div>
+  )
+}
+
+/**
+ * Secure checkout and the payment marks, on their own.
+ *
+ * Split out of the block above so it can close the column rather than sit four
+ * lines under the button. The delivery date and the returns window answer a
+ * question the shopper has *while choosing*, so they belong next to the choice.
+ * This answers one they have once they have decided, which is why it reads
+ * better after the detail than before it — the last thing on the way out.
+ */
+export function PaymentsRow({ className = '' }) {
+  const config = useStorefront()
+  const payments = config.trust?.payments || []
+  if (!payments.length) return null
+
+  return (
+    <div className={`mt-8 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-4 ${className}`}>
+      <span className="inline-flex items-center gap-1.5 text-[11px] text-faint">
+        <Icon name="shield" size={13} className="text-good" />
+        Secure checkout
+      </span>
+      {payments.map((p) => (
+        <span key={p} className="rounded-xs border border-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
+          {p}
+        </span>
+      ))}
     </div>
   )
 }

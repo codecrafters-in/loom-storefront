@@ -259,14 +259,7 @@ Cache it hard — it changes when a merchant saves settings, not per request.
       },
       { "icon": "ruler", "label": "Free size exchange, once per order" }
     ],
-    "maker": {
-      "name": "Todd & Duncan",
-      "location": "Kinross, Scotland",
-      "since": 2018,
-      "rating": 4.9,
-      "ratingCount": 204,
-      "note": "Spinning on the shore of Loch Leven since 1867."
-    },
+    "maker": { "name": "Filatura Sesia", "location": "Biella, Italy" },
     "specs": { "sleeve": "Full sleeve", "pattern": "Solid", "care": "Hand wash cool" },
     "manufacturer": {
       "genericName": "Apparel",
@@ -293,7 +286,7 @@ have scrolled, and they are the majority.
 | --- | --- | --- |
 | `highlights` | Above the buy button | The scan. Six pairs read in two seconds |
 | `assurances` | Under the buy button | What happens after the sale — returns, exchange, repair, payment |
-| `maker` | Under the assurances | Who made it. The marketplace seller block, adapted |
+| `maker` | First two rows of Manufacturer info | Who wove the cloth, and where |
 | `features` | "All details" → Features, a swipeable card row | Two or three things a competitor could not copy-paste |
 | `specs` | "All details" → Specifications, one group per slide | The reference table. Nobody reads it end to end |
 | `manufacturer` | "All details" → Manufacturer info | Compliance |

@@ -972,21 +972,22 @@ CREATE TABLE product_assurances (
   position   integer NOT NULL DEFAULT 0
 );
 
--- Who made it. A marketplace stores this as a seller with a rating; an
--- own-brand store stores the mill. Same shape either way.
+-- The mill. Renders as the first two rows of the compliance block, because that
+-- is where a shopper already looks for manufacturing facts and because the
+-- address on those rows belongs to the brand, not to whoever wove the cloth.
 --
--- Modelled as its own table rather than columns on `products` because one mill
--- supplies many products, and a rating repeated across forty rows goes stale in
--- thirty-nine of them the first time it is updated.
+-- Its own table rather than two columns on `products` because one mill supplies
+-- many products — renaming it should be one write, not forty.
+--
+-- Deliberately **no rating column.** This began as a marketplace seller record
+-- and lost it on the way: a score for a supplier nobody can review is a number
+-- somebody typed, and a shopper who works that out stops believing the review
+-- count and the stock level too. The cheapest way to keep a number honest is to
+-- have nowhere to put a dishonest one.
 CREATE TABLE makers (
-  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name         text NOT NULL,
-  location     text,
-  partner_since integer,
-  rating       numeric(2,1) CHECK (rating IS NULL OR rating BETWEEN 0 AND 5),
-  rating_count integer NOT NULL DEFAULT 0,
-  note         text,
-  CONSTRAINT rating_needs_a_count CHECK (rating IS NULL OR rating_count > 0)
+  id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name     text NOT NULL,
+  location text
 );
 
 -- Compliance. Separate from the rest because it is legally mandated in several
@@ -1016,10 +1017,9 @@ ALTER TABLE products ADD COLUMN maker_id uuid REFERENCES makers(id) ON DELETE SE
 `ON DELETE SET NULL`, not `CASCADE` — dropping a supplier from the directory must
 not delete the products they made.
 
-The `rating_needs_a_count` constraint is the interesting one. A supplier rating
-with nothing behind it is a number somebody typed, and a shopper who works that
-out stops believing the review count and the stock level too. The constraint
-makes publishing one without a denominator a write error rather than a habit.
+**Keep `makers.location` and `product_compliance.country_of_origin` in
+agreement.** They render four rows apart on the page, and derive from the same
+fact. A view or a check constraint is worth more here than a note in a runbook.
 
 Three decisions worth defending:
 

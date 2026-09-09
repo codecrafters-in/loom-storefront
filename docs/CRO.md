@@ -189,14 +189,21 @@ Two details that matter more than the copy:
 
 ### 12. Who made it — `product.enrichment.maker`
 
-A marketplace names the seller and shows their rating, because on a marketplace
-the seller is the variable. On an own-brand store the seller is never in doubt
-and the same block is dead weight — unless it names the mill, which is the
-equivalent unknown and, at a premium price, part of what is being bought.
+This started as a marketplace seller card — name, rating, years with us — and it
+was the wrong shape twice over. On a marketplace the seller is the variable and
+the rating is the reassurance; on an own-brand store the seller is never in doubt
+and the card has nothing to reassure anyone about. Worse, a rating for a supplier
+nobody can review is a number somebody typed, which is the fastest way to make
+the review count and the stock level look typed too.
 
-**Publish a rating only where you can point at what it averages.** An invented
-supplier score is the fastest way to make the review count, the stock level and
-every other number on the page look invented too. The block renders without one.
+What survived is the part that was information rather than decoration: **who wove
+the cloth and where**, as two rows at the top of the compliance block. That is
+where a shopper already looks for manufacturing facts, and the address on those
+rows is the brand's — so the mill is new information rather than a second copy.
+
+The same instinct applies to `countryOfOrigin`. It is legally mandated in several
+markets, and answering it with "see product specifications" is a shrug on a
+required field when the answer is one field away in the fabric data.
 
 ### 13. Fit warnings in the grid — `ProductCard`
 
@@ -224,7 +231,7 @@ Everything above is data. Nothing needs a code change.
 | Payment marks | `storefront.trust.payments` | Row hidden |
 | Highlights grid | `product.enrichment.highlights` | Block hidden |
 | Services block | `product.enrichment.assurances` | Falls back to `storefront.trust.assurances` |
-| Maker block | `product.enrichment.maker` | Block hidden |
+| Mill name and location | `product.enrichment.maker` | Rows hidden |
 | Feature cards | `product.enrichment.features` | Tab hidden |
 | Specifications | `product.enrichment.specs` | Tab hidden |
 | Manufacturer info | `product.enrichment.manufacturer` | Tab hidden |

@@ -545,9 +545,28 @@ function hashInt(str, max) {
  * derived from the fabric and fit data it already has — thinner, but present
  * and true.
  */
+/**
+ * Country of origin, from the fabric origin rather than from a constant.
+ *
+ * It is a legally mandated field in several markets, and "see product
+ * specifications" on a mandated field is the disclosure equivalent of a shrug —
+ * the answer is already in the data, one field away.
+ *
+ * The UK nations are folded up because the field asks for a country and
+ * "Scotland" is not the answer a customs form wants.
+ */
+const COUNTRY = { Scotland: 'United Kingdom', England: 'United Kingdom', 'Scottish Borders': 'United Kingdom' }
+
+function complianceFor(facts) {
+  const origin = facts.fabric?.origin
+  if (!origin) return manufacturerInfo
+  const last = origin.split(',').pop().trim()
+  return { ...manufacturerInfo, countryOfOrigin: COUNTRY[last] || last }
+}
+
 function enrichmentFor(raw, facts) {
   const authored = productEnrichment[raw.slug]
-  if (authored) return { ...authored, manufacturer: manufacturerInfo }
+  if (authored) return { ...authored, manufacturer: complianceFor(facts) }
 
   const fabric = facts.fabric || {}
   const highlights = [
@@ -615,30 +634,10 @@ function enrichmentFor(raw, facts) {
       note: 'A seam that fails, a zip that stops running, a button band that pulls — we repair it or replace the piece.' },
   ].filter(Boolean)
 
-  /**
-   * Who made it, without inventing who made it.
-   *
-   * Six products name their mill because those partners agreed to be named. For
-   * the rest the honest disclosure is the region, which the fabric data already
-   * carries — so this block names a place and omits the rating, rather than
-   * fabricating a supplier and a score for it. A store filling this in properly
-   * replaces it in the admin panel; the shape is identical either way.
-   */
-  const maker = fabric.origin
-    ? {
-        name: `Our mill in ${fabric.origin}`,
-        location: fabric.origin,
-        note: `We name the region on every piece and the mill wherever the partner is happy to be named. This one is woven and finished in ${fabric.origin}${
-          fabric.certifications?.length ? `, under ${fabric.certifications.join(' and ')}` : ''
-        }.`,
-      }
-    : null
-
   return {
     highlights,
     features,
     assurances,
-    maker,
     specs: {
       ...(fabric.composition?.length ? { composition: fabric.composition.map(([m, pct]) => `${pct}% ${m}`).join(', ') } : {}),
       ...(fabric.weight ? { weight: String(fabric.weight) } : {}),
@@ -647,7 +646,7 @@ function enrichmentFor(raw, facts) {
       ...(fabric.certifications?.length ? { certifications: fabric.certifications.join(', ') } : {}),
       ...(raw.care?.length ? { care: raw.care[0] } : {}),
     },
-    manufacturer: manufacturerInfo,
+    manufacturer: complianceFor(facts),
   }
 }
 

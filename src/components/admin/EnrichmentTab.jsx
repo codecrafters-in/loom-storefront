@@ -3,7 +3,6 @@ import { Button, Icon } from '../ui/index.jsx'
 import {
   ProductHighlights,
   ProductAssurances,
-  ProductMaker,
   FeatureCarousel,
   SpecCarousel,
   ManufacturerRows,
@@ -87,48 +86,17 @@ export default function EnrichmentTab({ draft, set, attributes = [], icons = [],
         )}
 
         {section === 'comes-with' && (
-          <div className="space-y-8">
-            <Panel
-              title="Comes with"
-              note="What happens after the sale — returns, exchange, repair, payment. It sits under the buy button because that is where the doubt arrives. Leave it empty and the product falls back to the store-wide rows in Settings, which is usually what you want; add rows here only where this piece differs."
-            >
-              <AssuranceEditor
-                rows={e.assurances || []}
-                icons={icons}
-                templates={assuranceTemplates}
-                onChange={(rows) => setE('assurances', rows)}
-              />
-            </Panel>
-
-            <Panel
-              title="Made by"
-              note="The mill, workshop or supplier, where they are happy to be named. On a marketplace this block is the seller and their rating; on an own-brand store the seller is never in doubt and the mill is the thing a shopper paying a premium is actually buying. Leave the name empty and the block does not render."
-            >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Name" placeholder="Veshti Mills" value={e.maker?.name || ''} onChange={(v) => setMaker('name', v)} />
-                <Field label="Location" placeholder="Erode, Tamil Nadu" value={e.maker?.location || ''} onChange={(v) => setMaker('location', v)} />
-                <Field label="Working with us since" placeholder="2019" value={e.maker?.since || ''} onChange={(v) => setMaker('since', v)} />
-                <Field label="Rating out of 5" placeholder="4.7" value={e.maker?.rating || ''} onChange={(v) => setMaker('rating', v)} />
-                <Field label="Number of ratings" placeholder="312" value={e.maker?.ratingCount || ''} onChange={(v) => setMaker('ratingCount', v)} />
-              </div>
-              <div className="mt-4">
-                <label htmlFor="maker-note" className="mb-1.5 block text-[13px] font-medium">Note</label>
-                <textarea
-                  id="maker-note"
-                  rows={3}
-                  className="field"
-                  placeholder="A 90-loom weaving house that has been making oxford cloth since 1978."
-                  value={e.maker?.note || ''}
-                  onChange={(ev) => setMaker('note', ev.target.value)}
-                />
-              </div>
-              <p className="mt-3 text-[12px] leading-relaxed text-faint">
-                A rating here is a claim about a third party. Publish one only if you can point at
-                what it is averaged from — an invented supplier score is the fastest way to make
-                every other number on the page look invented too.
-              </p>
-            </Panel>
-          </div>
+          <Panel
+            title="Comes with"
+            note="What happens after the sale — returns, exchange, repair, payment. It sits under the buy button because that is where the doubt arrives. Leave it empty and the product falls back to the store-wide rows in Settings, which is usually what you want; add rows here only where this piece differs."
+          >
+            <AssuranceEditor
+              rows={e.assurances || []}
+              icons={icons}
+              templates={assuranceTemplates}
+              onChange={(rows) => setE('assurances', rows)}
+            />
+          </Panel>
         )}
 
         {section === 'specs' && (
@@ -150,6 +118,20 @@ export default function EnrichmentTab({ draft, set, attributes = [], icons = [],
             note="Legally required on a listing in several markets — India's Legal Metrology rules mandate the manufacturer and packer address, the country of origin and the net quantity. Treat it as compliance, not marketing."
           >
             <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Woven by"
+                  placeholder="Veshti Mills"
+                  value={e.maker?.name || ''}
+                  onChange={(v) => setMaker('name', v)}
+                />
+                <Field
+                  label="Mill location"
+                  placeholder="Erode, Tamil Nadu"
+                  value={e.maker?.location || ''}
+                  onChange={(v) => setMaker('location', v)}
+                />
+              </div>
               {[
                 ['genericName', 'Generic name', 'T-shirts'],
                 ['countryOfOrigin', 'Country of origin', 'India'],
@@ -191,11 +173,8 @@ export default function EnrichmentTab({ draft, set, attributes = [], icons = [],
             ))}
 
           {section === 'comes-with' &&
-            (e.assurances?.length || e.maker?.name ? (
-              <>
-                <ProductAssurances product={preview} />
-                <ProductMaker enrichment={e} />
-              </>
+            (e.assurances?.length ? (
+              <ProductAssurances product={preview} />
             ) : (
               <Blank>
                 Nothing product-specific yet — the storefront falls back to the store-wide rows
@@ -218,8 +197,8 @@ export default function EnrichmentTab({ draft, set, attributes = [], icons = [],
             ))}
 
           {section === 'manufacturer' &&
-            (e.manufacturer && Object.values(e.manufacturer).some(Boolean) ? (
-              <ManufacturerRows info={e.manufacturer} />
+            (e.maker?.name || Object.values(e.manufacturer || {}).some(Boolean) ? (
+              <ManufacturerRows info={e.manufacturer} maker={e.maker} />
             ) : (
               <Blank>Fill in a field and the block appears here.</Blank>
             ))}

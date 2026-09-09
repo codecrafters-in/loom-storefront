@@ -192,10 +192,7 @@ GET /collections                → { items: Collection[], total }
     "assurances": [
       { "icon": "refresh", "label": "30-day returns, no reason needed", "note": "…" }
     ],
-    "maker": {
-      "name": "Todd & Duncan", "location": "Kinross, Scotland",
-      "since": 2018, "rating": 4.9, "ratingCount": 204, "note": "…"
-    },
+    "maker": { "name": "Filatura Sesia", "location": "Biella, Italy" },
     "specs": { "sleeve": "Full sleeve", "care": "Hand wash cool" },
     "manufacturer": {
       "genericName": "Apparel", "countryOfOrigin": "Italy",
@@ -226,8 +223,11 @@ Rules on Product:
 
 `enrichment` is several blocks on purpose, and all of them render in the column
 beside the buy button — `highlights` above it (six pairs, the two-second scan),
-`assurances` and `maker` under it, and `features`, `specs` and `manufacturer` in
-an "All details" tab block below that which is open by default. None of it is a full-width section below the
+`assurances` under it, and `features`, `specs` and `manufacturer` (which carries
+`maker`) in an "All details" tab block below that, open by default. The secure
+checkout and payment marks close the column *after* that block rather than
+sitting under the button — they answer a question a shopper has once they have
+decided, not while they are deciding. None of it is a full-width section below the
 fold: anything that decides a purchase has to be reachable without scrolling the
 button away. `specs` is paged by group in a carousel, which is how a full table
 fits in a 30rem column.
@@ -247,10 +247,14 @@ fits in a 30rem column.
   product inherits `storefront.trust.assurances`; **send an empty array** and it
   renders nothing, which is a different statement. Do not merge the two — a coat
   with a ten-year guarantee must not also advertise the store's two-year one
-- `maker` is the marketplace seller block, adapted: on a marketplace the seller
-  is the variable and the rating is the reassurance, on an own-brand store it is
-  the mill. `name` is required or nothing renders. Send `rating` only where you
-  can point at what it averages — `ratingCount` alongside it, always
+- `maker` names the mill and renders as the first two rows of `manufacturer`,
+  not as a block of its own. Keep `maker.location` consistent with
+  `fabric.origin` and with `countryOfOrigin` — they render within four rows of
+  each other, and a mill in one country next to an origin in another is a
+  contradiction a shopper only has to notice once
+- **`countryOfOrigin` is mandated, so answer it.** Derive it from the fabric
+  origin rather than shipping a constant; "see product specifications" on a
+  legally required field is the disclosure equivalent of a shrug
 
 Also expose the vocabulary behind it:
 

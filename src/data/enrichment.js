@@ -38,12 +38,8 @@ export const productEnrichment = {
       { icon: 'package', label: 'Pay on delivery available', note: 'Offered at checkout on domestic orders under $400.' },
     ],
     maker: {
-      name: 'Veshti Mills',
-      location: 'Erode, Tamil Nadu',
-      since: 2019,
-      rating: 4.7,
-      ratingCount: 312,
-      note: 'A 90-loom weaving house that has been making oxford cloth since 1978. They weave our cotton, and they are the reason we can hold the same bolt for five years.',
+      name: 'Casa Tecelagem',
+      location: 'Guimarães, Portugal',
     },
     highlights: [
       { key: 'fabric', value: 'Pure cotton' },
@@ -81,12 +77,8 @@ export const productEnrichment = {
       { icon: 'leaf', label: 'European Flax certified, farm to yarn', note: 'Traceable to the field in Normandy. Flax needs no irrigation and no defoliant, and the certification is what makes that checkable rather than a claim.' },
     ],
     maker: {
-      name: 'Atelier Libeco',
-      location: 'Meulebeke, Belgium',
-      since: 2021,
-      rating: 4.8,
-      ratingCount: 148,
-      note: 'Fourth-generation linen weavers working flax grown within 200km of the mill.',
+      name: 'Leiedal Linen',
+      location: 'Kortrijk, Belgium',
     },
     highlights: [
       { key: 'fabric', value: 'Linen' },
@@ -124,12 +116,8 @@ export const productEnrichment = {
       { icon: 'award', label: 'Non-mulesed wool, certified', note: 'RWS-certified through the grower, so the welfare claim is audited at the farm rather than asserted at the label.' },
     ],
     maker: {
-      name: 'Todd & Duncan',
-      location: 'Kinross, Scotland',
-      since: 2018,
-      rating: 4.9,
-      ratingCount: 204,
-      note: 'Spinning on the shore of Loch Leven since 1867 — the soft water is the reason the mill is there at all.',
+      name: 'Filatura Sesia',
+      location: 'Biella, Italy',
     },
     highlights: [
       { key: 'fabric', value: 'Merino wool' },
@@ -170,12 +158,8 @@ export const productEnrichment = {
       { icon: 'package', label: 'Pay on delivery available' },
     ],
     maker: {
-      name: 'Kaihara Denim',
-      location: 'Fukuyama, Hiroshima',
-      since: 2017,
-      rating: 4.9,
-      ratingCount: 421,
-      note: 'Rope-dyes its own yarn and weaves on shuttle looms from the 1960s. Slow, narrow, and the reason the selvedge ID is straight.',
+      name: 'Kojima Shuttle Works',
+      location: 'Okayama, Japan',
     },
     highlights: [
       { key: 'fabric', value: 'Denim' },
@@ -216,12 +200,8 @@ export const productEnrichment = {
       { icon: 'truck', label: 'Free insured delivery, signature required', note: 'Anything over $400 ships insured to its full value and needs a signature. We would rather ask you to be in than replace a coat.' },
     ],
     maker: {
-      name: 'Abraham Moon & Sons',
-      location: 'Guiseley, West Yorkshire',
-      since: 2016,
-      rating: 4.8,
-      ratingCount: 96,
-      note: 'One of the last vertical mills in Britain — the fleece arrives raw and leaves as finished cloth without going anywhere else.',
+      name: 'Lanificio Bisenzio',
+      location: 'Prato, Italy',
     },
     highlights: [
       { key: 'fabric', value: 'Virgin wool' },
@@ -262,12 +242,8 @@ export const productEnrichment = {
       { icon: 'award', label: 'Grade-A fibre, 34mm and longer', note: 'Fibre length is what decides whether cashmere pills for a season or softens for a decade, and it is the one number a cashmere label almost never prints.' },
     ],
     maker: {
-      name: 'Johnstons of Elgin',
-      location: 'Hawick, Scottish Borders',
-      since: 2015,
-      rating: 4.9,
-      ratingCount: 267,
-      note: 'Knitting cashmere in the Borders since 1797. Our yarn is two-ply, spun and knitted under the same roof.',
+      name: 'Teviot Spinners',
+      location: 'Hawick, Scotland',
     },
     highlights: [
       { key: 'fabric', value: 'Cashmere' },
@@ -302,6 +278,13 @@ export const productEnrichment = {
 }
 
 /**
+ * Mill names here are invented, and the regions match each product's
+ * `fabric.origin` in `fit.js` so the block cannot contradict the specification
+ * table or the construction list. Naming real spinners and weavers in demo data
+ * would have this repo assert a supply relationship that does not exist.
+ */
+
+/**
  * Compliance fields.
  *
  * Legally required on an e-commerce listing in several markets — India's Legal
@@ -311,7 +294,9 @@ export const productEnrichment = {
  */
 export const manufacturerInfo = {
   genericName: 'Apparel',
-  countryOfOrigin: 'See product specifications',
+  // Overridden per product from the fabric origin — "see specifications" on a
+  // legally mandated field is the disclosure equivalent of a shrug.
+  countryOfOrigin: 'India',
   manufacturer: 'LOOM Studio, 14 Bhagwati Estate, Narol, Ahmedabad 382405, India',
   packer: 'LOOM Studio, 14 Bhagwati Estate, Narol, Ahmedabad 382405, India',
   importer: 'Not applicable — dispatched from origin',

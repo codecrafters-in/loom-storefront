@@ -252,10 +252,10 @@ see what you are writing as you write it.
 | Section | Where a shopper sees it | Keep it to |
 | --- | --- | --- |
 | **Highlights** | Above the buy button | Six pairs |
-| **Comes with** | Under the buy button | Three or four rows, plus the maker |
+| **Comes with** | Under the buy button | Three or four rows |
 | **Features** | "All details" → first tab, cards you swipe through | Two or three |
 | **Specifications** | "All details" → swipes through one group at a time | As much as you like |
-| **Manufacturer info** | "All details" → last tab | Whatever the law asks for |
+| **Manufacturer info** | "All details" → last tab | Whatever the law asks for, plus the mill |
 
 > All of it sits in the column beside the buy button, and all of it previews at
 > that width. Nothing lives in a full-width section below the fold, and nothing
@@ -285,14 +285,14 @@ the label short enough to scan.
 > with a stricter returns window. Product rows *replace* the store's rather than
 > adding to them, so list everything the piece comes with, not just the extra.
 
-**Made by**, in the same section, names the mill or workshop. Leave the name
-empty and the block does not appear. If you publish a rating, publish the number
-of ratings with it — a score with nothing behind it makes every other number on
-the page look made up too.
-
 **Features** are the two or three things a competitor could not copy-paste. Pick
 an icon or paste your own image, write a title and a sentence. It counts the
 characters and warns before the card starts truncating.
+
+**Manufacturer info** opens with **Woven by** and **Mill location** — the mill
+that made the cloth, above the compliance rows, which carry your address rather
+than theirs. Keep the mill location and the country of origin agreeing with each
+other; they sit four rows apart and a shopper only has to spot that once.
 
 **Specifications** is the full table. Rows sort themselves into General, Fabric
 & care, Fit, Sustainability and Packaging by their key, so the order you type
