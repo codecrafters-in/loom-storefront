@@ -594,6 +594,51 @@ export function Storefront() {
           </p>
         </Group>
 
+        <Group
+          title="Delivery &amp; returns"
+          note="The panel on every product page. Numbers come from the settings above — write {shipping}, {freeOver} or {returnsDays} and they fill themselves in, so the prose cannot drift from what the cart charges."
+        >
+          <ul className="space-y-3">
+            {(cfg.deliveryPolicy || []).map((line, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <textarea
+                  rows={2}
+                  className="field text-[13px]"
+                  value={line}
+                  onChange={(e) =>
+                    patch('deliveryPolicy', (cfg.deliveryPolicy || []).map((l, k) => (k === i ? e.target.value : l)))
+                  }
+                />
+                <button
+                  type="button"
+                  aria-label="Remove paragraph"
+                  onClick={() => patch('deliveryPolicy', (cfg.deliveryPolicy || []).filter((_, k) => k !== i))}
+                  className="mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-xs text-faint transition-colors hover:bg-sale/10 hover:text-sale"
+                >
+                  <Icon name="trash" size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <Button
+            size="sm"
+            variant="quiet"
+            icon="plus"
+            onClick={() => patch('deliveryPolicy', [...(cfg.deliveryPolicy || []), ''])}
+          >
+            Add paragraph
+          </Button>
+          <p className="text-[12px] leading-relaxed text-faint">
+            Preview:{' '}
+            {(cfg.deliveryPolicy || [])
+              .join(' ')
+              .replace(/\{shipping\}/g, formatMoney({ amount: cfg.commerce?.shippingMethods?.[0]?.price ?? 0, currency: cfg.pricing?.currency || 'USD' }))
+              .replace(/\{freeOver\}/g, formatMoney({ amount: cfg.commerce?.freeShippingOver ?? 0, currency: cfg.pricing?.currency || 'USD' }))
+              .replace(/\{returnsDays\}/g, String(cfg.commerce?.returnsWindowDays ?? 30))
+              .slice(0, 260) || 'Nothing set — the panel will not render.'}
+          </p>
+        </Group>
+
         <Group title="Features" note="Turning one off removes its entry points. Routes stay reachable so old bookmarks do not 404.">
           <ul className="space-y-2.5">
             {Object.entries(cfg.features || {}).map(([k, v]) => (

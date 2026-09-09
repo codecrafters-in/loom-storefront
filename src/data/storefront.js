@@ -273,6 +273,28 @@ export const storefront = {
     socialProofThresholds: { bought: 25, saved: 20 },
   },
 
+  /**
+   * The "Delivery & returns" panel on a product page.
+   *
+   * It was three hardcoded paragraphs in a component, which meant a store could
+   * change its returns window in settings and still promise something else in
+   * prose four lines further down. Anything a shopper can read is configuration.
+   *
+   * The braces are filled from the commerce settings on render, so the numbers
+   * cannot drift from the ones the cart and the checkout actually use. An
+   * unknown token is left alone rather than blanked — a visible {typo} is
+   * findable, a silent gap is not.
+   *
+   *   {shipping}    standard shipping, formatted
+   *   {freeOver}    the free-shipping threshold, formatted
+   *   {returnsDays} the returns window in days
+   */
+  deliveryPolicy: [
+    'Standard shipping is {shipping}, free over {freeOver}. Orders placed before 2pm ship the same working day.',
+    'Returns are free within {returnsDays} days, unworn and with tags attached. A prepaid label is in every parcel.',
+    'We repair anything we made. Send it back and we will quote before doing the work.',
+  ],
+
   promises: [
     { icon: 'truck', title: 'Free shipping over $150', body: 'Two to four working days, tracked.' },
     { icon: 'refresh', title: '30-day returns', body: 'Unworn, tags on, return label included.' },

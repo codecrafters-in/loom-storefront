@@ -19,7 +19,7 @@
 import { isRealDiscount } from './money.js'
 
 const KEY = 'loom.db'
-const VERSION = 8
+const VERSION = 9
 
 const listeners = new Set()
 let cache = null
@@ -45,6 +45,8 @@ async function seed() {
     // products that use it instead of nine separate tables drifting apart.
     sizeCharts: Object.entries(sizeCharts).map(([id, chart]) => ({ id, ...chart })),
     settings: storefront,
+    // Starts empty: it is the merchant's own vocabulary, not ours.
+    library: { attributes: [], features: [], assurances: [] },
   }
 }
 
@@ -196,6 +198,7 @@ async function backfill(stored) {
     collections: mergeById(fresh.collections, stored.collections, 'slug'),
     sizeCharts: mergeById(fresh.sizeCharts, stored.sizeCharts, 'id'),
     settings: deepMerge(fresh.settings, stored.settings || {}),
+    library: { ...fresh.library, ...(stored.library || {}) },
   }
 }
 
@@ -403,6 +406,99 @@ export function deleteCategory(slug) {
     .map((c) => (c.parent === slug ? { ...c, parent: target?.parent ?? null } : c))
   persist({ ...cache, categories })
   return { ok: true }
+}
+
+/**
+ * The reuse library: what this store has described before.
+ *
+ * A merchant photographing a hundred shirts types "Collar type" on the first
+ * one and then has to remember, on the sixtieth, whether they wrote "Collar
+ * type", "Collar" or "Neck". The built-in vocabulary cannot help — it is a
+ * starting point, not their catalogue — so the store keeps its own.
+ *
+ * Three kinds, because they are reused in different ways: an `attribute` is a
+ * key and the values seen against it, a `feature` and an `assurance` are whole
+ * blocks worth pasting onto the next product unchanged.
+ */
+export function getLibrary() {
+  const l = cache?.library || {}
+  return { attributes: l.attributes || [], features: l.features || [], assurances: l.assurances || [] }
+}
+
+const KINDS = new Set(['attributes', 'features', 'assurances'])
+
+export function saveLibraryItem(kind, item) {
+  if (!KINDS.has(kind)) throw new Error(`Unknown library kind "${kind}".`)
+  const library = getLibrary()
+  const list = library[kind].slice()
+  const i = list.findIndex((x) => x.id === item.id || (item.key && x.key === item.key))
+  const next = { id: item.id || uid(kind.slice(0, -1)), ...list[i], ...item }
+  if (i >= 0) list[i] = next
+  else list.unshift(next)
+  persist({ ...cache, library: { ...library, [kind]: list } })
+  return next
+}
+
+export function deleteLibraryItem(kind, id) {
+  if (!KINDS.has(kind)) throw new Error(`Unknown library kind "${kind}".`)
+  const library = getLibrary()
+  persist({ ...cache, library: { ...library, [kind]: library[kind].filter((x) => x.id !== id) } })
+  return { ok: true }
+}
+
+/**
+ * Learn from a product as it is saved.
+ *
+ * Anything described here that the built-in vocabulary does not know becomes a
+ * suggestion on the next product, and every value seen against a key joins that
+ * key's list. This is the "promote unrecognised keys for review" job the schema
+ * notes describe, run inline — a merchant should not have to decide to save
+ * something in order to be offered it again.
+ *
+ * `known` is passed in rather than imported so this file stays free of the
+ * data layer above it.
+ */
+/** `collar_type` and `collarType` both read as "Collar type". */
+function humanise(key) {
+  return key
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .replace(/^./, (c) => c.toUpperCase())
+}
+
+export function learnFrom(product, known = new Set()) {
+  const e = product.enrichment || {}
+  const pairs = [
+    ...(e.highlights || []).map((h) => [h.key, h.value]),
+    ...Object.entries(e.specs || {}),
+  ].filter(([k, v]) => k && v)
+  if (!pairs.length) return
+
+  const library = getLibrary()
+  const byKey = new Map(library.attributes.map((a) => [a.key, a]))
+  let touched = false
+
+  for (const [key, value] of pairs) {
+    if (known.has(key)) continue
+    const existing = byKey.get(key)
+    const values = new Set(existing?.values || [])
+    const before = values.size
+    values.add(String(value))
+    if (existing && values.size === before) continue
+    byKey.set(key, {
+      id: existing?.id || uid('attribute'),
+      key,
+      // "collarType" and "collar_type" both read as "Collar type".
+      label: existing?.label || humanise(key),
+      group: existing?.group || 'general',
+      values: [...values].slice(0, 24),
+      custom: true,
+    })
+    touched = true
+  }
+
+  if (touched) persist({ ...cache, library: { ...library, attributes: [...byKey.values()] } })
 }
 
 export function updateSettings(patch) {

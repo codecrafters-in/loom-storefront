@@ -29,6 +29,7 @@ const SURFACE = [
   'adminListProducts', 'adminSaveProduct', 'adminDeleteProduct',
   'adminSetInventory', 'adminAdjustInventory',
   'adminSaveCategory', 'adminDeleteCategory',
+  'listLibrary', 'saveLibraryItem', 'deleteLibraryItem',
   'adminUpdateSettings', 'adminImport', 'adminExport', 'adminReset',
   'listSizeCharts', 'listAttributes', 'adminSaveSizeChart', 'adminGetProduct',
   'adminUpdateOrder', 'adminListDiscounts', 'adminSaveDiscount', 'adminDeleteDiscount',
@@ -61,13 +62,17 @@ const CACHEABLE = {
   getDeliveryEstimate: TTL.catalog,
   listSizeCharts: TTL.catalog,
   listAttributes: TTL.catalog,
+  listLibrary: TTL.catalog,
 }
 
 /** A write to any of these drops the read namespaces it could have invalidated. */
 const PURGES = {
   addToCart: [], updateCartLine: [], removeCartLine: [], applyDiscount: [], clearCart: [],
   checkout: ['listProducts', 'getProduct', 'getBootstrap'],
-  adminSaveProduct: ['listProducts', 'getProduct', 'getRelated', 'getBootstrap', 'adminListProducts', 'adminGetProduct'],
+  // A save can teach the library a new attribute, so the vocabulary is stale too.
+  adminSaveProduct: ['listProducts', 'getProduct', 'getRelated', 'getBootstrap', 'adminListProducts', 'adminGetProduct', 'listAttributes', 'listLibrary'],
+  saveLibraryItem: ['listAttributes', 'listLibrary'],
+  deleteLibraryItem: ['listAttributes', 'listLibrary'],
   adminSaveSizeChart: ['listSizeCharts', 'getProduct', 'adminGetProduct'],
   adminUpdateOrder: ['listOrders', 'getOrder', 'listProducts', 'getProduct'],
   adminSaveDiscount: ['adminListDiscounts'],

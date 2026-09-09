@@ -990,6 +990,43 @@ CREATE TABLE makers (
   location text
 );
 
+-- The store's own vocabulary, learned as it describes products.
+--
+-- `attributes` is a starting point, not a catalogue. A merchant listing a
+-- hundred shirts types "Collar type" on the first and, on the sixtieth, cannot
+-- remember whether they wrote "Collar type", "Collar" or "Neck" — and three
+-- spellings of one attribute is a facet nobody can filter on. So every key a
+-- product write does not recognise is promoted here, with the values seen
+-- against it, and offered back on the next product.
+--
+-- Separate from `attributes` rather than a `custom` flag on it, because the two
+-- have different lifecycles: ours ship with the theme and are replaced on
+-- upgrade, theirs are the store's data and must never be.
+CREATE TABLE library_attributes (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  key        text NOT NULL UNIQUE,
+  label      text NOT NULL,
+  group_id   text REFERENCES attribute_groups(id),
+  values     text[] NOT NULL DEFAULT '{}',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Whole blocks of copy saved for reuse. Unlike an attribute these are an
+-- editorial choice, so they are saved explicitly rather than learned.
+CREATE TABLE library_features (
+  id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  icon  text NOT NULL,
+  title text NOT NULL,
+  body  text
+);
+
+CREATE TABLE library_assurances (
+  id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  icon  text NOT NULL DEFAULT 'check',
+  label text NOT NULL,
+  note  text
+);
+
 -- Compliance. Separate from the rest because it is legally mandated in several
 -- markets and is audited as a unit.
 CREATE TABLE product_compliance (

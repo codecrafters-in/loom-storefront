@@ -381,6 +381,49 @@ click in the admin panel. Same reasoning as the attribute list: retyping a
 returns policy from memory on the fortieth product is how a catalogue ends up
 promising three different windows.
 
+The response folds in **the store's own library** (below): its attributes appear
+alongside the built-ins marked `"custom": true` and win on a key collision, its
+saved service rows join `assurances`, and `features` carries whole cards it has
+saved for reuse.
+
+### The reuse library
+
+```
+GET    /admin/library
+POST   /admin/library/:kind          → the saved item
+DELETE /admin/library/:kind/:id
+```
+
+`:kind` is `attributes`, `features` or `assurances`. Anything else is a 422
+`invalid_kind`.
+
+```json
+{
+  "attributes": [
+    { "id": "attribute_x1", "key": "collar_type", "label": "Collar type",
+      "group": "general", "values": ["Button-down", "Spread"], "custom": true }
+  ],
+  "features":   [{ "id": "feature_x2", "icon": "leaf", "title": "…", "body": "…" }],
+  "assurances": [{ "id": "assurance_x3", "icon": "shield", "label": "Lifetime repairs" }]
+}
+```
+
+**The attribute half fills itself in.** `POST /admin/products` reads the
+highlights and specifications it just saved, and any key the built-in vocabulary
+does not know becomes a suggestion on the next product, with every value seen
+against it collected on the key. This is the "promote unrecognised keys for
+review" job described in [DATABASE.md](DATABASE.md), run inline.
+
+The reason is worth stating: a merchant listing a hundred shirts types "Collar
+type" on the first and, on the sixtieth, cannot remember whether they wrote
+"Collar type", "Collar" or "Neck". Three spellings of one attribute is a facet
+nobody can filter on and a specification table that compares nothing — and it is
+not a discipline problem, it is a missing feature. Reuse should not require
+deciding to save.
+
+`features` and `assurances` are saved explicitly, because a whole block of copy
+is an editorial choice rather than a vocabulary one.
+
 **Suggestions, not a schema.** The admin combobox offers these and accepts
 anything typed over them. A closed list produces a merchandiser who cannot
 describe what they are selling; no list at all produces `Fabric`, `fabric`,

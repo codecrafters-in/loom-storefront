@@ -170,12 +170,27 @@ catalogue — size and fit cause roughly two thirds of fashion returns:
   review is a number somebody typed, and a shopper who works that out stops
   believing the review count and the stock level too
 
+**The reuse library** — the store's own vocabulary, as distinct from the one the
+theme ships:
+- `library_attributes` — key (unique), label, group_id, values (array),
+  created_at. Every attribute key a product write does not recognise is promoted
+  here with the value seen against it, and offered back on the next product
+- `library_features`, `library_assurances` — whole blocks of copy saved
+  explicitly for reuse
+
+Keep these **separate tables from `attributes`**, not a `custom` boolean on it.
+The two have different lifecycles: the shipped vocabulary is replaced on a theme
+upgrade and the store's own must never be. Say how you would merge them on read,
+and which one wins on a key collision — it should be the store's.
+
 Three things I want you to get right here and explain:
 
 1. **Do not put a foreign key from `product_attributes.attribute_key` to
    `attributes.key`.** A merchant entering `neckline` before it exists in the
-   vocabulary should get a saved product, not a constraint violation. Suggest a
-   job that promotes unrecognised keys for review instead.
+   vocabulary should get a saved product, not a constraint violation. The
+   promotion into `library_attributes` above is that job, run inline on write
+   rather than nightly — a suggestion that arrives tomorrow is a suggestion for
+   somebody who has already retyped it three different ways.
 2. **`value` is `text`.** A weight is `260`, a care instruction is a sentence, a
    certification list is comma-separated. Typing it means a
    value_text/value_number/value_json triple and a CASE in every read. Index

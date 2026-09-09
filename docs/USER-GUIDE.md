@@ -271,6 +271,10 @@ see what you are writing as you write it.
 > would wrap the strip across the garment) and the next one takes its place; it
 > still shows in full in the list below.
 
+> Every section now puts its suggestions **above** the rows, grouped. A list
+> found only after you have given up and typed something is a list for the
+> merchant who least needed it.
+
 **Highlights** are the two-second scan — fabric, fit, weight, the things
 somebody checks before deciding to keep reading. Start typing in the key box and
 it suggests `fabric`, `fit`, `sleeve` and the rest, with common values for
@@ -292,9 +296,21 @@ the label short enough to scan.
 > with a stricter returns window. Product rows *replace* the store's rather than
 > adding to them, so list everything the piece comes with, not just the extra.
 
-**Features** are the two or three things a competitor could not copy-paste. Pick
-an icon or paste your own image, write a title and a sentence. It counts the
-characters and warns before the card starts truncating.
+**Features** are the two or three things a competitor could not copy-paste.
+Choose an icon by looking at it — the grid shows every one there is, and
+**Image URL** takes your own artwork. Write a title and a sentence; it counts
+the characters and warns before the card clamps.
+
+**Save for reuse** on any feature or service row puts it in your library, and it
+appears as a one-click chip on every product after that. Worth doing for
+anything you would otherwise retype — forty slightly different versions of
+"Repairable for life" is forty chances to contradict yourself.
+
+> Your attribute keys save themselves. Type `collar_type` on one product and it
+> is suggested on the next, with every value you have used against it. You never
+> have to remember whether you wrote "Collar type", "Collar" or "Neck" — which
+> matters, because three spellings of one attribute is a filter that finds
+> nothing.
 
 **Manufacturer info** opens with **Woven by** and **Mill location** — the mill
 that made the cloth, above the compliance rows, which carry your address rather
@@ -348,6 +364,20 @@ own colour if there is one.
 > This is what makes the main photograph change when a shopper taps a swatch.
 > Tag nothing and the gallery behaves exactly as it did before — one set of
 > photographs shown for every colour.
+
+---
+
+## Change the delivery and returns wording
+
+**Admin → Storefront → Delivery & returns.**
+
+Each paragraph is editable, and the numbers fill themselves in: write
+`{shipping}`, `{freeOver}` or `{returnsDays}` and they take their values from
+the pricing settings above, so the prose cannot promise one returns window while
+the cart honours another. An unrecognised token stays visible — a `{typo}` you
+can see is a `{typo}` you can fix.
+
+Remove every paragraph and the panel does not render.
 
 ---
 

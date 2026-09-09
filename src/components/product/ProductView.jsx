@@ -123,6 +123,54 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
     (v) => v.options.Color === activeColor && v.options.Size === size,
   )
 
+  /**
+   * The price for what is currently chosen, which is not always a variant.
+   *
+   * `variant` needs a colour *and* a size, so a shopper who has picked a colour
+   * and nothing else was being shown `product.price` — the same number for
+   * every colourway, whatever the variants actually cost, and it then jumped
+   * when they chose a size. With per-variant pricing that reads as the page
+   * ignoring the picker, which is exactly what it was doing.
+   *
+   * So: the exact price once a variant is settled, and the range across the
+   * chosen colour before that. A range is the honest answer to "what does this
+   * cost" when the answer still depends on a choice not yet made.
+   */
+  const shown = useMemo(() => {
+    if (!product) return null
+    if (variant) return { price: variant.price, compareAt: variant.compareAtPrice ?? product.compareAtPrice }
+
+    const pool = product.variants.filter((v) => v.options.Color === activeColor)
+    const prices = (pool.length ? pool : product.variants).map((v) => v.price).filter(Boolean)
+    if (!prices.length) return { price: product.price, compareAt: product.compareAtPrice }
+
+    const low = prices.reduce((a, b) => (b.amount < a.amount ? b : a))
+    const high = prices.reduce((a, b) => (b.amount > a.amount ? b : a))
+    return low.amount === high.amount
+      ? { price: low, compareAt: product.compareAtPrice }
+      : { price: low, to: high }
+  }, [product, variant, activeColor])
+
+  /**
+   * The delivery paragraphs, with the numbers filled in from the same settings
+   * the cart and the checkout read. An unrecognised token is left visible: a
+   * `{typo}` on the page is findable, a silently blanked one is not.
+   */
+  const deliveryPolicy = useMemo(() => {
+    const currency = config.pricing?.currency || 'USD'
+    const values = {
+      shipping: formatMoney({
+        amount: config.commerce?.shippingMethods?.[0]?.price ?? 0,
+        currency,
+      }),
+      freeOver: formatMoney({ amount: config.commerce?.freeShippingOver ?? 0, currency }),
+      returnsDays: String(config.commerce?.returnsWindowDays ?? 30),
+    }
+    return (config.deliveryPolicy || []).map((line) =>
+      line.replace(/\{(\w+)\}/g, (whole, key) => values[key] ?? whole),
+    )
+  }, [config])
+
   /** Which colours have nothing left at all — struck through rather than hidden. */
   const colorSoldOut = useMemo(() => {
     if (!product) return {}
@@ -352,11 +400,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           <p className="mt-2 text-[15px] leading-snug text-muted">{product.subtitle}</p>
 
           <div className="mt-5 flex flex-wrap items-center gap-4">
-            <Price
-              price={variant?.price || product.price}
-              compareAt={variant?.compareAtPrice ?? product.compareAtPrice}
-              size="lg"
-            />
+            <Price price={shown.price} to={shown.to} compareAt={shown.compareAt} size="lg" />
             <a href="#reviews" className="shrink-0">
               <Rating value={product.rating.average} count={product.rating.count} />
             </a>
@@ -555,25 +599,14 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             </Accordion>
 
             <Accordion title="Delivery & returns">
+              {/* Copy from settings, numbers from the commerce config. Three
+                  paragraphs used to be hardcoded here, so a store could change
+                  its returns window in one place and go on promising something
+                  else four lines below it. */}
               <div className="space-y-3 text-[14px] leading-relaxed text-muted">
-                <p>
-                  Standard shipping is{' '}
-                  {formatMoney({
-                    amount: config.commerce?.shippingMethods?.[0]?.price ?? 1200,
-                    currency: config.pricing?.currency || 'USD',
-                  })}
-                  , free over{' '}
-                  {formatMoney({
-                    amount: config.commerce?.freeShippingOver ?? 15000,
-                    currency: config.pricing?.currency || 'USD',
-                  })}
-                  . Orders placed before 2pm ship the same working day.
-                </p>
-                <p>
-                  Returns are free within {config.commerce?.returnsWindowDays ?? 30} days, unworn and
-                  with tags attached. A prepaid label is in every parcel.
-                </p>
-                <p>We repair anything we made. Send it back and we will quote before doing the work.</p>
+                {deliveryPolicy.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
               </div>
             </Accordion>
           </div>
@@ -624,7 +657,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               <Icon name="chevron-down" size={12} className="shrink-0 rotate-180" />
             </p>
           </button>
-          <Price price={variant?.price || product.price} compareAt={variant?.compareAtPrice ?? product.compareAtPrice} size="sm" className="hidden shrink-0 sm:inline-flex" />
+          <Price price={shown.price} to={shown.to} compareAt={shown.compareAt} size="sm" className="hidden shrink-0 sm:inline-flex" />
           <Button
             size="md"
             className="shrink-0"
@@ -655,6 +688,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           sizeState={sizeState}
           colorSoldOut={colorSoldOut}
           variant={variant}
+          shown={shown}
           busy={busy}
           onColor={pickColor}
           onSize={setSize}
@@ -796,7 +830,7 @@ function SizeChips({ sizes, size, sizeState, activeColor, onPick }) {
  */
 function VariantSheet({
   product, colors, sizes, activeColor, size, sizeState, colorSoldOut,
-  variant, busy, onColor, onSize, onClose, onAdd, onOpenChart,
+  variant, shown, busy, onColor, onSize, onClose, onAdd, onOpenChart,
 }) {
   return (
     <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Choose colour and size">
@@ -813,12 +847,7 @@ function VariantSheet({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="truncate text-[14px] font-medium">{product.title}</p>
-              <Price
-                price={variant?.price || product.price}
-                compareAt={variant?.compareAtPrice ?? product.compareAtPrice}
-                size="sm"
-                className="mt-1 flex-wrap"
-              />
+              <Price price={shown.price} to={shown.to} compareAt={shown.compareAt} size="sm" className="mt-1 flex-wrap" />
             </div>
             <Button variant="quiet" size="sm" square aria-label="Close" onClick={onClose}>
               <Icon name="close" size={16} />

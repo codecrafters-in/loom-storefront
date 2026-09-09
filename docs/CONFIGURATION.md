@@ -362,6 +362,32 @@ with a ten-year structural guarantee should not also advertise the two-year one.
 An **empty array on the product** means *this product has none* and hides the
 block; **omitting the field** is what inherits these rows.
 
+### `deliveryPolicy`
+
+```json
+{
+  "deliveryPolicy": [
+    "Standard shipping is {shipping}, free over {freeOver}. Orders placed before 2pm ship the same working day.",
+    "Returns are free within {returnsDays} days, unworn and with tags attached.",
+    "We repair anything we made. Send it back and we will quote before doing the work."
+  ]
+}
+```
+
+The "Delivery & returns" panel on every product page. It was three hardcoded
+paragraphs in a component, which meant a store could change `returnsWindowDays`
+in settings and go on promising something else in prose four lines below it.
+Anything a shopper can read is configuration.
+
+| Token | Filled from |
+| --- | --- |
+| `{shipping}` | `commerce.shippingMethods[0].price`, formatted in the store currency |
+| `{freeOver}` | `commerce.freeShippingOver`, formatted |
+| `{returnsDays}` | `commerce.returnsWindowDays` |
+
+**An unknown token is left visible.** A `{typo}` on the page is findable; a
+silently blanked one is not. An empty array renders no panel.
+
 ### `promises`
 
 ```json

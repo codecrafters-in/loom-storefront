@@ -260,6 +260,17 @@ fits in a 30rem column.
   origin rather than shipping a constant; "see product specifications" on a
   legally required field is the disclosure equivalent of a shrug
 
+You will also need the **reuse library** — `GET /admin/library`,
+`POST /admin/library/:kind`, `DELETE /admin/library/:kind/:id` for `attributes`,
+`features` and `assurances`. `GET /attributes` folds the attribute half into its
+response marked `"custom": true`, and those win on a key collision.
+
+**Promote unrecognised attribute keys on write.** When a product is saved, any
+highlight or specification key your vocabulary does not know should become a
+suggestion on the next product, with the value seen against it collected on the
+key. Without it, a merchant listing a hundred shirts writes "Collar type",
+"Collar" and "Neck" across three of them, and no facet can filter on any of it.
+
 Also expose the vocabulary behind it:
 
 ```

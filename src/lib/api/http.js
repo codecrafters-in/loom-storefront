@@ -320,6 +320,17 @@ export const adminExport = () => get('/admin/export')
 export const listSizeCharts = () => get('/size-charts').then((r) => assertList(r, 'GET /size-charts'))
 export const listAttributes = () => get('/attributes').then((r) => assertList(r, 'GET /attributes'))
 export const adminSaveSizeChart = (chart) => post('/admin/size-charts', chart)
+
+/**
+ * The reuse library — the store's own attributes, feature cards and service
+ * rows, kept so the sixtieth product does not start from a blank vocabulary.
+ * `GET /attributes` already folds the attribute half into its response; these
+ * are for managing it.
+ */
+export const listLibrary = () => get('/admin/library')
+export const saveLibraryItem = ({ kind, item }) => post(`/admin/library/${encodeURIComponent(kind)}`, item)
+export const deleteLibraryItem = ({ kind, id }) =>
+  del(`/admin/library/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`)
 export const adminGetProduct = (id) => get(`/admin/products/${encodeURIComponent(id)}`)
 
 /**

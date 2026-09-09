@@ -65,12 +65,28 @@ export const Button = forwardRef(function Button(
 
 /* ── price ─────────────────────────────────────────────────────────────── */
 
-export function Price({ price, compareAt, size = 'md', className = '' }) {
-  const pct = discountPercent(price, compareAt)
+/**
+ * `to` renders a range: "$89.00 – $199.00".
+ *
+ * Needed the moment variants can be priced individually. Showing a single
+ * amount while the shopper has chosen a colour but not a size is a number that
+ * silently changes under them when they pick one — and a price that moves after
+ * the decision is the kind of surprise that ends the session, however honest the
+ * arithmetic. A range says up front that size is a pricing question here.
+ *
+ * A compare-at is deliberately not rendered alongside a range: "was" against
+ * two numbers is not a claim anybody can check.
+ */
+export function Price({ price, to, compareAt, size = 'md', className = '' }) {
+  const pct = to ? 0 : discountPercent(price, compareAt)
   const scale = size === 'lg' ? 'text-xl' : size === 'sm' ? 'text-[13px]' : 'text-[15px]'
   return (
     <span className={`inline-flex items-baseline gap-2 ${className}`}>
-      <span className={`${scale} ${pct ? 'text-sale' : 'text-ink'} tabular-nums`}>{formatMoney(price)}</span>
+      <span className={`${scale} ${pct ? 'text-sale' : 'text-ink'} tabular-nums`}>
+        {formatMoney(price)}
+        {to && <span className="text-faint"> – </span>}
+        {to && formatMoney(to)}
+      </span>
       {pct > 0 && (
         <>
           <s className="text-[13px] tabular-nums text-faint">{formatMoney(compareAt)}</s>

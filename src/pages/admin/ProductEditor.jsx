@@ -285,6 +285,16 @@ export default function ProductEditor() {
             attributes={vocab.data?.items || []}
             icons={vocab.data?.icons || []}
             assuranceTemplates={vocab.data?.assurances || []}
+            featurePresets={vocab.data?.features || []}
+            onSaveToLibrary={async (kind, item) => {
+              try {
+                await api.saveLibraryItem({ kind, item })
+                vocab.reload()
+                push('Saved for reuse on other products')
+              } catch (err) {
+                push(err.message, { tone: 'error' })
+              }
+            }}
           />
         )}
         {tab === 'organise' && <OrganiseTab {...props} />}

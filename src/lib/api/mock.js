@@ -914,9 +914,15 @@ export async function adminListProducts({ q = '', page = 1, perPage = 25 } = {})
   return { items: all.slice(start, start + perPage).map(publicProduct), total: all.length, page, perPage }
 }
 
+const BUILT_IN_KEYS = new Set(attributes.map((a) => a.key))
+
 export async function adminSaveProduct(patch) {
   await latency()
-  return publicProduct(db.upsertProduct(patch))
+  const saved = db.upsertProduct(patch)
+  // Anything described here that the built-in vocabulary does not know is
+  // offered on the next product. Reuse should not require deciding to save.
+  db.learnFrom(saved, BUILT_IN_KEYS)
+  return publicProduct(saved)
 }
 
 export async function adminDeleteProduct(idOrSlug) {
@@ -1030,14 +1036,52 @@ export async function deleteMedia(id) {
  * describe what they are selling, and no list at all produces "Fabric",
  * "fabric", "Material" and "Composition" as four different attributes.
  */
+/**
+ * The vocabulary this store can describe things with: ours, plus its own.
+ *
+ * Library entries are marked `custom` so an editor can show where a suggestion
+ * came from, and they win on a key collision — a merchant who has redefined
+ * "weight" for their catalogue means their version.
+ */
 export async function listAttributes() {
   await latency()
+  const library = db.getLibrary()
+  const byKey = new Map(attributes.map((a) => [a.key, a]))
+  for (const a of library.attributes) byKey.set(a.key, { ...byKey.get(a.key), ...a, custom: true })
+  const items = [...byKey.values()]
+
   return {
-    items: attributes,
+    items,
     groups: attributeGroups,
     icons: featureIcons,
-    assurances: assuranceTemplates,
-    total: attributes.length,
+    assurances: [...assuranceTemplates, ...library.assurances],
+    features: library.features,
+    total: items.length,
+  }
+}
+
+/* ── reuse library ─────────────────────────────────────────────────────── */
+
+export async function listLibrary() {
+  await latency()
+  return db.getLibrary()
+}
+
+export async function saveLibraryItem({ kind, item }) {
+  await latency()
+  try {
+    return db.saveLibraryItem(kind, item)
+  } catch (err) {
+    throw new ApiError(err.message, { status: 422, code: 'invalid_kind' })
+  }
+}
+
+export async function deleteLibraryItem({ kind, id }) {
+  await latency()
+  try {
+    return db.deleteLibraryItem(kind, id)
+  } catch (err) {
+    throw new ApiError(err.message, { status: 422, code: 'invalid_kind' })
   }
 }
 

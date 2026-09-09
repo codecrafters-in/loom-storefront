@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge, Icon, Price } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
@@ -11,6 +12,23 @@ import { useWishlist } from '../../store/WishlistContext.jsx'
  * images in the contract rather than one.
  */
 export default function ProductCard({ product, priority = false, className = '' }) {
+  /**
+   * A card shows a range when its variants disagree.
+   *
+   * A single price on a product whose black colourway costs thirty dollars more
+   * is a number the shopper finds out is wrong on the next page, which is the
+   * worst place to find it out. See the same calculation in ProductView.
+   */
+  const span = useMemo(() => {
+    const prices = (product.variants || []).map((v) => v.price).filter(Boolean)
+    if (!prices.length) return { price: product.price, compareAt: product.compareAtPrice }
+    const low = prices.reduce((a, b) => (b.amount < a.amount ? b : a))
+    const high = prices.reduce((a, b) => (b.amount > a.amount ? b : a))
+    return low.amount === high.amount
+      ? { price: low, compareAt: product.compareAtPrice }
+      : { price: low, to: high }
+  }, [product])
+
   const { has, toggle } = useWishlist()
   const saved = has(product.slug)
   const badge = product.badges?.find((b) => ['sold-out', 'sale', 'new', 'bestseller'].includes(b))
@@ -79,7 +97,7 @@ export default function ProductCard({ product, priority = false, className = '' 
           </Link>
         </h3>
         <p className="mt-1 text-[13px] text-faint">{product.subtitle}</p>
-        <Price price={product.price} compareAt={product.compareAtPrice} size="sm" className="mt-2 flex-wrap" />
+        <Price price={span.price} to={span.to} compareAt={span.compareAt} size="sm" className="mt-2 flex-wrap" />
 
         {/* One fit signal in the grid. Someone comparing eight products decides
             which two to open here, and "runs small" is the fact that decides it. */}
