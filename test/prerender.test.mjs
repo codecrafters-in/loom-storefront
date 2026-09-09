@@ -105,6 +105,31 @@ describe('prerendered output', { skip: built ? false : 'run `npm run build` firs
     }
   })
 
+  test('the host config does not shadow the prerendered files', () => {
+    /**
+     * The catch-all rewrite is what makes deep links work in a single-page app,
+     * and it is also what silently undoes prerendering: without `cleanUrls`,
+     * `/product/x` matches no file, falls through to the rewrite, and every
+     * route serves the home page shell again. Fifty-three files written and
+     * none of them reachable.
+     */
+    const vercel = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
+    assert.equal(vercel.cleanUrls, true, 'without cleanUrls, /product/x never finds product/x.html')
+    const catchAll = vercel.rewrites?.find((r) => r.source === '/(.*)')
+    assert.ok(catchAll, 'deep links into the SPA routes need a fallback rewrite')
+    assert.notEqual(catchAll.destination, '/', 'rewriting to "/" serves the home page for every route')
+  })
+
+  test('security headers are set on both hosts, not just one', () => {
+    const vercel = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
+    const netlify = fs.readFileSync(new URL('../public/_headers', import.meta.url), 'utf8')
+    const set = new Set(vercel.headers.flatMap((h) => h.headers.map((x) => x.key)))
+    for (const header of ['X-Content-Type-Options', 'Referrer-Policy', 'Strict-Transport-Security', 'Permissions-Policy']) {
+      assert.ok(set.has(header), `vercel.json is missing ${header}`)
+      assert.ok(netlify.includes(header), `public/_headers is missing ${header}`)
+    }
+  })
+
   test('no secret reached the output', () => {
     for (const file of pages()) {
       const html = read(file)
