@@ -244,7 +244,24 @@ The same instinct applies to `countryOfOrigin`. It is legally mandated in severa
 markets, and answering it with "see product specifications" is a shrug on a
 required field when the answer is one field away in the fabric data.
 
-### 14. Fit warnings in the grid — `ProductCard`
+### 14. The variant sheet — mobile
+
+On a phone the buy box is one column, so by the time a shopper has read the
+detail the colour swatches are most of a screen above them. Comparing two
+colourways means scrolling up, tapping, scrolling back down — twice — and the
+second comparison is the one nobody makes.
+
+The sticky bar's selection line is therefore a button, not a caption. Tapping it
+opens the same pickers in a sheet over the page, and "Add to bag" with no size
+chosen opens the same sheet rather than scrolling somewhere. The sheet stops
+short of full height so the photograph stays visible behind it, which matters
+most when the thing being changed is the colour.
+
+Both pickers are the same components the buy box uses. A second copy of a
+variant picker is how "sold out" ends up struck through in one place and greyed
+in the other, and how one of them quietly stops handling a sparse matrix.
+
+### 15. Fit warnings in the grid — `ProductCard`
 
 "Runs small" appears on the card, not just the product page. Someone comparing
 eight products decides which two to open from the grid, and that is the fact

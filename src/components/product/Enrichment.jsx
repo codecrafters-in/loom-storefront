@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Icon } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
-import { attributeByKey, attributeGroups } from '../../data/attributes.js'
+import { attributes, attributeByKey, attributeGroups } from '../../data/attributes.js'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 
 /**
@@ -43,37 +43,70 @@ export function ProductHighlights({ enrichment, limit = 6 }) {
 }
 
 /**
- * Two or three key facts, laid over the first photograph.
+ * A few specifications, laid faintly over the first photograph.
  *
- * The cheapest trust signal on the page: a shopper who has looked at nothing
- * but the picture has still read "Pure cotton · 140 gsm · Relaxed". It costs no
- * scroll, no tab and no click, and it reaches the visitors who never make it
- * past the image — which on a product page is a large share of them.
+ * This showed highlights first, and that was redundant: the highlights grid is
+ * already open a few hundred pixels below, so the overlay was repeating a fact
+ * the shopper could see without it. Specifications are the opposite — they are
+ * behind a tab, and a tab is a click, and a click is the thing most visitors do
+ * not spend. Putting a handful of them on the image is the only way they reach
+ * somebody who never interacts with the page at all.
  *
- * Three constraints keep it from being a sticker on the product:
+ * Anything already in the highlights is dropped, so the two blocks never say the
+ * same thing twice within one screen.
  *
- *  - **First image only.** Shots two onward are usually the detail crops — the
- *    collar, the weave, the hem — and covering those is covering the answer the
- *    shopper opened them for.
- *  - **Opaque chips, not text on the photo.** White text needs a scrim, a scrim
- *    darkens the garment, and the garment is what is being sold. A chip in the
- *    page colour is legible over any photograph without touching it.
- *  - **`aria-hidden` and `pointer-events-none`.** Every fact here is also in the
- *    highlights list a few lines below, so a screen reader should hear it once,
- *    and nothing decorative should intercept a click meant for the image.
+ * It is deliberately quiet. This is a *feel* — a sense that the piece is
+ * documented — not a label a shopper is meant to stop and read; the readable
+ * copy of every one of these rows is one tab away.
+ *
+ * Frosted blocks rather than a gradient wash with text on it. The wash was
+ * tried and it read as stray markup over the photograph: nothing gave the text
+ * a reason to be there, so it looked like something that had failed to load. A
+ * block at 60% with a blur behind it is legible over any photograph, reads as a
+ * deliberate object, and stays quiet because it is small and translucent rather
+ * than because the type is faint.
+ *
+ * Four, not six. Each block is an object on the image, and six objects stop
+ * being a detail in the corner and start being a panel over the garment —
+ * which is the thing actually being sold.
  */
-const CHIP_MAX = 24
+const STRIP_MAX = 28
 
-export function ImageKeyFacts({ enrichment, limit = 3 }) {
-  // Filter before slicing, not after. A composition like "Recycled polyester
-  // shell, Recycled polyester fill" wraps the strip onto a second row and turns
-  // a glanceable overlay into a caption block over the garment — so a value too
-  // long to be a chip is skipped and the next fact takes its place, rather than
-  // the whole overlay being sacrificed for it.
-  const rows = (enrichment?.highlights || [])
-    .filter((r) => r?.value && String(r.value).length <= CHIP_MAX)
-    .slice(0, limit)
-  if (!rows.length) return null
+export function ImageSpecs({ enrichment, limit = 4 }) {
+  const specs = enrichment?.specs || {}
+  const seen = new Set((enrichment?.highlights || []).map((h) => h.key))
+
+  // Vocabulary order, not object order — a store that happens to write `care`
+  // before `sleeve` should not get a different strip from one that does not.
+  // Long values are dropped rather than truncated: they wrap the strip up the
+  // image and it stops being a whisper.
+  const all = attributes
+    .filter((a) => specs[a.key])
+    // The unit joins the value here, not the label. The specifications table
+    // can afford "Weight (gsm)" in one column and "260" in the other; a single
+    // line cannot, and "Weight 260" on its own says nothing.
+    .map((a) => ({
+      key: a.key,
+      label: a.label,
+      value: a.unit ? `${specs[a.key]} ${a.unit}` : String(specs[a.key]),
+    }))
+    .filter((r) => r.value.length <= STRIP_MAX)
+
+  /**
+   * Prefer facts the shopper cannot already see, but do not insist on it.
+   *
+   * Deduping against the highlights outright read well on the six products with
+   * hand-written enrichment and emptied the strip on nine of the other
+   * eighteen, whose derived specs are mostly the same handful of facts the
+   * highlights are built from. An overlay that appears on some products and not
+   * others reads as a bug; repeating a fact from four inches below is only
+   * mildly redundant. So: new information first, and fall back to the whole
+   * list rather than showing nothing.
+   */
+  const fresh = all.filter((r) => !seen.has(r.key))
+  const rows = (fresh.length >= 3 ? fresh : all).slice(0, limit)
+
+  if (rows.length < 2) return null
 
   return (
     <div
@@ -83,12 +116,12 @@ export function ImageKeyFacts({ enrichment, limit = 3 }) {
       {rows.map((row) => (
         <span
           key={row.key}
-          className="rounded-xs bg-page/90 px-2.5 py-1.5 shadow-sm backdrop-blur-sm"
+          className="rounded-xs bg-page/60 px-2 py-1.5 backdrop-blur-md transition-opacity"
         >
-          <span className="block font-mono text-[9px] uppercase tracking-[0.12em] text-faint">
-            {label(row.key)}
+          <span className="block font-mono text-[8px] uppercase leading-none tracking-[0.14em] text-faint">
+            {row.label}
           </span>
-          <span className="mt-0.5 block text-[12px] font-medium leading-none text-ink">
+          <span className="mt-1 block text-[11px] font-medium leading-none text-ink/80">
             {row.value}
           </span>
         </span>

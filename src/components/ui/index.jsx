@@ -1,7 +1,7 @@
 import { forwardRef } from 'react'
 import { Link } from 'react-router-dom'
 import Icon from './Icon.jsx'
-import { formatMoney, discountPercent } from '../../lib/money.js'
+import { formatMoney, discountPercent, MIN_DISCOUNT } from '../../lib/money.js'
 
 export { default as Icon } from './Icon.jsx'
 
@@ -21,11 +21,30 @@ const SIZES = {
 }
 
 /**
+ * Icon-only buttons need their own sizes, not a padding override.
+ *
+ * `className="w-[52px] px-0"` looks like it works and does not: both `px-0`
+ * and `px-7` are plain utilities of equal specificity, so the winner is
+ * whichever Tailwind emits later — and it sorts by value, which puts `px-7`
+ * after `px-0`. A 52px-wide button with 28px of padding on each side has a
+ * negative content box, so the icon inside it is squeezed to nothing and the
+ * button renders empty. That is what happened to the save-for-later heart.
+ *
+ * Giving the shape its own class is the fix; a call site should never have to
+ * win a specificity argument with the component it is calling.
+ */
+const SQUARE = {
+  sm: 'h-9 w-9 text-[13px]',
+  md: 'h-11 w-11 text-sm',
+  lg: 'h-[52px] w-[52px] text-[15px]',
+}
+
+/**
  * One button, three shapes. `to` renders a Link, `href` an anchor, otherwise a
  * real <button> — so a navigation never ends up as a div with an onClick.
  */
 export const Button = forwardRef(function Button(
-  { as, to, href, variant = 'primary', size = 'md', full = false, icon, iconRight, className = '', children, ...rest },
+  { as, to, href, variant = 'primary', size = 'md', full = false, square = false, icon, iconRight, className = '', children, ...rest },
   ref,
 ) {
   const Tag = as || (to ? Link : href ? 'a' : 'button')
@@ -35,7 +54,7 @@ export const Button = forwardRef(function Button(
       ref={ref}
       {...props}
       {...rest}
-      className={`inline-flex select-none items-center justify-center gap-2 rounded-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-45 ${VARIANTS[variant]} ${SIZES[size]} ${full ? 'w-full' : ''} ${className}`}
+      className={`inline-flex select-none items-center justify-center gap-2 rounded-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-45 ${VARIANTS[variant]} ${square ? SQUARE[size] : SIZES[size]} ${full ? 'w-full' : ''} ${className}`}
     >
       {icon && <Icon name={icon} size={size === 'lg' ? 19 : 17} />}
       {children}
@@ -55,7 +74,9 @@ export function Price({ price, compareAt, size = 'md', className = '' }) {
       {pct > 0 && (
         <>
           <s className="text-[13px] tabular-nums text-faint">{formatMoney(compareAt)}</s>
-          <span className="text-[11px] font-medium text-sale">−{pct}%</span>
+          {/* The old price is a fact and always shows. The percentage is a
+              claim, and below the threshold it is one not worth making. */}
+          {pct >= MIN_DISCOUNT && <span className="text-[11px] font-medium text-sale">−{pct}%</span>}
         </>
       )}
     </span>

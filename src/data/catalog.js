@@ -11,7 +11,7 @@
  * integer minor units by `build()`, because that is what crosses the API
  * boundary. See src/lib/money.js.
  */
-import { toMinor } from '../lib/money.js'
+import { toMinor, isRealDiscount } from '../lib/money.js'
 import { productFacts } from './fit.js'
 import { productEnrichment, manufacturerInfo } from './enrichment.js'
 
@@ -100,6 +100,8 @@ const RAW = [
     tags: ['cotton', 'everyday', 'bestseller'],
     rating: [4.7, 214],
     imageQuery: 'white oxford button down shirt studio',
+    // Colour-neutral, so a colourway query can name the colour itself.
+    colorQuery: 'oxford button down shirt studio',
     altQuery: 'folded cotton shirt detail texture',
     badges: ['bestseller'],
   },
@@ -118,6 +120,7 @@ const RAW = [
     tags: ['linen', 'summer'],
     rating: [4.6, 138],
     imageQuery: 'linen camp collar shirt beige studio',
+    colorQuery: 'linen camp collar shirt studio',
     altQuery: 'linen fabric texture close up natural',
     badges: [],
   },
@@ -137,6 +140,7 @@ const RAW = [
     tags: ['cotton', 'formal'],
     rating: [4.5, 96],
     imageQuery: 'white dress shirt hanging minimal studio',
+    colorQuery: 'dress shirt hanging minimal studio',
     altQuery: 'shirt cuff button detail macro',
     badges: ['sale'],
   },
@@ -155,6 +159,7 @@ const RAW = [
     tags: ['merino', 'layering', 'bestseller'],
     rating: [4.8, 302],
     imageQuery: 'merino wool sweater folded neutral studio',
+    colorQuery: 'merino wool sweater folded studio',
     altQuery: 'knitted wool texture close up beige',
     badges: ['bestseller'],
   },
@@ -173,6 +178,7 @@ const RAW = [
     tags: ['wool', 'autumn'],
     rating: [4.7, 121],
     imageQuery: 'wool cardigan knitwear hanging neutral',
+    colorQuery: 'wool cardigan knitwear hanging',
     altQuery: 'cardigan button horn detail knit',
     badges: [],
   },
@@ -191,6 +197,7 @@ const RAW = [
     tags: ['cotton', 'organic'],
     rating: [4.4, 74],
     imageQuery: 'cable knit cotton sweater cream studio',
+    colorQuery: 'cable knit cotton sweater studio',
     altQuery: 'cable knit texture detail cream',
     badges: [],
   },
@@ -209,6 +216,7 @@ const RAW = [
     tags: ['wool', 'investment'],
     rating: [4.9, 58],
     imageQuery: 'camel wool overcoat minimal studio fashion',
+    colorQuery: 'wool overcoat minimal studio fashion',
     altQuery: 'wool coat fabric texture camel',
     badges: ['new'],
   },
@@ -227,6 +235,7 @@ const RAW = [
     tags: ['waterproof', 'heritage'],
     rating: [4.8, 167],
     imageQuery: 'waxed cotton jacket olive green outdoor',
+    colorQuery: 'waxed cotton jacket outdoor',
     altQuery: 'jacket brass zip pocket detail',
     badges: [],
   },
@@ -246,6 +255,7 @@ const RAW = [
     tags: ['recycled', 'packable'],
     rating: [4.5, 143],
     imageQuery: 'quilted liner jacket beige studio fashion',
+    colorQuery: 'quilted liner jacket studio fashion',
     altQuery: 'quilted fabric stitching detail',
     badges: ['sale'],
   },
@@ -264,6 +274,7 @@ const RAW = [
     tags: ['wool', 'tailored', 'bestseller'],
     rating: [4.6, 189],
     imageQuery: 'pleated wool trousers grey tailored studio',
+    colorQuery: 'pleated wool trousers tailored studio',
     altQuery: 'trouser waistband pleat detail',
     badges: ['bestseller'],
   },
@@ -282,6 +293,7 @@ const RAW = [
     tags: ['denim', 'raw'],
     rating: [4.7, 231],
     imageQuery: 'selvedge denim jeans folded indigo detail',
+    colorQuery: 'selvedge denim jeans folded detail',
     altQuery: 'denim selvedge edge detail macro',
     badges: [],
   },
@@ -300,6 +312,7 @@ const RAW = [
     tags: ['cotton', 'everyday'],
     rating: [4.5, 176],
     imageQuery: 'khaki chino trousers folded flat lay',
+    colorQuery: 'chino trousers folded flat lay',
     altQuery: 'cotton twill fabric texture khaki',
     badges: [],
   },
@@ -318,6 +331,7 @@ const RAW = [
     tags: ['linen', 'summer'],
     rating: [4.6, 108],
     imageQuery: 'linen slip dress neutral minimal fashion',
+    colorQuery: 'linen slip dress minimal fashion',
     altQuery: 'linen dress fabric drape detail',
     badges: ['new'],
   },
@@ -336,6 +350,7 @@ const RAW = [
     tags: ['cotton', 'workwear'],
     rating: [4.4, 87],
     imageQuery: 'white shirt dress on hanger minimal studio',
+    colorQuery: 'shirt dress on hanger minimal studio',
     altQuery: 'shirt dress collar placket detail',
     badges: [],
   },
@@ -354,6 +369,7 @@ const RAW = [
     tags: ['leather', 'lasts'],
     rating: [4.8, 143],
     imageQuery: 'leather belt brass buckle detail tan',
+    colorQuery: 'leather belt brass buckle detail',
     altQuery: 'leather texture close up tan grain',
     badges: [],
   },
@@ -372,6 +388,7 @@ const RAW = [
     tags: ['canvas', 'travel'],
     rating: [4.7, 92],
     imageQuery: 'canvas duffle weekender bag leather trim',
+    colorQuery: 'canvas duffle weekender bag',
     altQuery: 'canvas bag leather handle detail',
     badges: [],
   },
@@ -390,6 +407,7 @@ const RAW = [
     tags: ['wool', 'gift'],
     rating: [4.9, 204],
     imageQuery: 'wool scarf folded neutral texture',
+    colorQuery: 'wool scarf folded texture',
     altQuery: 'scarf wool fringe detail texture',
     badges: ['bestseller'],
   },
@@ -409,6 +427,7 @@ const RAW = [
     tags: ['cotton', 'everyday'],
     rating: [4.3, 61],
     imageQuery: 'cotton baseball cap neutral studio product',
+    colorQuery: 'cotton baseball cap studio product',
     altQuery: 'cap brass adjuster strap detail',
     badges: ['sale'],
   },
@@ -427,6 +446,7 @@ const RAW = [
     tags: ['cotton', 'winter'],
     rating: [4.5, 118],
     imageQuery: 'flannel check shirt folded plaid studio',
+    colorQuery: 'flannel shirt folded studio',
     altQuery: 'flannel check fabric texture detail',
     badges: [],
   },
@@ -445,6 +465,7 @@ const RAW = [
     tags: ['silk', 'everyday'],
     rating: [4.6, 267],
     imageQuery: 'plain white t-shirt folded minimal studio',
+    colorQuery: 't-shirt folded minimal studio',
     altQuery: 'cotton jersey fabric texture white',
     badges: [],
   },
@@ -463,6 +484,7 @@ const RAW = [
     tags: ['linen', 'summer'],
     rating: [4.5, 94],
     imageQuery: 'wide leg linen trousers beige minimal',
+    colorQuery: 'wide leg linen trousers minimal',
     altQuery: 'linen trouser drape fabric detail',
     badges: [],
   },
@@ -481,6 +503,7 @@ const RAW = [
     tags: ['cotton', 'winter'],
     rating: [4.7, 76],
     imageQuery: 'shearling collar denim trucker jacket brown',
+    colorQuery: 'shearling collar trucker jacket',
     altQuery: 'shearling collar texture detail jacket',
     badges: ['new'],
   },
@@ -499,6 +522,7 @@ const RAW = [
     tags: ['merino', 'winter', 'gift'],
     rating: [4.8, 155],
     imageQuery: 'wool beanie hat knitted neutral product',
+    colorQuery: 'wool beanie hat knitted product',
     altQuery: 'ribbed knit beanie texture close up',
     badges: [],
   },
@@ -518,6 +542,7 @@ const RAW = [
     tags: ['cashmere', 'investment'],
     rating: [4.9, 88],
     imageQuery: 'cashmere sweater camel folded luxury studio',
+    colorQuery: 'cashmere sweater folded luxury studio',
     altQuery: 'cashmere knit texture detail camel',
     badges: ['sale'],
   },
@@ -656,6 +681,35 @@ function build(raw) {
   const compareAt = raw.compareAt ? toMinor(raw.compareAt) : null
   const currency = 'USD'
 
+  /**
+   * Each colourway has its own photograph, and the first colour is the one the
+   * main shot was taken of.
+   *
+   * This is what makes the gallery follow the picker. Before, every variant
+   * pointed at `<slug>-1` and every image was untagged, so choosing a colour
+   * changed the swatch and nothing else — the scoping code was correct and had
+   * nothing to scope. `-2` stays untagged on purpose: a fabric or detail crop
+   * belongs to every colourway, so it survives the filter and stays in the
+   * gallery whichever colour is selected.
+   */
+  const colorImageId = (name) =>
+    `${raw.slug}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`
+
+  const firstColor = raw.colors[0]?.[0]
+  const images = [
+    // Index 0 and 1 are the card and its hover shot, so they stay put.
+    { id: `${raw.slug}-1`, url: `/images/products/${raw.slug}-1.jpg`, alt: `${raw.title} in ${firstColor}`, width: 900, height: 1125, color: firstColor },
+    { id: `${raw.slug}-2`, url: `/images/products/${raw.slug}-2.jpg`, alt: `${raw.title}, fabric detail`, width: 900, height: 1125 },
+    ...raw.colors.slice(1).map(([name]) => ({
+      id: colorImageId(name),
+      url: `/images/products/${colorImageId(name)}.jpg`,
+      alt: `${raw.title} in ${name}`,
+      width: 900,
+      height: 1125,
+      color: name,
+    })),
+  ]
+
   const variants = []
   for (const [colorName] of raw.colors) {
     for (const size of raw.sizes) {
@@ -669,11 +723,8 @@ function build(raw) {
         compareAtPrice: compareAt ? { amount: compareAt, currency } : null,
         inventory,
         available: inventory > 0,
-        // Which shot to show when this variant is selected. The demo catalogue
-        // photographs one colourway, so every variant points at the same image;
-        // a real store sends the id of that colour's shot and the gallery
-        // follows the picker automatically.
-        imageId: `${raw.slug}-1`,
+        // Which shot to show when this variant is selected.
+        imageId: colorName === firstColor ? `${raw.slug}-1` : colorImageId(colorName),
       })
     }
   }
@@ -691,10 +742,7 @@ function build(raw) {
     care: raw.care,
     price: { amount: price, currency },
     compareAtPrice: compareAt ? { amount: compareAt, currency } : null,
-    images: [
-      { id: `${raw.slug}-1`, url: `/images/products/${raw.slug}-1.jpg`, alt: `${raw.title} — ${raw.subtitle}`, width: 900, height: 1125 },
-      { id: `${raw.slug}-2`, url: `/images/products/${raw.slug}-2.jpg`, alt: `${raw.title}, fabric detail`, width: 900, height: 1125 },
-    ],
+    images,
     options: [
       { name: 'Color', values: raw.colors.map(([n]) => n) },
       { name: 'Size', values: raw.sizes },
@@ -704,7 +752,13 @@ function build(raw) {
     categories: [raw.category, LEAF_CATEGORY[raw.slug]].filter(Boolean),
     tags: raw.tags,
     rating: { average: raw.rating[0], count: raw.rating[1] },
-    badges: [...(raw.badges || []), ...(compareAt ? ['sale'] : []), ...(soldOut ? ['sold-out'] : low ? ['low-stock'] : [])],
+    // Same threshold the price chip uses — a reduction too small to advertise is
+    // too small to badge. See MIN_DISCOUNT in lib/money.js.
+    badges: [
+      ...(raw.badges || []),
+      ...(isRealDiscount({ amount: price }, compareAt ? { amount: compareAt } : null) ? ['sale'] : []),
+      ...(soldOut ? ['sold-out'] : low ? ['low-stock'] : []),
+    ],
     createdAt: new Date(2026, 0, 1 + hashInt(raw.slug, 240)).toISOString(),
     published: true,
 
@@ -729,6 +783,7 @@ function build(raw) {
     },
     // Consumed only by scripts/images.mjs; stripped from API responses.
     _imageQuery: raw.imageQuery,
+    _colorQuery: raw.colorQuery,
     _altQuery: raw.altQuery,
   }
 }

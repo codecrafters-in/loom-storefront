@@ -58,8 +58,18 @@ picker. `id` is what `Variant.imageId` references as the fallback.
   sizeChart?: SizeChart             // resolved from sizeChartId on read
   social?: Social
   enrichment?: Enrichment
+  relatedSlugs?: string[]           // ordered; used only by the `manual` rail
 }
 ```
+
+**`images[].color` is what makes the gallery follow the picker.** An image tagged
+with a colour shows only when that colour is selected; an untagged one — a fabric
+crop, a packshot, the size guide — belongs to every colourway and always shows.
+Point each variant's `imageId` at its own colour's first shot and the main image
+changes with the swatch, with no code involved.
+
+A store with one set of photographs simply tags nothing, and sees what it saw
+before.
 
 ## Variant
 

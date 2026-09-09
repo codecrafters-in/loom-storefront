@@ -50,7 +50,24 @@ export const addMoney = (a, b) => money(a.amount + b.amount, a.currency)
 export const mulMoney = (m, n) => money(Math.round(m.amount * n), m.currency)
 
 /** Percent off, rounded the way a shopper expects to read it. */
+/**
+ * Below this, a reduction is not a saving and should not be advertised.
+ *
+ * A merchant setting a compare-at price a couple of dollars above the price
+ * gets "−2%" in red next to a sale badge, which is worth nothing to a shopper
+ * and costs something: a discount too small to matter reads as a store trying
+ * to manufacture urgency, and that suspicion does not stay local to the badge.
+ * The struck-through price still shows — it is a fact — but it is not dressed
+ * up as an offer.
+ */
+export const MIN_DISCOUNT = 5
+
 export function discountPercent(price, compareAt) {
   if (!compareAt || compareAt.amount <= price.amount) return 0
   return Math.round(((compareAt.amount - price.amount) / compareAt.amount) * 100)
+}
+
+/** Whether a reduction is worth calling a sale. */
+export function isRealDiscount(price, compareAt) {
+  return discountPercent(price, compareAt) >= MIN_DISCOUNT
 }

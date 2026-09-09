@@ -62,16 +62,24 @@ export default function ProductCard({ product, priority = false, className = '' 
         <Icon name="heart" size={16} filled={saved} className={saved ? 'text-sale' : ''} />
       </button>
 
+      {/*
+        Title, then subtitle, then price — stacked, not title-left/price-right.
+
+        The two-column row looks tidy at desktop width and falls apart in a
+        two-up mobile grid: the price is `shrink-0` and a struck-through
+        original with a discount chip is 140px of it, which leaves "Everyday
+        Oxford Shirt" about forty pixels and one word per line. Stacking costs
+        a few pixels of height and never competes for width, which is why every
+        apparel grid worth copying does it this way.
+      */}
       <div className="pt-4">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-sans text-[15px] font-medium leading-snug">
-            <Link to={`/product/${product.slug}`} className="link-underline decoration-transparent">
-              {product.title}
-            </Link>
-          </h3>
-          <Price price={product.price} compareAt={product.compareAtPrice} size="sm" className="shrink-0" />
-        </div>
+        <h3 className="font-sans text-[15px] font-medium leading-snug">
+          <Link to={`/product/${product.slug}`} className="link-underline decoration-transparent">
+            {product.title}
+          </Link>
+        </h3>
         <p className="mt-1 text-[13px] text-faint">{product.subtitle}</p>
+        <Price price={product.price} compareAt={product.compareAtPrice} size="sm" className="mt-2 flex-wrap" />
 
         {/* One fit signal in the grid. Someone comparing eight products decides
             which two to open here, and "runs small" is the fact that decides it. */}

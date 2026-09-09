@@ -53,6 +53,7 @@ const BLANK = () => ({
   fabric: null,
   sizeChartId: null,
   social: null,
+  relatedSlugs: [],
   published: false,
   createdAt: new Date().toISOString(),
 })
@@ -76,6 +77,9 @@ export default function ProductEditor() {
   const charts = useAsync(() => api.listSizeCharts(), [])
   const vocab = useAsync(() => api.listAttributes(), [])
   const cats = useAsync(() => api.listCategories(), [])
+  // For the manual "You might also like" rail. Drafts included, because a
+  // merchant preparing a launch wants to wire the rail before publishing.
+  const catalogue = useAsync(() => api.adminListProducts({ perPage: 500 }), [])
 
   const [draft, setDraft] = useState(isNew ? BLANK() : null)
   const [tab, setTab] = useState('details')
@@ -181,7 +185,13 @@ export default function ProductEditor() {
 
   if (loaded.loading || !draft) return <Skeleton className="h-96 w-full" />
 
-  const props = { draft, set, charts: charts.data?.items || [], cats: cats.data?.items || [] }
+  const props = {
+    draft,
+    set,
+    charts: charts.data?.items || [],
+    cats: cats.data?.items || [],
+    catalogue: (catalogue.data?.items || []).filter((p) => p.slug !== draft.slug),
+  }
 
   return (
     <div className="pb-24">
@@ -1322,7 +1332,7 @@ function FitTab({ draft, set, charts }) {
 
 /* ── organise ──────────────────────────────────────────────────────────── */
 
-function OrganiseTab({ draft, set, cats }) {
+function OrganiseTab({ draft, set, cats, catalogue = [] }) {
   const parentOf = useMemo(() => {
     const map = {}
     cats.forEach((root) => (root.children || []).forEach((c) => { map[c.slug] = root.slug }))
@@ -1403,6 +1413,96 @@ function OrganiseTab({ draft, set, cats }) {
           A perfect 5.0 converts worse than 4.8 — it reads as filtered.
         </p>
       </Panel>
+
+      <Panel
+        title="You might also like"
+        note="The rail at the bottom of the product page. Used only while Storefront settings → recommendations is set to Manual; every other strategy scores this automatically and ignores what is here."
+      >
+        <RelatedPicker
+          slugs={draft.relatedSlugs || []}
+          catalogue={catalogue}
+          onChange={(next) => set('relatedSlugs', next)}
+        />
+      </Panel>
+    </div>
+  )
+}
+
+/**
+ * The manual recommendation rail.
+ *
+ * Ordered, because the order is the whole point of choosing manual over a
+ * scored strategy — a merchant reaching for this has a specific first item in
+ * mind. It is a list with arrows rather than a multi-select for the same
+ * reason: a set of ticks cannot express "this one first".
+ */
+function RelatedPicker({ slugs, catalogue, onChange }) {
+  const byslug = useMemo(() => Object.fromEntries(catalogue.map((p) => [p.slug, p])), [catalogue])
+  const available = catalogue.filter((p) => !slugs.includes(p.slug))
+
+  const move = (i, j) => {
+    if (j < 0 || j >= slugs.length) return
+    const next = slugs.slice()
+    ;[next[i], next[j]] = [next[j], next[i]]
+    onChange(next)
+  }
+
+  return (
+    <div className="space-y-3">
+      {slugs.length > 0 && (
+        <ol className="space-y-2">
+          {slugs.map((slug, i) => {
+            const p = byslug[slug]
+            return (
+              <li key={slug} className="flex items-center gap-3 rounded-xs border border-line p-2">
+                <span className="w-10 shrink-0">
+                  <span className="shot overflow-hidden rounded-xs bg-sunken">
+                    {p?.images?.[0] && (
+                      <Media src={p.images[0].url} alt="" className="h-full w-full object-cover" />
+                    )}
+                  </span>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px]">{p?.title || slug}</span>
+                  {/* A slug in the list with no product behind it is a rail
+                      item that silently disappears on the storefront. */}
+                  {!p && <span className="text-[11px] text-sale">No product with this slug</span>}
+                  {p?.published === false && <span className="text-[11px] text-faint">Draft — hidden on the shop</span>}
+                </span>
+                <TileBtn label="Move up" icon="chevron-left" onClick={() => move(i, i - 1)} />
+                <TileBtn label="Move down" icon="chevron-right" onClick={() => move(i, i + 1)} />
+                <TileBtn
+                  label="Remove"
+                  icon="trash"
+                  tone="sale"
+                  onClick={() => onChange(slugs.filter((s) => s !== slug))}
+                />
+              </li>
+            )
+          })}
+        </ol>
+      )}
+
+      <select
+        className="field h-9 py-0 text-[13px]"
+        value=""
+        onChange={(e) => e.target.value && onChange([...slugs, e.target.value])}
+      >
+        <option value="">Add a product…</option>
+        {available.map((p) => (
+          <option key={p.slug} value={p.slug}>
+            {p.title}
+            {p.published === false ? ' (draft)' : ''}
+          </option>
+        ))}
+      </select>
+
+      {!slugs.length && (
+        <p className="text-[12px] text-faint">
+          Nothing chosen. On Manual, the rail falls back to best-sellers rather than rendering
+          empty — an empty rail looks broken and a slightly-off one does not.
+        </p>
+      )}
     </div>
   )
 }

@@ -329,6 +329,18 @@ shorter page rather than a set of empty headings.
 
 ## Attributes
 
+### Discounts
+
+`compareAtPrice` above `price` renders a struck-through original. The **`−N%`
+chip and the `sale` badge need at least 5%** (`MIN_DISCOUNT` in
+`src/lib/money.js`).
+
+A merchant who sets a compare-at price two dollars above the price otherwise
+gets "−2%" in red beside a sale badge. That is worth nothing to a shopper and
+costs something: a discount too small to matter reads as a store manufacturing
+urgency, and the suspicion does not stay local to the badge. The old price still
+shows, because it is a fact; it is just not dressed up as an offer.
+
 ### `GET /attributes`
 
 The suggested vocabulary behind `highlights` and `specs`.

@@ -83,7 +83,7 @@ const id = (p) => `${p}_${Math.random().toString(36).slice(2, 10)}`
 
 /** Strip the fields that only exist to drive the image script. */
 const publicProduct = (p) => {
-  const { _imageQuery, _altQuery, sizeChartId, ...rest } = p
+  const { _imageQuery, _altQuery, _colorQuery, sizeChartId, ...rest } = p
   // A product either references a shared chart by id or carries its own. The
   // reference is resolved here so the storefront always sees one shape.
   const chart = sizeChartId ? sizeCharts.find((c) => c.id === sizeChartId) : rest.sizeChart

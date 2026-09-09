@@ -43,10 +43,50 @@ const SHAPES = {
   editorial: { w: 1400, h: 1050, orientation: 'landscape' },  // 4:3,  aspect-[4/3]
 }
 
+export const colorSlug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
 const jobs = []
 for (const p of products) {
   jobs.push({ key: `products/${p.slug}-1`, query: p._imageQuery, shape: 'product' })
   jobs.push({ key: `products/${p.slug}-2`, query: p._altQuery, shape: 'product' })
+
+  /**
+   * One photograph per colourway beyond the first.
+   *
+   * Without these the theme's variant gallery cannot be seen working: every
+   * variant pointed at the same shot, so picking a colour changed the swatch
+   * and nothing else, and the feature read as broken.
+   *
+   * Deriving them by tinting the first shot was tried and thrown away — hue
+   * rotation cannot recolour a near-white garment, so "Black" came out as an
+   * underexposed white shirt, which looks like a bug rather than a colourway.
+   * Fetching a real photograph of roughly that colour is no less honest than
+   * the rest of this catalogue, which is stock photography standing in for
+   * products throughout, and it actually looks like a different colourway.
+   *
+   * `colorQuery` is the colour-neutral half of the description, so the colour
+   * name can lead the query instead of fighting the one already in it.
+   */
+  const colors = Object.keys(p.swatches || {})
+  for (const name of colors.slice(1)) {
+    const garment = p._colorQuery || p._imageQuery
+    // Shortening beats rephrasing. A five-word query is an AND across all five
+    // and "merino wool sweater folded studio" matches nothing in the library,
+    // while its first three words match two thousand photographs.
+    const short = garment.split(' ').slice(0, 3).join(' ')
+    jobs.push({
+      key: `products/${p.slug}-${colorSlug(name)}`,
+      query: `${name} ${garment}`,
+      fallbacks: [
+        `${name.split(' ')[0]} ${garment}`,
+        `${name} ${short}`,
+        `${name.split(' ')[0]} ${short}`,
+        garment,
+        short,
+      ],
+      shape: 'product',
+    })
+  }
 }
 for (const c of categories) jobs.push({ key: `categories/${c.slug}`, query: c.imageQuery, shape: 'category' })
 for (const c of collections) jobs.push({ key: `collections/${c.slug}`, query: c.imageQuery, shape: 'collection' })
@@ -54,6 +94,27 @@ jobs.push({ key: 'editorial/hero', query: 'fashion lookbook woman wool coat autu
 jobs.push({ key: 'editorial/craft', query: 'tailor sewing machine workshop hands fabric', shape: 'editorial' })
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Try each query in turn and take the first that returns anything.
+ *
+ * Colourway queries fail on names a photo library has never been asked for —
+ * "Slate Check", "Moss", "Chalk". Falling back to the first word and then to
+ * the garment on its own means an obscure colour name costs a less specific
+ * photograph rather than a missing file, which would leave that variant with a
+ * broken image.
+ */
+async function searchAny(queries, orientation) {
+  let last
+  for (const q of queries.filter(Boolean)) {
+    try {
+      return await search(q, orientation)
+    } catch (err) {
+      last = err
+    }
+  }
+  throw last
+}
 
 async function search(query, orientation = 'portrait') {
   const res = await fetch(
@@ -122,7 +183,9 @@ async function main() {
     }
 
     try {
-      const entry = lock[job.key] || (await search(job.query, SHAPES[job.shape].orientation))
+      const entry =
+        lock[job.key] ||
+        (await searchAny([job.query, ...(job.fallbacks || [])], SHAPES[job.shape].orientation))
       const buf = await download(entry)
       await (await render(buf, job.shape)).toFile(file)
       const { size } = await fs.stat(file)

@@ -12,7 +12,7 @@ import { FitBlock, FabricBlock, SizeChartModal } from './FitBlock.jsx'
 import TrustRow, { PaymentsRow, SocialProof } from './TrustRow.jsx'
 import {
   ProductHighlights,
-  ImageKeyFacts,
+  ImageSpecs,
   ProductAssurances,
   DetailTabs,
   FeatureCarousel,
@@ -66,6 +66,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
   const [chartOpen, setChartOpen] = useState(false)
   const [showAllThumbs, setShowAllThumbs] = useState(false)
   const [showSticky, setShowSticky] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
   const buyRef = useRef(null)
 
   const { add, busy } = useCart()
@@ -192,6 +193,13 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
     if (i >= 0) setShot(i)
   }, [variant, gallery])
 
+  useEffect(() => {
+    if (!sheetOpen) return undefined
+    const onKey = (e) => e.key === 'Escape' && setSheetOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [sheetOpen])
+
   // A sticky buy bar once the real one scrolls away — on a long product page
   // the decision often happens next to the reviews, and walking back up to a
   // button is where a phone shopper leaves.
@@ -304,7 +312,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
 
                 {/* Only over the first shot — the rest are detail crops, and
                     the crop is the answer somebody opened them for. */}
-                {shot === 0 && <ImageKeyFacts enrichment={product.enrichment} />}
+                {shot === 0 && <ImageSpecs enrichment={product.enrichment} />}
               </div>
             </div>
           </div>
@@ -428,29 +436,13 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             <legend className="text-[13px] font-medium">
               Colour: <span className="text-muted">{activeColor}</span>
             </legend>
-            <div className="mt-3 flex flex-wrap gap-2.5">
-              {colors.map((c) => {
-                const out = colorSoldOut[c]
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => pickColor(c)}
-                    aria-pressed={c === activeColor}
-                    title={out ? `${c} — sold out` : c}
-                    className={`relative grid h-11 w-11 place-items-center rounded-full ring-1 ring-inset transition-shadow ${
-                      c === activeColor
-                        ? 'ring-2 ring-offset-2 ring-ink ring-offset-page'
-                        : 'ring-ink/15 hover:ring-muted'
-                    } ${out ? 'opacity-45' : ''}`}
-                    style={{ background: product.swatches?.[c] || '#ddd' }}
-                  >
-                    <span className="sr-only">{c}{out ? ' (sold out)' : ''}</span>
-                    {out && <span aria-hidden="true" className="absolute h-[1.5px] w-8 -rotate-45 bg-ink/60" />}
-                  </button>
-                )
-              })}
-            </div>
+            <ColorSwatches
+              colors={colors}
+              active={activeColor}
+              swatches={product.swatches}
+              soldOut={colorSoldOut}
+              onPick={pickColor}
+            />
           </fieldset>
 
           {/* size */}
@@ -465,47 +457,13 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                 <Link to="/pages/size-guide" className="text-[12px] text-muted link-underline">Size guide</Link>
               )}
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {sizes.map((s) => {
-                const { state } = sizeState[s] || { state: 'absent' }
-                const unavailable = state !== 'available'
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    disabled={unavailable}
-                    onClick={() => setSize(s)}
-                    aria-pressed={s === size}
-                    title={
-                      state === 'sold-out'
-                        ? `${s} is sold out in ${activeColor}`
-                        : state === 'absent'
-                          ? `${s} is not made in ${activeColor}`
-                          : undefined
-                    }
-                    className={`relative h-12 min-w-[3.5rem] rounded-xs border px-3.5 text-sm transition-colors ${
-                      state === 'absent'
-                        ? 'cursor-not-allowed border-dashed border-line text-faint/60'
-                        : state === 'sold-out'
-                          ? 'cursor-not-allowed border-line text-faint'
-                          : s === size
-                            ? 'border-ink bg-ink text-page'
-                            : 'border-line text-ink hover:border-ink'
-                    }`}
-                  >
-                    {s}
-                    <span className="sr-only">
-                      {state === 'sold-out' ? ' — sold out' : state === 'absent' ? ' — not available in this colour' : ''}
-                    </span>
-                    {/* A struck-through size reads as "gone"; a dashed outline
-                        reads as "not offered". Only the first gets the line. */}
-                    {state === 'sold-out' && (
-                      <span aria-hidden="true" className="absolute inset-x-2 top-1/2 h-px -rotate-[18deg] bg-line" />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+            <SizeChips
+              sizes={sizes}
+              size={size}
+              sizeState={sizeState}
+              activeColor={activeColor}
+              onPick={setSize}
+            />
             {size && lowStock && (
               <p className="mt-3 text-[13px] text-sale">Only {variant.inventory} left in {activeColor}, size {size}.</p>
             )}
@@ -517,11 +475,23 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           </fieldset>
 
           {/* add */}
-          <div ref={buyRef} className="mt-8 flex flex-wrap items-center gap-3">
+          {/*
+            One row on a wide column, two on a narrow one — and the wrap is
+            explicit rather than whatever `flex-wrap` happens to do.
+
+            Left to itself it wrapped the *heart* onto the second line on its
+            own, which reads as a stray button rather than a save control. The
+            grid puts quantity and heart side by side and gives the whole width
+            to the thing the shopper came to press.
+          */}
+          <div
+            ref={buyRef}
+            className="mt-8 grid grid-cols-[auto_1fr] items-center gap-3 sm:grid-cols-[auto_1fr_auto]"
+          >
             <QuantityStepper value={qty} onChange={setQty} max={variant?.inventory || 10} />
             <Button
               size="lg"
-              className="min-w-[12rem] flex-1"
+              className="order-last col-span-2 w-full sm:order-none sm:col-span-1"
               disabled={preview || !variant || busy}
               onClick={() => !preview && add(variant.id, qty, `${product.title} added to your bag`)}
             >
@@ -531,10 +501,11 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             <Button
               variant="quiet"
               size="lg"
+              square
               aria-pressed={saved}
               aria-label={saved ? 'Remove from saved' : 'Save for later'}
               onClick={() => !preview && toggle(product.slug, product.title)}
-              className="w-[52px] px-0"
+              className="justify-self-end sm:justify-self-auto"
             >
               <Icon name="heart" size={19} filled={saved} className={saved ? 'text-sale' : ''} />
             </Button>
@@ -611,13 +582,29 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               <Media src={product.images[shot]?.url} type={product.images[shot]?.type} alt="" loading="lazy" className="h-full w-full object-cover" />
             </div>
           </div>
-          <div className="min-w-0 flex-1">
+          {/*
+            The selection is a button, not a caption.
+
+            On a phone the picker is most of a screen above this bar, so the
+            only way to change colour or size was to scroll back up, change it,
+            and scroll down again — twice, if you were comparing two colours.
+            Tapping the selection opens the same choices in a sheet over the
+            page, which is what every apparel app does and for this reason.
+          */}
+          <button
+            type="button"
+            onClick={() => setSheetOpen(true)}
+            className="min-w-0 flex-1 text-left"
+          >
             <p className="truncate text-[13px] font-medium">{product.title}</p>
-            <p className="truncate text-[12px] text-faint">
-              {activeColor}
-              {size ? ` · ${size}` : ' · select a size'}
+            <p className="flex items-center gap-1 truncate text-[12px] text-faint">
+              <span className="truncate">
+                {activeColor}
+                {size ? ` · ${size}` : ' · select a size'}
+              </span>
+              <Icon name="chevron-down" size={12} className="shrink-0 rotate-180" />
             </p>
-          </div>
+          </button>
           <Price price={variant?.price || product.price} compareAt={variant?.compareAtPrice ?? product.compareAtPrice} size="sm" className="hidden shrink-0 sm:inline-flex" />
           <Button
             size="md"
@@ -626,7 +613,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             onClick={() =>
               variant
                 ? add(variant.id, qty, `${product.title} added to your bag`)
-                : buyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                : setSheetOpen(true)
             }
           >
             {!size ? 'Choose size' : !variant?.available ? 'Out of stock' : 'Add to bag'}
@@ -635,7 +622,207 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
       </div>
       )}
 
+      {!preview && sheetOpen && (
+        <VariantSheet
+          product={product}
+          colors={colors}
+          sizes={sizes}
+          activeColor={activeColor}
+          size={size}
+          sizeState={sizeState}
+          colorSoldOut={colorSoldOut}
+          variant={variant}
+          busy={busy}
+          onColor={pickColor}
+          onSize={setSize}
+          onClose={() => setSheetOpen(false)}
+          onAdd={() => {
+            add(variant.id, qty, `${product.title} added to your bag`)
+            setSheetOpen(false)
+          }}
+          onOpenChart={() => {
+            setSheetOpen(false)
+            if (onOpenChart) onOpenChart()
+            else setChartOpen(true)
+          }}
+        />
+      )}
+
       <SizeChartModal product={product} open={chartOpen} onClose={() => setChartOpen(false)} />
     </>
+  )
+}
+
+/* ── pickers ───────────────────────────────────────────────────────────── */
+
+/**
+ * Shared by the buy box and the sheet the sticky bar opens.
+ *
+ * Extracted the moment there were two places to choose a colour. A second copy
+ * of a variant picker is how "sold out" ends up struck through in one place and
+ * greyed in the other, and how one of them quietly stops handling the sparse
+ * matrix at all.
+ */
+function ColorSwatches({ colors, active, swatches, soldOut, onPick }) {
+  return (
+    <div className="mt-3 flex flex-wrap gap-2.5">
+      {colors.map((c) => {
+        const out = soldOut[c]
+        return (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onPick(c)}
+            aria-pressed={c === active}
+            title={out ? `${c} — sold out` : c}
+            className={`relative grid h-11 w-11 place-items-center rounded-full ring-1 ring-inset transition-shadow ${
+              c === active ? 'ring-2 ring-ink ring-offset-2 ring-offset-page' : 'ring-ink/15 hover:ring-muted'
+            } ${out ? 'opacity-45' : ''}`}
+            style={{ background: swatches?.[c] || '#ddd' }}
+          >
+            <span className="sr-only">
+              {c}
+              {out ? ' (sold out)' : ''}
+            </span>
+            {out && <span aria-hidden="true" className="absolute h-[1.5px] w-8 -rotate-45 bg-ink/60" />}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Three states, not two — see the comment on the strike below. */
+function SizeChips({ sizes, size, sizeState, activeColor, onPick }) {
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {sizes.map((s) => {
+        const { state } = sizeState[s] || { state: 'absent' }
+        const unavailable = state !== 'available'
+        return (
+          <button
+            key={s}
+            type="button"
+            disabled={unavailable}
+            onClick={() => onPick(s)}
+            aria-pressed={s === size}
+            title={
+              state === 'sold-out'
+                ? `${s} is sold out in ${activeColor}`
+                : state === 'absent'
+                  ? `${s} is not made in ${activeColor}`
+                  : undefined
+            }
+            className={`relative h-12 min-w-[3.5rem] rounded-xs border px-3.5 text-sm transition-colors ${
+              state === 'absent'
+                ? 'cursor-not-allowed border-dashed border-line text-faint/60'
+                : state === 'sold-out'
+                  ? 'cursor-not-allowed border-line text-faint'
+                  : s === size
+                    ? 'border-ink bg-ink text-page'
+                    : 'border-line text-ink hover:border-ink'
+            }`}
+          >
+            {s}
+            <span className="sr-only">
+              {state === 'sold-out' ? ' — sold out' : state === 'absent' ? ' — not available in this colour' : ''}
+            </span>
+            {/* A struck-through size reads as "gone"; a dashed outline reads as
+                "not offered". Only the first gets the line. */}
+            {state === 'sold-out' && (
+              <span aria-hidden="true" className="absolute inset-x-2 top-1/2 h-px -rotate-[18deg] bg-line" />
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * The picker, over the page, reachable from the sticky bar.
+ *
+ * The problem it solves is specific to phones: the buy box is one column, so by
+ * the time a shopper has read the detail the colour swatches are most of a
+ * screen above them. Comparing two colourways meant scrolling up, tapping,
+ * scrolling back down — twice — and the second comparison is the one nobody
+ * makes.
+ *
+ * A sheet rather than a modal because it is anchored to the bar that opened it,
+ * and it stops short of full height so the photograph stays visible behind it —
+ * which is the whole point when the thing being changed is the colour.
+ */
+function VariantSheet({
+  product, colors, sizes, activeColor, size, sizeState, colorSoldOut,
+  variant, busy, onColor, onSize, onClose, onAdd, onOpenChart,
+}) {
+  return (
+    <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label="Choose colour and size">
+      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
+
+      <div className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-lg border-t border-line bg-page">
+        {/* A grab handle is the only affordance that says "this came from the
+            bottom and goes back there" without any words. */}
+        <div className="sticky top-0 flex justify-center bg-page pb-1 pt-2.5">
+          <span aria-hidden="true" className="h-1 w-9 rounded-full bg-line" />
+        </div>
+
+        <div className="px-5 pb-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="truncate text-[14px] font-medium">{product.title}</p>
+              <Price
+                price={variant?.price || product.price}
+                compareAt={variant?.compareAtPrice ?? product.compareAtPrice}
+                size="sm"
+                className="mt-1 flex-wrap"
+              />
+            </div>
+            <Button variant="quiet" size="sm" square aria-label="Close" onClick={onClose}>
+              <Icon name="close" size={16} />
+            </Button>
+          </div>
+
+          <fieldset className="mt-5">
+            <legend className="text-[13px] font-medium">
+              Colour: <span className="text-muted">{activeColor}</span>
+            </legend>
+            <ColorSwatches
+              colors={colors}
+              active={activeColor}
+              swatches={product.swatches}
+              soldOut={colorSoldOut}
+              onPick={onColor}
+            />
+          </fieldset>
+
+          <fieldset className="mt-6">
+            <div className="flex items-baseline justify-between">
+              <legend className="text-[13px] font-medium">Size</legend>
+              <button type="button" onClick={onOpenChart} className="link-underline text-[12px] text-accent">
+                Size chart
+              </button>
+            </div>
+            <SizeChips
+              sizes={sizes}
+              size={size}
+              sizeState={sizeState}
+              activeColor={activeColor}
+              onPick={onSize}
+            />
+          </fieldset>
+
+          <Button
+            size="lg"
+            full
+            className="mt-6"
+            disabled={!variant || !variant.available || busy}
+            onClick={onAdd}
+          >
+            {!size ? 'Select a size' : !variant?.available ? 'Out of stock' : busy ? 'Adding…' : 'Add to bag'}
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }

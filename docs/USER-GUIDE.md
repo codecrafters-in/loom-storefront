@@ -19,11 +19,11 @@ Five tabs, filled in the order you would think about them:
 | Tab | What goes in it |
 | --- | --- |
 | **Details** | Title, slug, description, price, the Details and Care lists |
-| **Media** | Images. First is the card, second is the hover shot |
+| **Media** | Images, their alt text, and which colour each one belongs to |
 | **Variants** | Colours with swatches, sizes, then **Rebuild matrix** |
 | **Fit & fabric** | Fit verdict, model, size chart, composition, certifications |
 | **Highlights & specs** | Highlights, features, what it comes with, who made it, the spec table |
-| **Organise** | Categories, tags, rating |
+| **Organise** | Categories, tags, rating, demand counts, the related rail |
 
 Colours and sizes come first, then **Rebuild matrix** creates one row per
 combination. Fill in stock per row.
@@ -314,6 +314,39 @@ which is how the whole table fits in a column instead of a page.
 
 > Every block disappears when it is empty. A product with nothing filled in is a
 > shorter page, not a set of blank headings.
+
+---
+
+## Show a different photograph for each colour
+
+**Open the product → Media → the colour dropdown under each image.**
+
+An image tagged with a colour appears only when that colour is selected. Leave
+one on **All colours** — a fabric crop, a packshot, the size guide — and it stays
+in the gallery whichever colour is chosen.
+
+Then in **Variants**, each row's image picker points at the shot to jump to. Use
+**Rebuild matrix** and it wires itself: a new row takes the image tagged with its
+own colour if there is one.
+
+> This is what makes the main photograph change when a shopper taps a swatch.
+> Tag nothing and the gallery behaves exactly as it did before — one set of
+> photographs shown for every colour.
+
+---
+
+## Choose what appears in "You might also like"
+
+**Open the product → Organise → You might also like.**
+
+Add products and order them with the arrows. Order is the whole point of doing
+this by hand — if you did not have a specific first item in mind, one of the
+automatic strategies is a better answer.
+
+> This list is read **only** while **Storefront → Recommendations** is set to
+> Manual. Every other strategy scores the rail itself and ignores what is here.
+> With nothing chosen the rail falls back to best-sellers rather than rendering
+> empty: an empty rail looks broken, a slightly-off one does not.
 
 ---
 

@@ -16,8 +16,10 @@
  * In api mode this file is never touched.
  */
 
+import { isRealDiscount } from './money.js'
+
 const KEY = 'loom.db'
-const VERSION = 7
+const VERSION = 8
 
 const listeners = new Set()
 let cache = null
@@ -118,6 +120,42 @@ function fillMissing(existing, seeded) {
 }
 
 /**
+ * Take the seed's gallery when the stored one has clearly never been touched.
+ *
+ * `fillMissing` leaves arrays alone, which is right almost everywhere — a list
+ * the user has emptied on purpose must stay empty. It is wrong for exactly one
+ * case: the seed gained a photograph per colourway, and a store still holding
+ * the original two untagged images would keep them forever, so picking a colour
+ * would go on changing nothing.
+ *
+ * The test for "never touched" is narrow on purpose — the same two ids the old
+ * seed wrote, in that order, none of them tagged with a colour. Anything else,
+ * including one renamed alt text, is treated as the merchant's and left alone.
+ * Guessing wrong here silently destroys someone's photography, which is a much
+ * worse outcome than a demo that keeps showing one shot.
+ */
+function adoptSeededPhotography(product, seeded) {
+  const stored = product.images || []
+  const pristine =
+    stored.length === 2 &&
+    stored.every((img) => !img.color) &&
+    stored[0]?.id === `${product.slug}-1` &&
+    stored[1]?.id === `${product.slug}-2`
+
+  if (!pristine || !seeded.images?.length) return product
+
+  // Variants follow, but only the ones still pointing at the old single shot.
+  const byColor = new Map(seeded.images.filter((i) => i.color).map((i) => [i.color, i.id]))
+  const variants = (product.variants || []).map((v) =>
+    v.imageId && v.imageId !== `${product.slug}-1`
+      ? v
+      : { ...v, imageId: byColor.get(v.options?.Color) || v.imageId },
+  )
+
+  return { ...product, images: seeded.images, variants }
+}
+
+/**
  * Bring an older store up to the current shape.
  *
  * Seed values fill gaps; anything already present wins, because it is either
@@ -138,7 +176,7 @@ async function backfill(stored) {
     bySlug.delete(seeded.slug)
     // Only fill what is missing, at every depth. A key the user has edited
     // keeps its value even when the seed has since changed it.
-    return fillMissing(existing, seeded)
+    return adoptSeededPhotography(fillMissing(existing, seeded), seeded)
   })
 
   // Anything the user added that the seed does not know about.
@@ -217,7 +255,10 @@ function deriveBadges(product) {
   const variants = product.variants || []
   const live = variants.filter((v) => v.available)
   const out = [...manual]
-  if (product.compareAtPrice?.amount > product.price?.amount) out.push('sale')
+  // A sale badge on a 2% reduction is the same claim the price chip declines to
+  // make, so it uses the same threshold — one of them shouting while the other
+  // stays quiet is worse than either alone.
+  if (isRealDiscount(product.price, product.compareAtPrice)) out.push('sale')
   if (variants.length && live.length === 0) out.push('sold-out')
   else if (live.length && live.length <= 2) out.push('low-stock')
   return [...new Set(out)]
@@ -256,6 +297,7 @@ function normalise(product) {
     details: [],
     care: [],
     categories: [],
+    relatedSlugs: [],
     images: [],
     variants: [],
     options: [],
