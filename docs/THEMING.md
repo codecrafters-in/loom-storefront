@@ -120,9 +120,14 @@ Aspect ratios are fixed per surface so the grid never reflows as images decode:
 
 `npm run images` fetches each one **in the matching orientation** — cropping a
 3:2 banner out of a portrait photograph throws away most of the frame and
-usually decapitates the subject — then crops with `position: 'attention'` and
-grades everything to a common exposure so unrelated photographs read as one
-lookbook.
+usually decapitates the subject — and ranks candidates on how little of the
+frame the crop throws away, so a 4:5 photo wins a 4:5 slot over a 5:4 one. It
+then crops with `position: 'attention'` and grades everything toward a common
+exposure so unrelated photographs read as one lookbook.
+
+The grade is deliberately a nudge, not a rescue: a photograph that is mostly
+dark background asks for a large boost, and the boost lands on the one bright
+thing in the frame, which is usually the model's face.
 
 Replace `public/images/` wholesale when you have real product photography. Keep
 the ratios and nothing else needs to change.

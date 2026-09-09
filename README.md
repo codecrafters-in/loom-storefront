@@ -200,14 +200,33 @@ aggregate rating.
 ## Photography
 
 `npm run images` fetches every image from Unsplash, crops it to the right
-aspect, grades it to a common exposure so twenty-four unrelated photos read as
+aspect, grades it to a common exposure so a hundred unrelated photos read as
 one lookbook, and pins the chosen photo ids in `scripts/images.lock.json` so the
 same commit always builds the same store.
 
+Choosing a photograph is three checks, and each one exists because the
+catalogue used to fail it:
+
+- **No watermarks.** Unsplash+ photos rank first in search and are served with
+  a tiled watermark burnt into the pixels. They are filtered out entirely.
+- **On subject.** Every slot declares the garment it must show, and a candidate
+  whose caption never mentions that garment (or a synonym) is not considered,
+  however well it ranks — which is what stops a belt standing in for a cap.
+- **On colour.** Colourway shots are ranked against the swatch hex by sampling
+  the photograph, because a photo library has no idea what "Moss" is.
+
+Chosen ids are unique across the run, so no two products share a photograph.
+
 ```bash
-npm run images         # fetch anything missing
-npm run images:force   # re-roll everything
+npm run images                                  # fetch anything missing
+npm run images:force                            # re-roll everything
+npm run images -- --only=products/leather-belt  # re-roll one slot
+npm run images -- --candidates=categories/shirts  # what the search offers, as JSON
 ```
+
+To overrule the search for one slot, put `"id": "<photo id>"` in the lockfile
+entry and delete that file from `public/images/`; the next run fetches your
+photo and fills in the credit. `--candidates` is how you find the id.
 
 Credits are written to `public/images/CREDITS.md`. Replace the whole folder with
 real product photography when you have it — the shapes are 4:5 for products and
