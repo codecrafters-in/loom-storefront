@@ -329,6 +329,22 @@ shorter page rather than a set of empty headings.
 
 ## Attributes
 
+### Staleness across tabs
+
+`GET` responses are cached with a short TTL and served stale-while-revalidate.
+Two consequences worth implementing on the real backend too:
+
+- **A background refresh must reach the screen.** The cache announces a
+  revalidation whose result differs from what it served, and `useAsync` re-reads
+  silently. Without it the refresh lands in storage and the page goes on showing
+  what it had — which is how a product reads correctly in one place and wrongly
+  in another.
+- **A change this tab did not make invalidates everything catalogue-shaped.** In
+  mock mode that is a `storage` event from another tab. Against a real API it is
+  whatever you have — a websocket, SSE, a poll. The rule is the same: a local
+  write purges precisely, a foreign one purges broadly, because nothing local
+  can describe it.
+
 ### Order visibility
 
 `GET /orders` requires a session and returns only that customer's orders.

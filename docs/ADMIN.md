@@ -11,6 +11,34 @@ asserted.
 npm run dev   →   http://localhost:5173/admin
 ```
 
+
+## Two tabs open
+
+Keep the admin in one tab and the shop in another — the shop follows along.
+
+The demo backend is localStorage, which is shared between tabs, and the browser
+announces a write to *the other* tabs with a `storage` event. Adopting that data
+was never the hard half; the hard half is that the layers above it do not know
+they have gone stale. So a foreign write does two more things:
+
+- **The read cache is dropped.** A local write knows exactly which namespaces it
+  invalidated and purges those (`PURGES` in `src/lib/api/index.js`). A write
+  from another tab arrives as an opaque blob and nothing here knows what it
+  touched, so the honest response is to assume the catalogue is stale.
+- **Mounted pages are woken.** Emptying a cache only helps the *next* call, and
+  a shop page sitting open makes no next call. Every `useAsync` re-reads
+  silently, so a correction never flashes a skeleton over content someone is
+  reading.
+
+The same applies to the bag, saved items and the session: adding to the bag,
+filling a heart or signing out in one tab reaches the others. Signing out is the
+one worth calling out — a tab still showing an account menu, an order history
+and a saved address for somebody who has left is the disclosure that order
+scoping was fixed to prevent, arriving through a different door.
+
+In `api` mode none of these keys exist, no event ever names them, and every
+subscription is inert. Cart and session are the server's business then.
+
 ## How it relates to the storefront
 
 Both talk to the same `api` surface.

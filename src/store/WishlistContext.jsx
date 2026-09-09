@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../lib/api/index.js'
 import { useToast } from './ToastContext.jsx'
+import { onExternalWrite, STORAGE_KEYS } from '../lib/crossTab.js'
 
 /**
  * Saved items.
@@ -27,6 +28,18 @@ export function WishlistProvider({ children }) {
       alive = false
     }
   }, [])
+
+  // A heart filled in another tab is filled here too.
+  useEffect(
+    () =>
+      onExternalWrite(STORAGE_KEYS.wishlist, () => {
+        api
+          .getWishlist()
+          .then((r) => setSlugs(r.items.map((p) => p.slug)))
+          .catch(() => {})
+      }),
+    [],
+  )
 
   const toggle = useCallback(
     async (slug, title = 'Item') => {

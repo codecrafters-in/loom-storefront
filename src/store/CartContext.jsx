@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../lib/api/index.js'
 import { useToast } from './ToastContext.jsx'
+import { onExternalWrite, STORAGE_KEYS } from '../lib/crossTab.js'
 
 /**
  * Cart state.
@@ -30,6 +31,16 @@ export function CartProvider({ children }) {
       alive = false
     }
   }, [])
+
+  // Adding to the bag in another tab has to show up here, or the header count
+  // and this one disagree until something happens to remount.
+  useEffect(
+    () =>
+      onExternalWrite(STORAGE_KEYS.cart, () => {
+        api.getCart().then(setCart).catch(() => {})
+      }),
+    [],
+  )
 
   const run = useCallback(
     async (work, { successMessage, openDrawer } = {}) => {

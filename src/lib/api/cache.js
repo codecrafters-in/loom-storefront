@@ -158,6 +158,22 @@ export function invalidate(prefix) {
   savePersisted()
 }
 
+/**
+ * Drop cached reads and wake every listener.
+ *
+ * For a change this tab did not make. A local write knows exactly which read
+ * namespaces it invalidated and purges those; a write from another tab arrives
+ * as an opaque blob, so the honest response is to assume everything catalogue-
+ * shaped is stale and let the mounted pages re-read.
+ *
+ * The wake matters as much as the purge: emptying the cache only helps the
+ * *next* call, and a shop page sitting open makes no next call.
+ */
+export function invalidateAndNotify(prefix) {
+  invalidate(prefix)
+  announce(prefix || '*')
+}
+
 export function clearAll() {
   memory.clear()
   inflight.clear()

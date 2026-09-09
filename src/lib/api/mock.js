@@ -21,6 +21,7 @@ import * as mediaStore from '../media.js'
 import { attributes, attributeGroups, assuranceTemplates, featureIcons } from '../../data/attributes.js'
 import { config } from '../config.js'
 import { ApiError } from './contracts.js'
+import { invalidateAndNotify } from './cache.js'
 
 /**
  * The catalogue is read from the demo database, not from a static import.
@@ -42,7 +43,15 @@ function adopt() {
   sizeCharts = db.getSizeCharts()
   storefront = db.getSettings()
 }
-db.subscribe(adopt)
+/**
+ * A write from this tab has already been purged precisely by `PURGES`. One
+ * from another tab has not been purged at all, and cannot be — nothing here
+ * knows what it touched.
+ */
+db.subscribe((_next, origin) => {
+  adopt()
+  if (origin === 'remote') invalidateAndNotify()
+})
 
 const CURRENCY = config.store.currency
 const KEY = {

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../lib/api/index.js'
+import { onExternalWrite, STORAGE_KEYS } from '../lib/crossTab.js'
 
 const AuthContext = createContext(null)
 
@@ -20,6 +21,25 @@ export function AuthProvider({ children }) {
       alive = false
     }
   }, [])
+
+  /**
+   * Signing out in one tab signs out the others.
+   *
+   * The alternative is a tab that still shows an account menu, an order history
+   * and a saved address for somebody who has left — which on a shared computer
+   * is the disclosure the order scoping was fixed to prevent, arriving through
+   * a different door.
+   */
+  useEffect(
+    () =>
+      onExternalWrite(STORAGE_KEYS.session, () => {
+        api
+          .getMe()
+          .then(setCustomer)
+          .catch(() => setCustomer(null))
+      }),
+    [],
+  )
 
   const value = useMemo(
     () => ({

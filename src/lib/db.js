@@ -50,7 +50,15 @@ async function seed() {
   }
 }
 
-function persist(next) {
+/**
+ * `origin` tells a subscriber whether this tab caused the change.
+ *
+ * It matters because the two need different handling. A local write already
+ * knows precisely what it invalidated — `PURGES` in the API layer lists it. A
+ * write that arrived from another tab knows nothing, so the only safe response
+ * is to drop the cached reads and re-read.
+ */
+function persist(next, origin = 'local') {
   cache = next
   try {
     localStorage.setItem(KEY, JSON.stringify(next))
@@ -60,7 +68,7 @@ function persist(next) {
   }
   listeners.forEach((fn) => {
     try {
-      fn(next)
+      fn(next, origin)
     } catch {
       /* a bad subscriber must not break a write */
     }
@@ -211,14 +219,31 @@ export function subscribe(fn) {
   return () => listeners.delete(fn)
 }
 
-// Another tab wrote. Adopt it and tell this tab's listeners, so an admin open
-// beside the shop updates the shop live.
+/**
+ * Another tab wrote. Adopt it, and say that it came from outside.
+ *
+ * Adopting was never the missing half — this listener already existed and the
+ * data did arrive. What did not arrive was any signal that the layers above
+ * were now stale: the API cache went on serving the copy it had, and nothing
+ * told a mounted page to re-read. So an admin tab could save a price and the
+ * shop tab beside it would show the old one until its five-minute TTL lapsed.
+ *
+ * The `'remote'` origin is what lets the adapter respond differently to a
+ * change it did not make.
+ */
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
     if (e.key !== KEY || !e.newValue) return
     try {
-      cache = JSON.parse(e.newValue)
-      listeners.forEach((fn) => fn(cache))
+      const next = JSON.parse(e.newValue)
+      cache = next
+      listeners.forEach((fn) => {
+        try {
+          fn(next, 'remote')
+        } catch {
+          /* one bad subscriber must not stop the others */
+        }
+      })
     } catch {
       /* ignore a partial write from another tab */
     }
