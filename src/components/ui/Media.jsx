@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as media from '../../lib/media.js'
+import { responsive } from '../../lib/images.js'
 
 /**
  * Renders whatever a product stored: a CDN URL, a bundled path, or an uploaded
@@ -8,6 +9,12 @@ import * as media from '../../lib/media.js'
  * A `media:` reference has to be resolved out of IndexedDB, which is async. The
  * synchronous cache covers the overwhelming majority of renders — a grid asks
  * for the same handful of ids — and the effect below is the cold path only.
+ *
+ * Bundled photographs get a `<picture>` with narrower WebP copies; a phone
+ * loading a twelve-card grid pulls 246KB instead of 1.1MB. `sizes` is not
+ * optional there — without it the browser assumes the image fills the viewport
+ * and picks the largest candidate every time, which is the same bytes as
+ * before plus a second request format. Pass one from `SIZES`.
  */
 export default function Media({
   src,
@@ -17,6 +24,7 @@ export default function Media({
   poster,
   controls = false,
   autoPlay = false,
+  sizes,
   ...rest
 }) {
   const [resolved, setResolved] = useState(() => media.resolveSync(src))
@@ -63,5 +71,16 @@ export default function Media({
     )
   }
 
-  return <img src={resolved} alt={alt} className={className} {...rest} />
+  // Only for a source the responsive script actually processed. Uploaded
+  // files, CDN URLs and SVGs fall through to a plain img, which is the right
+  // answer rather than a fallback.
+  const alternates = resolved === src ? responsive(src) : null
+  if (!alternates) return <img src={resolved} alt={alt} className={className} {...rest} />
+
+  return (
+    <picture>
+      <source type={alternates.type} srcSet={alternates.srcSet} sizes={sizes} />
+      <img src={resolved} alt={alt} sizes={sizes} className={className} {...rest} />
+    </picture>
+  )
 }

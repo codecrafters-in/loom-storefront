@@ -67,46 +67,6 @@ function installBrowserGlobals() {
   globalThis.document = { addEventListener() {}, removeEventListener() {}, body: { style: {} } }
 }
 
-/* ── which routes, and what each one needs ─────────────────────────────── */
-
-/** Must match what Shop.jsx asks for on a first, unfiltered load. */
-const PER_PAGE = 12
-const LIST_DEFAULTS = {
-  category: undefined,
-  collection: undefined,
-  sizes: [],
-  colors: [],
-  tags: [],
-  inStock: false,
-  maxPrice: null,
-  sort: 'featured',
-  page: 1,
-  perPage: PER_PAGE,
-}
-
-function plan({ products, categories, collections }) {
-  const listing = (extra) => [['listProducts', [{ ...LIST_DEFAULTS, ...extra }]]]
-  return [
-    { url: '/', reads: [] },
-    { url: '/shop', reads: listing({}) },
-    ...categories.map((slug) => ({ url: `/shop/${slug}`, reads: listing({ category: slug }) })),
-    // The heading and title come from the collection record, not the listing.
-    ...collections.map((slug) => ({
-      url: `/collections/${slug}`,
-      reads: [...listing({ collection: slug }), ['listCollections', []]],
-    })),
-    ...products.map((slug) => ({
-      url: `/product/${slug}`,
-      reads: [
-        ['getProduct', [slug]],
-        ['getRelated', [slug, { limit: 4, strategy: 'automatic' }]],
-        ['getReviews', [slug]],
-      ],
-    })),
-    ...['size-guide', 'shipping', 'care', 'contact'].map((slug) => ({ url: `/pages/${slug}`, reads: [] })),
-  ]
-}
-
 /* ── the run ───────────────────────────────────────────────────────────── */
 
 async function main() {
@@ -123,7 +83,7 @@ async function main() {
     },
   })
 
-  const { render, prime, catalogue } = await import(path.join(SSR_OUT, 'entry-server.js'))
+  const { render, prime, routes: plan } = await import(path.join(SSR_OUT, 'entry-server.js'))
 
   const raw = await fs.readFile(path.join(DIST, 'index.html'), 'utf8')
   if (!raw.includes('<div id="root"></div>')) {
@@ -141,7 +101,7 @@ async function main() {
     .replace(/^\s*<title>[\s\S]*?<\/title>\n?/m, '')
     .replace(/^\s*<meta (?:name|property)="(?:description|og:title|og:description|og:image|og:type|og:site_name|twitter:card|twitter:title|twitter:description|twitter:image)"[^>]*>\n?/gm, '')
 
-  const routes = plan(await catalogue())
+  const routes = await plan()
   let written = 0
   let empty = 0
 

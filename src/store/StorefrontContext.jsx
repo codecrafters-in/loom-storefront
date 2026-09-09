@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import api, { peek } from '../lib/api/index.js'
+import { configureAnalytics } from '../lib/analytics.js'
 import { config } from '../lib/config.js'
 import { storefront as defaults } from '../data/storefront.js'
 
@@ -90,8 +91,15 @@ export function StorefrontProvider({ children }) {
     }
   }, [])
 
+  const cfg = useMemo(() => merge(merge(defaults, fromEnv()), remote), [remote])
+
+  // Settings decide whether anything is sent at all, so this runs before the
+  // first event rather than on the first render that happens to need one.
+  useEffect(() => {
+    configureAnalytics(cfg.analytics || {})
+  }, [cfg])
+
   const value = useMemo(() => {
-    const cfg = merge(merge(defaults, fromEnv()), remote)
     return {
       config: cfg,
       ready,
@@ -103,7 +111,7 @@ export function StorefrontProvider({ children }) {
       collections: boot?.collections || null,
       rails: boot?.rails || null,
     }
-  }, [remote, boot, ready, error])
+  }, [cfg, remote, boot, ready, error])
 
   return <StorefrontContext.Provider value={value}>{children}</StorefrontContext.Provider>
 }

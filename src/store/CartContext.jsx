@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import api from '../lib/api/index.js'
 import { useToast } from './ToastContext.jsx'
 import { onExternalWrite, STORAGE_KEYS } from '../lib/crossTab.js'
+import { addToCart as trackAdd, removeFromCart as trackRemove } from '../lib/analytics.js'
 
 /**
  * Cart state.
@@ -69,10 +70,25 @@ export function CartProvider({ children }) {
       open,
       setOpen,
       count: cart?.lines.reduce((a, l) => a + l.quantity, 0) || 0,
-      add: (variantId, quantity = 1, label = 'Added to your bag') =>
-        run(() => api.addToCart({ variantId, quantity }), { successMessage: label, openDrawer: true }),
+      add: async (variantId, quantity = 1, label = 'Added to your bag') => {
+        const next = await run(() => api.addToCart({ variantId, quantity }), {
+          successMessage: label,
+          openDrawer: true,
+        })
+        // Reported from the resulting cart, which is the only thing that knows
+        // what was actually added — the variant, the price and the quantity.
+        trackAdd(next?.lines?.find((l) => l.variantId === variantId), quantity)
+        return next
+      },
       update: (lineId, quantity) => run(() => api.updateCartLine(lineId, quantity)),
-      remove: (lineId) => run(() => api.removeCartLine(lineId), { successMessage: 'Removed' }),
+      remove: (lineId) => {
+        // Captured before the call, because after it the line is gone.
+        const line = cart?.lines?.find((l) => l.id === lineId)
+        return run(() => api.removeCartLine(lineId), { successMessage: 'Removed' }).then((next) => {
+          trackRemove(line)
+          return next
+        })
+      },
       applyDiscount: (code) => run(() => api.applyDiscount(code), { successMessage: 'Code applied' }),
       clear: () => run(() => api.clearCart()),
       refresh: () => api.getCart().then(setCart),

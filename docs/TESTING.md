@@ -45,6 +45,9 @@ to change the code rather than the wait.
 | `payments` | Overselling, the refund ledger, the write-only credential store |
 | `reference-server` | Signature verification, webhooks and admin auth, over HTTP |
 | `prerender` | What `dist/` actually contains after a build |
+| `analytics` | Consent, Do Not Track, event shapes, and staying silent by default |
+| `images` | Every srcset candidate existing, and being smaller than its source |
+| `error-boundary` | The reset, which is the part that fails silently |
 
 ## Two rules that make it worth having
 
@@ -84,7 +87,10 @@ and confirm it goes red.
 *previous* build and pass while the new one was broken. The pass after the build
 is where those nine run.
 
-**No rendering tests.** Nothing here mounts a component, so a broken layout, an
+**No rendering tests.** The error boundary's two decisions were pulled into
+`src/lib/errors.js` so they could be tested at all — Node cannot import `.jsx`,
+and mounting a component properly means a DOM and a testing library. The logic
+is covered; the markup is not. Nothing here mounts a component, so a broken layout, an
 unreadable contrast pairing or a button that does not respond to a click will
 pass. The logic behind the components is tested; the components are not. Adding
 that means jsdom and a testing library, which is a real cost against three

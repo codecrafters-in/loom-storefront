@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Layout from './components/layout/Layout.jsx'
 import { ToastProvider } from './store/ToastContext.jsx'
 import { CartProvider } from './store/CartContext.jsx'
@@ -8,6 +8,7 @@ import { AuthProvider } from './store/AuthContext.jsx'
 import { StorefrontProvider } from './store/StorefrontContext.jsx'
 import { AdminAuthProvider } from './store/AdminAuthContext.jsx'
 import RequireAdmin from './components/admin/RequireAdmin.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import Home from './pages/Home.jsx'
 import Shop from './pages/Shop.jsx'
 import Product from './pages/Product.jsx'
@@ -44,6 +45,13 @@ const AdminDiscounts = lazy(() => import('./pages/admin/pages2.jsx').then((m) =>
 const AdminDocs = lazy(() => import('./pages/admin/Docs.jsx'))
 const AdminLogin = lazy(() => import('./pages/admin/Login.jsx'))
 
+/** Keyed on the path, because a boundary that never resets breaks every page
+ *  after the first one. */
+function Boundary({ children }) {
+  const { pathname } = useLocation()
+  return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>
+}
+
 const Loading = () => (
   <div className="wrap py-20">
     <Skeleton className="h-96 w-full" />
@@ -58,6 +66,11 @@ export default function App() {
         <AuthProvider>
         <WishlistProvider>
           <CartProvider>
+            {/* Inside the providers, so a failed route keeps the header, the
+                bag and the search — somebody who hits this can carry on
+                shopping, which is the difference between an incident and a
+                bounce. Keyed on the path so navigating away clears it. */}
+            <Boundary>
             <Suspense fallback={<Loading />}>
               <Routes>
                 <Route element={<Layout />}>
@@ -102,6 +115,7 @@ export default function App() {
                 </Route>
               </Routes>
             </Suspense>
+            </Boundary>
           </CartProvider>
         </WishlistProvider>
         </AuthProvider>

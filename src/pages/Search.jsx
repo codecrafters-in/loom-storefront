@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import Seo from '../components/Seo.jsx'
 import api from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
+import { search as trackSearch } from '../lib/analytics.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
 import { Button, Empty, ErrorState } from '../components/ui/index.jsx'
 import { useBootstrap } from '../store/StorefrontContext.jsx'
@@ -17,6 +19,13 @@ export default function Search() {
     [q],
     { skip: !q },
   )
+
+  // Reported once the results are in, so the count is real. Firing on keystroke
+  // would report a dozen searches for one, and every one of them with a total
+  // of zero.
+  useEffect(() => {
+    if (q && !loading && data) trackSearch(q, data.total)
+  }, [q, loading, data])
 
   return (
     <>

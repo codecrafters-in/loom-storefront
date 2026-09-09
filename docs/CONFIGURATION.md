@@ -321,6 +321,35 @@ Three modes. Full guide with provider examples: **[CHECKOUT.md](CHECKOUT.md)**.
 
 `createUrl` may be a full URL or a path on your API. `:cartId` is substituted.
 
+### `analytics`
+
+```json
+{ "analytics": { "enabled": false, "respectDoNotTrack": true, "debug": false } }
+```
+
+Events are pushed to `window.dataLayer` in GA4's ecommerce vocabulary —
+`view_item`, `add_to_cart`, `begin_checkout`, `purchase`, `search`,
+`add_to_wishlist`, `app_error`. A tag manager reads that array natively and
+anything else can be pointed at it.
+
+**No vendor script ships with the theme**, and that is the point. A store
+already has GTM, or Plausible, or a self-hosted Umami; a theme that bundles a
+competing one is something to rip out rather than something to configure.
+
+The names follow GA4 rather than being invented, because a store's analytics
+people already have reports built on them — calling it `product_viewed` means
+rewriting every one.
+
+| Key | Does |
+| --- | --- |
+| `enabled` | Off by default, so a theme cloned for a demo does not start collecting |
+| `respectDoNotTrack` | Honours the header. One line, and it is what the header is for |
+| `debug` | Logs every event to the console without sending it. For wiring things up |
+
+Consent, if you gather it, goes through `setConsent(false)` until you have it.
+Nobody having been asked is treated as allowed — a shop with no banner should
+not silently record nothing.
+
 ### `notifications`
 
 ```json

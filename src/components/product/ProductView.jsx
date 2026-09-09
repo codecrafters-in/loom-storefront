@@ -4,6 +4,7 @@ import {
   Badge, Button, Icon, Price, QuantityStepper, Rating,
 } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
+import { SIZES } from '../../lib/images.js'
 import { formatMoney } from '../../lib/money.js'
 import { useCart } from '../../store/CartContext.jsx'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
@@ -307,7 +308,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                         i === shot ? 'ring-ink' : 'ring-line hover:ring-muted'
                       }`}
                     >
-                      <Media src={img.url} type={img.type} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      <Media src={img.url} type={img.type} alt="" loading="lazy" sizes={SIZES.thumb} className="h-full w-full object-cover" />
                     </button>
                   </li>
                 ))}
@@ -364,6 +365,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                   controls={gallery[shot]?.type === 'video'}
                   fetchPriority="high"
                   decoding="async"
+                  sizes={SIZES.hero}
                   className="h-full w-full object-cover"
                   style={{ objectPosition: '50% 38%' }}
                 />
@@ -631,7 +633,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
         <div className="wrap wrap-tight flex items-center gap-3 py-3">
           <div className="hidden w-12 shrink-0 sm:block">
             <div className="shot rounded-xs">
-              <Media src={product.images[shot]?.url} type={product.images[shot]?.type} alt="" loading="lazy" className="h-full w-full object-cover" />
+              <Media src={product.images[shot]?.url} type={product.images[shot]?.type} alt="" loading="lazy" sizes={SIZES.thumb} className="h-full w-full object-cover" />
             </div>
           </div>
           {/*

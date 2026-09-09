@@ -74,6 +74,44 @@ describe('prerendered output', { skip: built ? false : 'run `npm run build` firs
     assert.match(html, /schema\.org\/(In|Out)OfStock|schema\.org\/InStock/, 'availability is not derived')
   })
 
+  test('a listing page actually lists products', () => {
+    /**
+     * The failure this catches is silent: the prerenderer seeds a cache key the
+     * page does not ask for, the page renders its empty state, and the HTML
+     * looks the right size because the header and footer are in it. It happened
+     * because the build script kept its own copy of the listing query and drifted
+     * by one `null`.
+     */
+    for (const file of ['shop.html', 'shop/shirts.html', 'shop/knitwear.html', 'collections/new-season.html']) {
+      const html = read(file)
+      const links = new Set(html.match(/href="\/product\/[a-z0-9-]+"/g) || [])
+      assert.ok(links.size >= 3, `${file} prerendered ${links.size} products`)
+    }
+  })
+
+  test('images ship narrower copies with a sizes hint', () => {
+    // `srcset` without `sizes` does nothing: the browser assumes the image
+    // fills the viewport and picks the largest candidate every time.
+    for (const file of ['shop.html', 'product/oxford-shirt-ecru.html']) {
+      const html = read(file)
+      assert.ok(html.includes('<picture>'), `${file} has no responsive images`)
+      assert.match(html, /\.webp \d+w/, `${file} has no webp candidates`)
+      assert.match(html, /<source[^>]*sizes="/, `${file} has srcset without sizes`)
+    }
+  })
+
+  test('every srcset candidate exists on disk', () => {
+    // A candidate that 404s is worse than no srcset: the browser picks it and
+    // shows a broken image where the product was.
+    const missing = new Set()
+    for (const file of pages()) {
+      for (const [, url] of read(file).matchAll(/(\/images\/[^\s"]+?\.webp) \d+w/g)) {
+        if (!fs.existsSync(path.join(DIST, url.replace(/^\//, '')))) missing.add(url)
+      }
+    }
+    assert.deepEqual([...missing], [])
+  })
+
   test('titles are per route, not shared', () => {
     const titles = ['index.html', 'shop.html', 'shop/shirts.html', 'product/oxford-shirt-ecru.html',
       'collections/new-season.html', 'pages/care.html']

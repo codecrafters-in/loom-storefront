@@ -252,6 +252,23 @@ export const storefront = {
   },
 
   /**
+   * Analytics.
+   *
+   * Off by default, and no vendor script ships with the theme. Events are
+   * pushed to `window.dataLayer` in GA4's ecommerce vocabulary, which a tag
+   * manager reads natively and anything else can be pointed at — a store
+   * already has its own tooling, and a theme that bundles a competing one is
+   * something to rip out rather than something to configure.
+   */
+  analytics: {
+    enabled: false,
+    /** Honour the Do Not Track header. One line, and it is what it is for. */
+    respectDoNotTrack: true,
+    /** Log every event to the console without sending it. For wiring things up. */
+    debug: false,
+  },
+
+  /**
    * Transactional email.
    *
    * A store that takes money and sends nothing is broken, so this is not an

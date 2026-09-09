@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge, Icon, Price } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
+import { SIZES } from '../../lib/images.js'
 import { useWishlist } from '../../store/WishlistContext.jsx'
 
 /**
@@ -40,6 +41,7 @@ export default function ProductCard({ product, priority = false, className = '' 
       <Link to={`/product/${product.slug}`} className="block">
         <div className="shot relative rounded-xs">
           <Media
+            sizes={SIZES.card}
             src={product.images[0]?.url}
             type={product.images[0]?.type}
             alt={product.images[0]?.alt || product.title}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useCart } from '../../store/CartContext.jsx'
 import { Button, Icon, QuantityStepper, Empty } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
+import { SIZES } from '../../lib/images.js'
 import { formatMoney } from '../../lib/money.js'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import api from '../../lib/api/index.js'
@@ -89,7 +90,7 @@ export default function CartDrawer() {
                 <li key={line.id} className="flex gap-3.5 py-4">
                   <Link to={`/product/${line.productSlug}`} onClick={() => setOpen(false)} className="w-16 shrink-0">
                     <div className="shot rounded-xs">
-                      <Media src={line.image?.url} type={line.image?.type} alt={line.image?.alt || line.title} loading="lazy" className="h-full w-full object-cover" />
+                      <Media sizes={SIZES.thumb} src={line.image?.url} type={line.image?.type} alt={line.image?.alt || line.title} loading="lazy" className="h-full w-full object-cover" />
                     </div>
                   </Link>
                   <div className="min-w-0 flex-1">

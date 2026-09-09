@@ -265,3 +265,45 @@ Nine tests in `test/prerender.test.mjs` assert the output rather than the code,
 because every way this fails is invisible in the source: a duplicate title, a
 skeleton where a product should be, a missing hydration payload. They skip when
 `dist/` is absent, so the build removes it first and they run on the pass after.
+
+
+## Responsive images
+
+`npm run responsive` writes two narrower WebP copies of every bundled
+photograph, and `Media` emits a `<picture>` for anything the manifest lists.
+
+| | before | after |
+| --- | --- | --- |
+| A phone loading a 12-card grid | 1143KB | **246KB** |
+| A desktop product hero | 95KB | 76KB |
+
+Two widths, not five. 400 covers a phone at 2× and a card in a desktop grid;
+900 is the source width, and as WebP it is smaller than the JPEG it replaces,
+so it earns its place for everyone rather than only for small screens. More
+breakpoints past that trade real repository weight for a saving nobody sees.
+
+**`sizes` is not optional.** Without it the browser assumes the image fills the
+viewport and picks the largest candidate every time — the same bytes as before,
+plus a second format to decode. `SIZES` in `src/lib/images.js` holds the four
+that match this layout, measured against the real grid.
+
+**Driven by a manifest, not by filenames.** A `srcset` candidate that 404s is
+worse than none: the browser picks it, gets nothing, and shows a broken image
+where the product was. Only sources the script actually processed are listed,
+so uploaded files, CDN URLs and SVGs fall through to a plain `<img>`.
+
+The derivatives are committed. A theme that only looks right after somebody
+remembers to run a script is a theme that will be seen looking wrong.
+
+## When a render throws
+
+`ErrorBoundary` sits **inside** the layout, so a failure in one route leaves the
+header, the bag and the search intact — somebody who hits it can keep shopping,
+which is the difference between an incident and a bounce. Without one, React
+unmounts the whole tree and leaves a white page: on a product page that is a
+lost sale with no trace of why.
+
+It is keyed on the pathname, because a boundary that never resets stays broken
+for the rest of the session and makes every subsequent page look broken too.
+The message says what to do; the stack goes to the console and an `app_error`
+event goes to analytics.

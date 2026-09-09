@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Seo from '../components/Seo.jsx'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { startCheckout } from '../lib/checkout.js'
+import { beginCheckout, purchase } from '../lib/analytics.js'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import Media from '../components/ui/Media.jsx'
+import { SIZES } from '../lib/images.js'
 import { useCart } from '../store/CartContext.jsx'
 import { useAuth } from '../store/AuthContext.jsx'
 import { Button, Empty, Icon } from '../components/ui/index.jsx'
@@ -43,6 +45,14 @@ export default function Checkout() {
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
+  // Above the early returns: a hook after one runs in a different order on the
+  // render where it fires. Once per arrival at the form, not per render — the funnel step is reaching
+  // checkout, and reporting it four times makes the drop-off look invented.
+  useEffect(() => {
+    if (cart?.lines?.length) beginCheckout(cart)
+  }, [cart?.lines?.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+
   // Guest checkout is the default. A store that requires an account sends the
   // shopper to sign in and back, rather than failing at submit.
   if (config.checkout?.requireAccount && !customer) {
@@ -79,6 +89,7 @@ export default function Checkout() {
         return
       }
       await refresh()
+      purchase(result.order)
       navigate(`/order/${result.order.id}`, { state: { order: result.order } })
     } catch (err) {
       setError(err)
@@ -190,7 +201,7 @@ export default function Checkout() {
               <li key={l.id} className="flex gap-3.5">
                 <div className="relative w-14 shrink-0">
                   <div className="shot rounded-xs">
-                    <Media src={l.image?.url} type={l.image?.type} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    <Media sizes={SIZES.thumb} src={l.image?.url} type={l.image?.type} alt="" loading="lazy" className="h-full w-full object-cover" />
                   </div>
                   <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1 font-mono text-[10px] text-page tabular-nums">
                     {l.quantity}

@@ -20,6 +20,26 @@ const SORTS = [
 const PER_PAGE = 12
 
 /**
+ * The query this page makes with no filters applied.
+ *
+ * Exported so the prerenderer can seed the exact same cache key. Writing it out
+ * a second time in the build script is how a `maxPrice: null` crept in against
+ * this page's `undefined` — different key, no match, and every category page
+ * silently prerendered an empty grid while looking fine locally.
+ */
+export const listingQuery = (extra = {}) => ({
+  sizes: [],
+  colors: [],
+  tags: [],
+  inStock: false,
+  maxPrice: undefined,
+  sort: 'featured',
+  page: 1,
+  perPage: PER_PAGE,
+  ...extra,
+})
+
+/**
  * Filter state lives in the URL, not in React.
  *
  * That is what makes a filtered grid shareable, bookmarkable and survivable

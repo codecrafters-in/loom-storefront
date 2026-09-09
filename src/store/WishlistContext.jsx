@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import api from '../lib/api/index.js'
 import { useToast } from './ToastContext.jsx'
 import { onExternalWrite, STORAGE_KEYS } from '../lib/crossTab.js'
+import { track } from '../lib/analytics.js'
 
 /**
  * Saved items.
@@ -48,6 +49,10 @@ export function WishlistProvider({ children }) {
       try {
         if (saved) await api.removeFromWishlist(slug)
         else await api.addToWishlist(slug)
+        // Only the saving direction is an event. GA4 has no counterpart for
+        // un-saving, and inventing one gives an analyst a metric nothing else
+        // in their reports can be compared against.
+        if (!saved) track('add_to_wishlist', { items: [{ item_id: slug, item_name: title }] })
         push(saved ? `${title} removed from saved` : `${title} saved`)
       } catch (err) {
         setSlugs((s) => (saved ? [slug, ...s] : s.filter((x) => x !== slug))) // roll back

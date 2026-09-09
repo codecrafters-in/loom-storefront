@@ -4,6 +4,7 @@ import useAsync from '../hooks/useAsync.js'
 import { Button, Empty, ErrorState, Icon, Skeleton } from '../components/ui/index.jsx'
 import Promises from '../components/layout/Promises.jsx'
 import Media from '../components/ui/Media.jsx'
+import { SIZES } from '../lib/images.js'
 import { formatMoney } from '../lib/money.js'
 
 export default function OrderConfirmation() {
@@ -46,7 +47,7 @@ export default function OrderConfirmation() {
             {order.lines.map((l) => (
               <li key={l.id} className="flex gap-4 py-5">
                 <div className="w-16 shrink-0">
-                  <div className="shot rounded-xs"><Media src={l.image?.url} type={l.image?.type} alt="" loading="lazy" className="h-full w-full object-cover" /></div>
+                  <div className="shot rounded-xs"><Media sizes={SIZES.thumb} src={l.image?.url} type={l.image?.type} alt="" loading="lazy" className="h-full w-full object-cover" /></div>
                 </div>
                 <div className="min-w-0 flex-1">
                   <Link to={`/product/${l.productSlug}`} className="text-[14px] font-medium">{l.title}</Link>

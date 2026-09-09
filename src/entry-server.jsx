@@ -4,6 +4,7 @@ import App from './App.jsx'
 import api, { peek } from './lib/api/index.js'
 import { keyOf } from './lib/api/cache.js'
 import { startCollecting, stopCollecting, renderHead } from './lib/head.js'
+import { listingQuery } from './pages/Shop.jsx'
 
 /**
  * One route, rendered to HTML at build time.
@@ -30,18 +31,42 @@ export async function prime(reads = []) {
   return payload
 }
 
-/** What there is to prerender. Read here so the build script owns no data. */
-export async function catalogue() {
+/**
+ * Which routes to prerender, and what each one has to read first.
+ *
+ * Here rather than in the build script, so the listing query comes from the
+ * page that makes it. A second copy in the script is what produced a
+ * `maxPrice: null` against the page's `undefined` — a different cache key, no
+ * match, and a silently empty grid on every category page.
+ */
+export async function routes() {
   const [products, categories, collections] = await Promise.all([
     api.listProducts({ perPage: 500 }),
     api.listCategories(),
     api.listCollections(),
   ])
-  return {
-    products: products.items.map((p) => p.slug),
-    categories: categories.items.flatMap((c) => [c.slug, ...(c.children || []).map((x) => x.slug)]),
-    collections: collections.items.map((c) => c.slug),
-  }
+  const flatCategories = categories.items.flatMap((c) => [c, ...(c.children || [])])
+  const listing = (extra) => [['listProducts', [listingQuery(extra)]]]
+
+  return [
+    { url: '/', reads: [] },
+    { url: '/shop', reads: listing({}) },
+    ...flatCategories.map((c) => ({ url: `/shop/${c.slug}`, reads: listing({ category: c.slug }) })),
+    // The heading and title come from the collection record, not the listing.
+    ...collections.items.map((c) => ({
+      url: `/collections/${c.slug}`,
+      reads: [...listing({ collection: c.slug }), ['listCollections', []]],
+    })),
+    ...products.items.map((p) => ({
+      url: `/product/${p.slug}`,
+      reads: [
+        ['getProduct', [p.slug]],
+        ['getRelated', [p.slug, { limit: 4, strategy: 'automatic' }]],
+        ['getReviews', [p.slug]],
+      ],
+    })),
+    ...['size-guide', 'shipping', 'care', 'contact'].map((slug) => ({ url: `/pages/${slug}`, reads: [] })),
+  ]
 }
 
 /**

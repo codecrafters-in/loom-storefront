@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import api, { peek } from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
@@ -7,6 +8,7 @@ import { Breadcrumbs, Button, Empty, ErrorState, Icon, Rating, Skeleton } from '
 import Seo from '../components/Seo.jsx'
 import ProductView from '../components/product/ProductView.jsx'
 import { useStorefront } from '../store/StorefrontContext.jsx'
+import { viewItem } from '../lib/analytics.js'
 
 export default function Product() {
   const { slug } = useParams()
@@ -26,6 +28,12 @@ export default function Product() {
   const reviews = useAsync(() => api.getReviews(slug), [slug], {
     skip: config.features?.reviews === false,
   })
+
+  // Keyed on the slug, so navigating between products reports each one — and
+  // not on every render, which would report the same view a dozen times.
+  useEffect(() => {
+    if (product) viewItem(product)
+  }, [product?.slug]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <ProductSkeleton />
   if (error) {
