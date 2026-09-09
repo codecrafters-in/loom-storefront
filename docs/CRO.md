@@ -285,7 +285,36 @@ Video opens in the viewer but never zooms, and its frame is a plain box rather
 than a button: a `<video controls>` inside a `<button>` is invalid markup and a
 scrub bar that cannot be scrubbed.
 
-### 16. Fit warnings in the grid — `ProductCard`
+### 16. The cart drawer's vertical budget
+
+Everything in the drawer competes with the one thing it is for: seeing what is
+in the bag. Measured against the classes actually in the file, the header, the
+suggestion rail and the totals came to **548px of fixed chrome** — on a 667px
+phone that leaves 119px, which is *less than one line item*. A two-item bag
+where the second item is a rumour.
+
+| Block | Was | Now |
+| --- | --- | --- |
+| Header | 60 | 54 |
+| Free-shipping strip | 42 | 36 |
+| Suggestions | 214 | 114 |
+| Totals and buttons | 232 | 206 |
+| One line item | 140 | 112 |
+
+**The suggestion rail was the whole problem.** Three 4:5 cards with a name and a
+price under each is a third of a phone screen given to things the shopper has
+not chosen, directly above the total they came to check. Laid on their side —
+40px thumbnail, name and price beside it, scrolling horizontally — the same
+three cost about 90px and are no harder to read, because a small thumbnail is
+plenty to recognise something you were looking at a minute ago.
+
+Chrome drops to 410px, so a 667px screen shows two items instead of none.
+
+The lesson generalises: in a drawer, *rails are the expensive thing*. A card
+grid is the right shape on a page with a screen to spare and the wrong one in a
+panel where every block pushes the checkout button further away.
+
+### 17. Fit warnings in the grid — `ProductCard`
 
 "Runs small" appears on the card, not just the product page. Someone comparing
 eight products decides which two to open from the grid, and that is the fact
