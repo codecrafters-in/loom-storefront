@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch cancels the first. Nobody needs the results
+# of a commit that has already been replaced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` rather than `npm install`: it installs exactly the lockfile and
+      # fails if package.json and the lock disagree, which is the difference
+      # between a build that reproduces and one that happens to work today.
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # `npm run build` already runs check-docs and the unit tests before
+      # building, so this one command covers most of the gate. It also fails on
+      # a prerendered route that renders nothing or ships without a title.
+      - name: Build
+        run: npm run build
+
+      # The prerender tests assert what `dist/` actually contains, so they can
+      # only run once it exists — during the build they skip themselves. This
+      # second pass is where they run.
+      - name: Test the built output
+        run: npm test
+
+      - name: Reference server
+        working-directory: examples/server
+        run: |
+          npm install --no-audit --no-fund
+          node --check server.mjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dist
+          path: dist
+          retention-days: 7

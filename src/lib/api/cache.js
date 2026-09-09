@@ -66,6 +66,39 @@ export const TTL = {
   none: 0,
 }
 
+/**
+ * Entries the prerenderer already resolved, inlined into the page.
+ *
+ * Without this the server renders a product and the browser's first render —
+ * with an empty cache — renders a skeleton, and React reports a hydration
+ * mismatch and throws the server's markup away. The whole point of prerendering
+ * is lost at the last step.
+ *
+ * Reading it here, before anything else runs, means the first client render
+ * produces exactly what the server produced.
+ */
+try {
+  if (typeof window !== 'undefined' && window.__LOOM_CACHE__) {
+    for (const [key, value] of Object.entries(window.__LOOM_CACHE__)) {
+      memory.set(key, { value, at: Date.now(), ttl: TTL.catalog })
+    }
+  }
+} catch {
+  /* a malformed payload must not stop the shop loading */
+}
+
+/**
+ * What is in the cache right now, or `undefined`.
+ *
+ * Synchronous on purpose: a component that renders during SSR cannot await
+ * anything, and a component hydrating must not flash a skeleton over data it
+ * already has.
+ */
+export function peek(key) {
+  const entry = readEntry(key)
+  return entry ? entry.value : undefined
+}
+
 let persisted = null
 function loadPersisted() {
   if (persisted) return persisted

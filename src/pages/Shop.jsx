@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import api from '../lib/api/index.js'
+import api, { peek } from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
 import FilterPanel from '../components/shop/FilterPanel.jsx'
@@ -93,9 +93,31 @@ export default function Shop({ mode = 'category' }) {
         perPage: PER_PAGE,
       }),
     [category, collection, JSON.stringify(filters)],
+    // Seeded by the prerenderer for the default, unfiltered view — the one a
+    // crawler and a first-time visitor both land on. Any filter is a cache miss
+    // and fetches as before.
+    {
+      initial: peek.listProducts({
+        category,
+        collection,
+        sizes: filters.sizes,
+        colors: filters.colors,
+        tags: filters.tags,
+        inStock: filters.inStock,
+        maxPrice: filters.maxPrice,
+        sort: filters.sort,
+        page: filters.page,
+        perPage: PER_PAGE,
+      }),
+    },
   )
 
-  const collectionMeta = useAsync(() => api.listCollections(), [], { skip: mode !== 'collection' })
+  const collectionMeta = useAsync(() => api.listCollections(), [], {
+    skip: mode !== 'collection',
+    // The heading and the page title come from this record, so without it a
+    // prerendered collection page ships titled "All products".
+    initial: peek.listCollections(),
+  })
   const col = collectionMeta.data?.items.find((c) => c.slug === collection)
 
   useEffect(() => {

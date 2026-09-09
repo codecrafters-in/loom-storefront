@@ -11,6 +11,10 @@ import RequireAdmin from './components/admin/RequireAdmin.jsx'
 import Home from './pages/Home.jsx'
 import Shop from './pages/Shop.jsx'
 import Product from './pages/Product.jsx'
+// Eager, because it is prerendered and in the sitemap: a lazy component renders
+// its Suspense fallback during a server render, so an indexed route that is
+// code-split ships a skeleton to the crawler.
+import StaticPage from './pages/StaticPage.jsx'
 import { Skeleton } from './components/ui/index.jsx'
 
 // Split the routes a browsing visitor never reaches. Checkout and account are
@@ -23,7 +27,6 @@ const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation.jsx'))
 const Account = lazy(() => import('./pages/Account.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Search = lazy(() => import('./pages/Search.jsx'))
-const StaticPage = lazy(() => import('./pages/StaticPage.jsx'))
 const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 
 // The admin panel is a separate chunk. A shopper never downloads it.

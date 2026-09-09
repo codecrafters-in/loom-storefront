@@ -42,6 +42,9 @@ to change the code rather than the wait.
 | `library` | Attributes learned from products, blocks saved explicitly, kinds validated |
 | `adapters` | Both adapters implementing the same surface, read from source |
 | `ui-logic` | The specification editor, delivery tokens, lightbox zoom and pan |
+| `payments` | Overselling, the refund ledger, the write-only credential store |
+| `reference-server` | Signature verification, webhooks and admin auth, over HTTP |
+| `prerender` | What `dist/` actually contains after a build |
 
 ## Two rules that make it worth having
 
@@ -76,6 +79,11 @@ and confirm it goes red.
 
 ## What is not covered
 
+**`prerender` asserts output, not code.** It skips when `dist/` is missing, so
+`npm run build` removes it first — otherwise the pre-build run would assert the
+*previous* build and pass while the new one was broken. The pass after the build
+is where those nine run.
+
 **No rendering tests.** Nothing here mounts a component, so a broken layout, an
 unreadable contrast pairing or a button that does not respond to a click will
 pass. The logic behind the components is tested; the components are not. Adding
@@ -84,5 +92,6 @@ runtime dependencies — worth paying when the first layout regression ships, an
 not before.
 
 **No integration test against a real backend.** `http.js` is checked for shape,
-never for behaviour. Until it has been run against a server, "works with your
-API" is a design rather than a fact.
+never for behaviour. The reference payments server *is* run for real, but
+against forged signatures rather than Razorpay's — the crypto is verified, the
+provider round trip is not.

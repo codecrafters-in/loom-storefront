@@ -18,7 +18,10 @@ import { onRevalidated } from '../lib/api/cache.js'
 export default function useAsync(fn, deps = [], { skip = false, initial = null } = {}) {
   const [data, setData] = useState(initial)
   const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(!skip)
+  // Data in hand is not a loading state. This is what lets a prerendered page
+  // hydrate into the same markup the server sent instead of flashing a skeleton
+  // over it — and it removes the flash on any warm cache hit too.
+  const [loading, setLoading] = useState(!skip && initial === null)
   const gen = useRef(0)
 
   // eslint-disable-next-line react-hooks/exhaustive-deps

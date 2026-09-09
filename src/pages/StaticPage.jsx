@@ -1,6 +1,7 @@
 import { useParams, Navigate } from 'react-router-dom'
 import Promises from '../components/layout/Promises.jsx'
 import { Breadcrumbs } from '../components/ui/index.jsx'
+import Seo from '../components/Seo.jsx'
 
 /**
  * The pages a storefront needs before it can take a real order. Content is a
@@ -68,6 +69,9 @@ export default function StaticPage() {
 
   return (
     <>
+      {/* These four are in the sitemap. Without this they shared the site
+          default, which is the thing per-route titles exist to prevent. */}
+      <Seo title={page.title} description={page.intro} path={`/pages/${slug}`} />
       <div className="wrap max-w-3xl py-10 pb-20">
         <Breadcrumbs trail={[{ label: 'Home', to: '/' }, { label: page.title }]} />
         <h1 className="mt-6 text-display-lg">{page.title}</h1>

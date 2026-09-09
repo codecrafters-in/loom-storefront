@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom'
-import api from '../lib/api/index.js'
+import api, { peek } from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
 import Promises from '../components/layout/Promises.jsx'
@@ -10,7 +10,12 @@ import { useStorefront } from '../store/StorefrontContext.jsx'
 
 export default function Product() {
   const { slug } = useParams()
-  const { data: product, error, loading, reload } = useAsync(() => api.getProduct(slug), [slug])
+  // `initial` is what the prerenderer put in the page. Without it the first
+  // client render paints a skeleton over markup the server already sent, and
+  // React discards the whole prerendered tree as a mismatch.
+  const { data: product, error, loading, reload } = useAsync(() => api.getProduct(slug), [slug], {
+    initial: peek.getProduct(slug),
+  })
   const config = useStorefront()
   const recs = config.recommendations || {}
   const related = useAsync(

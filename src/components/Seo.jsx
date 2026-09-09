@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import { toMajor } from '../lib/money.js'
+import { applyHead, collecting, record } from '../lib/head.js'
 
 /**
  * Per-route title, description, canonical, Open Graph and structured data.
@@ -10,11 +11,14 @@ import { toMajor } from '../lib/money.js'
  * fifty-four URLs in the sitemap shares one title — which is the first thing a
  * merchant's marketer raises and the last thing anyone notices while building.
  *
- * Set at runtime rather than prerendered. Google executes JavaScript and reads
- * what ends up in the DOM; other crawlers and every link-preview scraper do not,
- * so a store that depends on search should prerender or server-render these
- * routes. That trade is stated in docs/PERFORMANCE.md rather than left as a
- * surprise.
+ * The head is built as *data* and then either applied to a real document or
+ * handed to the prerenderer. Google executes JavaScript and would eventually
+ * read tags set in an effect; no other crawler and no link-preview scraper
+ * does, which is why `npm run build` writes these into the HTML.
+ *
+ * Recording during render rather than in an effect is deliberate and is the
+ * only way this can work: effects do not run during a server render, so a head
+ * assembled in one is a head the prerenderer never sees.
  *
  * `product` triggers Product schema, which is what puts a price and a rating in
  * a search result. It is the highest-value markup a shop can emit and costs one
@@ -24,78 +28,62 @@ export default function Seo({ title, description, image, type = 'website', produ
   const config = useStorefront()
   const { pathname } = useLocation()
 
-  useEffect(() => {
-    const storeName = config.store?.name || 'LOOM'
-    const full = title ? `${title} — ${storeName}` : `${storeName} — ${config.store?.tagline || ''}`.trim()
-    const desc = description || config.store?.description || ''
-    const url = typeof window !== 'undefined' ? `${window.location.origin}${pathname}` : pathname
-    const img = image || '/og.jpg'
+  const tags = useMemo(
+    () => buildHead({ title, description, image, type, product, noindex, pathname, config }),
+    [title, description, image, type, product, noindex, pathname, config],
+  )
 
-    document.title = full
+  // During a server render there is no document and no effect. Collect instead.
+  if (collecting()) record(tags)
 
-    meta('name', 'description', desc)
-    meta('name', 'robots', noindex ? 'noindex, nofollow' : 'index, follow')
-    link('canonical', url)
-
-    meta('property', 'og:title', full)
-    meta('property', 'og:description', desc)
-    meta('property', 'og:url', url)
-    meta('property', 'og:type', type)
-    meta('property', 'og:image', absolute(img))
-    meta('property', 'og:site_name', storeName)
-    meta('name', 'twitter:card', 'summary_large_image')
-    meta('name', 'twitter:title', full)
-    meta('name', 'twitter:description', desc)
-    meta('name', 'twitter:image', absolute(img))
-
-    jsonLd(product ? productSchema(product, url, config) : null)
-  }, [title, description, image, type, product, noindex, pathname, config])
+  useEffect(() => applyHead(tags), [tags])
 
   return null
 }
 
-function absolute(url) {
+/**
+ * The head for one route, as a list of tags.
+ *
+ * Pure, so the prerenderer can call it in Node and the browser can apply the
+ * identical result. `origin` is passed in rather than read from `window`,
+ * because at build time there is no window and a relative Open Graph image is
+ * ignored by every scraper that reads it.
+ */
+export function buildHead({ title, description, image, type = 'website', product, noindex = false, pathname, config, origin }) {
+  const storeName = config?.store?.name || 'LOOM'
+  const base = origin || (typeof window !== 'undefined' ? window.location.origin : '')
+  const full = title ? `${title} — ${storeName}` : `${storeName} — ${config?.store?.tagline || ''}`.trim()
+  const desc = description || config?.store?.description || ''
+  const url = `${base}${pathname}`
+  const img = absolute(image || '/og.jpg', base)
+
+  return [
+    { kind: 'title', text: full },
+    { kind: 'meta', attr: 'name', key: 'description', content: desc },
+    { kind: 'meta', attr: 'name', key: 'robots', content: noindex ? 'noindex, nofollow' : 'index, follow' },
+    { kind: 'link', rel: 'canonical', href: url },
+    { kind: 'meta', attr: 'property', key: 'og:title', content: full },
+    { kind: 'meta', attr: 'property', key: 'og:description', content: desc },
+    { kind: 'meta', attr: 'property', key: 'og:url', content: url },
+    { kind: 'meta', attr: 'property', key: 'og:type', content: type },
+    { kind: 'meta', attr: 'property', key: 'og:image', content: img },
+    { kind: 'meta', attr: 'property', key: 'og:site_name', content: storeName },
+    { kind: 'meta', attr: 'name', key: 'twitter:card', content: 'summary_large_image' },
+    { kind: 'meta', attr: 'name', key: 'twitter:title', content: full },
+    { kind: 'meta', attr: 'name', key: 'twitter:description', content: desc },
+    { kind: 'meta', attr: 'name', key: 'twitter:image', content: img },
+    { kind: 'jsonld', data: product ? productSchema(product, url, config) : null },
+  ]
+}
+
+function absolute(url, base = '') {
   if (!url || /^https?:\/\//.test(url)) return url
-  return typeof window !== 'undefined' ? `${window.location.origin}${url}` : url
+  return `${base}${url}`
 }
 
-function meta(attr, key, content) {
-  if (typeof document === 'undefined') return
-  let el = document.head.querySelector(`meta[${attr}="${key}"]`)
-  if (!el) {
-    el = document.createElement('meta')
-    el.setAttribute(attr, key)
-    document.head.appendChild(el)
-  }
-  el.setAttribute('content', content || '')
-}
 
-function link(rel, href) {
-  if (typeof document === 'undefined') return
-  let el = document.head.querySelector(`link[rel="${rel}"]`)
-  if (!el) {
-    el = document.createElement('link')
-    el.setAttribute('rel', rel)
-    document.head.appendChild(el)
-  }
-  el.setAttribute('href', href)
-}
 
-const LD_ID = 'seo-jsonld'
 
-function jsonLd(data) {
-  if (typeof document === 'undefined') return
-  const existing = document.getElementById(LD_ID)
-  if (!data) {
-    existing?.remove()
-    return
-  }
-  const el = existing || document.createElement('script')
-  el.id = LD_ID
-  el.type = 'application/ld+json'
-  el.textContent = JSON.stringify(data)
-  if (!existing) document.head.appendChild(el)
-}
 
 /**
  * schema.org Product.

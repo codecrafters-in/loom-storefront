@@ -12,7 +12,7 @@
 import { config, assertConfig, isMock } from '../config.js'
 import * as mock from './mock.js'
 import * as http from './http.js'
-import { cached, dedupe, invalidate, keyOf, TTL } from './cache.js'
+import { cached, dedupe, invalidate, keyOf, peek as peekKey, TTL } from './cache.js'
 
 assertConfig()
 
@@ -113,6 +113,21 @@ function wrap(name, fn) {
 }
 
 export const api = Object.fromEntries(SURFACE.map((name) => [name, wrap(name, adapter[name])]))
+
+/**
+ * The same calls, read from the cache without a request.
+ *
+ * `peek.getProduct(slug)` returns what a `getProduct(slug)` would have, if it
+ * is already there, and `undefined` otherwise. Two things need it: a server
+ * render, which cannot await; and a hydrating page, which must not paint a
+ * skeleton over content the server already sent.
+ *
+ * Deliberately not a fallback for reads. It never fetches, so anything using it
+ * must still ask properly — this only removes the wait, never the request.
+ */
+export const peek = Object.fromEntries(
+  SURFACE.map((name) => [name, (...args) => peekKey(keyOf(name, args))]),
+)
 
 /** Escape hatch for a "refresh" button, and for tests. */
 export { invalidate, clearAll, stats as cacheStats } from './cache.js'

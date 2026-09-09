@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/check-docs.mjs && node --test test/ && node scripts/brand.mjs && vite build && node scripts/sitemap.mjs",
+    "build": "npm run clean && node scripts/check-docs.mjs && node --test test/ && node scripts/brand.mjs && vite build && node scripts/prerender.mjs && node scripts/sitemap.mjs",
     "preview": "vite preview",
     "lint": "eslint src scripts test",
     "images": "node scripts/images.mjs",
@@ -16,7 +16,9 @@
     "sitemap": "node scripts/sitemap.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "test": "node --test test/",
-    "test:watch": "node --test --watch test/"
+    "test:watch": "node --test --watch test/",
+    "prerender": "node scripts/prerender.mjs",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
     "react": "^18.3.1",

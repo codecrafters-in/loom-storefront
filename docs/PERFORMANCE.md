@@ -186,14 +186,10 @@ merchant's marketer raises.
 Two honest caveats:
 
 - **It is set at runtime.** Google executes JavaScript and reads the resulting
-  DOM, so this works for Google. Other crawlers and most link-preview scrapers
-  do not. A store that depends on organic search should prerender or
-  server-render the catalogue routes; the tags are written by a small component
-  (`src/components/Seo.jsx`) that a prerenderer can execute at build time
-  unchanged.
-- **Availability and rating are claimed from real data.** `availability` follows
-  actual variant stock, and `aggregateRating` is omitted entirely when there are
-  no reviews. Claiming either falsely is how rich results get suspended.
+  DOM, so this alone would work for Google. No other crawler and no
+  link-preview scraper runs JavaScript — which is why `npm run build`
+  prerenders these routes and writes the tags into the HTML. See below.
+
 
 Cart, checkout, account and search are marked `noindex` — they are per-visitor
 and have nothing to rank.
@@ -225,3 +221,47 @@ and have nothing to rank.
 - [ ] Webhook revalidation instead of short TTLs
 - [ ] Images on a CDN with `width`/`height` in the response
 - [ ] Inventory re-checked at checkout, not trusted from the cart
+
+
+## Prerendering
+
+`npm run build` writes real HTML for the 53 routes worth indexing — home, the
+shop, every category, every collection, every product, and the content pages.
+
+```
+dist/product/oxford-shirt-ecru.html   47KB of rendered markup
+                                      <title>Everyday Oxford Shirt — LOOM</title>
+                                      <h1>, the price, Product JSON-LD, canonical, OG
+```
+
+Cart, checkout, account, search and admin are deliberately left as a
+single-page app. They are per-visitor, there is nothing to index, and a
+prerendered cart is a stale bag served to everybody.
+
+### Three things it has to get right
+
+**Resolve the data before rendering.** Effects do not run in `renderToString`,
+so a component that fetches in one renders its loading skeleton. `prime()`
+fetches a route's reads first and seeds the cache; without that step the whole
+exercise produces 53 pages of grey boxes that look prerendered.
+
+**Prime inside the SSR bundle, not outside it.** A Vite SSR build is its own
+module graph. Filling the cache from the build script fills a *different
+instance* from the one the components read — which is exactly what happened
+here first time, and it fails silently.
+
+**Inline the same data into the page.** Otherwise the browser's first render,
+with an empty cache, produces different markup, React calls it a hydration
+mismatch and throws the server's work away at the last step. Each page carries
+`window.__LOOM_CACHE__` and `cache.js` picks it up before anything else runs.
+
+### Two failures it now refuses to ship
+
+A route that renders under 500 bytes, and a route with no `<title>`. The second
+caught four content pages that had no `Seo` component in them at all — they had
+been quietly sharing the site default since the day they were written.
+
+Nine tests in `test/prerender.test.mjs` assert the output rather than the code,
+because every way this fails is invisible in the source: a duplicate title, a
+skeleton where a product should be, a missing hydration payload. They skip when
+`dist/` is absent, so the build removes it first and they run on the pass after.

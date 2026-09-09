@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import api from '../lib/api/index.js'
+import api, { peek } from '../lib/api/index.js'
 import { config } from '../lib/config.js'
 import { storefront as defaults } from '../data/storefront.js'
 
@@ -42,9 +42,13 @@ function fromEnv() {
 }
 
 export function StorefrontProvider({ children }) {
-  const [remote, setRemote] = useState(null)
-  const [boot, setBoot] = useState(null)
-  const [ready, setReady] = useState(false)
+  // Whatever the prerenderer already resolved. Every page below reads settings,
+  // so without this a server render has no store name, no menu and no currency
+  // — and the markup it produces is not the markup the browser will build.
+  const seeded = peek.getBootstrap()
+  const [remote, setRemote] = useState(seeded?.storefront || null)
+  const [boot, setBoot] = useState(seeded || null)
+  const [ready, setReady] = useState(Boolean(seeded))
   const [error, setError] = useState(null)
 
   /**
