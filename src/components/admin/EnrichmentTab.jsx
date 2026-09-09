@@ -4,7 +4,7 @@ import {
   ProductHighlights,
   ProductAssurances,
   ProductMaker,
-  FeatureList,
+  FeatureCarousel,
   SpecCarousel,
   ManufacturerRows,
 } from '../product/Enrichment.jsx'
@@ -205,7 +205,7 @@ export default function EnrichmentTab({ draft, set, attributes = [], icons = [],
 
           {section === 'features' &&
             (e.features?.length ? (
-              <FeatureList items={e.features} />
+              <FeatureCarousel items={e.features} />
             ) : (
               <Blank>Add a feature and the card appears here.</Blank>
             ))}

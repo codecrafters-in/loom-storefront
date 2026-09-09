@@ -253,14 +253,16 @@ see what you are writing as you write it.
 | --- | --- | --- |
 | **Highlights** | Above the buy button | Six pairs |
 | **Comes with** | Under the buy button | Three or four rows, plus the maker |
-| **Features** | Detail stack — "What makes it different" | Two or three |
-| **Specifications** | Detail stack — swipes through one group at a time | As much as you like |
-| **Manufacturer info** | Detail stack | Whatever the law asks for |
+| **Features** | "All details" → first tab, cards you swipe through | Two or three |
+| **Specifications** | "All details" → swipes through one group at a time | As much as you like |
+| **Manufacturer info** | "All details" → last tab | Whatever the law asks for |
 
 > All of it sits in the column beside the buy button, and all of it previews at
-> that width. Nothing lives in a full-width section below the fold any more:
-> anything that decides a purchase has to be reachable without scrolling the buy
-> button off the screen.
+> that width. Nothing lives in a full-width section below the fold, and nothing
+> is hidden behind a closed panel: **"All details" opens with the Features tab
+> already showing.** Anything that costs a click before it can be read is
+> enrichment that mostly does not get read — the shopper willing to open four
+> panels was already going to buy.
 
 **Highlights** are the two-second scan — fabric, fit, weight, the things
 somebody checks before deciding to keep reading. Start typing in the key box and
@@ -296,6 +298,12 @@ characters and warns before the card starts truncating.
 & care, Fit, Sustainability and Packaging by their key, so the order you type
 them in does not matter — and on the product page it swipes one group at a time,
 which is how the whole table fits in a column instead of a page.
+
+> Feature cards sit side by side and swipe, with the next one deliberately cut
+> off at the edge — a half-visible card is the only reliable way to say "there
+> are more of these". Bodies longer than about 105 characters clamp to three
+> lines with a **more** link, so the cards stay the same height. Write past that
+> if the sentence needs it; nothing is lost.
 
 > Every block disappears when it is empty. A product with nothing filled in is a
 > shorter page, not a set of blank headings.

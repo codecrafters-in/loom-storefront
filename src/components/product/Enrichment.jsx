@@ -141,44 +141,195 @@ export function ProductMaker({ enrichment, className = '' }) {
 /**
  * The detail blocks, in the column beside the buy button.
  *
- * These used to be a full-width tabbed section below the fold, and that was the
- * wrong place for them. Everything a shopper needs in order to decide has to be
- * reachable without leaving the buy button behind — a page that asks someone to
- * scroll past the fold to find the fabric weight has already lost the shoppers
- * who would not have scrolled, and they are the majority.
+ * These were a full-width tabbed section below the fold, then a stack of
+ * accordions. Both were wrong, in opposite directions: the section asked a
+ * shopper to scroll the buy button off the screen, and the accordion asked them
+ * to click four times to find out what the thing is made of.
  *
- * So the detail lives in the same stack as fit, care and delivery: hairline
- * rows, collapsed, with the buy button as the only heavy element on screen. The
- * cost is width, which is why the specification table below is a carousel
- * rather than two columns.
+ * Enrichment exists to be read. Anything that costs an interaction before it
+ * can be read is enrichment that mostly is not — the shopper who would have
+ * opened all four panels was already going to buy. So: one block, open, with
+ * the content of the first tab visible on arrival and every other tab one click
+ * away rather than one-click-per-section.
  *
- * Each one renders nothing when it has no data, so a thin product is a shorter
- * stack rather than a row of empty headings.
+ * The collapse control stays, because somebody who has read it should be able
+ * to get it out of the way — but the default is open, which is the half that
+ * decides whether any of this gets seen.
  */
 
-/** Feature cards, stacked. One per row — a 30rem column has no second column. */
-export function FeatureList({ items = [] }) {
-  if (!items.length) return null
+/**
+ * The "All details" block: a heading, a scrollable pill row, and a panel.
+ *
+ * Tabs rather than a stack because this is reference material in a 30rem
+ * column, and stacking every section makes the page four screens longer for
+ * content most people want one fact from. Tabs rather than accordions because
+ * a tab shows something by default and an accordion shows nothing.
+ *
+ * The pill row scrolls sideways rather than wrapping. A wrapped row of five
+ * pills is two lines of chrome above the content; a scrolling one is one line,
+ * and the half-visible pill at the edge is what tells you to keep going.
+ */
+export function DetailTabs({ title = 'All details', tabs = [], defaultOpen = true }) {
+  const usable = tabs.filter((t) => t && t.when !== false)
+  const [open, setOpen] = useState(defaultOpen)
+  const [tab, setTab] = useState(null)
+
+  if (!usable.length) return null
+  const active = tab && usable.some((t) => t.id === tab) ? tab : usable[0].id
+  const panel = usable.find((t) => t.id === active)
+
   return (
-    <ul className="space-y-5">
-      {items.map((f) => (
-        <li key={f.title} className="flex min-w-0 gap-3.5">
-          <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-accent-soft text-accent">
-            {/* A merchant can point at an image instead of naming an icon —
-                brands with their own iconography should not be forced into ours. */}
-            {f.icon?.startsWith('http') || f.icon?.startsWith('/') || f.icon?.startsWith('media:') ? (
-              <Media src={f.icon} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <Icon name={f.icon || 'sparkle'} size={18} />
-            )}
-          </span>
-          <div className="min-w-0">
-            <h3 className="break-words text-[14px] font-medium leading-snug">{f.title}</h3>
-            <p className="mt-1 text-[13px] leading-relaxed text-muted">{f.body}</p>
+    <section className="mt-8 border-t border-line pt-6">
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-[15px] font-medium">{title}</h2>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label={open ? `Collapse ${title}` : `Expand ${title}`}
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-xs border border-line text-muted transition-colors hover:border-ink hover:text-ink"
+        >
+          <Icon name="chevron-down" size={15} className={open ? 'rotate-180' : ''} />
+        </button>
+      </div>
+
+      {open && (
+        <>
+          <div className="no-scrollbar -mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1" role="tablist">
+            {usable.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={active === t.id}
+                onClick={() => setTab(t.id)}
+                className={`whitespace-nowrap rounded-xs border px-3.5 py-1.5 text-[13px] transition-colors ${
+                  active === t.id
+                    ? 'border-ink bg-ink text-page'
+                    : 'border-line text-muted hover:border-ink hover:text-ink'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-        </li>
-      ))}
-    </ul>
+
+          <div className="mt-5">{panel?.render()}</div>
+        </>
+      )}
+    </section>
+  )
+}
+
+/**
+ * Feature cards, side by side, swipeable.
+ *
+ * Stacking them was honest and unreadable: three cards of three lines each is
+ * most of a screen for the section a shopper glances at. Side by side, the
+ * first card is fully visible and the second is deliberately cut off at the
+ * edge — a card that is half on screen is the only reliable way to say "there
+ * are more of these" without a caption saying so.
+ *
+ * The body is clamped rather than truncated at a character count, so the card
+ * height is stable and nothing is lost: "more" opens it in place. Clamping to
+ * three lines and offering the rest costs nothing to skip and one tap to read,
+ * which is the right trade for copy that is nice to have rather than decisive.
+ */
+export function FeatureCarousel({ items = [] }) {
+  const trackRef = useRef(null)
+  const [at, setAt] = useState(0)
+
+  if (!items.length) return null
+
+  const scrollBy = (dir) => {
+    const track = trackRef.current
+    if (!track) return
+    track.scrollBy({ left: dir * track.clientWidth * 0.86, behavior: 'smooth' })
+  }
+
+  const onScroll = (ev) => {
+    const el = ev.currentTarget
+    // A fraction, not an index — the arrows care about "is there anything left
+    // in this direction", which a card index cannot answer mid-swipe.
+    setAt(el.scrollLeft / Math.max(1, el.scrollWidth - el.clientWidth))
+  }
+
+  const many = items.length > 1
+
+  return (
+    <div className="relative">
+      <ul
+        ref={trackRef}
+        onScroll={onScroll}
+        className="no-scrollbar -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1"
+      >
+        {items.map((f) => (
+          <FeatureCard key={f.title} feature={f} solo={!many} />
+        ))}
+      </ul>
+
+      {many && (
+        <>
+          <CarouselArrow side="left" hidden={at <= 0.02} onClick={() => scrollBy(-1)} />
+          <CarouselArrow side="right" hidden={at >= 0.98} onClick={() => scrollBy(1)} />
+        </>
+      )}
+    </div>
+  )
+}
+
+function FeatureCard({ feature: f, solo }) {
+  const [expanded, setExpanded] = useState(false)
+  // Measuring the clamp is unreliable at this size and reflows on every font
+  // swap. A length threshold is deterministic and wrong only at the margin,
+  // where the cost is an unnecessary "more" that opens two words.
+  const long = (f.body || '').length > 105
+
+  return (
+    <li
+      className={`flex snap-start flex-col rounded-xs border border-line bg-surface p-4 ${
+        solo ? 'w-full' : 'w-[86%] shrink-0 sm:w-[78%]'
+      }`}
+    >
+      <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-accent-soft text-accent">
+        {/* A merchant can point at an image instead of naming an icon — brands
+            with their own iconography should not be forced into ours. */}
+        {f.icon?.startsWith('http') || f.icon?.startsWith('/') || f.icon?.startsWith('media:') ? (
+          <Media src={f.icon} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <Icon name={f.icon || 'sparkle'} size={22} />
+        )}
+      </span>
+      <h3 className="mt-3.5 break-words text-[14px] font-medium leading-snug">{f.title}</h3>
+      <p className={`mt-1.5 text-[13px] leading-relaxed text-muted ${expanded || !long ? '' : 'line-clamp-3'}`}>
+        {f.body}
+      </p>
+      {long && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 self-start text-[13px] font-medium text-accent hover:underline"
+        >
+          {expanded ? 'less' : 'more'}
+        </button>
+      )}
+    </li>
+  )
+}
+
+function CarouselArrow({ side, hidden, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={side === 'left' ? 'Previous' : 'Next'}
+      tabIndex={hidden ? -1 : 0}
+      className={`absolute top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-line bg-page text-ink shadow-sm transition-opacity ${
+        side === 'left' ? '-left-1' : '-right-1'
+      } ${hidden ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
+    >
+      <Icon name={side === 'left' ? 'chevron-left' : 'chevron-right'} size={16} />
+    </button>
   )
 }
 

@@ -14,7 +14,8 @@ import {
   ProductHighlights,
   ProductAssurances,
   ProductMaker,
-  FeatureList,
+  DetailTabs,
+  FeatureCarousel,
   SpecCarousel,
   ManufacturerRows,
 } from './Enrichment.jsx'
@@ -465,15 +466,9 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           <ProductMaker enrichment={product.enrichment} />
 
           {/*
-            One accordion, not five bordered cards.
-            Fit, fabric, details, care and delivery were each their own panel,
-            which is five competing boxes in a 26rem column and no hierarchy at
-            all — everything shouts, so nothing reads. A single stack of
-            hairline rows gives the buy button the only heavy weight on the
-            page, which is what it should have.
-
-            Fit is open by default because it is the field that decides whether
-            an apparel order gets kept.
+            Fit stays an accordion and stays open: it is the field that decides
+            whether an apparel order gets kept, and it carries a size chart and
+            a distribution rather than a paragraph.
           */}
           <div className="mt-8 border-t border-line">
             <Accordion title="Fit & sizing" defaultOpen>
@@ -483,55 +478,6 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                 onOpenChart={() => (onOpenChart ? onOpenChart() : setChartOpen(true))}
               />
             </Accordion>
-
-            {/* Enrichment lives in this stack rather than in a section below
-                the fold. Anything that decides a purchase has to be reachable
-                without scrolling the buy button off the screen — a shopper who
-                has to go looking for the fabric weight mostly does not go. */}
-            {product.enrichment?.features?.length > 0 && (
-              <Accordion title="What makes it different">
-                <FeatureList items={product.enrichment.features} />
-              </Accordion>
-            )}
-
-            <Accordion title="Fabric & care">
-              <FabricBlock product={product} flat />
-              {product.care?.length > 0 && (
-                <ul className="mt-5 space-y-2.5">
-                  {product.care.map((c) => (
-                    <li key={c} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
-                      <Icon name="sparkle" size={15} className="mt-0.5 shrink-0 text-accent" />
-                      {c}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Accordion>
-
-            {Object.keys(product.enrichment?.specs || {}).length > 0 && (
-              <Accordion title="Specifications">
-                <SpecCarousel specs={product.enrichment.specs} />
-              </Accordion>
-            )}
-
-            {product.details?.length > 0 && (
-              <Accordion title="Details">
-                <ul className="space-y-2.5">
-                  {product.details.map((d) => (
-                    <li key={d} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
-                      <Icon name="check" size={15} className="mt-0.5 shrink-0 text-accent" />
-                      {d}
-                    </li>
-                  ))}
-                </ul>
-              </Accordion>
-            )}
-
-            {product.enrichment?.manufacturer && (
-              <Accordion title="Manufacturer info">
-                <ManufacturerRows info={product.enrichment.manufacturer} />
-              </Accordion>
-            )}
 
             <Accordion title="Delivery & returns">
               <div className="space-y-3 text-[14px] leading-relaxed text-muted">
@@ -556,6 +502,69 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               </div>
             </Accordion>
           </div>
+
+          {/*
+            Everything else is one open block. Five accordions meant five clicks
+            to read what the product is made of, and the shopper willing to make
+            all five was not the one being lost.
+          */}
+          <DetailTabs
+            tabs={[
+              {
+                id: 'features',
+                label: 'Features',
+                when: product.enrichment?.features?.length > 0,
+                render: () => <FeatureCarousel items={product.enrichment.features} />,
+              },
+              {
+                id: 'fabric',
+                label: 'Fabric & care',
+                when: Boolean(product.fabric) || product.care?.length > 0,
+                render: () => (
+                  <>
+                    <FabricBlock product={product} flat />
+                    {product.care?.length > 0 && (
+                      <ul className="mt-5 space-y-2.5">
+                        {product.care.map((c) => (
+                          <li key={c} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
+                            <Icon name="sparkle" size={15} className="mt-0.5 shrink-0 text-accent" />
+                            {c}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                ),
+              },
+              {
+                id: 'specs',
+                label: 'Specifications',
+                when: Object.keys(product.enrichment?.specs || {}).length > 0,
+                render: () => <SpecCarousel specs={product.enrichment.specs} />,
+              },
+              {
+                id: 'details',
+                label: 'Construction',
+                when: product.details?.length > 0,
+                render: () => (
+                  <ul className="space-y-2.5">
+                    {product.details.map((d) => (
+                      <li key={d} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
+                        <Icon name="check" size={15} className="mt-0.5 shrink-0 text-accent" />
+                        {d}
+                      </li>
+                    ))}
+                  </ul>
+                ),
+              },
+              {
+                id: 'manufacturer',
+                label: 'Manufacturer info',
+                when: Boolean(product.enrichment?.manufacturer),
+                render: () => <ManufacturerRows info={product.enrichment.manufacturer} />,
+              },
+            ]}
+          />
         </div>
       </div>
 

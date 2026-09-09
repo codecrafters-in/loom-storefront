@@ -130,13 +130,26 @@ looking for" before anyone commits to reading a paragraph — and the full table
 one group at a time in the detail stack, still catches the person who wants to
 check the leg opening.
 
-**All of it lives beside the buy button.** This was a full-width section below
-the fold and that was the wrong place: a shopper who has to scroll the button
-off the screen to find the fabric weight mostly does not go looking, and the
-ones who would have are not the ones you were losing. The cost of moving it is
-width, which is why the specification table pages by group rather than laying
-out two columns — the groups are the units a shopper thinks in, so a slide is a
-complete answer rather than an arbitrary slice.
+**All of it lives beside the buy button, and none of it is closed.** Two
+mistakes worth naming, because they are the obvious designs and they are both
+wrong in the same way:
+
+- A *full-width section below the fold* asks a shopper to scroll the buy button
+  off the screen to find the fabric weight. Most do not go looking, and the ones
+  who would have were not the ones you were losing.
+- A *stack of accordions* asks for a click per section. Same failure, smaller
+  scale: the shopper willing to open four panels was already going to buy.
+
+So it is one open block with tabs. The first tab renders on arrival; the others
+cost one click each rather than one click per section. The cost of moving into
+the column is width, which is why the specification table pages by group instead
+of laying out two columns — the groups are the units a shopper thinks in, so a
+slide is a complete answer rather than an arbitrary slice.
+
+Feature cards sit side by side with the next one deliberately cut off at the
+edge. A half-visible card is the only reliable way to say "there are more of
+these" without a caption saying so, and it is why the row is 86% wide rather
+than a tidy 100%.
 
 Two rules that keep it useful rather than decorative:
 

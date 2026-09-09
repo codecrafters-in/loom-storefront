@@ -294,9 +294,14 @@ have scrolled, and they are the majority.
 | `highlights` | Above the buy button | The scan. Six pairs read in two seconds |
 | `assurances` | Under the buy button | What happens after the sale — returns, exchange, repair, payment |
 | `maker` | Under the assurances | Who made it. The marketplace seller block, adapted |
-| `features` | Detail stack, "What makes it different" | Two or three things a competitor could not copy-paste |
-| `specs` | Detail stack, "Specifications" — a carousel, one group per slide | The reference table. Nobody reads it end to end |
-| `manufacturer` | Detail stack, "Manufacturer info" | Compliance |
+| `features` | "All details" → Features, a swipeable card row | Two or three things a competitor could not copy-paste |
+| `specs` | "All details" → Specifications, one group per slide | The reference table. Nobody reads it end to end |
+| `manufacturer` | "All details" → Manufacturer info | Compliance |
+
+"All details" is a tab block, **open by default with the first tab rendered**.
+Tabs rather than accordions on purpose: a tab shows something on arrival and an
+accordion shows nothing, and enrichment that costs an interaction before it can
+be read is mostly enrichment that does not get read.
 
 The specification table is paged **by group**, not by row. The groups are already
 the units a shopper thinks in, so a slide is a complete answer rather than an

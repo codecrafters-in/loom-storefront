@@ -226,8 +226,8 @@ Rules on Product:
 
 `enrichment` is several blocks on purpose, and all of them render in the column
 beside the buy button — `highlights` above it (six pairs, the two-second scan),
-`assurances` and `maker` under it, `features`, `specs` and `manufacturer` in the
-collapsed detail stack below that. None of it is a full-width section below the
+`assurances` and `maker` under it, and `features`, `specs` and `manufacturer` in
+an "All details" tab block below that which is open by default. None of it is a full-width section below the
 fold: anything that decides a purchase has to be reachable without scrolling the
 button away. `specs` is paged by group in a carousel, which is how a full table
 fits in a 30rem column.
