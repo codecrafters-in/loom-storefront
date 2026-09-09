@@ -372,6 +372,29 @@ server, so it records the marker and discards the value.
 shortfall named per line. See [CHECKOUT.md](CHECKOUT.md) for why, and for the
 refund shape.
 
+### `POST /orders/lookup`
+
+```json
+{ "number": "LM-10428", "email": "guest@example.com" }   →  the Order
+```
+
+Both fields, and **that is the whole security model**. Order numbers are
+sequential in most shops — including this one — so the number alone is
+guessable and the email is what turns a lookup into a proof.
+
+Two things a real implementation must do:
+
+- **Rate-limit it.** Matched pairs are cheap to test in bulk otherwise, and a
+  store's order volume is a thing competitors like to know.
+- **Fail identically** whether the number is wrong, the email is wrong, or
+  both. A distinct "that order exists but the email does not match" turns this
+  endpoint into an oracle for which order numbers are real.
+
+It exists because guest checkout is the default. Without it a guest who clears
+their browser, or opens the confirmation email on a different phone, has no way
+back to their own order — so they email support, or assume the order failed and
+order again.
+
 ### Order visibility
 
 `GET /orders` requires a session and returns only that customer's orders.

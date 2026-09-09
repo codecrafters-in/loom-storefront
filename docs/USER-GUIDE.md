@@ -143,6 +143,24 @@ wishlist, search, accounts and the newsletter box.
 
 ---
 
+## Decide what crawlers may do
+
+**Admin → Storefront → Search engines.**
+
+Set the **site URL** first — it is the one setting with no sensible default, and
+a sitemap, a canonical tag and a link preview all need an absolute address.
+
+**AI crawlers is your call, not the theme's.** Assistants increasingly answer
+"where can I buy a linen shirt", and a shop they cannot read is not in the
+answer. Against that, your photography and product copy end up in a training
+set. Allow all, block all, or decide bot by bot.
+
+> Switching **indexing** off removes the whole shop from search. That is right
+> for a staging deployment — an indexed staging site competes with your real one
+> for your own keywords — and wrong for anything you sell from.
+
+---
+
 ## Take real payments
 
 **Storefront → Checkout → Mode**
@@ -364,6 +382,24 @@ own colour if there is one.
 > This is what makes the main photograph change when a shopper taps a swatch.
 > Tag nothing and the gallery behaves exactly as it did before — one set of
 > photographs shown for every colour.
+
+---
+
+## Decide what crawlers may do
+
+**Admin → Storefront → Search engines.**
+
+Set the **site URL** first — it is the one setting with no sensible default, and
+a sitemap, a canonical tag and a link preview all need an absolute address.
+
+**AI crawlers is your call, not the theme's.** Assistants increasingly answer
+"where can I buy a linen shirt", and a shop they cannot read is not in the
+answer. Against that, your photography and product copy end up in a training
+set. Allow all, block all, or decide bot by bot.
+
+> Switching **indexing** off removes the whole shop from search. That is right
+> for a staging deployment — an indexed staging site competes with your real one
+> for your own keywords — and wrong for anything you sell from.
 
 ---
 

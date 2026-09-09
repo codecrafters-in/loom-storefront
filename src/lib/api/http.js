@@ -335,6 +335,13 @@ export const adminSaveSizeChart = (chart) => post('/admin/size-charts', chart)
  * is a secret in every log, cache and browser history between here and the
  * server. The read returns whether each one is set and when.
  */
+/**
+ * Both fields, or nothing. And rate-limit this on the server: order numbers are
+ * sequential in most shops, so an unthrottled lookup is a way to enumerate them
+ * against a list of leaked emails.
+ */
+export const lookupOrder = (body) => post('/orders/lookup', body)
+
 export const adminRefundOrder = (orderId, body) =>
   post(`/admin/orders/${encodeURIComponent(orderId)}/refunds`, body)
 export const adminGetCredentials = () => get('/admin/credentials')

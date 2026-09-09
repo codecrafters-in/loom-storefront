@@ -798,6 +798,7 @@ export function Storefront() {
           <Row label="How many" type="number" value={cfg.recommendations?.limit ?? 4} onChange={(e) => patch('recommendations.limit', Number(e.target.value))} />
         </Group>
 
+        <SeoGroup cfg={cfg} patch={patch} />
         <PaymentsGroup cfg={cfg} patch={patch} />
         <EmailGroup cfg={cfg} patch={patch} />
         <CredentialsGroup />
@@ -897,6 +898,110 @@ export function Data() {
 }
 
 /* ── bits ──────────────────────────────────────────────────────────────── */
+
+/**
+ * Search engines and crawlers.
+ *
+ * Every line here is policy rather than engineering, which is exactly why it is
+ * a screen and not a file. Whether an AI crawler may read your catalogue is a
+ * decision about your business — some stores want the traffic an assistant
+ * sends, some do not want their photography in a training set — and a theme
+ * that picks for you has picked wrong for half its users.
+ */
+function SeoGroup({ cfg, patch }) {
+  const seo = cfg.seo || {}
+  const mode = seo.aiCrawlers || 'allow'
+
+  return (
+    <Group
+      title="Search engines"
+      note="Written into robots.txt and the sitemap at build time. Nothing here changes what a shopper sees."
+    >
+      <Row
+        label="Site URL"
+        mono
+        placeholder="https://yourshop.com"
+        value={seo.siteUrl || ''}
+        onChange={(e) => patch('seo.siteUrl', e.target.value)}
+      />
+      <p className="-mt-2 text-[12px] leading-relaxed text-faint">
+        Required, and the one setting with no sensible default. A sitemap, a canonical tag and an
+        Open Graph image all need absolute URLs — a relative one is ignored by every scraper that
+        reads it.
+      </p>
+
+      <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
+        <input
+          type="checkbox"
+          checked={seo.indexable !== false}
+          onChange={(e) => patch('seo.indexable', e.target.checked)}
+          className="h-4 w-4 accent-[rgb(var(--accent))]"
+        />
+        Allow search engines to index this shop
+      </label>
+      {seo.indexable === false && (
+        <p className="-mt-2 rounded-xs border border-sale/30 bg-sale/5 p-3 text-[12px] leading-relaxed text-muted">
+          <strong className="text-ink">Nothing here will appear in search.</strong> Right for a
+          staging deployment — a staging site that is indexed competes with production for its own
+          keywords — and wrong for anything you are selling from.
+        </p>
+      )}
+
+      <div>
+        <label htmlFor="ai-crawlers" className="mb-1.5 block text-[13px] font-medium">
+          AI crawlers
+        </label>
+        <select
+          id="ai-crawlers"
+          className="field"
+          value={mode}
+          onChange={(e) => patch('seo.aiCrawlers', e.target.value)}
+        >
+          <option value="allow">Allow — assistants can read and cite the shop</option>
+          <option value="block">Block all of them</option>
+          <option value="custom">Decide one at a time</option>
+        </select>
+        <p className="mt-1.5 text-[12px] leading-relaxed text-faint">
+          Assistants increasingly answer &ldquo;where can I buy a linen shirt&rdquo;, and a shop
+          they cannot read is not in the answer. Against that, your photography and product copy end
+          up in a training set. Both are defensible; this is your call, not the theme&rsquo;s.
+        </p>
+      </div>
+
+      {mode === 'custom' && (
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {Object.entries(seo.crawlers || {}).map(([bot, allowed]) => (
+            <li key={bot}>
+              <label className="flex cursor-pointer items-center gap-2.5 font-mono text-[12px]">
+                <input
+                  type="checkbox"
+                  checked={Boolean(allowed)}
+                  onChange={(e) => patch(`seo.crawlers.${bot}`, e.target.checked)}
+                  className="h-4 w-4 accent-[rgb(var(--accent))]"
+                />
+                {bot}
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
+        <input
+          type="checkbox"
+          checked={seo.sitemapImages !== false}
+          onChange={(e) => patch('seo.sitemapImages', e.target.checked)}
+          className="h-4 w-4 accent-[rgb(var(--accent))]"
+        />
+        List product photographs in the sitemap
+      </label>
+      <p className="-mt-2 text-[12px] leading-relaxed text-faint">
+        Google Images is a shopping surface of its own, and it will not find pictures that exist
+        only inside a gallery. This is the entire cost of appearing there.
+      </p>
+    </Group>
+  )
+}
 
 /* ── payments, email and the things that must never reach a browser ────── */
 

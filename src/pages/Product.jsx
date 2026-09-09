@@ -9,6 +9,9 @@ import Seo from '../components/Seo.jsx'
 import ProductView from '../components/product/ProductView.jsx'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import { viewItem } from '../lib/analytics.js'
+import { remember } from '../lib/recentlyViewed.js'
+import { useAuth } from '../store/AuthContext.jsx'
+import RecentlyViewed from '../components/product/RecentlyViewed.jsx'
 
 export default function Product() {
   const { slug } = useParams()
@@ -19,6 +22,7 @@ export default function Product() {
     initial: peek.getProduct(slug),
   })
   const config = useStorefront()
+  const { customer } = useAuth()
   const recs = config.recommendations || {}
   const related = useAsync(
     () => api.getRelated(slug, { limit: recs.limit || 4, strategy: recs.strategy || 'automatic' }),
@@ -32,8 +36,13 @@ export default function Product() {
   // Keyed on the slug, so navigating between products reports each one — and
   // not on every render, which would report the same view a dozen times.
   useEffect(() => {
-    if (product) viewItem(product)
-  }, [product?.slug]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!product) return
+    viewItem(product)
+    // Scoped to the signed-in customer. A shared laptop is the normal case in a
+    // household, and a rail showing the last person's browsing is both a
+    // privacy problem and a useless recommendation.
+    if (config.features?.recentlyViewed !== false) remember(product.slug, customer?.id)
+  }, [product?.slug, customer?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <ProductSkeleton />
   if (error) {
@@ -169,6 +178,8 @@ export default function Product() {
           </div>
         </section>
       )}
+
+      <RecentlyViewed exclude={product.slug} />
 
       <Promises />
 

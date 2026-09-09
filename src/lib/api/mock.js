@@ -937,6 +937,53 @@ export async function getOrder(orderId) {
   return order
 }
 
+/**
+ * Find an order without an account, from the number and the email on it.
+ *
+ * The gap this closes is not theoretical: a guest checks out, clears their
+ * browser or opens their phone, and their order becomes unreachable — the
+ * confirmation link only works from the browser that placed it. They then email
+ * support, which is a cost, or assume the order failed, which is worse.
+ *
+ * Both fields must match, and that is the whole security model. An order number
+ * alone is guessable — they are sequential in most shops, including this one —
+ * so the email is what turns a lookup into a proof. A real backend must also
+ * rate-limit this endpoint: matched pairs are cheap to test in bulk otherwise,
+ * and a store's order volume is a thing competitors like to know.
+ */
+export async function lookupOrder({ number, email } = {}) {
+  await latency()
+
+  if (!number?.trim() || !email?.trim()) {
+    throw new ApiError('Both the order number and the email address are needed.', {
+      status: 422,
+      code: 'missing_fields',
+    })
+  }
+
+  const wanted = number.trim().toLowerCase()
+  const order = read(KEY.orders, []).find(
+    (o) =>
+      (o.number?.toLowerCase() === wanted || o.id?.toLowerCase() === wanted) &&
+      o.email?.toLowerCase() === email.trim().toLowerCase(),
+  )
+
+  // The same 404 whether the number is wrong, the email is wrong or both. A
+  // distinct "that order exists but the email does not match" turns this into
+  // an oracle for which order numbers are real.
+  if (!order) {
+    throw new ApiError('No order matches that number and email address.', {
+      status: 404,
+      code: 'not_found',
+    })
+  }
+
+  // Remembering it means the confirmation page works from here on, which is
+  // what somebody looking their order up actually wanted.
+  write(KEY.placed, [...new Set([order.id, ...read(KEY.placed, [])])].slice(0, 50))
+  return order
+}
+
 /* ── account ───────────────────────────────────────────────────────────── */
 
 const DEMO_CUSTOMER = {

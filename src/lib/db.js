@@ -19,7 +19,7 @@
 import { isRealDiscount } from './money.js'
 
 const KEY = 'loom.db'
-const VERSION = 10
+const VERSION = 11
 
 const listeners = new Set()
 let cache = null

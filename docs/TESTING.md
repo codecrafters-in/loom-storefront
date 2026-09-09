@@ -48,6 +48,9 @@ to change the code rather than the wait.
 | `analytics` | Consent, Do Not Track, event shapes, and staying silent by default |
 | `images` | Every srcset candidate existing, and being smaller than its source |
 | `error-boundary` | The reset, which is the part that fails silently |
+| `order-lookup` | Both fields matching, and failing identically when they do not |
+| `seo` | robots.txt and the sitemap, by running the scripts for real |
+| `recently-viewed` | Per-customer scoping, the sign-in merge, corrupt storage |
 
 ## Two rules that make it worth having
 

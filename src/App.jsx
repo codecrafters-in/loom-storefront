@@ -25,6 +25,7 @@ const Cart = lazy(() => import('./pages/Cart.jsx'))
 const Wishlist = lazy(() => import('./pages/Wishlist.jsx'))
 const Checkout = lazy(() => import('./pages/Checkout.jsx'))
 const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation.jsx'))
+const OrderLookup = lazy(() => import('./pages/OrderLookup.jsx'))
 const Account = lazy(() => import('./pages/Account.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Search = lazy(() => import('./pages/Search.jsx'))
@@ -84,6 +85,7 @@ export default function App() {
                   <Route path="wishlist" element={<Wishlist />} />
                   <Route path="checkout" element={<Checkout />} />
                   <Route path="order/:id" element={<OrderConfirmation />} />
+                  <Route path="orders/lookup" element={<OrderLookup />} />
                   <Route path="login" element={<Login />} />
                   <Route path="account/*" element={<Account />} />
                   <Route path="pages/:slug" element={<StaticPage />} />

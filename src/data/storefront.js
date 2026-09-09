@@ -74,6 +74,9 @@ export const storefront = {
     accounts: true,
     discountCodes: true,
     newsletter: true,
+    /** The rail of what this visitor was just looking at. Local to their
+     *  browser — nothing is stored server-side and nobody is profiled. */
+    recentlyViewed: true,
   },
 
   /**
@@ -109,6 +112,10 @@ export const storefront = {
         links: [
           { label: 'Your account', to: '/account' },
           { label: 'Orders', to: '/account/orders' },
+          // Guest checkout is the default, so most orders have no account
+          // behind them. Without this the only way back to one is the browser
+          // that placed it.
+          { label: 'Find an order', to: '/orders/lookup' },
           { label: 'Addresses', to: '/account/addresses' },
           { label: 'Your bag', to: '/cart' },
         ],
@@ -249,6 +256,45 @@ export const storefront = {
     termsUrl: '/pages/shipping',
     /** Put the stock back when an order is refunded or cancelled. */
     restockOnRefund: true,
+  },
+
+  /**
+   * Search engines and crawlers.
+   *
+   * These are policy, not engineering. Whether an AI crawler may read your
+   * catalogue is a decision about your business — some stores want the traffic
+   * an assistant sends, some do not want their photography and copy in a
+   * training set, and a theme has no business deciding either way. So the
+   * defaults are the neutral ones and every line is editable in Settings.
+   *
+   * `siteUrl` is the only one that must be set. Absolute URLs are required in a
+   * sitemap, in a canonical tag and in an Open Graph image — a relative one is
+   * ignored by every scraper that reads it.
+   */
+  seo: {
+    siteUrl: '',
+    /** Off takes the whole shop out of every index. For a staging deployment. */
+    indexable: true,
+    /** Paths no crawler should walk. Per-visitor pages, not secrets. */
+    disallow: ['/checkout', '/account', '/cart', '/orders/lookup', '/admin'],
+    /**
+     * `allow` — the default, and what a shop selling things usually wants.
+     * `block` — no AI crawler, stated per bot so it is checkable.
+     * `custom` — decide one at a time in `crawlers` below.
+     */
+    aiCrawlers: 'allow',
+    crawlers: {
+      GPTBot: true,
+      'ChatGPT-User': true,
+      ClaudeBot: true,
+      'anthropic-ai': true,
+      PerplexityBot: true,
+      'Google-Extended': true,
+      CCBot: false,
+      Bytespider: false,
+    },
+    /** Put every product photograph in the sitemap, for Google Images. */
+    sitemapImages: true,
   },
 
   /**

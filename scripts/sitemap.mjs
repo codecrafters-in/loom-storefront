@@ -8,9 +8,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { products, categories, collections } from '../src/data/catalog.js'
+import { storefront } from '../src/data/storefront.js'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const BASE = process.env.SITE_URL || 'https://loom.example'
+const seo = storefront.seo || {}
+const BASE = (process.env.SITE_URL || seo.siteUrl || 'https://loom.example').replace(/\/$/, '')
 const today = new Date().toISOString().slice(0, 10)
 
 const urls = [
@@ -19,16 +21,47 @@ const urls = [
   { loc: '/search', priority: '0.3', changefreq: 'monthly' },
   ...categories.map((c) => ({ loc: `/shop/${c.slug}`, priority: c.parent ? '0.7' : '0.8', changefreq: 'weekly' })),
   ...collections.map((c) => ({ loc: `/collections/${c.slug}`, priority: '0.8', changefreq: 'weekly' })),
-  ...products.map((p) => ({ loc: `/product/${p.slug}`, priority: '0.8', changefreq: 'weekly' })),
+  /**
+   * Product entries carry their photographs.
+   *
+   * Google Images is a shopping surface in its own right and it will not find
+   * 112 pictures that only exist inside a JavaScript-rendered gallery. This is
+   * the whole cost of appearing there.
+   */
+  ...products.map((p) => ({
+    loc: `/product/${p.slug}`,
+    priority: '0.8',
+    changefreq: 'weekly',
+    images: seo.sitemapImages === false ? [] : (p.images || []).filter((i) => i.type !== 'video'),
+  })),
   ...['size-guide', 'shipping', 'care', 'contact'].map((s) => ({ loc: `/pages/${s}`, priority: '0.4', changefreq: 'monthly' })),
 ]
 
+/** `&` in a caption or a filename would otherwise break the document. */
+const xmlEscape = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+
+const imageTags = (images = []) =>
+  images
+    .map(
+      (img) =>
+        `\n    <image:image><image:loc>${BASE}${xmlEscape(img.url)}</image:loc>` +
+        (img.alt ? `<image:title>${xmlEscape(img.alt)}</image:title>` : '') +
+        `</image:image>`,
+    )
+    .join('')
+
 const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${urls
   .map(
     (u) =>
-      `  <url><loc>${BASE}${u.loc}</loc><lastmod>${today}</lastmod><changefreq>${u.changefreq}</changefreq><priority>${u.priority}</priority></url>`,
+      `  <url><loc>${BASE}${u.loc}</loc><lastmod>${today}</lastmod><changefreq>${u.changefreq}</changefreq><priority>${u.priority}</priority>${imageTags(u.images)}</url>`,
   )
   .join('\n')}
 </urlset>
@@ -36,4 +69,5 @@ ${urls
 
 await fs.mkdir(path.join(ROOT, 'dist'), { recursive: true })
 await fs.writeFile(path.join(ROOT, 'dist/sitemap.xml'), xml)
-console.log(`[sitemap] ${urls.length} urls → dist/sitemap.xml`)
+const imageCount = urls.reduce((a, u) => a + (u.images?.length || 0), 0)
+console.log(`[sitemap] ${urls.length} urls, ${imageCount} images → dist/sitemap.xml`)

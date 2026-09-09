@@ -22,7 +22,7 @@ const SURFACE = [
   'getStorefront', 'getBootstrap',
   'listProducts', 'getProduct', 'getRelated', 'listCategories', 'listCollections', 'getReviews',
   'getCart', 'addToCart', 'updateCartLine', 'removeCartLine', 'applyDiscount', 'clearCart',
-  'checkout', 'listOrders', 'getOrder',
+  'checkout', 'listOrders', 'getOrder', 'lookupOrder',
   'login', 'register', 'logout', 'getMe', 'updateMe', 'saveAddress', 'deleteAddress',
   'getWishlist', 'addToWishlist', 'removeFromWishlist',
   'subscribe', 'getDeliveryEstimate',
@@ -79,6 +79,8 @@ const PURGES = {
   // A refund can put stock back, so the catalogue is stale too.
   adminRefundOrder: ['listOrders', 'getOrder', 'listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
   adminSaveCredentials: ['adminGetCredentials'],
+  // A successful lookup grants this browser access to that order.
+  lookupOrder: ['getOrder'],
   adminSaveDiscount: ['adminListDiscounts'],
   uploadMedia: ['listMedia'],
   deleteMedia: ['listMedia'],

@@ -321,6 +321,47 @@ Three modes. Full guide with provider examples: **[CHECKOUT.md](CHECKOUT.md)**.
 
 `createUrl` may be a full URL or a path on your API. `:cartId` is substituted.
 
+### `seo`
+
+```json
+{
+  "seo": {
+    "siteUrl": "https://yourshop.com",
+    "indexable": true,
+    "disallow": ["/checkout", "/account", "/cart", "/orders/lookup", "/admin"],
+    "aiCrawlers": "allow",
+    "crawlers": { "GPTBot": true, "ClaudeBot": true, "CCBot": false },
+    "sitemapImages": true
+  }
+}
+```
+
+`robots.txt` and `sitemap.xml` are **generated from these at build time**. They
+used to be a static file, which made one of its lines a decision the theme had
+taken on the merchant's behalf.
+
+**`siteUrl` is the one setting with no sensible default.** A sitemap, a
+canonical tag and an Open Graph image all need absolute URLs; a relative one is
+ignored by every scraper that reads it.
+
+`aiCrawlers` is policy, not engineering. Assistants increasingly answer "where
+can I buy a linen shirt", and a shop they cannot read is not in the answer —
+against which your photography and product copy end up in a training set. Both
+positions are defensible, which is exactly why the theme does not hold one.
+
+| Mode | Writes |
+| --- | --- |
+| `allow` | Nothing per-bot. An absent rule already means allowed |
+| `block` | Every named bot refused, regardless of its own flag |
+| `custom` | Each bot honoured separately |
+
+`indexable: false` takes the whole shop out of every index — right for a staging
+deployment, which otherwise competes with production for its own keywords.
+
+`sitemapImages` puts all 112 product photographs in the sitemap. Google Images
+is a shopping surface of its own and will not find pictures that exist only
+inside a JavaScript-rendered gallery.
+
 ### `analytics`
 
 ```json

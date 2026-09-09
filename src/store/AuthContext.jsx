@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../lib/api/index.js'
 import { onExternalWrite, STORAGE_KEYS } from '../lib/crossTab.js'
+import { adopt } from '../lib/recentlyViewed.js'
 
 const AuthContext = createContext(null)
 
@@ -48,11 +49,15 @@ export function AuthProvider({ children }) {
       signedIn: !!customer,
       login: async (body) => {
         const res = await api.login(body)
+        // Somebody who browsed for ten minutes and then signed in to check out
+        // should not lose the ten minutes.
+        adopt(res.customer?.id)
         setCustomer(res.customer)
         return res
       },
       register: async (body) => {
         const res = await api.register(body)
+        adopt(res.customer?.id)
         setCustomer(res.customer)
         return res
       },
