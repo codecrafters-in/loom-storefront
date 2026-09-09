@@ -52,6 +52,10 @@ const KEY = {
   session: 'loom.session',
   wishlist: 'loom.wishlist',
   customer: 'loom.customer',
+  // Orders placed from this browser, signed in or not. A guest needs to reach
+  // the confirmation page for the order they just placed, and an order id is
+  // the only thing they have.
+  placed: 'loom.placed',
 }
 
 async function latency() {
@@ -622,6 +626,7 @@ export async function checkout({ email, shippingAddress, shippingMethod = 'stand
   adopt()
 
   write(KEY.orders, [order, ...orders])
+  write(KEY.placed, [order.id, ...read(KEY.placed, [])].slice(0, 50))
   saveCart(emptyCart())
   return order
 }
@@ -647,16 +652,47 @@ export async function adminUpdateOrder(orderId, patch) {
   return orders[i]
 }
 
+/**
+ * Order history belongs to whoever is signed in — and to nobody otherwise.
+ *
+ * This used to hand back every order in the browser regardless of session, so
+ * signing out and reloading still showed the previous person's purchases,
+ * addresses and totals. On a shared laptop that is a real disclosure, and it is
+ * the kind a demo backend teaches an integrator to reproduce.
+ */
 export async function listOrders() {
   await latency()
-  const items = read(KEY.orders, [])
+  const me = read(KEY.customer, null)
+  if (!me) throw new ApiError('Sign in to see your orders.', { status: 401, code: 'unauthenticated' })
+  const items = read(KEY.orders, []).filter(
+    (o) => o.email?.toLowerCase() === me.email?.toLowerCase(),
+  )
   return { items, total: items.length }
 }
 
+/**
+ * A single order opens for its owner, or for the browser that placed it.
+ *
+ * The second half is what makes guest checkout work: somebody who has just
+ * ordered without an account has nothing but the id, and bouncing them off
+ * their own confirmation page to a sign-in form is the worst possible moment to
+ * ask for a password. Anyone else gets a 404 rather than a 403 — a "you are not
+ * allowed to see this" confirms the order exists.
+ */
 export async function getOrder(orderId) {
   await latency()
   const order = read(KEY.orders, []).find((o) => o.id === orderId || o.number === orderId)
   if (!order) throw new ApiError('Order not found.', { status: 404, code: 'not_found' })
+
+  const me = read(KEY.customer, null)
+  // The browser capability is for guests only. Once somebody is signed in, that
+  // is an assertion of identity, and it has to be the one that decides — or the
+  // second person to use a shared laptop can open the first person's order.
+  const allowed = me
+    ? order.email?.toLowerCase() === me.email?.toLowerCase()
+    : read(KEY.placed, []).includes(order.id)
+  if (!allowed) throw new ApiError('Order not found.', { status: 404, code: 'not_found' })
+
   return order
 }
 
@@ -684,6 +720,62 @@ const DEMO_CUSTOMER = {
   ],
 }
 
+/**
+ * Two orders for the demo account, so its Orders tab shows something.
+ *
+ * Written on first sign-in rather than at seed time, because they belong to
+ * whichever email is used and there is no account until somebody signs in. A
+ * fulfilled order with tracking and a delivered one from last season is enough
+ * to exercise every status the list renders.
+ */
+function seedDemoOrders(email) {
+  const orders = read(KEY.orders, [])
+  if (orders.some((o) => o.email?.toLowerCase() === email.toLowerCase())) return
+
+  const pick = (slug, size, qty = 1) => {
+    const p = products.find((x) => x.slug === slug)
+    const v = p?.variants.find((x) => x.options.Size === size) || p?.variants[0]
+    if (!p || !v) return null
+    return {
+      variantId: v.id,
+      slug: p.slug,
+      title: p.title,
+      image: p.images[0]?.url,
+      options: v.options,
+      quantity: qty,
+      price: v.price,
+      lineTotal: { amount: v.price.amount * qty, currency: v.price.currency },
+    }
+  }
+
+  const build = (n, daysAgo, status, tracking, lines) => {
+    const subtotal = lines.reduce((a, l) => a + l.lineTotal.amount, 0)
+    return {
+      id: `order_demo_${n}`,
+      number: `LM-${10000 + n}`,
+      status,
+      placedAt: new Date(Date.now() - daysAgo * 864e5).toISOString(),
+      lines,
+      subtotal: { amount: subtotal, currency: CURRENCY },
+      discount: null,
+      shipping: { amount: 0, currency: CURRENCY },
+      tax: { amount: 0, currency: CURRENCY },
+      total: { amount: subtotal, currency: CURRENCY },
+      shippingAddress: DEMO_CUSTOMER.addresses[0],
+      shippingMethod: 'standard',
+      email,
+      tracking,
+    }
+  }
+
+  const seeded = [
+    build(428, 6, 'fulfilled', 'LM8841204471', [pick('oxford-shirt-ecru', 'M'), pick('merino-beanie', 'One size')].filter(Boolean)),
+    build(392, 74, 'delivered', 'LM8830119265', [pick('selvedge-denim-straight', '32')].filter(Boolean)),
+  ].filter((o) => o.lines.length)
+
+  if (seeded.length) write(KEY.orders, [...orders, ...seeded])
+}
+
 export async function login({ email, password }) {
   await latency()
   if (!email || !password) throw new ApiError('Email and password are required.', { status: 422, code: 'missing_credentials' })
@@ -691,6 +783,7 @@ export async function login({ email, password }) {
   const customer = { ...DEMO_CUSTOMER, email }
   write(KEY.session, { token: `demo_${Date.now().toString(36)}` })
   write(KEY.customer, customer)
+  seedDemoOrders(email)
   return { token: read(KEY.session, {}).token, customer }
 }
 

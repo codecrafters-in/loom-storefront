@@ -317,6 +317,22 @@ which is how the whole table fits in a column instead of a page.
 
 ---
 
+## Sign in as a shopper
+
+**Any email and any password of six characters or more.** The demo backend has
+no real authentication — it accepts what you type and signs you in as that
+address, which is the point: an integrator swaps `mock.js` for `http.js` and
+their own auth arrives with it.
+
+Signing in for the first time seeds two orders on that address — one fulfilled
+with tracking, one delivered — so **Account → Orders** shows something.
+
+> Orders are scoped to the signed-in address. Sign out and the history is
+> refused; sign in as somebody else and you see theirs, not the first person's.
+> The order you placed as a guest still opens from its own confirmation link.
+
+---
+
 ## Show a different photograph for each colour
 
 **Open the product → Media → the colour dropdown under each image.**

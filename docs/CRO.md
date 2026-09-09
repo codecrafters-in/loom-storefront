@@ -261,7 +261,31 @@ Both pickers are the same components the buy box uses. A second copy of a
 variant picker is how "sold out" ends up struck through in one place and greyed
 in the other, and how one of them quietly stops handling a sparse matrix.
 
-### 15. Fit warnings in the grid — `ProductCard`
+### 15. Full-screen photography with zoom — `Lightbox`
+
+Apparel is bought on detail a 900px thumbnail cannot carry: the weave, the
+stitch density, how a collar actually rolls. A shopper who cannot get closer
+either takes the risk or leaves, and in a category where returns already run
+high, "takes the risk" is not the outcome to design for either.
+
+Tapping the photograph opens it full screen with arrows, thumbnails, keyboard
+control and zoom to 3×. Three decisions that make it work rather than merely
+exist:
+
+- **Zoom is a transform, not a bigger request.** The source is already the
+  largest file there is; re-fetching at higher density would put a spinner in
+  the middle of the interaction meant to answer the question.
+- **Pan is clamped to the image.** Unclamped panning is how a zoomed photo ends
+  up as an empty field with a sleeve in the corner and no obvious way back.
+- **Zooming disables the swipe.** Sharing one gesture between "look closer" and
+  "next photo" means neither works — every pan across the image would advance
+  the gallery.
+
+Video opens in the viewer but never zooms, and its frame is a plain box rather
+than a button: a `<video controls>` inside a `<button>` is invalid markup and a
+scrub bar that cannot be scrubbed.
+
+### 16. Fit warnings in the grid — `ProductCard`
 
 "Runs small" appears on the card, not just the product page. Someone comparing
 eight products decides which two to open from the grid, and that is the fact

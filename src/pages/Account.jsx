@@ -22,18 +22,31 @@ export default function Account() {
   if (!customer) return <Navigate to="/login" state={{ from: '/account' }} replace />
 
   return (
-    <div className="wrap grid gap-10 py-12 pb-20 lg:grid-cols-[14rem_1fr]">
-      <aside>
+    <div className="wrap grid gap-8 py-12 pb-20 lg:grid-cols-[14rem_1fr] lg:gap-10">
+      {/*
+        A sidebar on a wide screen, a row of pills on a narrow one.
+
+        Stacked vertically on a phone the same nav is four full-width rows plus
+        a sign-out between the heading and the content, so "Orders" starts
+        below the fold on a page whose whole purpose is to get someone to their
+        orders. The pill row scrolls sideways and costs one line.
+      */}
+      <aside className="min-w-0">
         <p className="eyebrow">Signed in as</p>
         <p className="mt-2 truncate text-[15px] font-medium">{customer.email}</p>
-        <nav className="mt-7 space-y-0.5">
+
+        <nav className="no-scrollbar -mx-1 mt-5 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:mx-0 lg:mt-7 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0">
           {TABS.map((t) => (
             <NavLink
               key={t.to}
               to={t.to}
               end={t.end}
               className={({ isActive }) =>
-                `flex items-center gap-2.5 rounded-xs px-3 py-2.5 text-[14px] transition-colors ${isActive ? 'bg-sunken text-ink' : 'text-muted hover:text-ink'}`
+                `flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xs border px-3 py-2.5 text-[14px] transition-colors lg:border-transparent ${
+                  isActive
+                    ? 'border-ink bg-ink text-page lg:border-transparent lg:bg-sunken lg:text-ink'
+                    : 'border-line text-muted hover:text-ink lg:border-transparent'
+                }`
               }
             >
               <Icon name={t.icon} size={16} />
@@ -43,7 +56,7 @@ export default function Account() {
           <button
             type="button"
             onClick={async () => { await logout(); navigate('/') }}
-            className="flex w-full items-center gap-2.5 rounded-xs px-3 py-2.5 text-[14px] text-muted transition-colors hover:text-sale"
+            className="flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xs border border-line px-3 py-2.5 text-[14px] text-muted transition-colors hover:text-sale lg:w-full lg:border-transparent"
           >
             <Icon name="log-out" size={16} />
             Sign out

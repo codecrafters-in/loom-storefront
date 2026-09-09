@@ -329,6 +329,20 @@ shorter page rather than a set of empty headings.
 
 ## Attributes
 
+### Order visibility
+
+`GET /orders` requires a session and returns only that customer's orders.
+`GET /orders/:id` opens for its owner, or — when nobody is signed in — for the
+browser that placed it, which is what makes guest checkout's confirmation page
+work without a password prompt at the worst possible moment.
+
+Two rules worth copying into a real implementation:
+
+- **A signed-in session wins over the browser capability.** Otherwise the second
+  person to use a shared laptop can open the first person's order.
+- **Refuse with 404, not 403.** "You are not allowed to see this" confirms the
+  order exists, which is most of what an attacker enumerating ids wants.
+
 ### Discounts
 
 `compareAtPrice` above `price` renders a struck-through original. The **`−N%`

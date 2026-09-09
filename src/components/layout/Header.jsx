@@ -179,9 +179,28 @@ export default function Header() {
               </Link>
             )}
 
+            {/*
+              Visible at every width. It was `hidden sm:grid`, which left a
+              phone with no way to reach an order, an address or a sign-out
+              except through the hamburger — and nobody opens a navigation
+              drawer looking for their account. The bag and the saved items are
+              both there at every width; the account is the same kind of thing.
+            */}
             {features.accounts !== false && (
-              <Link to={signedIn ? '/account' : '/login'} aria-label={signedIn ? 'Your account' : 'Sign in'} className={`${iconBtn} hidden sm:grid`}>
+              <Link
+                to={signedIn ? '/account' : '/login'}
+                aria-label={signedIn ? 'Your account' : 'Sign in'}
+                className={iconBtn}
+              >
                 <Icon name="user" size={19} />
+                {/* Signed-in state has to be legible without opening the page,
+                    or the only way to find out is to tap and see. */}
+                {signedIn && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-good ring-2 ring-page"
+                  />
+                )}
               </Link>
             )}
 

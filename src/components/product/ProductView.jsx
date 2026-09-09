@@ -9,6 +9,7 @@ import { useCart } from '../../store/CartContext.jsx'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { useWishlist } from '../../store/WishlistContext.jsx'
 import { FitBlock, FabricBlock, SizeChartModal } from './FitBlock.jsx'
+import Lightbox from './Lightbox.jsx'
 import TrustRow, { PaymentsRow, SocialProof } from './TrustRow.jsx'
 import {
   ProductHighlights,
@@ -67,6 +68,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
   const [showAllThumbs, setShowAllThumbs] = useState(false)
   const [showSticky, setShowSticky] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [zoomOpen, setZoomOpen] = useState(false)
   const buyRef = useRef(null)
 
   const { add, busy } = useCart()
@@ -289,9 +291,17 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                 head and the hem. 4:5 is what Zara, COS, Uniqlo and Everlane all
                 shoot to, and every image in this theme is produced at 900×1125.
               */}
-              <div
-                className="relative w-full overflow-hidden rounded-xs bg-sunken"
-                style={{ aspectRatio: '4 / 5', maxHeight: '78vh' }}
+              {/*
+                The frame is a button on a photograph and a plain box on a
+                video. Tapping a product photo to see it bigger is the
+                most-tried gesture on a page like this and until now it did
+                nothing — but a `<video controls>` inside a `<button>` is
+                invalid markup and, worse, a scrub bar that cannot be scrubbed.
+              */}
+              <Frame
+                zoomable={gallery[shot]?.type !== 'video'}
+                onZoom={() => setZoomOpen(true)}
+                label={`View ${product.title} full screen`}
               >
                 {/* A short viewport crops the panel. Biasing the crop above
                     centre keeps the collar and the face; a centred crop takes
@@ -313,7 +323,16 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                 {/* Only over the first shot — the rest are detail crops, and
                     the crop is the answer somebody opened them for. */}
                 {shot === 0 && <ImageSpecs enrichment={product.enrichment} />}
-              </div>
+
+                {gallery[shot]?.type !== 'video' && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-page/80 text-ink backdrop-blur-sm"
+                  >
+                    <Icon name="search" size={16} />
+                  </span>
+                )}
+              </Frame>
             </div>
           </div>
         </div>
@@ -622,6 +641,10 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
       </div>
       )}
 
+      {!preview && zoomOpen && (
+        <Lightbox images={gallery} index={shot} onIndex={setShot} onClose={() => setZoomOpen(false)} />
+      )}
+
       {!preview && sheetOpen && (
         <VariantSheet
           product={product}
@@ -650,6 +673,25 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
 
       <SizeChartModal product={product} open={chartOpen} onClose={() => setChartOpen(false)} />
     </>
+  )
+}
+
+/** The gallery frame: a zoom button over a photograph, a plain box over video. */
+function Frame({ zoomable, onZoom, label, children }) {
+  const shared = 'relative block w-full overflow-hidden rounded-xs bg-sunken'
+  const style = { aspectRatio: '4 / 5', maxHeight: '78vh' }
+
+  if (!zoomable) {
+    return (
+      <div className={shared} style={style}>
+        {children}
+      </div>
+    )
+  }
+  return (
+    <button type="button" onClick={onZoom} aria-label={label} className={`${shared} cursor-zoom-in`} style={style}>
+      {children}
+    </button>
   )
 }
 
