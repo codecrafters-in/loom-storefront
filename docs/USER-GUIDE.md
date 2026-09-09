@@ -160,6 +160,24 @@ For **redirect**, paste the address your developer gives you into **Create URL**
 
 ---
 
+## See how it will look before you save
+
+**Preview**, at the top of the product editor.
+
+It works on a brand-new product before you have saved anything, and it shows
+your unsaved edits — it renders the same components the shop does, so what you
+see is what a shopper gets. You also get the listing card, because that is where
+most people meet a product and a shot that works in the gallery can still be
+wrong at thumbnail size.
+
+A strip at the top flags anything that would look broken: no image, missing alt
+text, no variants, everything out of stock, no category, still a draft.
+
+> **Live page** beside it opens the published version in a new tab, for
+> comparison. It only appears once the product is saved and published.
+
+---
+
 ## Add photos and video
 
 **Open the product → Media**

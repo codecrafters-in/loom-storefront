@@ -7,6 +7,7 @@ import Media from '../../components/ui/Media.jsx'
 import * as media from '../../lib/media.js'
 import { Hint } from '../../components/admin/Tour.jsx'
 import { useToast } from '../../store/ToastContext.jsx'
+import ProductPreview from '../../components/admin/ProductPreview.jsx'
 import { formatMoney, toMinor, toMajor } from '../../lib/money.js'
 
 /**
@@ -77,6 +78,7 @@ export default function ProductEditor() {
   const [tab, setTab] = useState('details')
   const [busy, setBusy] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
 
   useEffect(() => {
     if (loaded.data && !draft) setDraft(structuredClone(loaded.data))
@@ -181,15 +183,25 @@ export default function ProductEditor() {
             {draft.published !== false ? 'Published' : 'Draft'}
           </button>
 
-          {!isNew && draft.slug && (
+          <button
+            type="button"
+            onClick={() => setPreviewing(true)}
+            className="inline-flex items-center gap-1.5 rounded-xs border border-line px-3 py-1.5 text-[12px] text-muted transition-colors hover:border-ink hover:text-ink"
+          >
+            <Icon name="search" size={13} />
+            Preview
+          </button>
+
+          {/* The live page, for comparison. Only exists once something is
+              saved, and only useful when it is published. */}
+          {!isNew && draft.slug && draft.published !== false && (
             <a
               href={`/product/${draft.slug}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-xs border border-line px-3 py-1.5 text-[12px] text-muted transition-colors hover:border-ink hover:text-ink"
+              className="inline-flex items-center gap-1.5 text-[12px] text-faint transition-colors hover:text-ink"
             >
-              <Icon name="search" size={13} />
-              Preview on store
+              Live page <Icon name="arrow-right" size={13} />
             </a>
           )}
         </div>
@@ -219,6 +231,13 @@ export default function ProductEditor() {
         {tab === 'fit' && <FitTab {...props} />}
         {tab === 'organise' && <OrganiseTab {...props} />}
       </div>
+
+      <ProductPreview
+        draft={draft}
+        charts={charts.data?.items || []}
+        open={previewing}
+        onClose={() => setPreviewing(false)}
+      />
 
       {/* A save bar that is always reachable. On a five-tab form, a button at
           the bottom of tab three is a button nobody finds. */}

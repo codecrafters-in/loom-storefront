@@ -1,0 +1,434 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import {
+  Badge, Button, Icon, Price, QuantityStepper, Rating,
+} from '../ui/index.jsx'
+import Media from '../ui/Media.jsx'
+import { formatMoney } from '../../lib/money.js'
+import { useCart } from '../../store/CartContext.jsx'
+import { useStorefront } from '../../store/StorefrontContext.jsx'
+import { useWishlist } from '../../store/WishlistContext.jsx'
+import { FitBlock, FabricBlock, SizeChartModal } from './FitBlock.jsx'
+import TrustRow, { SocialProof } from './TrustRow.jsx'
+
+/**
+ * The gallery and the buy box — everything above the reviews on a product page.
+ *
+ * Extracted so the admin preview renders *this*, not a lookalike. A preview
+ * built from its own markup drifts from the real page within a release or two,
+ * and then it is worse than no preview: it shows something that will not
+ * happen.
+ *
+ * `preview` makes it inert. The cart, the wishlist, the URL sync and the sticky
+ * bar are all real-page concerns; in the editor they would either fail (there is
+ * no route to sync) or do something genuinely wrong (adding an unsaved product
+ * to a shopper's bag).
+ */
+export default function ProductView({ product, preview = false, onOpenChart }) {
+  const config = useStorefront()
+  const [params, setParams] = useSearchParams()
+  const [color, setColor] = useState(null)
+  const [size, setSize] = useState(null)
+  const [qty, setQty] = useState(1)
+  const [shot, setShot] = useState(0)
+  const [tab, setTab] = useState('details')
+  const [chartOpen, setChartOpen] = useState(false)
+  const [showSticky, setShowSticky] = useState(false)
+  const buyRef = useRef(null)
+
+  const { add, busy } = useCart()
+  const { has, toggle } = useWishlist()
+
+  const colors = useMemo(
+    () => product?.options.find((o) => o.name === 'Color')?.values || [],
+    [product],
+  )
+  const sizes = useMemo(
+    () => product?.options.find((o) => o.name === 'Size')?.values || [],
+    [product],
+  )
+  /**
+   * Default to the first colour that is actually buyable.
+   *
+   * Falling back to `colors[0]` looks harmless until the first colourway sells
+   * out, at which point every visitor lands on a product where every size is
+   * struck through and concludes the whole thing is gone.
+   */
+  const firstInStock = useMemo(() => {
+    if (!product) return null
+    return (
+      colors.find((c) => product.variants.some((v) => v.options.Color === c && v.available)) ||
+      colors[0] ||
+      null
+    )
+  }, [product, colors])
+  const activeColor = color ?? firstInStock
+
+  /** Which sizes are actually buyable in the chosen colour — greying these out
+   *  is the difference between a picker and a guessing game. */
+  const sizeAvailability = useMemo(() => {
+    if (!product) return {}
+    return Object.fromEntries(
+      sizes.map((s) => [
+        s,
+        product.variants.find((v) => v.options.Color === activeColor && v.options.Size === s)?.inventory ?? 0,
+      ]),
+    )
+  }, [product, sizes, activeColor])
+
+  const variant = product?.variants.find(
+    (v) => v.options.Color === activeColor && v.options.Size === size,
+  )
+
+  /** Which colours have nothing left at all — struck through rather than hidden. */
+  const colorSoldOut = useMemo(() => {
+    if (!product) return {}
+    return Object.fromEntries(
+      colors.map((c) => [c, !product.variants.some((v) => v.options.Color === c && v.available)]),
+    )
+  }, [product, colors])
+
+  /**
+   * Changing colour keeps the size when that size still exists in the new
+   * colour. Clearing it every time makes the picker feel like it is fighting
+   * you, and it is the most common thing to get wrong in a variant selector.
+   */
+  const pickColor = (c) => {
+    setColor(c)
+    const stillThere = product.variants.find(
+      (v) => v.options.Color === c && v.options.Size === size && v.available,
+    )
+    if (!stillThere) setSize(null)
+  }
+
+  // The selected variant lives in the URL, so a shared link, an ad or a
+  // back button all land on the exact colour and size that was chosen. In the
+  // editor there is no product route to sync with, so this stays off.
+  useEffect(() => {
+    if (preview || !variant) return
+    const next = new URLSearchParams(params)
+    if (next.get('variant') === variant.id) return
+    next.set('variant', variant.id)
+    setParams(next, { replace: true })
+  }, [preview, variant, params, setParams])
+
+  // Restore from the URL on first load.
+  useEffect(() => {
+    if (preview || !product || color || size) return
+    const wanted = params.get('variant')
+    const found = product.variants.find((v) => v.id === wanted)
+    if (found) {
+      setColor(found.options.Color)
+      setSize(found.options.Size)
+    }
+  }, [preview, product, params, color, size])
+
+  /**
+   * The gallery follows the colour picker.
+   *
+   * An image tagged with the chosen colour wins; failing that, the variant's
+   * own `imageId`. Both are optional, so a store with one set of photography
+   * behaves exactly as before.
+   */
+  useEffect(() => {
+    if (!product) return
+    const byColor = product.images.findIndex((img) => img.color && img.color === activeColor)
+    if (byColor >= 0) {
+      setShot(byColor)
+      return
+    }
+    if (variant?.imageId) {
+      const i = product.images.findIndex((img) => img.id === variant.imageId)
+      if (i >= 0) setShot(i)
+    }
+  }, [variant, product, activeColor])
+
+  // A sticky buy bar once the real one scrolls away — on a long product page
+  // the decision often happens next to the reviews, and walking back up to a
+  // button is where a phone shopper leaves.
+  useEffect(() => {
+    const el = buyRef.current
+    if (preview || !el || typeof IntersectionObserver === 'undefined') return undefined
+    const io = new IntersectionObserver(([e]) => setShowSticky(!e.isIntersecting), { threshold: 0 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [preview, product])
+
+  const saved = has(product.slug)
+  const lowStock = variant && variant.inventory > 0 && variant.inventory <= 3
+
+  return (
+    <>
+      <div className={`grid gap-10 pb-16 lg:grid-cols-2 lg:gap-16 ${preview ? "" : "wrap mt-8"}`}>
+        {/* gallery */}
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          <div className="shot rounded-xs">
+            <Media
+              src={product.images[shot]?.url}
+              type={product.images[shot]?.type}
+              alt={product.images[shot]?.alt}
+              width={product.images[shot]?.width}
+              height={product.images[shot]?.height}
+              controls={product.images[shot]?.type === 'video'}
+              fetchPriority="high"
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
+          </div>
+          {product.images.length > 1 && (
+            <div className="mt-3 flex gap-3">
+              {product.images.map((img, i) => (
+                <button
+                  key={img.url}
+                  type="button"
+                  onClick={() => setShot(i)}
+                  aria-label={`View image ${i + 1}`}
+                  aria-current={i === shot}
+                  className={`shot w-20 rounded-xs ring-1 transition-shadow ${i === shot ? 'ring-ink' : 'ring-line hover:ring-muted'}`}
+                >
+                  <Media src={img.url} type={img.type} alt="" loading="lazy" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* buy box */}
+        <div>
+          {product.badges?.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {product.badges.map((b) => <Badge key={b} kind={b} />)}
+            </div>
+          )}
+
+          <h1 className="text-display-lg">{product.title}</h1>
+          <p className="mt-2 text-[15px] text-muted">{product.subtitle}</p>
+
+          <div className="mt-5 flex flex-wrap items-center gap-4">
+            <Price
+              price={variant?.price || product.price}
+              compareAt={variant?.compareAtPrice ?? product.compareAtPrice}
+              size="lg"
+            />
+            <a href="#reviews" className="shrink-0">
+              <Rating value={product.rating.average} count={product.rating.count} />
+            </a>
+          </div>
+
+          <p className="mt-6 text-[15px] leading-relaxed text-muted">{product.description}</p>
+
+          {/* colour */}
+          <fieldset className="mt-9">
+            <legend className="text-[13px] font-medium">
+              Colour: <span className="text-muted">{activeColor}</span>
+            </legend>
+            <div className="mt-3 flex flex-wrap gap-2.5">
+              {colors.map((c) => {
+                const out = colorSoldOut[c]
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => pickColor(c)}
+                    aria-pressed={c === activeColor}
+                    title={out ? `${c} — sold out` : c}
+                    className={`relative grid h-11 w-11 place-items-center rounded-full ring-1 ring-inset transition-shadow ${
+                      c === activeColor
+                        ? 'ring-2 ring-offset-2 ring-ink ring-offset-page'
+                        : 'ring-ink/15 hover:ring-muted'
+                    } ${out ? 'opacity-45' : ''}`}
+                    style={{ background: product.swatches?.[c] || '#ddd' }}
+                  >
+                    <span className="sr-only">{c}{out ? ' (sold out)' : ''}</span>
+                    {out && <span aria-hidden="true" className="absolute h-[1.5px] w-8 -rotate-45 bg-ink/60" />}
+                  </button>
+                )
+              })}
+            </div>
+          </fieldset>
+
+          {/* size */}
+          <fieldset className="mt-7">
+            <div className="flex items-baseline justify-between">
+              <legend className="text-[13px] font-medium">Size</legend>
+              {product.sizeChart ? (
+                <button type="button" onClick={() => (onOpenChart ? onOpenChart() : setChartOpen(true))} className="text-[12px] text-accent link-underline">
+                  Size chart
+                </button>
+              ) : (
+                <Link to="/pages/size-guide" className="text-[12px] text-muted link-underline">Size guide</Link>
+              )}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {sizes.map((s) => {
+                const stock = sizeAvailability[s]
+                const out = stock === 0
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={out}
+                    onClick={() => setSize(s)}
+                    aria-pressed={s === size}
+                    className={`relative h-12 min-w-[3.5rem] rounded-xs border px-3.5 text-sm transition-colors ${
+                      out
+                        ? 'cursor-not-allowed border-line text-faint'
+                        : s === size
+                          ? 'border-ink bg-ink text-page'
+                          : 'border-line text-ink hover:border-ink'
+                    }`}
+                  >
+                    {s}
+                    {out && (
+                      <span aria-hidden="true" className="absolute inset-x-2 top-1/2 h-px -rotate-[18deg] bg-line" />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            {size && lowStock && (
+              <p className="mt-3 text-[13px] text-sale">Only {variant.inventory} left in {activeColor}, size {size}.</p>
+            )}
+          </fieldset>
+
+          {/* add */}
+          <div ref={buyRef} className="mt-8 flex flex-wrap items-center gap-3">
+            <QuantityStepper value={qty} onChange={setQty} max={variant?.inventory || 10} />
+            <Button
+              size="lg"
+              className="min-w-[12rem] flex-1"
+              disabled={preview || !variant || busy}
+              onClick={() => !preview && add(variant.id, qty, `${product.title} added to your bag`)}
+            >
+              {!size ? 'Select a size' : !variant?.available ? 'Out of stock' : busy ? 'Adding…' : 'Add to bag'}
+            </Button>
+            {config.features?.wishlist !== false && (
+            <Button
+              variant="quiet"
+              size="lg"
+              aria-pressed={saved}
+              aria-label={saved ? 'Remove from saved' : 'Save for later'}
+              onClick={() => !preview && toggle(product.slug, product.title)}
+              className="w-[52px] px-0"
+            >
+              <Icon name="heart" size={19} filled={saved} className={saved ? 'text-sale' : ''} />
+            </Button>
+            )}
+          </div>
+
+          <TrustRow />
+          {config.trust?.showSocialProof !== false && <SocialProof product={product} />}
+
+          {config.trust?.showFitFeedback !== false && (
+            <FitBlock product={product} onOpenChart={() => (onOpenChart ? onOpenChart() : setChartOpen(true))} />
+          )}
+          <FabricBlock product={product} />
+
+          {/* details */}
+          <div className="mt-10 border-t border-line">
+            <div className="flex gap-6 border-b border-line" role="tablist">
+              {[['details', 'Details'], ['care', 'Care'], ['shipping', 'Shipping']].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === id}
+                  onClick={() => setTab(id)}
+                  className={`-mb-px border-b-2 py-3.5 text-[13px] transition-colors ${tab === id ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="py-6">
+              {tab === 'details' && (
+                <ul className="space-y-2.5">
+                  {product.details.map((d) => (
+                    <li key={d} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
+                      <Icon name="check" size={15} className="mt-0.5 shrink-0 text-accent" />
+                      {d}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {tab === 'care' && (
+                <ul className="space-y-2.5">
+                  {product.care.map((c) => (
+                    <li key={c} className="flex gap-2.5 text-[14px] leading-relaxed text-muted">
+                      <Icon name="sparkle" size={15} className="mt-0.5 shrink-0 text-accent" />
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {tab === 'shipping' && (
+                <div className="space-y-3 text-[14px] leading-relaxed text-muted">
+                  <p>
+                    Standard shipping is{' '}
+                    {formatMoney({
+                      amount: config.commerce?.shippingMethods?.[0]?.price ?? 1200,
+                      currency: config.pricing?.currency || 'USD',
+                    })}
+                    , free over{' '}
+                    {formatMoney({
+                      amount: config.commerce?.freeShippingOver ?? 15000,
+                      currency: config.pricing?.currency || 'USD',
+                    })}
+                    . Orders placed before 2pm ship the same working day.
+                  </p>
+                  <p>
+                    Returns are free within {config.commerce?.returnsWindowDays ?? 30} days, unworn and
+                    with tags attached. A prepaid label is in every parcel.
+                  </p>
+                  <p>We repair anything we made. Send it back and we will quote before doing the work.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sticky buy bar. Appears only once the real one has scrolled away, so
+          it never competes with itself, and it repeats the selection so the bar
+          is never ambiguous about what it is about to add. Never in a preview:
+          a fixed bar inside a dialog is a bar stuck to the browser window. */}
+      {!preview && (
+      <div
+        className={`fixed inset-x-0 bottom-0 z-30 border-t border-line bg-page/95 backdrop-blur transition-transform duration-300 ${
+          showSticky ? 'translate-y-0' : 'translate-y-full'
+        }`}
+      >
+        <div className="wrap flex items-center gap-3 py-3">
+          <div className="hidden w-12 shrink-0 sm:block">
+            <div className="shot rounded-xs">
+              <Media src={product.images[shot]?.url} type={product.images[shot]?.type} alt="" loading="lazy" className="h-full w-full object-cover" />
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-medium">{product.title}</p>
+            <p className="truncate text-[12px] text-faint">
+              {activeColor}
+              {size ? ` · ${size}` : ' · select a size'}
+            </p>
+          </div>
+          <Price price={variant?.price || product.price} compareAt={variant?.compareAtPrice ?? product.compareAtPrice} size="sm" className="hidden shrink-0 sm:inline-flex" />
+          <Button
+            size="md"
+            className="shrink-0"
+            disabled={!variant || busy}
+            onClick={() =>
+              variant
+                ? add(variant.id, qty, `${product.title} added to your bag`)
+                : buyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+          >
+            {!size ? 'Choose size' : !variant?.available ? 'Out of stock' : 'Add to bag'}
+          </Button>
+        </div>
+      </div>
+      )}
+
+      <SizeChartModal product={product} open={chartOpen} onClose={() => setChartOpen(false)} />
+    </>
+  )
+}
