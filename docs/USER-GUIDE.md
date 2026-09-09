@@ -251,17 +251,16 @@ see what you are writing as you write it.
 
 | Section | Where a shopper sees it | Keep it to |
 | --- | --- | --- |
-| **Highlights** | Beside the buy button, above the fold | Six pairs |
+| **Highlights** | Above the buy button | Six pairs |
 | **Comes with** | Under the buy button | Three or four rows, plus the maker |
-| **Features** | Below, in "All details" | Two or three |
-| **Specifications** | Below, grouped, expandable | As much as you like |
-| **Manufacturer info** | Below | Whatever the law asks for |
+| **Features** | Detail stack — "What makes it different" | Two or three |
+| **Specifications** | Detail stack — swipes through one group at a time | As much as you like |
+| **Manufacturer info** | Detail stack | Whatever the law asks for |
 
-> The preview changes width with the section, because the page does. Highlights
-> and Comes with preview in a narrow column, because that is the column they
-> ship in beside the buy button; the rest preview full width. A full-width block
-> shown in a narrow rail is not what ships, and it will talk you into rewriting
-> copy that was fine.
+> All of it sits in the column beside the buy button, and all of it previews at
+> that width. Nothing lives in a full-width section below the fold any more:
+> anything that decides a purchase has to be reachable without scrolling the buy
+> button off the screen.
 
 **Highlights** are the two-second scan — fabric, fit, weight, the things
 somebody checks before deciding to keep reading. Start typing in the key box and
@@ -295,7 +294,8 @@ characters and warns before the card starts truncating.
 
 **Specifications** is the full table. Rows sort themselves into General, Fabric
 & care, Fit, Sustainability and Packaging by their key, so the order you type
-them in does not matter.
+them in does not matter — and on the product page it swipes one group at a time,
+which is how the whole table fits in a column instead of a page.
 
 > Every block disappears when it is empty. A product with nothing filled in is a
 > shorter page, not a set of blank headings.

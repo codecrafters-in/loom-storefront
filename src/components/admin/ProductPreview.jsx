@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from 'react'
 import ProductView from '../product/ProductView.jsx'
-import { ProductDetails } from '../product/Enrichment.jsx'
 import ProductCard from '../product/ProductCard.jsx'
 import { Icon } from '../ui/index.jsx'
 
@@ -102,10 +101,6 @@ export default function ProductPreview({ draft, charts = [], open, onClose }) {
             </div>
           </section>
         </div>
-
-        {/* Outside the container above — ProductDetails brings its own, and
-            nesting one inside the other doubles the padding. */}
-        <ProductDetails product={product} />
       </div>
     </div>
   )

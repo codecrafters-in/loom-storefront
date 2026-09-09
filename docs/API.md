@@ -284,13 +284,25 @@ Cache it hard — it changes when a merchant saves settings, not per request.
 
 Three blocks, deliberately not one:
 
+Every block renders in the column beside the buy button. Nothing is a full-width
+section below the fold any more: a page that asks a shopper to scroll past the
+button to find the fabric weight has already lost the shoppers who would not
+have scrolled, and they are the majority.
+
 | Block | Where it renders | What it is for |
 | --- | --- | --- |
-| `highlights` | Above the fold, beside the buy button | The scan. Six pairs read in two seconds |
+| `highlights` | Above the buy button | The scan. Six pairs read in two seconds |
 | `assurances` | Under the buy button | What happens after the sale — returns, exchange, repair, payment |
 | `maker` | Under the assurances | Who made it. The marketplace seller block, adapted |
-| `features` | Below the fold, in "All details" | Two or three things a competitor could not copy-paste |
-| `specs` | Below the fold, grouped, expandable | The reference table. Nobody reads it end to end |
+| `features` | Detail stack, "What makes it different" | Two or three things a competitor could not copy-paste |
+| `specs` | Detail stack, "Specifications" — a carousel, one group per slide | The reference table. Nobody reads it end to end |
+| `manufacturer` | Detail stack, "Manufacturer info" | Compliance |
+
+The specification table is paged **by group**, not by row. The groups are already
+the units a shopper thinks in, so a slide is a complete answer rather than an
+arbitrary slice of a list — which is what makes a carousel acceptable here at
+all. Order and grouping still come from `GET /attributes` on read; a backend
+stores a flat map and no presentation order.
 | `manufacturer` | Below the fold | Compliance, not marketing — see below |
 
 Putting all of it in one long table means most shoppers read none of it and the

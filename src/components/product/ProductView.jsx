@@ -10,7 +10,14 @@ import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { useWishlist } from '../../store/WishlistContext.jsx'
 import { FitBlock, FabricBlock, SizeChartModal } from './FitBlock.jsx'
 import TrustRow, { SocialProof } from './TrustRow.jsx'
-import { ProductHighlights, ProductAssurances, ProductMaker } from './Enrichment.jsx'
+import {
+  ProductHighlights,
+  ProductAssurances,
+  ProductMaker,
+  FeatureList,
+  SpecCarousel,
+  ManufacturerRows,
+} from './Enrichment.jsx'
 
 /**
  * The gallery and the buy box — everything above the reviews on a product page.
@@ -477,6 +484,16 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               />
             </Accordion>
 
+            {/* Enrichment lives in this stack rather than in a section below
+                the fold. Anything that decides a purchase has to be reachable
+                without scrolling the buy button off the screen — a shopper who
+                has to go looking for the fabric weight mostly does not go. */}
+            {product.enrichment?.features?.length > 0 && (
+              <Accordion title="What makes it different">
+                <FeatureList items={product.enrichment.features} />
+              </Accordion>
+            )}
+
             <Accordion title="Fabric & care">
               <FabricBlock product={product} flat />
               {product.care?.length > 0 && (
@@ -491,6 +508,12 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               )}
             </Accordion>
 
+            {Object.keys(product.enrichment?.specs || {}).length > 0 && (
+              <Accordion title="Specifications">
+                <SpecCarousel specs={product.enrichment.specs} />
+              </Accordion>
+            )}
+
             {product.details?.length > 0 && (
               <Accordion title="Details">
                 <ul className="space-y-2.5">
@@ -501,6 +524,12 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                     </li>
                   ))}
                 </ul>
+              </Accordion>
+            )}
+
+            {product.enrichment?.manufacturer && (
+              <Accordion title="Manufacturer info">
+                <ManufacturerRows info={product.enrichment.manufacturer} />
               </Accordion>
             )}
 

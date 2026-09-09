@@ -126,8 +126,17 @@ Highlights, features and a specification table, in three places rather than one.
 The split is the point. A single long table gets read by almost nobody, and the
 shopper who does want one fact has to hunt for it. Six key/value pairs beside
 the buy button is a two-second scan that answers "is this the kind of thing I am
-looking for" before anyone commits to reading a paragraph — and the full table
-below still catches the person who wants to check the leg opening.
+looking for" before anyone commits to reading a paragraph — and the full table,
+one group at a time in the detail stack, still catches the person who wants to
+check the leg opening.
+
+**All of it lives beside the buy button.** This was a full-width section below
+the fold and that was the wrong place: a shopper who has to scroll the button
+off the screen to find the fabric weight mostly does not go looking, and the
+ones who would have are not the ones you were losing. The cost of moving it is
+width, which is why the specification table pages by group rather than laying
+out two columns — the groups are the units a shopper thinks in, so a slide is a
+complete answer rather than an arbitrary slice.
 
 Two rules that keep it useful rather than decorative:
 

@@ -1,6 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Button, Icon } from '../ui/index.jsx'
-import { ProductHighlights, ProductDetails, ProductAssurances, ProductMaker } from '../product/Enrichment.jsx'
+import {
+  ProductHighlights,
+  ProductAssurances,
+  ProductMaker,
+  FeatureList,
+  SpecCarousel,
+  ManufacturerRows,
+} from '../product/Enrichment.jsx'
 import { attributeByKey, attributeGroups } from '../../data/attributes.js'
 
 /**
@@ -17,17 +24,6 @@ import { attributeByKey, attributeGroups } from '../../data/attributes.js'
  * they are selling, and no list at all produces "Fabric", "fabric", "Material"
  * and "Composition" as four separate attributes nobody can filter on.
  */
-/**
- * Sections that live in the 30rem buy column on the real page, and sections
- * that live full-width below it.
- *
- * The preview has to match, and until now it did not: a full-width block shown
- * inside a 26rem rail produced three feature cards at about 100px each, one
- * word per line. That is not what ships, so previewing it that way is worse
- * than not previewing it — it invites a merchant to rewrite copy that was fine.
- */
-const NARROW = new Set(['highlights', 'comes-with'])
-
 export default function EnrichmentTab({ draft, set, attributes = [], icons = [], assuranceTemplates = [] }) {
   const e = useMemo(() => draft.enrichment || {}, [draft.enrichment])
   const [section, setSection] = useState('highlights')
@@ -42,10 +38,8 @@ export default function EnrichmentTab({ draft, set, attributes = [], icons = [],
     [draft, e],
   )
 
-  const narrow = NARROW.has(section)
-
   return (
-    <div className={narrow ? 'grid gap-8 xl:grid-cols-[minmax(0,1fr)_26rem]' : 'space-y-10'}>
+    <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_26rem]">
       <div className="min-w-0 space-y-8">
         <div className="flex flex-wrap gap-2">
           {[
@@ -178,54 +172,61 @@ export default function EnrichmentTab({ draft, set, attributes = [], icons = [],
         )}
       </div>
 
-      {/* The real components, not an approximation of them — and at the width
-          they actually ship at, which is the half of "what you see is what
-          ships" that is easy to get wrong. */}
-      <aside className={narrow ? 'min-w-0 xl:sticky xl:top-24 xl:self-start' : 'min-w-0'}>
+      {/*
+        The real components, at the width they ship at.
+
+        Every one of these blocks now renders in the ~30rem column beside the
+        buy button, so a narrow rail is the honest preview — which it was not
+        while the specification table and the feature cards were a full-width
+        section below the fold.
+      */}
+      <aside className="min-w-0 xl:sticky xl:top-24 xl:self-start">
         <p className="eyebrow">Live preview</p>
-        <div
-          className={`mt-3 overflow-hidden rounded-xs border border-line bg-page ${
-            narrow ? '' : 'overflow-x-auto'
-          }`}
-        >
+        <div className="mt-3 overflow-hidden rounded-xs border border-line bg-page p-5">
           {section === 'highlights' &&
             (e.highlights?.length ? (
-              <div className="p-5">
-                <ProductHighlights enrichment={e} />
-              </div>
+              <ProductHighlights enrichment={e} />
             ) : (
-              <div className="p-5">
-                <Blank>Add a pair and it appears here, exactly as a shopper sees it.</Blank>
-              </div>
+              <Blank>Add a pair and it appears here, exactly as a shopper sees it.</Blank>
             ))}
 
           {section === 'comes-with' &&
             (e.assurances?.length || e.maker?.name ? (
-              <div className="p-5">
+              <>
                 <ProductAssurances product={preview} />
                 <ProductMaker enrichment={e} />
-              </div>
+              </>
             ) : (
-              <div className="p-5">
-                <Blank>
-                  Nothing product-specific yet — the storefront falls back to the store-wide rows
-                  from Settings.
-                </Blank>
-              </div>
+              <Blank>
+                Nothing product-specific yet — the storefront falls back to the store-wide rows
+                from Settings.
+              </Blank>
             ))}
 
-          {!narrow &&
-            (e.features?.length || specRows.length || e.manufacturer ? (
-              <ProductDetails product={preview} />
+          {section === 'features' &&
+            (e.features?.length ? (
+              <FeatureList items={e.features} />
             ) : (
-              <div className="p-5">
-                <Blank>Nothing to show yet.</Blank>
-              </div>
+              <Blank>Add a feature and the card appears here.</Blank>
+            ))}
+
+          {section === 'specs' &&
+            (specRows.length ? (
+              <SpecCarousel specs={e.specs} />
+            ) : (
+              <Blank>Add a row and the table appears here, grouped.</Blank>
+            ))}
+
+          {section === 'manufacturer' &&
+            (e.manufacturer && Object.values(e.manufacturer).some(Boolean) ? (
+              <ManufacturerRows info={e.manufacturer} />
+            ) : (
+              <Blank>Fill in a field and the block appears here.</Blank>
             ))}
         </div>
         <p className="mt-3 text-[12px] leading-relaxed text-faint">
-          Rendered with the storefront&rsquo;s own components at the width they ship at
-          {narrow ? ' — the column beside the buy button.' : ' — the full page, below the fold.'}
+          Rendered with the storefront&rsquo;s own components, in the column they ship in beside
+          the buy button.
         </p>
       </aside>
     </div>

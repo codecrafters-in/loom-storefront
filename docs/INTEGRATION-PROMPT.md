@@ -224,11 +224,13 @@ Rules on Product:
 - **`categories`** lists the leaf and its ancestors, or just the leaf if you
   resolve ancestors server-side when filtering.
 
-`enrichment` is several blocks on purpose, and they render in different places:
-`highlights` above the fold beside the buy button (six pairs, the two-second
-scan), `assurances` and `maker` under the buy button, `features` and `specs`
-below it. All of one long table means most people read none of it; all of it
-above the fold pushes the buy button off screen.
+`enrichment` is several blocks on purpose, and all of them render in the column
+beside the buy button — `highlights` above it (six pairs, the two-second scan),
+`assurances` and `maker` under it, `features`, `specs` and `manufacturer` in the
+collapsed detail stack below that. None of it is a full-width section below the
+fold: anything that decides a purchase has to be reachable without scrolling the
+button away. `specs` is paged by group in a carousel, which is how a full table
+fits in a 30rem column.
 
 - `highlights` is an **ordered array**, not an object — order is editorial and a
   JSON object does not guarantee it
