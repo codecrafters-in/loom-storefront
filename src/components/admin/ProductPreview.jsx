@@ -95,10 +95,6 @@ export default function ProductPreview({ draft, charts = [], open, onClose }) {
         <div className="wrap wrap-tight py-8">
           <ProductView product={product} preview />
 
-          <div className="-mx-5 mt-4">
-            <ProductDetails product={product} />
-          </div>
-
           <section className="mt-4 border-t border-line pt-10">
             <p className="eyebrow">On a listing page</p>
             <div className="mt-5 max-w-[16rem]">
@@ -106,6 +102,10 @@ export default function ProductPreview({ draft, charts = [], open, onClose }) {
             </div>
           </section>
         </div>
+
+        {/* Outside the container above — ProductDetails brings its own, and
+            nesting one inside the other doubles the padding. */}
+        <ProductDetails product={product} />
       </div>
     </div>
   )

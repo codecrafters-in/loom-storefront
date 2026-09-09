@@ -255,5 +255,15 @@ and wrong for a shop:
 
 - Export before you experiment. **Import / export → Download JSON.**
 - **Reset to demo data** discards everything and reseeds.
-- Bumping `VERSION` in `src/lib/db.js` reseeds on next load. It does not
-  migrate — this is demo data, and that is exactly why the file is demo-only.
+- Bumping `VERSION` in `src/lib/db.js` **backfills** on next load: fields the
+  seed has gained since — enrichment, size charts — appear on existing products,
+  and anything already there, including everything you have edited, is kept.
+  Products you created are untouched.
+
+  Reseeding outright would be worse than useless: the catalogue would look fine
+  and your work would be silently gone. A real backend runs ordered migrations
+  against a schema; a field-level merge is the honest browser equivalent, and it
+  is why this file never runs in `api` mode.
+
+  If a store looks stale after an upgrade — a block that should be there and is
+  not — reload once. If it persists, **Import / export → Reset to demo data**.

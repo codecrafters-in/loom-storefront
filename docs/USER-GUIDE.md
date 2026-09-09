@@ -402,4 +402,5 @@ developer wants [ADMIN.md](ADMIN.md#bulk).
 | A product vanished from the shop | Every size is at 0. Check **Inventory → Out of stock** |
 | A category shows no products | Nothing is filed under it or its children yet |
 | Prices look wrong by 100× | Free-shipping threshold is in the smallest unit; product prices are not |
+| A new feature is missing from old products | Reload once. The store fills in fields it has gained, keeping your edits |
 | Everything is broken | **Import / export → Reset to demo data** starts fresh |

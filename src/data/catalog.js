@@ -561,9 +561,41 @@ function enrichmentFor(raw, facts) {
     fabric.origin && { key: 'countryOfOrigin', value: fabric.origin },
   ].filter(Boolean)
 
+  /**
+   * Feature cards derived from facts the product already carries.
+   *
+   * An empty Features tab on eighteen of twenty-four products is not an
+   * editorial choice, it is a hole — and it is exactly the state a catalogue
+   * arrives in after a migration. These are built from the mill, the
+   * certification and the fit note, so nothing is invented; a merchant replaces
+   * them with their own copy when they have it.
+   */
+  const features = [
+    fabric.weight && fabric.weave && {
+      icon: 'ruler',
+      title: `${fabric.weight}gsm ${fabric.weave.toLowerCase()}`,
+      body: `Weight is what decides drape and warmth. At ${fabric.weight}gsm this hangs rather than clings, and it is the number most listings leave out.`,
+    },
+    fabric.origin && {
+      icon: 'award',
+      title: `Made in ${fabric.origin}`,
+      body: `Cut and finished in ${fabric.origin}. We name the mill because a country of origin on its own tells you almost nothing.`,
+    },
+    fabric.certifications?.length && {
+      icon: 'leaf',
+      title: fabric.certifications[0],
+      body: `Independently audited rather than self-declared, which is the whole difference between a certification and a claim. Certificate numbers on request.`,
+    },
+    facts.fit?.note && {
+      icon: 'sparkle',
+      title: facts.fit.verdict === 'true-to-size' ? 'Take your usual size' : 'Read the fit note first',
+      body: facts.fit.note,
+    },
+  ].filter(Boolean).slice(0, 3)
+
   return {
     highlights,
-    features: [],
+    features,
     specs: {
       ...(fabric.composition?.length ? { composition: fabric.composition.map(([m, pct]) => `${pct}% ${m}`).join(', ') } : {}),
       ...(fabric.weight ? { weight: String(fabric.weight) } : {}),

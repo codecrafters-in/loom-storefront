@@ -17,7 +17,7 @@
  */
 
 const KEY = 'loom.db'
-const VERSION = 4
+const VERSION = 5
 
 const listeners = new Set()
 let cache = null
@@ -76,15 +76,68 @@ export function ready() {
     } catch {
       stored = null
     }
-    if (!stored || stored.version !== VERSION) {
-      // A schema change reseeds rather than migrating. This is demo data; a
-      // real backend migrates, and that is exactly why this file is demo-only.
-      return persist(await seed())
+    if (!stored) return persist(await seed())
+
+    if (stored.version !== VERSION) {
+      // Reseeding outright would throw away everything the user has edited, and
+      // silently: the catalogue would look fine and their work would be gone.
+      // Backfilling instead means a field added to the seed after they started
+      // — enrichment, size charts — appears on their products without touching
+      // what they changed.
+      return persist(await backfill(stored))
     }
     cache = stored
     return cache
   })()
   return readyPromise
+}
+
+/**
+ * Bring an older store up to the current shape.
+ *
+ * Seed values fill gaps; anything already present wins, because it is either
+ * the original seed or something the user typed. Products the seed has gained
+ * since are added; products the user created are left alone.
+ *
+ * A real backend runs ordered migrations against a schema. This is demo data in
+ * a browser, and a field-level merge is the honest equivalent — it is why this
+ * file is demo-only and `api` mode never touches it.
+ */
+async function backfill(stored) {
+  const fresh = await seed()
+  const bySlug = new Map((stored.products || []).map((p) => [p.slug, p]))
+
+  const products = fresh.products.map((seeded) => {
+    const existing = bySlug.get(seeded.slug)
+    if (!existing) return seeded
+    bySlug.delete(seeded.slug)
+    // Only fill what is missing. A key the user has edited keeps its value even
+    // when the seed has since changed it.
+    const merged = { ...existing }
+    for (const [key, value] of Object.entries(seeded)) {
+      if (merged[key] === undefined || merged[key] === null) merged[key] = value
+    }
+    return merged
+  })
+
+  // Anything the user added that the seed does not know about.
+  products.push(...bySlug.values())
+
+  const mergeById = (seedList, storedList, key) => {
+    const map = new Map((seedList || []).map((x) => [x[key], x]))
+    ;(storedList || []).forEach((x) => map.set(x[key], { ...map.get(x[key]), ...x }))
+    return [...map.values()]
+  }
+
+  return {
+    ...fresh,
+    version: VERSION,
+    products,
+    categories: mergeById(fresh.categories, stored.categories, 'slug'),
+    collections: mergeById(fresh.collections, stored.collections, 'slug'),
+    sizeCharts: mergeById(fresh.sizeCharts, stored.sizeCharts, 'id'),
+    settings: deepMerge(fresh.settings, stored.settings || {}),
+  }
 }
 
 export function snapshot() {
