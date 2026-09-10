@@ -1,1 +1,12 @@
+# Netlify and Cloudflare Pages.
+#
+# The catch-all must come LAST and must not shadow the prerendered files. Every
+# route in the sitemap is written to disk as real HTML by scripts/prerender.mjs,
+# and a rewrite placed above them serves the home page for all 53 — which looks
+# fine locally and is invisible until somebody checks what Google indexed.
+#
+# `200!` would force the rewrite even when a file exists. That is exactly what
+# must not happen here, so it is a plain 200: the file wins, and this only
+# catches the client-side routes that have no file — cart, checkout, account,
+# search, admin.
 /*    /index.html   200

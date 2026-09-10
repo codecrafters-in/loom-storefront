@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "license": "MIT",
-  "description": "A production-shaped clothing storefront theme. Runs on bundled mock data out of the box, or against your own API by flipping one environment variable.",
+  "description": "Open-source React e-commerce storefront. Prerendered for SEO with Product JSON-LD, CRO built in, and AI prompts that generate your backend. Runs on bundled demo data or your own API.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -41,5 +41,30 @@
     "sharp": "^0.33.5",
     "tailwindcss": "^3.4.13",
     "vite": "^5.4.8"
-  }
+  },
+  "keywords": [
+    "ecommerce",
+    "storefront",
+    "react",
+    "vite",
+    "headless-commerce",
+    "seo",
+    "ssg",
+    "prerendering",
+    "json-ld",
+    "cro",
+    "tailwindcss",
+    "shopify-alternative",
+    "ecommerce-template",
+    "razorpay"
+  ],
+  "author": "CodeCrafters <hello@codecrafters.in>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codecrafters-in/loom-storefront.git"
+  },
+  "bugs": {
+    "url": "https://github.com/codecrafters-in/loom-storefront/issues"
+  },
+  "homepage": "https://github.com/codecrafters-in/loom-storefront#readme"
 }

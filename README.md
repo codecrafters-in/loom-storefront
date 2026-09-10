@@ -269,9 +269,18 @@ npm run preview
 
 Client-side routing needs a rewrite so deep links do not 404:
 
-- **Vercel** — add `{ "rewrites": [{ "source": "/(.*)", "destination": "/" }] }` to `vercel.json`
-- **Netlify** — `/*  /index.html  200` in `public/_redirects`
-- **nginx** — `try_files $uri $uri/ /index.html;`
+- **Vercel** — `vercel.json` is in the repo. It sets `cleanUrls` so `/product/x`
+  finds the prerendered `product/x.html`, and only falls back to the SPA for
+  routes that have no file.
+- **Netlify / Cloudflare Pages** — `public/_redirects` and `public/_headers` are
+  in the repo and do the same.
+- **nginx** — `try_files $uri $uri/ /index.html;` is already correct: it tries
+  the prerendered file first and only falls through when there is none.
+
+> **Do not add a catch-all rewrite above those.** `/(.*) → /` serves the home
+> page for all 53 prerendered routes. It looks correct locally, because the
+> browser routes around it, and it is invisible until you check what a crawler
+> actually received.
 
 ---
 
