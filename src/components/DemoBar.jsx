@@ -58,9 +58,10 @@ export default function DemoBar() {
 
   return (
     <div
-      // Above the product page's sticky buy bar (z-30) and below the toasts and
-      // the mobile sheets (z-50), which are things somebody asked for.
-      className="fixed bottom-5 left-5 z-40 hidden items-center gap-2 rounded-full border border-line bg-page/95 py-1.5 pl-3.5 pr-1.5 shadow-lift backdrop-blur sm:flex"
+      // Bottom right, where a page's own controls are not. Above the product
+      // page's sticky buy bar (z-30) and below the toasts and the mobile
+      // sheets (z-50), which are things somebody asked for.
+      className="fixed bottom-5 right-5 z-40 hidden items-center gap-2 rounded-full border border-line bg-page/95 py-1.5 pl-3.5 pr-1.5 shadow-lift backdrop-blur sm:flex"
     >
       <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint">demo</span>
       <span className="h-3.5 w-px bg-line" aria-hidden="true" />
