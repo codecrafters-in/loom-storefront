@@ -12,10 +12,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { storefront } from '../src/data/storefront.js'
+import { siteUrl } from './lib/site-url.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const seo = storefront.seo || {}
-const base = (process.env.SITE_URL || seo.siteUrl || '').replace(/\/$/, '')
+const base = siteUrl().origin
 
 const lines = []
 
@@ -43,8 +44,10 @@ if (seo.indexable === false) {
   }
 }
 
-if (base) lines.push('', `Sitemap: ${base}/sitemap.xml`)
-else lines.push('', 'Sitemap: /sitemap.xml')
+// A relative Sitemap: line is ignored by every crawler that reads it, so this
+// is always absolute. The sitemap script does the warning when the origin is
+// only a placeholder; twice in one build log is noise.
+lines.push('', `Sitemap: ${base}/sitemap.xml`)
 
 await fs.mkdir(path.join(ROOT, 'dist'), { recursive: true })
 await fs.writeFile(path.join(ROOT, 'dist/robots.txt'), `${lines.join('\n')}\n`)

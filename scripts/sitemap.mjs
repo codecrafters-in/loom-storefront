@@ -9,10 +9,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { products, categories, collections } from '../src/data/catalog.js'
 import { storefront } from '../src/data/storefront.js'
+import { docPages, docPath } from '../src/data/docs.js'
+import { announceSiteUrl } from './lib/site-url.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const seo = storefront.seo || {}
-const BASE = (process.env.SITE_URL || seo.siteUrl || 'https://loom.example').replace(/\/$/, '')
+const BASE = announceSiteUrl('sitemap').origin
 const today = new Date().toISOString().slice(0, 10)
 
 const urls = [
@@ -35,6 +37,10 @@ const urls = [
     images: seo.sitemapImages === false ? [] : (p.images || []).filter((i) => i.type !== 'video'),
   })),
   ...['size-guide', 'shipping', 'care', 'contact'].map((s) => ({ loc: `/pages/${s}`, priority: '0.4', changefreq: 'monthly' })),
+  // The documentation is public and prerendered, so it is indexable — and it
+  // is what somebody evaluating the theme searches for before they search for
+  // the shop.
+  ...docPages.map((d) => ({ loc: docPath(d.slug), priority: d.slug === 'readme' ? '0.6' : '0.5', changefreq: 'monthly' })),
 ]
 
 /** `&` in a caption or a filename would otherwise break the document. */

@@ -16,6 +16,7 @@ import Product from './pages/Product.jsx'
 // its Suspense fallback during a server render, so an indexed route that is
 // code-split ships a skeleton to the crawler.
 import StaticPage from './pages/StaticPage.jsx'
+import Docs from './pages/Docs.jsx'
 import { Skeleton } from './components/ui/index.jsx'
 
 // Split the routes a browsing visitor never reaches. Checkout and account are
@@ -43,7 +44,6 @@ const AdminData = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ d
 const AdminProductEditor = lazy(() => import('./pages/admin/ProductEditor.jsx'))
 const AdminSizeCharts = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.SizeCharts })))
 const AdminDiscounts = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Discounts })))
-const AdminDocs = lazy(() => import('./pages/admin/Docs.jsx'))
 const AdminLogin = lazy(() => import('./pages/admin/Login.jsx'))
 
 /** Keyed on the path, because a boundary that never resets breaks every page
@@ -89,6 +89,10 @@ export default function App() {
                   <Route path="login" element={<Login />} />
                   <Route path="account/*" element={<Account />} />
                   <Route path="pages/:slug" element={<StaticPage />} />
+                  {/* Public and prerendered. The API reference behind a login
+                      is a reference nobody reads before deciding. */}
+                  <Route path="docs" element={<Docs />} />
+                  <Route path="docs/:page" element={<Docs />} />
                   <Route path="404" element={<NotFound />} />
                   <Route path="*" element={<Navigate to="/404" replace />} />
                 </Route>
@@ -112,8 +116,6 @@ export default function App() {
                   <Route path="discounts" element={<AdminDiscounts />} />
                   <Route path="storefront" element={<AdminStorefront />} />
                   <Route path="data" element={<AdminData />} />
-                  <Route path="docs" element={<AdminDocs />} />
-                  <Route path="docs/:page" element={<AdminDocs />} />
                 </Route>
               </Routes>
             </Suspense>

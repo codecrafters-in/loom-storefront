@@ -77,6 +77,16 @@ export const storefront = {
     /** The rail of what this visitor was just looking at. Local to their
      *  browser — nothing is stored server-side and nobody is profiled. */
     recentlyViewed: true,
+    /**
+     * A link to `/docs` in the footer's bottom bar.
+     *
+     * `'auto'` — shown while the shop is running on demo data, hidden the
+     * moment it is pointed at a real API. A demo exists to be read; a shop
+     * selling shirts should not offer its customers an API reference.
+     * `true` / `false` override that either way. The pages themselves stay
+     * public regardless, and the back office always links to them.
+     */
+    docsLink: 'auto',
   },
 
   /**

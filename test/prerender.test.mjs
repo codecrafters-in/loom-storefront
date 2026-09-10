@@ -169,11 +169,43 @@ describe('prerendered output', { skip: built ? false : 'run `npm run build` firs
   })
 
   test('no secret reached the output', () => {
+    const NAMES = ['key_secret', 'smtpPassword', 'razorpayKeySecret', 'RAZORPAY_KEY_SECRET']
     for (const file of pages()) {
       const html = read(file)
-      for (const needle of ['key_secret', 'smtpPassword', 'razorpayKeySecret', 'RAZORPAY_KEY_SECRET']) {
-        assert.ok(!html.includes(needle), `${file} mentions ${needle}`)
+      /**
+       * The documentation names these fields on purpose — `/docs/checkout` is
+       * the page that tells an implementer never to keep them in settings — so
+       * a word scan over its text says nothing. What matters is the same thing
+       * everywhere else: that nothing from the store's own configuration
+       * carried a secret into the page. On a docs page that surface is the API
+       * cache seed and only the API cache seed; the other seed is markdown
+       * from a public repository.
+       */
+      const haystack = file.startsWith('docs') ? cacheSeed(html) : html
+      for (const needle of NAMES) {
+        assert.ok(!haystack.includes(needle), `${file} mentions ${needle}`)
       }
     }
   })
+
+  test('the documentation is public, prerendered and reads as itself', () => {
+    const files = pages()
+    assert.ok(files.includes('docs.html'), 'the overview was not prerendered')
+    assert.ok(files.includes('docs/api.html'), 'the API reference was not prerendered')
+    // One URL per document: the overview is /docs, never /docs/readme.
+    assert.ok(!files.includes('docs/readme.html'), '/docs/readme duplicates /docs')
+
+    const api = read('docs/api.html')
+    assert.match(api, /<title>API reference — /)
+    assert.match(api, /rel="canonical" href="[^"]+\/docs\/api"/)
+    // The words, not a skeleton: the markdown has to have been resolved before
+    // the render, and inlined so the first client render finds the same text.
+    assert.ok(bodyOf(api).length > 20000, 'the reference rendered without its markdown')
+    assert.ok(api.includes('window.__LOOM_DOCS__'), 'the source was not seeded for hydration')
+  })
 })
+
+/** The API cache seed, which is where a setting could reach a page. */
+function cacheSeed(html) {
+  return html.match(/window\.__LOOM_CACHE__=[\s\S]*?<\/script>/)?.[0] ?? ''
+}

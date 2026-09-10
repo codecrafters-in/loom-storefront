@@ -26,7 +26,7 @@ const NAV = [
   { to: '/admin/discounts', label: 'Discounts', icon: 'sparkle' },
   { to: '/admin/storefront', label: 'Storefront', icon: 'star' },
   { to: '/admin/data', label: 'Import / export', icon: 'refresh' },
-  { to: '/admin/docs', label: 'Developer docs', icon: 'info' },
+  { to: '/docs', label: 'Developer docs', icon: 'info' },
 ]
 
 export default function AdminLayout() {

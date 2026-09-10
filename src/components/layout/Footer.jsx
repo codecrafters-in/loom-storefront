@@ -31,6 +31,14 @@ export default function Footer() {
 
   const cols = config.navigation?.footer || []
 
+  /**
+   * The documentation is public, but it is developer furniture: it belongs in
+   * the utility bar beside "Source", not in the merchant's own footer columns,
+   * and it belongs on a demo rather than on a shop with customers.
+   */
+  const docsLink = config.features?.docsLink
+  const showDocs = docsLink === 'auto' || docsLink === undefined ? isMock : docsLink !== false
+
   return (
     <footer className="mt-24 border-t border-line bg-sunken/50">
       <div className="wrap grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
@@ -100,6 +108,15 @@ export default function Footer() {
               >
                 <Icon name="user" size={13} />
                 Admin
+              </Link>
+            )}
+            {showDocs && (
+              <Link
+                to="/docs"
+                className="inline-flex items-center gap-2 text-[13px] text-muted transition-colors hover:text-ink"
+              >
+                <Icon name="info" size={16} />
+                Docs &amp; API
               </Link>
             )}
             <a

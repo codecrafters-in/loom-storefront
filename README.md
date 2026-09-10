@@ -67,6 +67,17 @@ files, rendered, with copy buttons on every prompt.
 
 ### Documentation
 
+Every page below is also served by the storefront itself at **`/docs`** — same
+markdown, no second copy — and it is prerendered, so it is readable without
+JavaScript and indexable. `/docs/api` carries a live explorer: pick an endpoint,
+press Run, and read the JSON the adapter actually returns. On a demo that is the
+bundled catalogue; pointed at your API it is a real request.
+
+The link sits in the footer's utility bar while the shop runs on demo data and
+disappears once it is pointed at a real backend — a shop selling shirts should
+not offer its customers an API reference. `features.docsLink` overrides it
+either way.
+
 | | |
 | --- | --- |
 | [docs/README.md](docs/README.md) | Index — start here |
@@ -266,6 +277,19 @@ Static output — anything that serves files will do.
 npm run build        # → dist/
 npm run preview
 ```
+
+**Set the site URL, or canonical tags point at nothing.** Sitemap entries,
+canonical links and Open Graph URLs have to be absolute, and they are resolved
+at build time:
+
+```bash
+SITE_URL=https://yourshop.com npm run build
+```
+
+On Vercel you can skip it — `VERCEL_PROJECT_PRODUCTION_URL` is picked up
+automatically, so a fork that clicks Deploy still canonicalises to its own
+domain. Anywhere else, set `SITE_URL` or `seo.siteUrl` in Settings; the build
+warns and falls back to a placeholder rather than guessing.
 
 Client-side routing needs a rewrite so deep links do not 404:
 

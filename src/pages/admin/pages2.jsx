@@ -641,6 +641,14 @@ export function Discounts() {
 
 /* ── storefront settings ───────────────────────────────────────────────── */
 
+/** Settings under `features` that are three-state rather than on/off. */
+const TRISTATE = {
+  docsLink: {
+    label: 'Docs & API link in the footer',
+    note: 'Automatic shows it while the shop runs on demo data and hides it once it is pointed at a real API. The pages at /docs stay public either way, and this back office always links to them.',
+  },
+}
+
 export function Storefront() {
   const { data, loading, reload } = useAsync(() => api.getStorefront(), [])
   const [draft, setDraft] = useState(null)
@@ -772,19 +780,41 @@ export function Storefront() {
 
         <Group title="Features" note="Turning one off removes its entry points. Routes stay reachable so old bookmarks do not 404.">
           <ul className="space-y-2.5">
-            {Object.entries(cfg.features || {}).map(([k, v]) => (
-              <li key={k}>
-                <label className="flex cursor-pointer items-center gap-2.5 text-[14px]">
-                  <input
-                    type="checkbox"
-                    checked={!!v}
-                    onChange={(e) => patch(`features.${k}`, e.target.checked)}
-                    className="h-4 w-4 accent-[rgb(var(--accent))]"
-                  />
-                  <span className="capitalize">{k.replace(/([A-Z])/g, ' $1')}</span>
-                </label>
-              </li>
-            ))}
+            {Object.entries(cfg.features || {}).map(([k, v]) =>
+              // A few of these are three-state rather than on/off. A checkbox
+              // would quietly collapse "auto" to a yes the first time anyone
+              // touched it.
+              TRISTATE[k] ? (
+                <li key={k}>
+                  <label htmlFor={`feature-${k}`} className="mb-1.5 block text-[14px]">{TRISTATE[k].label}</label>
+                  <select
+                    id={`feature-${k}`}
+                    className="field"
+                    value={v === true ? 'on' : v === false ? 'off' : 'auto'}
+                    onChange={(e) =>
+                      patch(`features.${k}`, e.target.value === 'auto' ? 'auto' : e.target.value === 'on')
+                    }
+                  >
+                    <option value="auto">Automatic</option>
+                    <option value="on">Always show</option>
+                    <option value="off">Never show</option>
+                  </select>
+                  <p className="mt-1.5 text-[12px] leading-relaxed text-faint">{TRISTATE[k].note}</p>
+                </li>
+              ) : (
+                <li key={k}>
+                  <label className="flex cursor-pointer items-center gap-2.5 text-[14px]">
+                    <input
+                      type="checkbox"
+                      checked={!!v}
+                      onChange={(e) => patch(`features.${k}`, e.target.checked)}
+                      className="h-4 w-4 accent-[rgb(var(--accent))]"
+                    />
+                    <span className="capitalize">{k.replace(/([A-Z])/g, ' $1')}</span>
+                  </label>
+                </li>
+              ),
+            )}
           </ul>
         </Group>
 

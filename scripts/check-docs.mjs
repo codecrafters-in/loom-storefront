@@ -22,7 +22,7 @@ const DOCS = path.join(ROOT, 'docs')
 
 /** The parser, lifted from the component so there is one implementation. */
 function loadParser() {
-  const src = fs.readFileSync(path.join(ROOT, 'src/components/admin/Markdown.jsx'), 'utf8')
+  const src = fs.readFileSync(path.join(ROOT, 'src/components/Markdown.jsx'), 'utf8')
   const body = src
     .slice(src.indexOf('function parse(src)'), src.indexOf('function Block('))
     .replace(/^const cells.*$/m, '')
@@ -58,14 +58,18 @@ for (const file of files) {
   }
 }
 
-// 2. Every page the viewer lists has a file.
-const viewer = fs.readFileSync(path.join(ROOT, 'src/pages/admin/Docs.jsx'), 'utf8')
+// 2. Every page the index lists has a file, and every file is listed.
+//
+// The index is `src/data/docs.js` rather than the page that renders it,
+// because the sitemap and the prerenderer read the same list — a document
+// nobody lists is a document nobody can reach or find.
+const viewer = fs.readFileSync(path.join(ROOT, 'src/data/docs.js'), 'utf8')
 const listed = [...viewer.matchAll(/file:\s*'([^']+)'/g)].map((m) => m[1])
 for (const file of listed) {
-  if (!files.includes(file)) fail(`Docs.jsx lists ${file}, which is not in docs/`)
+  if (!files.includes(file)) fail(`src/data/docs.js lists ${file}, which is not in docs/`)
 }
 for (const file of files) {
-  if (!listed.includes(file)) console.warn(`warn  ${file} exists but is not listed in Docs.jsx`)
+  if (!listed.includes(file)) console.warn(`warn  ${file} exists but is not listed in src/data/docs.js`)
 }
 
 // 3. Every relative link resolves.

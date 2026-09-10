@@ -30,11 +30,12 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
+import { siteUrl } from './lib/site-url.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
 const SSR_OUT = path.join(ROOT, 'node_modules/.loom-ssr')
-const ORIGIN = (process.env.SITE_URL || 'https://loom.example').replace(/\/$/, '')
+const ORIGIN = siteUrl().origin
 
 /* ── a browser, for Node ───────────────────────────────────────────────── */
 
@@ -110,7 +111,7 @@ async function main() {
 
     let rendered
     try {
-      rendered = render(route.url)
+      rendered = render(route.url, route)
     } catch (err) {
       console.error(`[prerender] ${route.url} threw during render: ${err.message}`)
       process.exitCode = 1
@@ -133,7 +134,12 @@ async function main() {
     }
 
     const html = template
-      .replace('</head>', `  ${rendered.head}\n    ${seedScript(payload)}\n  </head>`)
+      .replace(
+        '</head>',
+        `  ${rendered.head}\n    ${seedScript('__LOOM_CACHE__', payload)}` +
+          (route.docs ? `\n    ${seedScript('__LOOM_DOCS__', route.docs)}` : '') +
+          '\n  </head>',
+      )
       .replace('<div id="root"></div>', `<div id="root">${rendered.html}</div>`)
 
     const file = route.url === '/' ? 'index.html' : `${route.url.replace(/^\//, '')}.html`
@@ -154,8 +160,8 @@ async function main() {
  * `</script>` inside a product description would close this tag early and hand
  * the rest of the catalogue to the HTML parser. Merchants write descriptions.
  */
-const seedScript = (payload) =>
-  `<script>window.__LOOM_CACHE__=${JSON.stringify(payload)
+const seedScript = (name, payload) =>
+  `<script>window.${name}=${JSON.stringify(payload)
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
     .replace(/&/g, '\\u0026')}</script>`

@@ -5,6 +5,8 @@ import api, { peek } from './lib/api/index.js'
 import { keyOf } from './lib/api/cache.js'
 import { startCollecting, stopCollecting, renderHead } from './lib/head.js'
 import { listingQuery } from './pages/Shop.jsx'
+import { loadDoc } from './pages/Docs.jsx'
+import { docPages, docPath } from './data/docs.js'
 
 /**
  * One route, rendered to HTML at build time.
@@ -66,6 +68,18 @@ export async function routes() {
       ],
     })),
     ...['size-guide', 'shipping', 'care', 'contact'].map((slug) => ({ url: `/pages/${slug}`, reads: [] })),
+    /**
+     * The documentation reads from disk rather than from the API, so it seeds
+     * itself: the markdown travels with the page it produced, and the first
+     * client render finds the same text the server did.
+     */
+    ...(await Promise.all(
+      docPages.map(async (d) => ({
+        url: docPath(d.slug),
+        reads: [],
+        docs: { [d.slug]: await loadDoc(d.slug) },
+      })),
+    )),
   ]
 }
 
@@ -73,7 +87,8 @@ export async function routes() {
  * `StaticRouter` rather than `BrowserRouter`, and no `StrictMode` — a double
  * render would collect every head tag twice.
  */
-export function render(url) {
+export function render(url, { docs } = {}) {
+  globalThis.__LOOM_DOCS__ = docs
   startCollecting()
   try {
     const html = renderToString(
@@ -85,5 +100,7 @@ export function render(url) {
   } catch (err) {
     stopCollecting()
     throw err
+  } finally {
+    globalThis.__LOOM_DOCS__ = undefined
   }
 }

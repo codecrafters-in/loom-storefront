@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Icon } from '../ui/index.jsx'
+import { Icon } from './ui/index.jsx'
 
 /**
  * A small markdown renderer.

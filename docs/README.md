@@ -3,6 +3,11 @@
 A clothing storefront that runs on bundled demo data out of the box and on your
 own backend by changing one environment variable.
 
+> These pages are served by the storefront as well as by the repository:
+> **`/docs`** on any deployment, prerendered and public. `/docs/api` adds an
+> explorer that runs each read endpoint against whatever the shop is currently
+> pointed at, so the response you read is the response you get.
+
 ## Start here
 
 | If you want to… | Read |
