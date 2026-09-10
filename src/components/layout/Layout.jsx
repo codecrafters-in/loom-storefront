@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import Header from './Header.jsx'
 import Footer from './Footer.jsx'
 import CartDrawer from '../cart/CartDrawer.jsx'
+import DemoBar from '../DemoBar.jsx'
 
 export default function Layout() {
   const { pathname } = useLocation()
@@ -27,6 +28,7 @@ export default function Layout() {
       </main>
       <Footer />
       <CartDrawer />
+      <DemoBar />
     </div>
   )
 }

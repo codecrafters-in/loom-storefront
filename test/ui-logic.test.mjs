@@ -4,6 +4,7 @@ import { loadApp } from './helpers/browser.mjs'
 
 const { api, root } = await loadApp()
 const { formatMoney } = await import(`${root}lib/money.js`)
+const { docsLinkVisible } = await import(`${root}lib/docs-link.js`)
 
 /* ── the specifications editor ─────────────────────────────────────────── */
 
@@ -137,4 +138,29 @@ test('pan cannot leave the image behind', () => {
   assert.deepEqual(pan(clampPan({ x: 999, y: -999 }, 2, box)), { x: 200, y: -250 })
   assert.deepEqual(pan(clampPan({ x: 50, y: -30 }, 2, box)), { x: 50, y: -30 })
   assert.deepEqual(pan(clampPan({ x: 200, y: 250 }, 1.5, box)), { x: 100, y: 125 })
+})
+
+/* ── who is offered the documentation ──────────────────────────────────── */
+
+/**
+ * The footer, the mobile menu and the demo pill all ask this, and they have to
+ * agree — a merchant who switches it off and still finds it in one of the three
+ * has been told the setting works when it does not.
+ *
+ * The default is not "on". It is "on while this is a demo": a shop with real
+ * customers, running against a real backend, should not offer them an API
+ * reference next to its returns policy.
+ */
+test('the docs link follows the setting, and defaults to demo-only', () => {
+  const on = { features: { docsLink: true } }
+  const off = { features: { docsLink: false } }
+  const auto = { features: { docsLink: 'auto' } }
+
+  assert.equal(docsLinkVisible(auto, true), true, 'a demo should offer its documentation')
+  assert.equal(docsLinkVisible(auto, false), false, 'a live shop should not')
+  assert.equal(docsLinkVisible({}, false), false, 'an absent setting means auto, not on')
+  assert.equal(docsLinkVisible(undefined, true), true, 'and it must survive a config that has not loaded')
+
+  assert.equal(docsLinkVisible(on, false), true, 'an explicit yes wins against a live API')
+  assert.equal(docsLinkVisible(off, true), false, 'an explicit no wins on a demo')
 })

@@ -7,6 +7,7 @@ import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { useAdminAuth } from '../../store/AdminAuthContext.jsx'
 import Logo from '../ui/Logo.jsx'
 import { config as envConfig } from '../../lib/config.js'
+import { docsLinkVisible } from '../../lib/docs-link.js'
 
 export default function Footer() {
   const [email, setEmail] = useState('')
@@ -33,11 +34,9 @@ export default function Footer() {
 
   /**
    * The documentation is public, but it is developer furniture: it belongs in
-   * the utility bar beside "Source", not in the merchant's own footer columns,
-   * and it belongs on a demo rather than on a shop with customers.
+   * the utility bar beside "Source", not in the merchant's own footer columns.
    */
-  const docsLink = config.features?.docsLink
-  const showDocs = docsLink === 'auto' || docsLink === undefined ? isMock : docsLink !== false
+  const showDocs = docsLinkVisible(config)
 
   return (
     <footer className="mt-24 border-t border-line bg-sunken/50">

@@ -8,6 +8,7 @@ import { useStorefront, useBootstrap } from '../../store/StorefrontContext.jsx'
 import Logo from '../ui/Logo.jsx'
 import useAsync from '../../hooks/useAsync.js'
 import api from '../../lib/api/index.js'
+import { docsLinkVisible } from '../../lib/docs-link.js'
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -263,6 +264,17 @@ export default function Header() {
               {signedIn ? 'Your account' : 'Sign in'}
             </Link>
           </li>
+          {/* The floating pill is desktop-only — the bottom of a phone screen
+              belongs to the buy bar. This is the same door, in the drawer that
+              already exists, costing no space until it is opened. */}
+          {docsLinkVisible(config) && (
+            <li className="border-t border-line pt-1">
+              <Link to="/docs" className="flex items-center gap-2 py-3.5 text-[15px] text-muted">
+                <Icon name="info" size={16} />
+                Docs &amp; API
+              </Link>
+            </li>
+          )}
         </ul>
       </nav>
     </>
