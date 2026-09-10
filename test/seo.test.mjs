@@ -16,13 +16,28 @@ import path from 'node:path'
 const ROOT = new URL('../', import.meta.url).pathname
 const SETTINGS = path.join(ROOT, 'src/data/storefront.js')
 
-function robotsWith(seo) {
+/**
+ * The scripts resolve their origin from the environment first, then from
+ * settings — SITE_URL is how a staging build overrides a production domain.
+ * That means these tests, which assert what a *settings* file produces, have
+ * to run with those variables cleared.
+ *
+ * Found on a real deployment: SITE_URL was set in the project, the build ran
+ * the suite, and the fixture's origin lost to the environment. A test that
+ * passes or fails depending on the machine it runs on has stopped testing the
+ * thing it names.
+ */
+const ENV = { ...process.env }
+delete ENV.SITE_URL
+delete ENV.VERCEL_PROJECT_PRODUCTION_URL
+
+function robotsWith(seo, env = {}) {
   const original = fs.readFileSync(SETTINGS, 'utf8')
   const patched = original.replace(/ {2}seo: \{[\s\S]*?\n {2}\},\n/, `  seo: ${JSON.stringify(seo)},\n`)
   assert.notEqual(patched, original, 'the seo block was not found in storefront.js')
   try {
     fs.writeFileSync(SETTINGS, patched)
-    execFileSync(process.execPath, ['scripts/robots.mjs'], { cwd: ROOT, stdio: 'pipe' })
+    execFileSync(process.execPath, ['scripts/robots.mjs'], { cwd: ROOT, stdio: 'pipe', env: { ...ENV, ...env } })
     return fs.readFileSync(path.join(ROOT, 'dist/robots.txt'), 'utf8')
   } finally {
     fs.writeFileSync(SETTINGS, original)
@@ -31,7 +46,7 @@ function robotsWith(seo) {
 
 /** Generated here rather than read from a `dist/` some other step may have wiped. */
 function sitemap() {
-  execFileSync(process.execPath, ['scripts/sitemap.mjs'], { cwd: ROOT, stdio: 'pipe' })
+  execFileSync(process.execPath, ['scripts/sitemap.mjs'], { cwd: ROOT, stdio: 'pipe', env: ENV })
   return fs.readFileSync(path.join(ROOT, 'dist/sitemap.xml'), 'utf8')
 }
 
@@ -69,6 +84,22 @@ test('switching indexing off takes the whole shop out', () => {
 test('the sitemap is absolute, because a relative one is ignored', () => {
   const robots = robotsWith({ ...BASE, aiCrawlers: 'allow', crawlers: {} })
   assert.match(robots, /Sitemap: https:\/\/shop\.example\/sitemap\.xml/)
+})
+
+test('SITE_URL overrides the setting, which is what a staging build needs', () => {
+  const robots = robotsWith({ ...BASE, aiCrawlers: 'allow', crawlers: {} }, {
+    SITE_URL: 'https://staging.shop.example',
+  })
+  assert.match(robots, /Sitemap: https:\/\/staging\.shop\.example\/sitemap\.xml/)
+})
+
+test("a host's own production domain is used when nothing else says", () => {
+  // Vercel sets this during the build. Without the fallback, a fork that just
+  // clicks Deploy canonicalises its whole catalogue to an example domain.
+  const robots = robotsWith({ ...BASE, siteUrl: '', aiCrawlers: 'allow', crawlers: {} }, {
+    VERCEL_PROJECT_PRODUCTION_URL: 'loom-studio.codecrafters.in',
+  })
+  assert.match(robots, /Sitemap: https:\/\/loom-studio\.codecrafters\.in\/sitemap\.xml/)
 })
 
 test('per-visitor paths stay out of the index', () => {
