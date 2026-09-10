@@ -16,12 +16,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    # The oldest version package.json claims to support, and the newest LTS.
+    #
+    # This matrix exists because of a real failure: `node --test test/` runs
+    # every file in the directory on Node 24 and up, and on Node 22 tries to
+    # load the directory itself as a module. The suite passed on a laptop and
+    # the build failed in CI. A claim of ">=22" that is only ever exercised on
+    # one version is a claim nobody has checked.
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: npm
 
       # `npm ci` rather than `npm install`: it installs exactly the lockfile and
@@ -50,8 +62,11 @@ jobs:
           npm install --no-audit --no-fund
           node --check server.mjs
 
+      # One copy of the output is enough, and only if there is one — a failed
+      # build leaves no dist/ and the upload warns about a path that was never
+      # going to exist.
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: success() && matrix.node == 24
         with:
           name: dist
           path: dist

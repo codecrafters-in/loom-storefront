@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run clean && node scripts/check-docs.mjs && node scripts/contrast.mjs && node scripts/responsive.mjs && node --test test/ && node scripts/brand.mjs && vite build && node scripts/budget.mjs && node scripts/prerender.mjs && node scripts/sitemap.mjs && node scripts/robots.mjs",
+    "build": "npm run clean && node scripts/check-docs.mjs && node scripts/contrast.mjs && node scripts/responsive.mjs && node --test \"test/**/*.test.mjs\" && node scripts/brand.mjs && vite build && node scripts/budget.mjs && node scripts/prerender.mjs && node scripts/sitemap.mjs && node scripts/robots.mjs",
     "preview": "vite preview",
     "lint": "eslint src scripts test",
     "images": "node scripts/images.mjs",
@@ -15,8 +15,8 @@
     "brand": "node scripts/brand.mjs",
     "sitemap": "node scripts/sitemap.mjs",
     "check:docs": "node scripts/check-docs.mjs",
-    "test": "node --test test/",
-    "test:watch": "node --test --watch test/",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "test:watch": "node --test --watch \"test/**/*.test.mjs\"",
     "prerender": "node scripts/prerender.mjs",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "responsive": "node scripts/responsive.mjs",
@@ -66,5 +66,8 @@
   "bugs": {
     "url": "https://github.com/codecrafters-in/loom-storefront/issues"
   },
-  "homepage": "https://github.com/codecrafters-in/loom-storefront#readme"
+  "homepage": "https://github.com/codecrafters-in/loom-storefront#readme",
+  "engines": {
+    "node": ">=22"
+  }
 }
