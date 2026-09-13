@@ -92,7 +92,7 @@ export function render(url, { docs } = {}) {
   startCollecting()
   try {
     const html = renderToString(
-      <StaticRouter location={url}>
+      <StaticRouter location={url} future={{ v7_relativeSplatPath: true }}>
         <App />
       </StaticRouter>,
     )

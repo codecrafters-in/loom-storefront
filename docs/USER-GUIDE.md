@@ -31,6 +31,16 @@ combination. Fill in stock per row.
 > Rebuilding keeps everything you already typed. Adding a fourth colour does not
 > wipe the stock counts on the first three.
 
+> **You will not lose what you type.** Unsaved changes stay in this browser, so a
+> reload or a crashed tab reopens the product with *Unsaved changes … were
+> restored*. **Save** keeps them; **Discard them** goes back to the saved version.
+
+If a save is refused, the editor opens the tab with the problem and shows what to
+fix. The usual ones on a live shop: a slug that ends in a number (write
+`levis-501-jeans`, not `levis-jeans-501`), and words in a number field such as
+**Recycled content**, which takes a percentage — the fabric itself goes under
+**Fabric**.
+
 ---
 
 ## Change a price
@@ -169,6 +179,8 @@ set. Allow all, block all, or decide bot by bot.
 - **redirect** — sends the customer to Stripe, Razorpay or whoever takes your
   money. **This is what a real shop uses**
 - **api** — for invoicing, cash on delivery or wholesale terms
+- **payments** — the backend's own payment methods, paid on the checkout page.
+  **What an Odoo-backed shop uses**; the methods are switched on in Odoo, not here
 
 For **redirect**, paste the address your developer gives you into **Create URL**.
 
@@ -330,6 +342,10 @@ anything you would otherwise retype — forty slightly different versions of
 > matters, because three spellings of one attribute is a filter that finds
 > nothing.
 
+> **Highlights and Specifications share their values.** Change *Fabric* in either
+> and the other follows. A number attribute — Recycled content, Weight, Length —
+> shows **Number in %** (or gsm, cm) in its box and warns if you type words.
+
 **Manufacturer info** opens with **Woven by** and **Mill location** — the mill
 that made the cloth, above the compliance rows, which carry your address rather
 than theirs. Keep the mill location and the country of origin agreeing with each
@@ -364,6 +380,25 @@ with tracking, one delivered — so **Account → Orders** shows something.
 > Orders are scoped to the signed-in address. Sign out and the history is
 > refused; sign in as somebody else and you see theirs, not the first person's.
 > The order you placed as a guest still opens from its own confirmation link.
+
+---
+
+## What a customer sees in their account
+
+**/account**, once signed in. It reads like a summary, not a form — a form opens
+only for the one thing being changed, in place, with **Cancel** beside **Save**.
+
+| Tab | What is on it |
+| --- | --- |
+| **Overview** | The latest order (number, date, status, total, thumbnails), personal details with **Edit**, the default address with **Manage**, and the number of saved items |
+| **Orders** | Every order, newest first. Each card opens the order and its tracking |
+| **Addresses** | One card per address with **Edit**, **Set as default** and **Remove** (which asks first), and an **Add a new address** tile |
+
+**State / region follows the country.** For a country the backend has states for —
+India, the United States, Canada, Australia and many more — it is a list; anywhere
+else it is a text box. Checkout uses the same field, so a state picked from the
+list is never refused. If something is missing, the field turns red and the
+message names it: *Please add: State / region*.
 
 ---
 
@@ -447,7 +482,8 @@ server the same button sends.
 
 ## Refund an order
 
-**Admin → Orders → Refund.**
+**Admin → Orders → open the order → Payment → Refund.** Against Odoo, refunds are
+issued in Odoo — the Payment card links to the order there.
 
 It defaults to whatever is still outstanding. Enter less for a partial refund —
 the order stays open and the amounts add up, so a second refund is not issued
@@ -519,13 +555,32 @@ Tick it back on when the season opens.
 
 ## Fulfil an order
 
-**Orders → change the status dropdown**
+**Admin → Orders → To ship → open the order**
 
-`placed` → `paid` → `fulfilled` → `delivered`, or `cancelled`.
+1. **Pack it.** The order page lists the items, the customer and the address to
+   ship to.
+2. **Mark as shipped.** Add the carrier, tracking number and tracking link if you
+   have them — all optional, and you can add them later with **Add tracking**.
+   The customer's order page changes to *On its way* with a **Track parcel**
+   button. Against Odoo this completes the delivery order, so the stock leaves
+   the warehouse.
+3. **Mark as delivered** when it arrives. The customer's page says *Delivered*.
 
-> Cancelling puts the stock back automatically. An order that disappears without
-> returning its units is how a shop slowly loses inventory nobody can account
-> for.
+**Cash on delivery** works the same way, with one more step: ship it first
+(this confirms the order), then press **Record cash received** under Payment
+once the courier has collected the money. Until then it sits under **Awaiting
+payment**, which lists every order whose money has not arrived yet: a payment
+still pending, such as Cash on Delivery or a bank transfer, or an order with no
+payment recorded at all (one created in the back office, for example). Cancelled
+orders are never there.
+
+The **To ship** and **Awaiting payment** numbers on the Overview are the same
+tabs, so the day's work is one click from the first screen.
+
+> **Cancel order** is only offered before an order ships, and it puts the stock
+> back automatically. An order that disappears without returning its units is
+> how a shop slowly loses inventory nobody can account for. A paid order still
+> needs its refund.
 
 ---
 
@@ -617,4 +672,7 @@ developer wants [ADMIN.md](ADMIN.md#bulk).
 | A category shows no products | Nothing is filed under it or its children yet |
 | Prices look wrong by 100× | Free-shipping threshold is in the smallest unit; product prices are not |
 | A new feature is missing from old products | Reload once. The store fills in fields it has gained, keeping your edits |
+| An address will not save | The field in red is missing — usually **State / region** for India or the US. Pick it from the list |
+| A product reopened with a *restored* bar | Your browser kept unsaved changes through a reload. **Save** or **Discard them** |
+| Orders, Discounts or Import are missing from the admin | The shop runs on a real backend, which manages those itself |
 | Everything is broken | **Import / export → Reset to demo data** starts fresh |

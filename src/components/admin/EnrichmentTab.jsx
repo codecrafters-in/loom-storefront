@@ -8,6 +8,34 @@ import {
   ManufacturerRows,
 } from '../product/Enrichment.jsx'
 import { attributeByKey, attributeGroups } from '../../data/attributes.js'
+import { highlightsFromSpecs, specsFromHighlights } from '../../lib/spec-sync.js'
+
+const NUMERIC = new Set(['integer', 'float'])
+const isNumeric = (attribute) => NUMERIC.has(attribute?.type)
+const valuePlaceholder = (attribute) =>
+  isNumeric(attribute) ? `Number${attribute.unit ? ` in ${attribute.unit}` : ''}` : 'Value'
+
+/** The backend's vocabulary, which knows each attribute's type and unit, over the built-in one. */
+function useAttributeLookup(attributes) {
+  return useMemo(() => {
+    const byKey = Object.fromEntries(attributes.map((a) => [a.key, a]))
+    return (key) => (byKey[key] || attributeByKey[key] ? { ...attributeByKey[key], ...byKey[key] } : null)
+  }, [attributes])
+}
+
+/**
+ * A number attribute is stored as a number, and the backend refuses the whole
+ * product over "Pure Wool" in a percentage. Say so beside the box instead.
+ */
+function NumberHint({ attribute, value }) {
+  const text = String(value ?? '').trim()
+  if (!isNumeric(attribute) || !text || /\d/.test(text)) return null
+  return (
+    <p className="mt-1 text-[11px] text-sale">
+      &ldquo;{attribute.label}&rdquo; takes a number{attribute.unit ? ` in ${attribute.unit}` : ''}, not text.
+    </p>
+  )
+}
 
 /**
  * The enrichment editor, with the storefront rendering beside it.
@@ -37,6 +65,21 @@ export default function EnrichmentTab({
 
   const setE = (key, value) => set(`enrichment.${key}`, value)
   const setMaker = (key, value) => setE('maker', { ...(e.maker || {}), [key]: value })
+
+  // A highlight and the specification row with the same key are one value.
+  // Keep them agreeing, or the untouched copy is saved too and overrides the edit.
+  const setHighlights = (rows) => {
+    setE('highlights', rows)
+    const specs = e.specs || {}
+    const synced = specsFromHighlights(specs, rows)
+    if (synced !== specs) setE('specs', synced)
+  }
+  const setSpecs = (next) => {
+    setE('specs', next)
+    const rows = e.highlights || []
+    const synced = highlightsFromSpecs(rows, next)
+    if (synced !== rows) setE('highlights', synced)
+  }
 
   const specRows = useMemo(() => Object.entries(e.specs || {}), [e.specs])
 
@@ -78,7 +121,7 @@ export default function EnrichmentTab({
               rows={e.highlights || []}
               attributes={attributes.filter((a) => a.highlight)}
               allAttributes={attributes}
-              onChange={(rows) => setE('highlights', rows)}
+              onChange={setHighlights}
               warnAfter={6}
             />
           </Panel>
@@ -118,7 +161,7 @@ export default function EnrichmentTab({
             title="Specifications"
             note="The full table, below the fold, grouped automatically by attribute. Nobody reads it end to end; everybody uses it to check one thing."
           >
-            <SpecEditor specs={e.specs} attributes={attributes} onChange={(next) => setE('specs', next)} />
+            <SpecEditor specs={e.specs} attributes={attributes} onChange={setSpecs} />
           </Panel>
         )}
 
@@ -227,6 +270,7 @@ export default function EnrichmentTab({
 function PairEditor({ rows, attributes, allAttributes, onChange, warnAfter }) {
   const patch = (i, key, value) => onChange(rows.map((r, k) => (k === i ? { ...r, [key]: value } : r)))
   const used = new Set(rows.map((r) => r.key))
+  const lookup = useAttributeLookup(allAttributes)
 
   // The starred ones first: they are the handful worth putting above the fold,
   // and a merchant filling in highlights wants those before the long tail.
@@ -257,9 +301,9 @@ function PairEditor({ rows, attributes, allAttributes, onChange, warnAfter }) {
               value={row.key || ''}
               onChange={(ev) => patch(i, 'key', ev.target.value)}
             />
-            {attributeByKey[row.key] && (
+            {lookup(row.key) && (
               <p className="mt-1 text-[11px] text-faint">
-                Shows as &ldquo;{attributeByKey[row.key].label}&rdquo;
+                Shows as &ldquo;{lookup(row.key).label}&rdquo;
               </p>
             )}
           </div>
@@ -267,15 +311,17 @@ function PairEditor({ rows, attributes, allAttributes, onChange, warnAfter }) {
             <input
               list={`vals-${row.key}`}
               className="field h-9 text-[13px]"
-              placeholder="Value"
+              placeholder={valuePlaceholder(lookup(row.key))}
+              inputMode={isNumeric(lookup(row.key)) ? 'decimal' : undefined}
               value={row.value || ''}
               onChange={(ev) => patch(i, 'value', ev.target.value)}
             />
-            {attributeByKey[row.key]?.values && (
+            {lookup(row.key)?.values?.length > 0 && (
               <datalist id={`vals-${row.key}`}>
-                {attributeByKey[row.key].values.map((v) => <option key={v} value={v} />)}
+                {lookup(row.key).values.map((v) => <option key={v} value={v} />)}
               </datalist>
             )}
+            <NumberHint attribute={lookup(row.key)} value={row.value} />
           </div>
           <button
             type="button"
@@ -549,6 +595,7 @@ function SpecEditor({ specs, attributes, onChange }) {
   const committed = useMemo(() => Object.entries(specs || {}), [specs])
   const [rows, setRows] = useState(committed)
   const mine = useRef(JSON.stringify(committed))
+  const lookup = useAttributeLookup(attributes)
 
   useEffect(() => {
     const signature = JSON.stringify(committed)
@@ -605,18 +652,22 @@ function SpecEditor({ specs, attributes, onChange }) {
               </p>
             )}
           </div>
-          <input
-            list={`spec-vals-${key}`}
-            className="field h-9 min-w-[9rem] flex-1 text-[13px]"
-            placeholder="Value"
-            value={value}
-            onChange={(ev) => patch(i, 1, ev.target.value)}
-          />
-          {attributeByKey[key]?.values && (
-            <datalist id={`spec-vals-${key}`}>
-              {attributeByKey[key].values.map((v) => <option key={v} value={v} />)}
-            </datalist>
-          )}
+          <div className="min-w-[9rem] flex-1">
+            <input
+              list={`spec-vals-${key}`}
+              className="field h-9 text-[13px]"
+              placeholder={valuePlaceholder(lookup(key))}
+              inputMode={isNumeric(lookup(key)) ? 'decimal' : undefined}
+              value={value}
+              onChange={(ev) => patch(i, 1, ev.target.value)}
+            />
+            {lookup(key)?.values?.length > 0 && (
+              <datalist id={`spec-vals-${key}`}>
+                {lookup(key).values.map((v) => <option key={v} value={v} />)}
+              </datalist>
+            )}
+            <NumberHint attribute={lookup(key)} value={value} />
+          </div>
           <span className="w-28 shrink-0 text-[11px] text-faint">
             {attributeGroups.find((g) => g.id === (attributeByKey[key]?.group || 'general'))?.label}
           </span>

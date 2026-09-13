@@ -35,11 +35,13 @@ Deliver, in this order:
 
 1. The catalogue endpoints. The storefront's home page, category pages and
    product pages work off these alone.
-2. Cart and checkout.
+2. Cart and checkout — and, if my payment gateways live in my system, the
+   on-site payment routes.
 3. Account, orders, wishlist.
 4. `GET /bootstrap` and `GET /storefront` — performance and settings.
-5. The `/admin/*` write endpoints, only if I want to manage the catalogue from
-   the storefront rather than from my own system.
+5. The `/admin/*` write endpoints, only if I want to manage the catalogue and
+   fulfil orders (ship, track, deliver) from the storefront rather than from my
+   own system.
 
 Each stage is independently useful. Do not try to do all five before I can see
 anything working.
@@ -79,7 +81,27 @@ cart is repriced server-side on every mutation and again at checkout.
 ```
 
 The `message` is displayed verbatim to the customer. Write it for them, not for
-a log file. `code` is machine-readable.
+a log file. `code` is machine-readable. When a request fails on fields the
+shopper can fix, name them — the forms mark exactly those fields:
+
+```json
+{ "message": "Please add the state / region.", "code": "invalid_address", "detail": { "fields": ["region"] } }
+```
+
+**6. The browser never decides that money moved.** Take every amount from the
+order on the server. A gateway result sent by the browser counts only after you
+verify its signature in constant time; otherwise wait for the gateway's webhook.
+The payment id you give the browser is random, and you store only its hash.
+
+**7. Anything that can be retried is idempotent.** Webhooks, payment actions,
+fulfilment actions and inventory deltas are all delivered twice sooner or later.
+A replay answers with the current state and has no second effect — no second
+order, email, shipment or stock movement.
+
+**8. An order moves only through the transitions the server allows, and the
+server says which.** Placed → paid → shipped → delivered; cancel only before it
+ships. The admin order carries `actions`, the list of what may happen next, and
+every action re-checks it inside the write.
 
 ## Endpoints
 
@@ -352,7 +374,7 @@ The cart is server-owned. Every mutation returns the **whole repriced cart**;
 the client replaces its state wholesale and never recomputes a total.
 
 ```
-POST   /carts                       {} → Cart
+POST   /carts                       {} | { fresh: true } → Cart
 GET    /carts/:id                   → Cart (404 is fine; client makes a new one)
 POST   /carts/:id/lines             { variant_id, quantity } → Cart
 PATCH  /carts/:id/lines/:lineId     { quantity } → Cart
@@ -360,6 +382,22 @@ DELETE /carts/:id/lines/:lineId     → Cart
 DELETE /carts/:id/lines             → Cart (empty it)
 POST   /carts/:id/discount          { code } → Cart   ("" clears)
 ```
+
+One customer, one open bag per store. You MUST:
+
+- **Honour `fresh`.** `POST /carts` with `{ "fresh": true }` creates a new empty
+  bag and never reuses an open one. The client sends it right after a bag
+  became an order. Without `fresh`, a signed-in customer gets their newest open
+  bag back (a new device restores the bag); a guest always gets a new one.
+- **Merge on claim.** When a customer token opens a guest bag on any cart route,
+  fold that customer's other open bags on the store into it — an item in both
+  keeps the higher quantity, never the sum; skip items no longer sellable — then
+  retire the others so they answer `404 cart_not_found`.
+- **Close a bag once it is an order.** A bag that became an order, or has a
+  payment underway or taken, answers `404 cart_not_found` on every cart route.
+
+Skipping any of these lets a customer own two bags, and after paying one the
+other comes back as "your bag" with items that look already bought.
 
 ```json
 {
@@ -423,6 +461,66 @@ Your endpoint MUST, before creating anything:
 redirect.** A shopper can close the tab before redirecting, and anyone can visit
 a success URL by hand.
 
+### On-site payments — only if my payment gateways live in my system
+
+When `checkout.mode` is `"payments"`, the storefront shows my system's own
+payment methods on its checkout page and asks me to run them:
+
+```
+POST /carts/:id/payment-options     checkout body → { amount, methods, savedMethods, total }
+POST /carts/:id/payments            checkout body + provider_id, method_id or token_id,
+                                    save_method, success_url, cancel_url, expected_total → Payment
+POST /payments/:id/actions/:action  a gateway step the browser cannot post to me directly → Payment
+GET  /payments/:id                  → Payment   (private, no-store)
+```
+
+A method is `{ id, providerId, methodId, provider, providerName, code, name,
+image, brands, flow, test, canSave, note }`. `flow` is what the page does with
+it: `direct` (the gateway's own form or modal, on the page), `redirect` (the
+gateway's hosted page), `offline` (cash on delivery, bank transfer). Saved
+methods pay with `token`.
+
+`Payment`:
+
+```json
+{
+  "id": "opaque random id", "reference": "S00012-1", "provider": "razorpay", "flow": "direct",
+  "status": "draft", "message": null,
+  "client": { "razorpay_key_id": "rzp_live_…", "razorpay_order_id": "order_…", "amount": 12800, "currency": "INR" },
+  "redirect": null,
+  "order": null
+}
+```
+
+`status`: `draft` `pending` `authorized` `paid` `cancelled` `failed`. `order`
+(`{ id, number }`) appears once the order exists. `redirect` is `{ url }` for a
+hosted page; when the gateway sends the shopper back to me, redirect them to
+`<storefront>/checkout/return?payment=<id>`.
+
+MUST:
+
+1. Apply the checkout body exactly as the checkout endpoint would — address,
+   delivery, stock, discount — before listing methods, because what can pay
+   depends on the destination and the total.
+2. Lock the order while creating a payment (`409 payment_in_progress`), refuse a
+   paid one (`409 already_paid`), and refuse an `expected_total` that no longer
+   matches (`409 cart_changed`). `422 no_payment_methods` when nothing can pay.
+3. `client` holds only values the gateway designs to be public. Build it once, on
+   create — rebuilding it on every status read opens a new order at the gateway.
+4. Allow-list actions per provider (`404 unsupported_action` otherwise). For
+   Razorpay, `complete` takes `razorpay_payment_id`, `razorpay_order_id` and
+   `razorpay_signature`; verify the HMAC before the payment counts
+   (`403 invalid_signature`).
+5. Offline methods place the order as pending straight away.
+6. `GET /payments/:id` confirms the order the first time it sees a final payment,
+   exactly once, and answers `409 retry` if another request holds the lock.
+7. Never roll back a recorded payment because confirming the order failed.
+   Store what the gateway reported in its own step; if confirming, invoicing or
+   sending email then fails, keep the payment, log the error, answer `paid` with
+   `order: null` and a `message` ("Payment received. We are confirming your
+   order…"), and retry the confirmation on the next status read and in a
+   background job until it succeeds.
+
 ### Orders, account, wishlist
 
 ```
@@ -436,6 +534,7 @@ PATCH /me                     → Customer
 POST   /me/addresses          → Customer
 PATCH  /me/addresses/:id      → Customer
 DELETE /me/addresses/:id      → Customer
+GET    /countries/:code       → { code, name, stateRequired, zipRequired, states: [{ code, name }] }
 GET    /me/wishlist           → { items: Product[], total }
 POST   /me/wishlist           { product_slug } → { ok: true }
 DELETE /me/wishlist/:slug     → { ok: true }
@@ -446,6 +545,13 @@ GET    /delivery-estimate     ?method=standard&country=US
 
 Address endpoints return the **whole Customer**, not the address, so the client
 never merges state by hand.
+
+Validate addresses on the server — at checkout and in the address book — and
+refuse with `422 invalid_address` naming the fields in `detail.fields`. Store the
+state as its code when the country has states. `GET /countries/:code` is what the
+storefront's State / region dropdown is built from, so a state picked from it
+must always validate; a country with no states answers an empty list and the
+form keeps a text box.
 
 Auth: the token from login is sent as `Authorization: Bearer <token>` on later
 requests. `GET /me` returning 401 is the normal signed-out state and must not
@@ -460,11 +566,15 @@ be logged as an error.
   "lines": [ /* same shape as CartLine */ ],
   "subtotal": {}, "discount": {}, "shipping": {}, "tax": {}, "total": {},
   "shippingAddress": {}, "email": "sam@example.com",
-  "tracking": { "carrier": "DHL", "code": "JD0146…", "url": "https://…" }
+  "tracking": { "carrier": "DHL", "code": "JD0146…", "url": "https://…" },
+  "payment": { "provider": "razorpay", "status": "captured", "method": "UPI", "amount": {}, "capturedAt": "ISO" }
 }
 ```
 
-`status`: `placed` `paid` `fulfilled` `delivered` `cancelled`.
+`status`: `placed` `paid` `fulfilled` (shipped) `delivered` `cancelled`.
+`payment` is null until there is one; its `status` is `pending` `authorized`
+`captured` `cancelled` `failed` — `captured` is what `GET /payments/:id` calls
+`paid`.
 
 ### Performance: one request for the first screen
 
@@ -526,11 +636,14 @@ PATCH  /admin/products/:id                               → Product
 DELETE /admin/products/:id
 PATCH  /admin/variants/:id/inventory  { quantity }                    → Variant
 POST   /admin/variants/:id/inventory  { delta, reason?, operationId? } → Variant
+GET    /admin/categories                                 → { items, total }   (the /categories tree, empty categories included)
 POST   /admin/categories              { slug, name, parent, blurb }
 DELETE /admin/categories/:slug
 GET    /size-charts                                      → { items, total }   (public)
 POST   /admin/size-charts             { id, unit, note, columns, rows }
-PATCH  /admin/orders/:id              { status, tracking }
+GET    /admin/orders?q=&status=&payment=&delivery=&page=&per_page=  → { items, total, page, perPage, counts }
+GET    /admin/orders/:id                                  → AdminOrder
+PATCH  /admin/orders/:id              { action: ship|update_tracking|deliver|record_payment|cancel, tracking? }
 GET    /admin/discounts                                  → { items, total }
 POST   /admin/discounts               { code, label, kind, value, active }
 DELETE /admin/discounts/:code
@@ -548,9 +661,33 @@ the element so a catalogue page does not reflow while shots decode. `type` is
 `image` or `video`.
 
 `discounts.kind` is `percent`, `fixed` (minor units) or `shipping`.
-`orders.status` is `placed` `paid` `fulfilled` `delivered` `cancelled`.
+`AdminOrder` is the customer `Order` plus what the back office needs:
 
-Six rules on writes:
+```json
+{
+  "backendId": "42", "backendUrl": "https://my-system/orders/42",
+  "customer": { "name": "…", "email": "…", "phone": "…" },
+  "orderState": "quotation | confirmed | cancelled",
+  "paymentStatus": "paid | authorized | pending | failed | unpaid",
+  "delivery": { "status": "none | to_ship | shipped | delivered | cancelled", "method": "Standard",
+                "shippedAt": null, "deliveredAt": null, "carrier": "", "trackingCode": "", "trackingUrl": "",
+                "references": ["OUT/00013"] },
+  "actions": ["ship", "update_tracking", "deliver", "record_payment", "cancel"]
+}
+```
+
+The list takes `q`, `status`, `payment` (`paid`, `authorized`, `pending`,
+`failed`, `unpaid`, or `awaiting` = not cancelled and `pending` or `unpaid`),
+`delivery`, `page` and `per_page`. It also returns `counts: { toShip, shipped,
+delivered, awaitingPayment, cancelled }` over every order, not the filtered page
+— they label the filter tabs. Each count MUST equal the `total` of its tab's
+filter, computed with the same predicate: `toShip` = `delivery=to_ship`,
+`awaitingPayment` = `payment=awaiting`, `shipped` = `delivery=shipped`,
+`delivered` = `delivery=delivered`, `cancelled` = `status=cancelled`. A count
+built from a different rule than its list shows a number over an empty tab. `PATCH` takes exactly one `{ action, tracking? }` and answers the updated
+`AdminOrder`; `tracking` is `{ carrier?, code?, url? }`, the URL `http(s)://` only.
+
+Rules on writes:
 
 1. **Prefer the inventory delta over the set.** Two people adjusting the same
    SKU with `set` silently overwrite each other; with a delta both land, and a
@@ -572,6 +709,21 @@ Six rules on writes:
    `images` `variants` `options` to empty, `rating` to `{average:0,count:0}`,
    `published` to true. A missing `rating` that reaches a sort comparator takes
    down a whole listing rather than one card.
+8. **`GET /admin/products/:id` returns what you store**, because the editor sends
+   the whole record back on every save: prices before pricelists and tax, every
+   tag, fit, fabric and the product's own size chart. Saving an unchanged record
+   must change nothing; `fit: null` or `fabric: null` means "leave it alone".
+9. **Forgive half-finished input.** Skip blank assurance, feature and composition
+   rows instead of refusing the product; match spec keys by key or label,
+   case-insensitively; accept common country names and codes.
+10. **A product created here tracks stock.** Whatever my system's default, the
+    editor's inventory numbers are the stock, not decoration.
+11. **Fulfilment actions do the real thing.** `ship` completes the delivery in my
+    system (the stock leaves once) and stores the tracking; `update_tracking`
+    only after shipping; `deliver` ships first if needed; `record_payment` only
+    for an offline payment still pending; `cancel` only before shipping, and it
+    returns the stock. Refuse anything not in `actions` with
+    `409 action_not_allowed`.
 
 `POST /admin/import` is what a nightly dump from my system should use. A
 thousand individual writes is a thousand transactions and a rate limit I will
@@ -646,11 +798,14 @@ table and a `carts`/`cart_lines` pair is enough to open a store.
 Four endpoints, and three rules that matter more than the endpoints.
 
 ```
-POST /carts/:cartId/checkout      create the payment
-POST /payments/verify             verify the signature, place the order
+POST /carts/:cartId/checkout      create the payment (redirect and razorpay modes)
+POST /payments/verify             razorpay mode: verify the signature, place the order
 POST /webhooks/<provider>         the truth, when the browser closed early
 POST /admin/orders/:id/refunds    { amount?, reason?, restock? } → the Order
 ```
+
+In `payments` mode the storefront uses the on-site payment routes above instead,
+and every rule below applies to them too.
 
 **Never charge an amount the browser sent you.** This is the vulnerability in
 almost every hand-rolled checkout: the page posts `{ amount: 24900 }` and the

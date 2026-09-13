@@ -6,7 +6,7 @@ npm run test:watch # on change
 npm run build      # docs → tests → build; a failing test fails the build
 ```
 
-81 tests, no test framework. `node --test` is already in Node, and a theme that
+Two hundred-odd tests, no test framework. `node --test` is already in Node, and a theme that
 ships three runtime dependencies should not quadruple its install to check
 arithmetic. Node runs each **file** in its own process, so every file gets a
 clean database singleton for free — which is what makes the migration and
@@ -53,6 +53,59 @@ to change the code rather than the wait.
 | `recently-viewed` | Per-customer scoping, the sign-in merge, corrupt storage |
 | `orders` | Server-side placement, idempotent replays, admin vs owner scoping |
 | `gates` | The contrast formula, and the budget measuring the real initial download |
+| `payments-onsite` | Method routing, polling that backs off and gives up, the demo and Razorpay drivers, and the demo backend end to end |
+| `admin-orders` | Shipping with tracking reaching the shopper, delivery, cash on delivery, cancelling returning stock, filters and counts |
+| `admin-editor` | Slug rules while typing, highlights and specifications staying in sync, the admin category list |
+| `regions` | `getCountry` listing states, and the empty list that keeps a text box |
+| `prefill` | A refreshed checkout filling the default address without overwriting what was typed |
+
+## Checking payments, fulfilment and addresses by hand
+
+The suite covers the logic. These confirm the wiring against a real backend.
+
+**On-site payments** (`checkout.mode: "payments"`):
+
+1. **Demo card.** Pick the test card and try each outcome. *Paid* opens the
+   order; *Pending* opens it with the payment pending; *Cancelled* and *Declined*
+   return to checkout with the bag unchanged.
+2. **Cash on delivery.** The order opens straight away with the payment pending.
+3. **Razorpay in test mode.** Use Razorpay's test keys and test card or UPI id.
+   The order appears only after the backend verifies the signature — post a
+   tampered `razorpay_signature` to `POST /payments/:id/actions/complete` and
+   expect `403 invalid_signature`.
+4. **A hosted payment page.** Come back from it and confirm `/checkout/return`
+   opens the order, and that a cancelled attempt returns to checkout with the
+   reason.
+5. **A changed bag.** Change the bag in another tab between listing methods and
+   paying, and expect `409 cart_changed` and fresh options.
+
+**Fulfilment** (`/admin/orders`):
+
+1. A paid order sits under **To ship**. Mark it shipped with a carrier, tracking
+   number and link; the shopper's order page shows *On its way* and **Track
+   parcel**.
+2. Update the tracking, then **Mark as delivered**; the shopper's page shows
+   *Delivered*.
+3. A cash on delivery order: ship it, then **Record cash received** — the payment
+   turns paid.
+4. Cancel an unshipped order and confirm its stock came back; cancelling a
+   shipped one must be refused.
+
+**The bag after an order.**
+
+1. Sign in, add an item and pay. The header bag is empty on the order page and
+   after a reload.
+2. Sign out, add an item as a guest, sign back in on the same browser while your
+   account already had a different item in its bag. The bag now holds both
+   items, once each — an item in both bags keeps the higher quantity, not the
+   sum.
+
+**Addresses.** Pick India or the United States at checkout and in the address
+book — State / region is a dropdown; pick France — it is a text box. Save an
+address without a required state and expect that field marked, not a generic
+error.
+
+[CHECKOUT.md](CHECKOUT.md) covers testing the older `redirect` contract.
 
 ## Two rules that make it worth having
 

@@ -1,8 +1,9 @@
 import api from './api/index.js'
 import { ApiError } from './api/contracts.js'
+import { loadScript } from './payments/load-script.js'
 
 /**
- * Checkout, in four modes.
+ * Checkout, in five modes.
  *
  * Which one runs is configuration (`storefront.checkout.mode`), not code, so a
  * merchant can move from a demo to a live payment provider without a rebuild.
@@ -24,6 +25,10 @@ import { ApiError } from './api/contracts.js'
  *   api      POSTs and expects an Order back. For merchants who settle payment
  *            elsewhere — invoicing, cash on delivery, wholesale terms.
  *
+ *   payments The backend's own gateways, on this page. The checkout page runs
+ *            it step by step (options, pay, poll) through `lib/payments`, so it
+ *            never reaches `startCheckout`. See docs/CHECKOUT.md.
+ *
  * Anything that takes a card in the browser is deliberately not offered here.
  *
  * No mode reads a secret. `key_secret`, webhook secrets and SMTP passwords go
@@ -41,6 +46,12 @@ export async function startCheckout({ config, cart, email, shippingAddress, ship
   if (mode === 'demo') {
     const order = await api.checkout({ email, shippingAddress, shippingMethod })
     return { kind: 'order', order }
+  }
+
+  if (mode === 'payments') {
+    throw new ApiError('checkout.mode "payments" runs on the checkout page through lib/payments, not startCheckout.', {
+      code: 'checkout_misconfigured',
+    })
   }
 
   if (mode === 'razorpay') return startRazorpay({ checkout, cart, email, shippingAddress, shippingMethod })
@@ -214,27 +225,4 @@ async function startRazorpay({ checkout, cart, email, shippingAddress, shippingM
     )
   }
   return { kind: 'order', order }
-}
-
-/** One tag per src, so a second checkout does not load the SDK twice. */
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${src}"]`)
-    if (existing) {
-      if (existing.dataset.loaded === 'true') return resolve()
-      existing.addEventListener('load', () => resolve())
-      existing.addEventListener('error', () => reject(new Error(`Could not load ${src}`)))
-      return undefined
-    }
-    const tag = document.createElement('script')
-    tag.src = src
-    tag.async = true
-    tag.addEventListener('load', () => {
-      tag.dataset.loaded = 'true'
-      resolve()
-    })
-    tag.addEventListener('error', () => reject(new Error(`Could not load ${src}`)))
-    document.head.appendChild(tag)
-    return undefined
-  })
 }

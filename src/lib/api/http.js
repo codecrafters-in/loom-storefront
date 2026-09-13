@@ -34,10 +34,41 @@ function url(path, query) {
   return u.toString()
 }
 
+const ADMIN_SESSION_KEY = 'loom.admin_session'
+
+/**
+ * The admin token, for /admin calls only.
+ *
+ * Never the customer token: a shopper's session must not reach the write API,
+ * and an admin session must not be sent to the shop's customer endpoints.
+ */
+function adminToken() {
+  try {
+    const session = JSON.parse(localStorage.getItem(ADMIN_SESSION_KEY) || 'null')
+    return session?.expiresAt && Date.now() < session.expiresAt ? session.token || '' : ''
+  } catch {
+    return ''
+  }
+}
+
+/** The server rejected the admin token: end the session so the panel asks to sign in again. */
+function adminSignedOut() {
+  try {
+    localStorage.removeItem(ADMIN_SESSION_KEY)
+  } catch {
+    /* already gone */
+  }
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new Event('loom:admin-signed-out'))
+  }
+}
+
+const isAdminPath = (path) => path === '/admin' || path.startsWith('/admin/')
+
 async function request(method, path, { query, body } = {}) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), config.api.timeout)
-  const auth = token()
+  const auth = isAdminPath(path) ? adminToken() : token()
 
   let res
   try {
@@ -45,6 +76,8 @@ async function request(method, path, { query, body } = {}) {
       method,
       signal: controller.signal,
       credentials: 'include',
+      // The server's Cache-Control is honoured unless the cache is switched off.
+      cache: config.api.cache ? 'default' : 'no-store',
       headers: {
         accept: 'application/json',
         ...(body ? { 'content-type': 'application/json' } : {}),
@@ -65,6 +98,7 @@ async function request(method, path, { query, body } = {}) {
   }
   clearTimeout(timer)
 
+  if (res.status === 401 && isAdminPath(path)) adminSignedOut()
   if (res.status === 204) return null
 
   let payload = null
@@ -160,6 +194,21 @@ export async function getReviews(slug, { page = 1, perPage = 5 } = {}) {
 /* ── cart ──────────────────────────────────────────────────────────────── */
 
 const CART_KEY = 'loom.cart_id'
+const FRESH_CART_KEY = 'loom.cart_fresh'
+
+/**
+ * The bag became an order: forget it, and ask for a fresh one next time. Without
+ * `fresh`, a signed-in customer's older open bag came back as "your bag" with
+ * items that looked already bought.
+ */
+function markCartSpent() {
+  try {
+    localStorage.removeItem(CART_KEY)
+    localStorage.setItem(FRESH_CART_KEY, '1')
+  } catch {
+    /* storage unavailable — the next bag is a new one anyway */
+  }
+}
 const cartId = () => {
   try {
     return localStorage.getItem(CART_KEY) || ''
@@ -186,7 +235,21 @@ async function ensureCart() {
       if (err.status !== 404) throw err
     }
   }
-  return rememberCart(assertCart(await post('/carts', {}), 'POST /carts'))
+  let fresh = false
+  try {
+    fresh = localStorage.getItem(FRESH_CART_KEY) === '1'
+  } catch {
+    /* storage unavailable */
+  }
+  const cart = rememberCart(assertCart(await post('/carts', fresh ? { fresh: true } : {}), 'POST /carts'))
+  if (fresh) {
+    try {
+      localStorage.removeItem(FRESH_CART_KEY)
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  return cart
 }
 
 export async function getCart() {
@@ -234,16 +297,71 @@ export async function checkout({ email, shippingAddress, shippingMethod = 'stand
     shipping_address: shippingAddress,
     shipping_method: shippingMethod,
   })
-  try {
-    localStorage.removeItem(CART_KEY)
-  } catch {
-    /* nothing to forget */
-  }
+  markCartSpent()
   return order
 }
 
 export const listOrders = () => get('/orders').then((r) => assertList(r, 'GET /orders'))
 export const getOrder = (orderId) => get(`/orders/${encodeURIComponent(orderId)}`)
+
+/* ── on-site payments (checkout.mode "payments") ───────────────────────── */
+
+// Never cached: every answer here is about one shopper's money.
+
+const checkoutFields = (body = {}) => ({
+  email: body.email,
+  shipping_address: body.shippingAddress,
+  shipping_method: body.shippingMethod,
+  currency: body.currency,
+})
+
+function assertPayment(payment, where) {
+  if (!payment || typeof payment.id !== 'string' || typeof payment.status !== 'string') {
+    throw new ContractError(where, 'a Payment with string "id" and "status"', payment)
+  }
+  return payment
+}
+
+/** A payment with an order behind it has spent the cart; the next visit starts a new bag. */
+function forgetSpentCart(payment) {
+  if (payment?.order) markCartSpent()
+  return payment
+}
+
+const paymentPath = (paymentId) => `/payments/${encodeURIComponent(paymentId)}`
+
+export async function getPaymentOptions(cartIdArg, body = {}) {
+  const id = cartIdArg || (await ensureCart()).id
+  const options = await post(`/carts/${encodeURIComponent(id)}/payment-options`, checkoutFields(body))
+  if (!options || !Array.isArray(options.methods)) {
+    throw new ContractError('POST /carts/:id/payment-options', 'an object with a "methods" array', options)
+  }
+  return options
+}
+
+export async function createPayment(cartIdArg, body = {}) {
+  const id = cartIdArg || (await ensureCart()).id
+  const payment = await post(`/carts/${encodeURIComponent(id)}/payments`, {
+    ...checkoutFields(body),
+    provider_id: body.providerId,
+    method_id: body.methodId,
+    token_id: body.tokenId,
+    save_method: Boolean(body.saveMethod),
+    success_url: body.successUrl,
+    cancel_url: body.cancelUrl,
+    expected_total: body.expectedTotal,
+  })
+  return forgetSpentCart(assertPayment(payment, 'POST /carts/:id/payments'))
+}
+
+export async function paymentAction(paymentId, action, body = {}) {
+  const payment = await post(`${paymentPath(paymentId)}/actions/${encodeURIComponent(action)}`, body)
+  return forgetSpentCart(assertPayment(payment, 'POST /payments/:id/actions/:action'))
+}
+
+export async function getPayment(paymentId) {
+  return forgetSpentCart(assertPayment(await get(paymentPath(paymentId)), 'GET /payments/:id'))
+}
 
 /* ── account ───────────────────────────────────────────────────────────── */
 
@@ -271,15 +389,48 @@ export async function logout() {
   return { ok: true }
 }
 
-export const getMe = () => get('/me')
+/**
+ * Signed out is known without asking.
+ *
+ * The API authenticates with the bearer token stored at sign-in (docs/API.md),
+ * so a browser holding none is a visitor by definition. Asking anyway costs a
+ * request on every page load, and because browsers print every failed request,
+ * it puts a red 401 in the console for every visitor — the normal state
+ * reported as an error.
+ */
+const unauthenticated = () => new ApiError('Not signed in.', { status: 401, code: 'unauthenticated' })
+
+function forgetSession() {
+  try {
+    localStorage.removeItem(SESSION_KEY)
+  } catch {
+    /* already gone */
+  }
+}
+
+export async function getMe() {
+  if (!token()) throw unauthenticated()
+  try {
+    return await get('/me')
+  } catch (err) {
+    // An expired or revoked token: drop it, so the next load does not ask again.
+    if (err.status === 401 && !config.api.token) forgetSession()
+    throw err
+  }
+}
 export const updateMe = (body) => patch('/me', body)
+/** States and required address fields for one country — public, cacheable. */
+export const getCountry = (code) => get(`/countries/${encodeURIComponent(code)}`)
 export const saveAddress = (address) =>
   address.id ? patch(`/me/addresses/${address.id}`, address) : post('/me/addresses', address)
 export const deleteAddress = (addressId) => del(`/me/addresses/${addressId}`)
 
 /* ── wishlist ──────────────────────────────────────────────────────────── */
 
-export const getWishlist = () => get('/me/wishlist').then((r) => assertList(r, 'GET /me/wishlist'))
+export const getWishlist = () =>
+  token()
+    ? get('/me/wishlist').then((r) => assertList(r, 'GET /me/wishlist'))
+    : Promise.reject(unauthenticated())
 export const addToWishlist = (slug) => post('/me/wishlist', { product_slug: slug })
 export const removeFromWishlist = (slug) => del(`/me/wishlist/${encodeURIComponent(slug)}`)
 
@@ -303,8 +454,33 @@ export const getBootstrap = () => get('/bootstrap')
 
 /* ── admin (write API) ─────────────────────────────────────────────────── */
 
-export const adminListProducts = ({ q = '', page = 1, perPage = 25 } = {}) =>
-  get('/admin/products', { q, page, per_page: perPage })
+/** The most products one admin page may return. */
+const ADMIN_PAGE_LIMIT = 100
+
+/**
+ * Admin product list.
+ *
+ * The API caps a page at 100, so a screen that wants everything at once (the
+ * inventory table, the related-products picker) asks for more and gets it one
+ * page at a time, up to what it asked for, instead of silently seeing the
+ * first hundred.
+ */
+export async function adminListProducts({ q = '', page = 1, perPage = 25 } = {}) {
+  if (perPage <= ADMIN_PAGE_LIMIT) return get('/admin/products', { q, page, per_page: perPage })
+  const offset = (page - 1) * perPage
+  const items = []
+  let next = Math.floor(offset / ADMIN_PAGE_LIMIT) + 1
+  let total = 0
+  do {
+    const chunk = await get('/admin/products', { q, page: next, per_page: ADMIN_PAGE_LIMIT })
+    total = chunk.total
+    items.push(...chunk.items)
+    next += 1
+    if (!chunk.items.length) break
+  } while (items.length < offset % ADMIN_PAGE_LIMIT + perPage && (next - 1) * ADMIN_PAGE_LIMIT < total)
+  const start = offset % ADMIN_PAGE_LIMIT
+  return { items: items.slice(start, start + perPage), total, page, perPage }
+}
 export const adminSaveProduct = (patch) =>
   patch.id ? patch_(`/admin/products/${patch.id}`, patch) : post('/admin/products', patch)
 export const adminDeleteProduct = (id) => del(`/admin/products/${encodeURIComponent(id)}`)
@@ -314,6 +490,10 @@ export const adminAdjustInventory = (variantId, delta) =>
   post(`/admin/variants/${encodeURIComponent(variantId)}/inventory`, { delta })
 export const adminSaveCategory = (body) => post('/admin/categories', body)
 export const adminDeleteCategory = (slug) => del(`/admin/categories/${encodeURIComponent(slug)}`)
+// Every category, including empty ones and ones holding only drafts — the
+// public list leaves those out, and they are exactly what an admin needs to see.
+export const adminListCategories = () =>
+  get('/admin/categories').then((r) => assertList(r, 'GET /admin/categories'))
 export const adminUpdateSettings = (body) => patch_('/admin/storefront', body)
 export const adminImport = (body) => post('/admin/import', body)
 export const adminExport = () => get('/admin/export')
@@ -353,6 +533,10 @@ export const lookupOrder = (body) => post('/orders/lookup', body)
 export const adminPlaceOrder = ({ cartId, email, payment, idempotencyKey }) =>
   post('/admin/orders', { cart_id: cartId, email, payment, idempotency_key: idempotencyKey })
 export const adminGetOrder = (id) => get(`/admin/orders/${encodeURIComponent(id)}`)
+/** Every order the store has taken, for the back office — `{ items, total, page, perPage, counts }`. */
+export const adminListOrders = ({ q, status, payment, delivery, page = 1, perPage = 25 } = {}) =>
+  get('/admin/orders', { q, status, payment, delivery, page, per_page: perPage })
+    .then((r) => assertList(r, 'GET /admin/orders'))
 
 export const adminRefundOrder = (orderId, body) =>
   post(`/admin/orders/${encodeURIComponent(orderId)}/refunds`, body)
@@ -373,21 +557,18 @@ export const adminGetProduct = (id) => get(`/admin/products/${encodeURIComponent
 export async function uploadMedia(file) {
   const body = new FormData()
   body.append('file', file)
-  let session = ''
-  try {
-    session = JSON.parse(localStorage.getItem('loom.session') || 'null')?.token || ''
-  } catch {
-    /* no session */
-  }
+  // The admin session, never the customer's or the publishable key: uploading is a write.
+  const session = adminToken()
   const res = await fetch(`${config.api.baseUrl}/admin/media`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       accept: 'application/json',
-      ...(config.api.token || session ? { authorization: `Bearer ${config.api.token || session}` } : {}),
+      ...(session ? { authorization: `Bearer ${session}` } : {}),
     },
     body,
   })
+  if (res.status === 401) adminSignedOut()
   const json = await res.json().catch(() => null)
   if (!res.ok) {
     throw new ApiError(json?.message || `Upload failed with ${res.status}.`, {

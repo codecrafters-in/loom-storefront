@@ -81,6 +81,7 @@ either way.
 | | |
 | --- | --- |
 | [docs/README.md](docs/README.md) | Index — start here |
+| [CHANGELOG.md](docs/CHANGELOG.md) | What changed, newest first |
 | [CONFIGURATION.md](docs/CONFIGURATION.md) | Every setting: menu, home page, currency, features |
 | [API.md](docs/API.md) | Endpoint reference |
 | [DATA-MODEL.md](docs/DATA-MODEL.md) | Every object shape |
@@ -111,11 +112,12 @@ either way.
 | `/search?q=` | Free-text search |
 | `/cart` | Full bag, quantity, discount codes, free-shipping progress |
 | `/wishlist` | Saved items |
-| `/checkout` | Contact, address, delivery method, order summary |
+| `/checkout` | Contact, address (with a state list per country), delivery method, payment step, order summary |
+| `/checkout/return` | Where a shopper lands after a gateway's hosted payment page |
 | `/order/:id` | Confirmation and receipt |
-| `/account` | Profile, orders, addresses |
+| `/account` | Overview (latest order, details, default address, saved items), orders, address book |
 | `/login` | Sign in and register |
-| `/pages/:slug` | Size guide, shipping, care, contact |
+| `/pages/:slug` | Size guide, shipping, care, contact — content built into the theme |
 | `*` | 404 |
 
 Plus a slide-in cart drawer, a mobile filter sheet, and toasts.
@@ -134,6 +136,7 @@ cp .env.example .env.local
 | `VITE_API_BASE_URL` | — | Required when `api`. No trailing slash |
 | `VITE_API_TOKEN` | — | Sent as `Authorization: Bearer`. Publishable keys only |
 | `VITE_API_TIMEOUT` | `12000` | Request timeout in ms |
+| `VITE_API_CACHE` | `on` | `off` shows backend edits on the next load. For development. Browser only — the build always caches |
 | `VITE_STORE_NAME` | `LOOM` | Wordmark and page titles |
 | `VITE_CURRENCY` | `USD` | ISO 4217 |
 | `VITE_LOCALE` | `en-US` | Number and date formatting |

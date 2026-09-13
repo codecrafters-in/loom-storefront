@@ -23,11 +23,16 @@ const NAV = [
   { to: '/admin/categories', label: 'Categories', icon: 'map-pin' },
   { to: '/admin/size-charts', label: 'Size charts', icon: 'filter' },
   { to: '/admin/orders', label: 'Orders', icon: 'truck' },
-  { to: '/admin/discounts', label: 'Discounts', icon: 'sparkle' },
-  { to: '/admin/storefront', label: 'Storefront', icon: 'star' },
-  { to: '/admin/data', label: 'Import / export', icon: 'refresh' },
+  { to: '/admin/discounts', label: 'Discounts', icon: 'sparkle', localOnly: true },
+  { to: '/admin/storefront', label: 'Storefront', icon: 'star', localOnly: true },
+  { to: '/admin/data', label: 'Import / export', icon: 'refresh', localOnly: true },
   { to: '/docs', label: 'Developer docs', icon: 'info' },
 ]
+
+// Against a real backend the write API covers the catalogue and order
+// fulfilment; discounts, settings and bulk import stay in the back office. The
+// routes remain and explain that, but the nav does not offer screens that cannot work.
+const VISIBLE_NAV = NAV.filter((n) => isMock || !n.localOnly)
 
 export default function AdminLayout() {
   const config = useStorefront()
@@ -59,7 +64,7 @@ export default function AdminLayout() {
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 gap-8 px-5 py-8">
         <nav aria-label="Admin" className="hidden w-52 shrink-0 lg:block">
           <ul className="sticky top-8 space-y-0.5">
-            {NAV.map((n) => (
+            {VISIBLE_NAV.map((n) => (
               <li key={n.to}>
                 <NavLink
                   to={n.to}
@@ -82,7 +87,7 @@ export default function AdminLayout() {
           {/* Mobile nav — a horizontal scroller rather than a hamburger, because
               an admin on a phone is usually doing one quick thing. */}
           <ul className="no-scrollbar mb-6 flex gap-2 overflow-x-auto lg:hidden">
-            {NAV.map((n) => (
+            {VISIBLE_NAV.map((n) => (
               <li key={n.to}>
                 <NavLink
                   to={n.to}

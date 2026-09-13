@@ -27,7 +27,7 @@ serves them.
 2. An ER diagram in plain text.
 3. The indexes, with a sentence each on which query they serve.
 4. A seed script inserting one complete product so I can verify it.
-5. The queries for the three hard reads, written out (below).
+5. The queries for the four hard reads, written out (below).
 
 ## Non-negotiable rules
 
@@ -132,7 +132,13 @@ catalogue — size and fit cause roughly two thirds of fashion returns:
 - `carts`, `cart_lines` — cart lines store `unit_price_amount` **as captured**,
   so a sale ending mid-session does not silently reprice an open bag. The
   captured price is a quote, not a promise: reprice every line from `variants`
-  at checkout and tell the shopper if anything moved.
+  at checkout and tell the shopper if anything moved. **At most one open cart
+  per customer per store:** carts carry `converted_order_id`, `retired_at` and
+  `merged_into`, and a partial unique index on `(store_id, customer_id)` where
+  the cart is neither converted nor retired enforces it. Claiming a guest cart
+  for a signed-in customer merges their other open cart into it (higher
+  quantity wins, never the sum) and retires the other — see DATABASE.md
+  *Carts*.
 - `discounts` — code, label, active, kind (`percent` | `fixed` | `shipping` —
   these exact strings; the storefront branches on them), value, starts_at,
   ends_at, usage_limit, used_count, minimum_subtotal
@@ -140,6 +146,18 @@ catalogue — size and fit cause roughly two thirds of fashion returns:
   price copied at purchase, never a live join to `products`. A product renamed
   next year must not change a receipt from last year.
 - `customers`, `addresses`, `wishlist_items`
+- `countries` — code (ISO 3166-1 alpha-2, primary key), name, state_required,
+  zip_required — and `country_states` — country_code, code, name, unique on
+  (country_code, code). `addresses.region` holds the state **code** whenever the
+  country has states, and the address write refuses any other value, naming the
+  field. The storefront builds its State / region dropdown from these rows
+- `shipments` — order_id, status (`pending`, `shipped`, `delivered`,
+  `cancelled`), carrier, tracking_code, tracking_url, delivery_refs (the
+  warehouse's own delivery ids), shipped_at, delivered_at, created_by. A table,
+  not columns on `orders`: one order can leave in two parcels, and "shipped" and
+  "delivered" are facts with a time and a person attached. Every fulfilment
+  action (ship, update tracking, deliver, cancel) is a guarded transition on
+  these rows, checked inside the same transaction that writes it
 - `reviews` — product_id, author, rating, body, verified, size_purchased,
   height, fit (`small` | `true` | `large`), created_at
 - `review_photos`
@@ -177,11 +195,21 @@ how a replay is detected — the caller then answers with the original order and
 stock twice and emails the customer again.
 
 **Money** — payments, refunds and the messages sent about them:
-- `payments` — order_id, provider, status (`pending | authorized | captured |
-  failed | refunded | partially_refunded`), reference (the provider's payment
-  id), method, amount, currency, captured_at. Put a **unique constraint on
-  (provider, reference)**: providers retry their webhooks, and a retry must not
-  create a second payment for the same money
+- `payment_methods` — what can pay: provider (`razorpay`, `stripe`, `custom` for
+  cash on delivery or transfer…), method code and display name, flow (`direct`,
+  `redirect`, `offline`, `token`), enabled, test_mode, supported countries and
+  currencies, and **public** configuration only. If a payment platform already
+  owns this list, read it from there instead and say so
+- `payments` — one row per attempt: order_id, provider, method, flow, status
+  (`draft`, `pending`, `authorized`, `captured`, `cancelled`, `failed`,
+  `refunded`, `partially_refunded`), reference (the provider's payment id),
+  amount, currency, message, token_hash (sha256 of the opaque id the browser
+  holds — never the id itself), processed_at (set once the order has been
+  confirmed from this payment, so it happens exactly once), captured_at. Put a
+  **unique constraint on (provider, reference)** and on token_hash: providers
+  retry their webhooks, and a retry must not create a second payment for the same
+  money. The status API says `paid` where this says `captured` — store one
+  vocabulary and map it on the way out
 - `refunds` — payment_id, amount, currency, reason, reference, restocked,
   created_at. A **list, not a flag on the order**: a partial refund is the
   common case, a boolean cannot express "refunded twice for two reasons", and a
@@ -239,13 +267,15 @@ put the catalogue into a state the storefront renders wrongly.
 
 **Operations**
 - `stores` / `store_settings` — the storefront configuration document
-  (navigation, home sections, checkout mode). Ask me whether to store it as
+  (navigation, home sections, checkout mode), plus `payment_mode` — whether
+  shoppers pay on the storefront or on a hosted page of mine — as a real column,
+  because the API branches on it. Ask me whether to store it as
   `jsonb` or as normalised tables, and give me your recommendation with a reason.
 - `admin_users` — with hashed passwords, and say which algorithm and cost
 - `webhook_events` — outbound delivery log with retry state
 - `audit_log` — actor, entity, before, after, at
 
-## The three hard reads
+## The hard reads
 
 Write these out. They are what the storefront actually does, and they are where
 a naive schema falls over.
@@ -265,6 +295,16 @@ me how many queries yours takes and why.
 **C. The bootstrap.** Store settings, the category tree with descendant-inclusive
 counts, collections, and the first N products for each of several home rails, in
 one response.
+
+**D. The admin order list.** One page of orders, newest first, each with its
+customer, total, payment status (from its latest payment) and delivery status
+(from its shipments) — filterable by any of those and searchable by order
+number, email or tracking code — plus counts over **every** order for To ship,
+Shipped, Delivered, Awaiting payment and Cancelled, which label the filter tabs.
+Each count must use exactly the predicate of its tab's filter, so a tab never
+shows a number over an empty list. Awaiting payment is every order that is not
+cancelled whose payment is pending **or** has none recorded at all. Show me how
+the counts avoid one query per tab.
 
 ## Also tell me
 

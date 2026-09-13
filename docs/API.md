@@ -68,6 +68,64 @@ array throws a `ContractError` naming the endpoint and the field, because a
 wrong shape that passes silently surfaces three components later as a null
 dereference and takes an afternoon to trace.
 
+**Caching.** Catalogue reads (`public` below) may be cached and revalidated — an
+`ETag` with a short `max-age` is enough. Anything carrying a cart id, a payment
+id or a token answers `Cache-Control: private, no-store`: a cached bag or payment
+is how one shopper ends up looking at another's.
+
+---
+
+## Endpoint index
+
+Every route the theme calls, and what the request must carry. **Auth** is
+nothing, the cart or payment id in the path (an unguessable id is the
+capability), a customer token, or an admin token — never interchangeable.
+
+| Method | Route | Auth | Cache | Section |
+| --- | --- | --- | --- | --- |
+| `GET` | `/bootstrap` | none | public | [Bootstrap](#bootstrap) |
+| `GET` | `/storefront` | none | public | [Storefront configuration](#storefront-configuration) |
+| `GET` | `/products`, `/products/:slug` | none | public | [Catalogue](#catalogue) |
+| `GET` | `/products/:slug/related`, `/products/:slug/reviews` | none | public | [Catalogue](#catalogue) |
+| `GET` | `/categories`, `/collections` | none | public | [Catalogue](#catalogue) |
+| `GET` | `/attributes` | none | public | [Attributes](#attributes) |
+| `GET` | `/size-charts` | none | public | [ADMIN.md](ADMIN.md) |
+| `GET` | `/countries/:code` | none | public | [Orders and account](#orders-and-account) |
+| `GET` | `/delivery-estimate` | none | public | [Delivery estimate](#delivery-estimate) |
+| `POST` | `/carts` | none | no-store | [Cart](#cart) |
+| `GET` `POST` `PATCH` `DELETE` | `/carts/:id`, `/carts/:id/lines…`, `/carts/:id/discount` | cart id | no-store | [Cart](#cart) |
+| `POST` | `/carts/:id/checkout` | cart id | no-store | [Checkout](#checkout) |
+| `POST` | `/carts/:id/payment-options`, `/carts/:id/payments` | cart id | no-store | [On-site payments](#on-site-payments) |
+| `POST` | `/payments/:id/actions/:action` | payment id | no-store | [On-site payments](#on-site-payments) |
+| `GET` | `/payments/:id` | payment id | no-store | [On-site payments](#on-site-payments) |
+| `POST` | `/payments/verify` | none — the signature is the proof | no-store | [Payments, refunds and secrets](#payments-refunds-and-secrets) |
+| `POST` | `/auth/login`, `/auth/register` | none | no-store | [Orders and account](#orders-and-account) |
+| `POST` | `/auth/logout` | customer | no-store | [Orders and account](#orders-and-account) |
+| `GET` `PATCH` | `/me` | customer | no-store | [Orders and account](#orders-and-account) |
+| `POST` `PATCH` `DELETE` | `/me/addresses…` | customer | no-store | [Orders and account](#orders-and-account) |
+| `GET` | `/orders` | customer | no-store | [Order visibility](#order-visibility) |
+| `GET` | `/orders/:id` | customer, or the browser that placed it | no-store | [Order visibility](#order-visibility) |
+| `POST` | `/orders/lookup` | order number and email, rate-limited | no-store | [Order visibility](#order-visibility) |
+| `GET` `POST` `DELETE` | `/me/wishlist…` | customer | no-store | [Wishlist](#wishlist) |
+| `POST` | `/newsletter` | none | no-store | [Newsletter](#newsletter) |
+| `POST` | `/admin/auth/login` | none, rate-limited | no-store | [ADMIN.md](ADMIN.md) |
+| `GET` `POST` `PATCH` `DELETE` | `/admin/products…`, `/admin/variants/:id/inventory` | admin | no-store | [Write API](#write-api-admin) |
+| `GET` `POST` `DELETE` | `/admin/categories…` | admin | no-store | [Write API](#write-api-admin) |
+| `POST` | `/admin/size-charts` | admin | no-store | [ADMIN.md](ADMIN.md) |
+| `GET` `POST` `DELETE` | `/admin/library…`, `/admin/media…` | admin | no-store | [The reuse library](#the-reuse-library) |
+| `GET` | `/admin/orders`, `/admin/orders/:id` | admin | no-store | [Admin orders](#admin-orders) |
+| `PATCH` | `/admin/orders/:id` | admin | no-store | [Admin orders](#admin-orders) |
+| `POST` | `/admin/orders` | admin, server to server | no-store | [Placing an order from a server](#placing-an-order-from-a-server) |
+| `POST` | `/admin/orders/:id/refunds` | admin | no-store | [Payments, refunds and secrets](#payments-refunds-and-secrets) |
+| `GET` `POST` `DELETE` | `/admin/discounts…` | admin | no-store | [ADMIN.md](ADMIN.md) |
+| `PATCH` | `/admin/storefront` | admin | no-store | [Write API](#write-api-admin) |
+| `POST` `GET` | `/admin/import`, `/admin/export` | admin | no-store | [Write API](#write-api-admin) |
+| `GET` `POST` | `/admin/credentials`, `/admin/notifications/test` | admin | no-store | [Payments, refunds and secrets](#payments-refunds-and-secrets) |
+
+A backend does not need all of it. The catalogue rows open a shop; the rest can
+arrive a section at a time, and the theme shows a clear error on a route that is
+not there yet rather than a blank page.
+
 ---
 
 ## Bootstrap
@@ -348,8 +406,9 @@ Two consequences worth implementing on the real backend too:
 ### Payments, refunds and secrets
 
 ```
-POST /carts/:cartId/checkout      create a payment (see CHECKOUT.md)
-POST /payments/verify             check a signature, place the order
+POST /carts/:cartId/checkout      create a payment — redirect, razorpay and api modes (see CHECKOUT.md)
+POST /payments/verify             razorpay mode: check a signature, place the order
+POST /carts/:cartId/payments      payments mode — see On-site payments below
 POST /admin/orders/:id/refunds    { amount?, reason?, restock? } → the Order
 GET  /admin/credentials           which secrets are set, and when — never values
 POST /admin/credentials           write-only
@@ -399,7 +458,7 @@ order again.
 
 ```
 POST /admin/orders   { cart_id, email, payment, idempotency_key }  → Order + created
-GET  /admin/orders/:id                                             → Order
+GET  /admin/orders/:id                                             → AdminOrder (an Order plus fulfilment fields)
 ```
 
 The route a payment webhook uses to turn money that has already moved into an
@@ -663,7 +722,7 @@ client that recalculates them will eventually disagree with the invoice.
 
 | Method | Route | Body |
 | --- | --- | --- |
-| `POST` | `/carts` | `{}` — creates one, returns `Cart` |
+| `POST` | `/carts` | `{}` or `{ "fresh": true }` — returns `Cart` (see *Who owns a bag* below) |
 | `GET` | `/carts/:id` | 404 if expired; the theme silently creates a new one |
 | `POST` | `/carts/:id/lines` | `{ variant_id, quantity }` |
 | `PATCH` | `/carts/:id/lines/:lineId` | `{ quantity }` |
@@ -705,6 +764,30 @@ zero when it does not apply.
 Expected errors: `409 insufficient_inventory`, `409 out_of_stock`,
 `422 invalid_discount`.
 
+### Who owns a bag
+
+One customer, one open bag per store. Three rules keep it that way, and each
+one exists because a bought item once showed up in the bag again after paying:
+
+- **`POST /carts` with a customer token and no body** returns the customer's
+  newest open bag if they have one — signing in on a new device brings the bag
+  back — and creates a new one otherwise. A guest always gets a new bag.
+- **`POST /carts` with `{ "fresh": true }`** always creates a new, empty bag and
+  never reuses an open one. The theme sends it on the first `POST /carts` after
+  a bag became an order (classic checkout, or an on-site payment whose response
+  carries `order`), right after forgetting the old cart id
+  (`src/lib/api/http.js`). Without it, a customer who owned a second open bag
+  got that one back — with items that looked already bought.
+- **Claiming a guest bag merges.** When a request with a customer token opens a
+  guest bag (any cart route), the backend folds the customer's other open bags
+  on that store into it and retires them. An item in both keeps the **higher**
+  quantity, never the sum; an item that is no longer sellable is skipped. A
+  retired bag answers `404 cart_not_found`, which the theme treats like an
+  expired one.
+
+A bag that became an order, or has a payment underway or taken, is no longer
+open: every cart route answers `404 cart_not_found` for it.
+
 ---
 
 ## Checkout
@@ -727,10 +810,117 @@ Expected errors: `409 insufficient_inventory`, `409 out_of_stock`,
 
 > **The theme never collects card details, and it never should.** A storefront
 > that touches a card number drags your whole frontend into PCI scope. In
-> production, replace this call with your provider's flow — Stripe Elements,
-> Razorpay Checkout, Adyen Drop-in — and create the order server-side when the
-> payment webhook confirms. The address form here is exactly the part that is
-> safe to own.
+> production, either keep this call and have your backend hand the shopper to a
+> hosted payment page (`redirect` mode), or let the backend list its gateways and
+> run each one's own form on the checkout page (`payments` mode, below). Either
+> way the card goes to the gateway's page or iframe and the order is confirmed
+> server-side. The address form here is exactly the part that is safe to own.
+
+### On-site payments
+
+Used when `checkout.mode` is `"payments"`: the backend owns the payment
+gateways, and the storefront shows them and runs each gateway's own form on the
+checkout page. The storefront never records a payment — it asks.
+
+| Method | Route | Returns |
+| --- | --- | --- |
+| `POST` | `/carts/:id/payment-options` | `{ amount, methods, savedMethods, total }` |
+| `POST` | `/carts/:id/payments` | `Payment` |
+| `POST` | `/payments/:paymentId/actions/:action` | `Payment` |
+| `GET` | `/payments/:paymentId` | `Payment` — never cached |
+
+`payment-options` takes the checkout body (`email`, `shipping_address`,
+`shipping_method`, `currency`) and applies it to the cart, because what can pay
+depends on where the parcel is going and what it costs:
+
+```json
+{
+  "amount": { "amount": 12800, "currency": "INR" },
+  "methods": [
+    {
+      "id": "3-12", "providerId": "3", "methodId": "12",
+      "provider": "razorpay", "providerName": "Razorpay",
+      "code": "upi", "name": "UPI", "image": "https://…", "brands": [],
+      "flow": "direct", "test": false, "canSave": false, "note": null
+    }
+  ],
+  "savedMethods": [{ "id": "7", "providerId": "3", "provider": "stripe", "name": "•••• 4242", "methodName": "Card" }],
+  "total": 1
+}
+```
+
+`flow` decides what the page does: `direct` runs a driver on this page,
+`redirect` sends the browser to the gateway's hosted page, `offline` (cash on
+delivery, bank transfer) needs nothing from the shopper.
+
+`payments` takes the same body plus `provider_id` and `method_id` (or
+`token_id`), `save_method`, `success_url`, `cancel_url` and `expected_total` in
+minor units:
+
+```json
+{
+  "id": "Xq3…opaque", "reference": "S00012-1",
+  "provider": "razorpay", "flow": "direct",
+  "status": "draft",
+  "message": null,
+  "client": { "razorpay_key_id": "rzp_live_…", "razorpay_order_id": "order_…", "amount": 12800, "currency": "INR" },
+  "redirect": null,
+  "order": null
+}
+```
+
+`status` is `draft`, `pending`, `authorized`, `paid`, `cancelled` or `failed`.
+`order` (`{ id, number }`) appears once the order is confirmed — or sent, for a
+method that settles later. `client` holds only values a gateway designs to be
+public. `id` is the only thing the browser keeps; `reference` is for people.
+`client` is filled only on the create response of a `direct` payment — building
+it again would open a second order at the gateway — and is `null` on status and
+action responses.
+
+**`paid` with `order: null` means the money arrived but the order is still
+being confirmed** — for example confirming it failed on the backend (an invoice
+PDF that could not be rendered) and will be retried. `message` says so
+("Payment received. We are confirming your order and will email you as soon as
+it is done."). Keep polling and show the message; never treat it as a failed
+payment or offer to pay again.
+
+`actions` are the gateway steps a browser cannot send to the backend's own
+payment routes: `demo`/`simulate` with `{ outcome, cardNumber }` (last four
+digits), and `razorpay`/`complete` with Razorpay's
+`razorpay_payment_id`, `razorpay_order_id` and `razorpay_signature`, which the
+backend verifies before the payment counts.
+
+**A hosted payment page comes back through the backend.** For
+`flow: "redirect"` the browser follows `redirect.url`; when the gateway returns
+the shopper, the backend sends them on to the storefront's
+`/checkout/return?payment=<id>`, which polls `GET /payments/:id` and opens the
+order.
+
+What the backend must do, whatever its payment system:
+
+- **Take the amount from the order, never from the request.** `expected_total`
+  only lets the backend refuse with `409 cart_changed` when the bag moved.
+- **Lock the order** while a payment is created (`409 payment_in_progress`), and
+  refuse one that is already paid (`409 already_paid`).
+- **Make `id` random and store only its hash.** It is the capability for the
+  status and action routes; a copied database must not hand them out.
+- **Put only public values in `client`** — the ones the gateway itself sends to a
+  browser. Never a secret key.
+- **Believe the gateway, not the browser.** An action's payload counts only after
+  its signature is verified; otherwise wait for the gateway's webhook.
+- **Confirm the order exactly once.** `GET /payments/:id` may be the first to see
+  a final payment — confirm the order there, idempotently, and answer
+  `409 retry` if a concurrent request holds the lock.
+- **Never roll back a recorded payment because confirming the order failed.**
+  Record what the gateway reported first; if confirming, invoicing or emailing
+  then fails, keep the payment, answer `paid` with `order: null` and a message,
+  and retry the confirmation (on the next status read and in the background).
+
+Expected errors: the checkout errors, `422 no_payment_methods`,
+`422 invalid_payment_method`, `409 cart_changed`, `409 payment_in_progress`,
+`409 already_paid`, `403 invalid_signature`, `404 unsupported_action`,
+`409 retry` (poll again). All codes: [ERRORS.md](ERRORS.md).
+See [CHECKOUT.md](CHECKOUT.md) for the flows and how to add a gateway driver.
 
 ---
 
@@ -748,9 +938,38 @@ Expected errors: `409 insufficient_inventory`, `409 out_of_stock`,
 | `POST` | `/me/addresses` | `Customer` |
 | `PATCH` | `/me/addresses/:id` | `Customer` |
 | `DELETE` | `/me/addresses/:id` | `Customer` |
+| `GET` | `/countries/:code` | `Country` — states and required address fields. Public, cacheable |
 
 Address endpoints return the **whole customer**, not the address, so the account
 page never has to merge state by hand.
+
+**Addresses are validated on the server**, at checkout and in the address book
+alike. A refused address answers `422 invalid_address` with the fields to fix and
+a message that names them:
+
+```json
+{ "message": "Please add the state / region.", "code": "invalid_address", "detail": { "fields": ["region"] } }
+```
+
+The checkout and account forms mark exactly those fields. A typed state that is
+not one of the country's gets its own message: `"Gujrat" is not a state of India.
+Use the state's full name or its code.`
+
+`GET /countries/:code` is what keeps that from happening:
+
+```json
+{
+  "code": "IN", "name": "India", "stateRequired": true, "zipRequired": true,
+  "states": [{ "code": "GJ", "name": "Gujarat" }, { "code": "MH", "name": "Maharashtra" }]
+}
+```
+
+When `states` has entries, **State / region** is a dropdown of those codes — the
+same codes the backend matches, so a picked state is never refused. An empty list,
+or a `404` for an unknown code, keeps a free-text box. An address's `region` is
+the state code whenever the country has a list; a saved state *name* is settled on
+its code the next time the form opens. The demo adapter answers from
+`src/data/regions.js`, a copy of Odoo's country data.
 
 ```json
 {
@@ -759,11 +978,17 @@ page never has to merge state by hand.
   "lines": [ /* CartLine */ ],
   "subtotal": {}, "discount": {}, "shipping": {}, "tax": {}, "total": {},
   "shippingAddress": { }, "email": "sam@example.com",
-  "tracking": { "carrier": "DHL", "code": "JD014600…", "url": "https://…" }
+  "tracking": { "carrier": "DHL", "code": "JD014600…", "url": "https://…" },
+  "payment": { "provider": "demo", "status": "captured", "method": "Card", "amount": {}, "capturedAt": "2026-09-09T10:15:02.000Z" }
 }
 ```
 
 `status` — `placed` `paid` `fulfilled` `delivered` `cancelled`.
+
+`payment` is `null` until the order has a payment. Its `status` is `pending`,
+`authorized`, `captured`, `cancelled` or `failed`. **`captured` is what
+`GET /payments/:id` calls `paid`** — the two routes describe the same completed
+payment in their own vocabulary.
 
 ---
 
@@ -801,19 +1026,131 @@ storefront token**. Full guide, including the reference implementation at
 | `DELETE` | `/admin/products/:id` | |
 | `PATCH` | `/admin/variants/:id/inventory` | `{ quantity }` — set |
 | `POST` | `/admin/variants/:id/inventory` | `{ delta, reason?, operationId? }` — adjust |
+| `GET` | `/admin/categories` | `{ items, total }` — the `/categories` tree, including empty categories |
 | `POST` | `/admin/categories` | `{ slug, name, parent, blurb }` |
 | `DELETE` | `/admin/categories/:slug` | Children are promoted to the deleted node's parent |
+| `GET` | `/admin/orders?q=&status=&payment=&delivery=&page=&per_page=` | `{ items: AdminOrder[], total, page, perPage, counts }` |
+| `GET` | `/admin/orders/:id` | `AdminOrder` — id, order number or backend id |
+| `PATCH` | `/admin/orders/:id` | `{ action, tracking? }` → `AdminOrder` — ship, update_tracking, deliver, record_payment, cancel |
 | `PATCH` | `/admin/storefront` | Deep-merged; arrays replace |
 | `POST` | `/admin/import` | `{ mode, products, categories, collections, settings }` |
 | `GET` | `/admin/export` | The same shape |
 
-Two things that are easy to get wrong:
+Three things that are easy to get wrong:
 
 - **Prefer the inventory delta over the set.** Two people adjusting the same SKU
   with `set` silently overwrite each other; with a delta both land, and a
   replayed webhook keyed on `operationId` is a safe no-op.
 - **A product price change must cascade to its variants** unless a variant has
   an explicit override — or you sell at last month's price.
+- **`GET /admin/products/:id` must return what you store**, because the editor
+  sends the whole record back on every save: prices before pricelists and tax,
+  every tag, and fit, fabric and the product's own size chart even where a
+  category hides them. Saving an unchanged record must change nothing — the full
+  list of round-trip rules is in [ADMIN.md](ADMIN.md).
+
+### Admin orders
+
+`AdminOrder` is the customer `Order` plus what the back office needs to move it
+along:
+
+```json
+{
+  "id": "…", "number": "S00011", "status": "placed", "…": "every Order field",
+  "backendId": "42",
+  "backendUrl": "https://odoo.example/odoo/sales/42",
+  "customer": { "name": "Sam Rivera", "email": "sam@example.com", "phone": "+1 555 0134" },
+  "orderState": "quotation",
+  "paymentStatus": "pending",
+  "delivery": {
+    "status": "to_ship", "method": "Standard",
+    "shippedAt": null, "deliveredAt": null,
+    "carrier": "", "trackingCode": "", "trackingUrl": "",
+    "references": ["WH/OUT/00013"]
+  },
+  "actions": ["ship", "deliver", "record_payment", "cancel"]
+}
+```
+
+| Field | Values |
+| --- | --- |
+| `orderState` | `quotation` `confirmed` `cancelled` |
+| `paymentStatus` | `paid` `authorized` `pending` (incl. cash on delivery) `failed` `unpaid` |
+| `delivery.status` | `none` (nothing to deliver) `to_ship` `shipped` `delivered` `cancelled` |
+| `actions` | Allowed right now, in display order: `ship` `update_tracking` `deliver` `record_payment` `cancel` |
+
+`backendId` and `backendUrl` are `null` in the demo.
+
+`GET /admin/orders` filters combine; `all` or an empty value ignores one, and an
+unknown value is `422 invalid_filter`:
+
+| Parameter | Values |
+| --- | --- |
+| `q` | Order number, customer name or email, tracking number |
+| `status` | `placed` `paid` `fulfilled` `delivered` `cancelled` (the customer `Order.status`) |
+| `payment` | `paid` `authorized` `pending` `failed` `unpaid`, or `awaiting` = not cancelled and `pending` **or** `unpaid` |
+| `delivery` | `none` `to_ship` `shipped` `delivered` `cancelled` |
+| `page`, `per_page` | Default 25, maximum 100 |
+
+The list's `counts` — `{ toShip, shipped, delivered, awaitingPayment, cancelled }`
+— label the filter tabs. Each one is **exactly the `total` its tab's filter
+returns**, counted over every order whatever filter or page is open: a tab that
+says 1 lists one order.
+
+| Count | Equals the `total` of | Contains |
+| --- | --- | --- |
+| `toShip` | `delivery=to_ship` | Not shipped yet, not cancelled |
+| `awaitingPayment` | `payment=awaiting` | Money not received yet: a payment still pending (Cash on Delivery, a bank transfer) or no payment recorded at all. Cancelled orders are left out |
+| `shipped` | `delivery=shipped` | On the way, not yet marked delivered |
+| `delivered` | `delivery=delivered` | Marked delivered |
+| `cancelled` | `status=cancelled` | Cancelled |
+
+Build each count from the same predicate as its filter, never a separate rule. A
+count that includes `unpaid` while the tab lists only `pending` shows a number
+over an empty list.
+
+`PATCH /admin/orders/:id` takes exactly one action:
+
+```json
+{ "action": "ship", "tracking": { "carrier": "Delhivery", "code": "AWB123", "url": "https://…" } }
+{ "action": "update_tracking", "tracking": { "code": "AWB124" } }
+{ "action": "deliver" }
+{ "action": "record_payment" }
+{ "action": "cancel" }
+```
+
+Every tracking field is optional, and one left out of `update_tracking` is kept.
+Shipping an order moves the customer's `Order.status` to `fulfilled` and fills
+`Order.tracking`; delivering moves it to `delivered`.
+
+| Status | Code | When |
+| --- | --- | --- |
+| 404 | `not_found` | No such order |
+| 403 | `not_allowed` | The signed-in user may not change orders or deliveries |
+| 409 | `action_not_allowed` | The action is not in the order's `actions` |
+| 409 | `cannot_ship` | The backend could not complete the delivery, with its reason |
+| 409 | `already_shipped` / `not_shipped` / `nothing_to_record` | The order moved on since it was loaded |
+| 422 | `invalid_action` | Not one of the five actions |
+| 422 | `invalid_tracking` | The link is not `http(s)://`, or the number is over 128 characters |
+
+**The actions are a state machine, and the backend owns it.**
+
+| From | Action | To | What the backend does |
+| --- | --- | --- | --- |
+| To ship | `ship` | Shipped | Confirms a quotation paid offline, completes the delivery (stock leaves once), stores the tracking |
+| Shipped or delivered | `update_tracking` | Unchanged | Replaces the tracking fields it was sent |
+| To ship or shipped | `deliver` | Delivered | Ships first if needed, then records the delivery |
+| Awaiting an offline payment | `record_payment` | Paid | Marks the cash or transfer received and confirms the order |
+| Not shipped | `cancel` | Cancelled | Cancels the order and its open deliveries; the stock returns |
+
+`actions` is recomputed on every answer and checked again inside the write, so a
+second click on **Mark as shipped** answers `409 action_not_allowed` rather than
+shipping twice. A backend that keeps discounts, refunds or store settings in its
+own screens should answer those admin routes with a `404` whose message says
+where to go, not a bare not-found.
+
+The older `{ "status": "fulfilled" | "delivered" | "cancelled" }` body maps to
+`ship`, `deliver` and `cancel`.
 
 `POST /admin/import` is what a nightly ERP dump should use. A thousand
 individual writes is a thousand transactions, a thousand cache purges, and a

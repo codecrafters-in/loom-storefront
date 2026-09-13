@@ -54,13 +54,22 @@ function announce(key) {
   }
 }
 
-/** How long a response stays fresh, by namespace. Milliseconds. */
+/**
+ * How long a response is trusted without asking, by namespace. Milliseconds.
+ *
+ * Short on purpose. Past it the cached copy is still painted instantly, and
+ * the background refresh asks the server with the browser's validator — a
+ * server that supports it answers 304 when nothing changed, so asking is
+ * cheap and an edited price or a sold-out size reaches the screen on the next
+ * view instead of minutes later. The window only absorbs the burst of
+ * identical reads one navigation makes.
+ */
 export const TTL = {
-  bootstrap: 5 * 60_000,
-  storefront: 10 * 60_000,
-  catalog: 5 * 60_000,
-  product: 5 * 60_000,
-  reviews: 10 * 60_000,
+  bootstrap: 15_000,
+  storefront: 15_000,
+  catalog: 15_000,
+  product: 15_000,
+  reviews: 15_000,
   // Cart, orders and account are per-user and change on every action. Caching
   // them is how a shopper ends up looking at someone else's bag on a CDN.
   none: 0,
@@ -205,6 +214,12 @@ export function invalidate(prefix) {
 export function invalidateAndNotify(prefix) {
   invalidate(prefix)
   announce(prefix || '*')
+}
+
+/** Forget what earlier sessions stored, keeping the entries this page was rendered from. */
+export function dropPersisted() {
+  persisted = {}
+  savePersisted()
 }
 
 export function clearAll() {

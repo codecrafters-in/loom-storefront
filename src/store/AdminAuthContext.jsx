@@ -14,12 +14,24 @@ import { config, isMock } from '../lib/config.js'
  * server refusing unauthenticated /admin/* requests.** That is stated here
  * rather than buried in a doc because it is the thing people get wrong.
  */
-const KEY = 'loom.admin_session'
+export const ADMIN_SESSION_KEY = 'loom.admin_session'
+/** Fired by the API client when the server rejects the admin token. */
+export const ADMIN_SIGNED_OUT_EVENT = 'loom:admin-signed-out'
+const KEY = ADMIN_SESSION_KEY
 const AdminAuthContext = createContext(null)
+const TWELVE_HOURS = 12 * 60 * 60 * 1000
 
 const DEMO = {
   username: config.adminUser || 'admin',
   password: config.adminPassword || 'admin',
+}
+
+function persist(session) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(session))
+  } catch {
+    /* not persisted; the session still works for this tab */
+  }
 }
 
 export function AdminAuthProvider({ children }) {
@@ -38,7 +50,14 @@ export function AdminAuthProvider({ children }) {
     setReady(true)
   }, [])
 
-  const signIn = useCallback(async ({ username, password }) => {
+  // The server is the authority: an expired or revoked token ends the session here too.
+  useEffect(() => {
+    const onSignedOut = () => setSession(null)
+    window.addEventListener(ADMIN_SIGNED_OUT_EVENT, onSignedOut)
+    return () => window.removeEventListener(ADMIN_SIGNED_OUT_EVENT, onSignedOut)
+  }, [])
+
+  const signIn = useCallback(async ({ username, password, totp }) => {
     if (isMock) {
       // Constant-ish comparison is pointless here — the credential is public and
       // in the bundle. The demo is a door, not a lock.
@@ -50,13 +69,9 @@ export function AdminAuthProvider({ children }) {
       const next = {
         username,
         token: `demo_${Date.now().toString(36)}`,
-        expiresAt: Date.now() + 12 * 60 * 60 * 1000,
+        expiresAt: Date.now() + TWELVE_HOURS,
       }
-      try {
-        localStorage.setItem(KEY, JSON.stringify(next))
-      } catch {
-        /* not persisted; the session still works for this tab */
-      }
+      persist(next)
       setSession(next)
       return next
     }
@@ -66,7 +81,7 @@ export function AdminAuthProvider({ children }) {
       method: 'POST',
       credentials: 'include',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, ...(totp ? { totp } : {}) }),
     })
     const body = await res.json().catch(() => null)
     if (!res.ok) {
@@ -74,24 +89,36 @@ export function AdminAuthProvider({ children }) {
       err.code = body?.code || `http_${res.status}`
       throw err
     }
-    const next = { username, token: body.token, expiresAt: Date.now() + 12 * 60 * 60 * 1000 }
-    try {
-      localStorage.setItem(KEY, JSON.stringify(next))
-    } catch {
-      /* not persisted */
+    const serverExpiry = Date.parse(body?.expiresAt || '')
+    const next = {
+      username: body?.user?.name || username,
+      token: body.token,
+      expiresAt: Number.isFinite(serverExpiry) ? serverExpiry : Date.now() + TWELVE_HOURS,
     }
+    persist(next)
     setSession(next)
     return next
   }, [])
 
   const signOut = useCallback(() => {
+    const token = session?.token
+    if (!isMock && token) {
+      // Revoke on the server too, so a copied token stops working. Best effort: the local
+      // session ends either way.
+      fetch(`${config.api.baseUrl}/admin/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json', accept: 'application/json', authorization: `Bearer ${token}` },
+        body: '{}',
+      }).catch(() => {})
+    }
     try {
       localStorage.removeItem(KEY)
     } catch {
       /* already gone */
     }
     setSession(null)
-  }, [])
+  }, [session])
 
   const value = useMemo(
     () => ({ session, ready, signedIn: !!session, signIn, signOut, demo: isMock ? DEMO : null }),

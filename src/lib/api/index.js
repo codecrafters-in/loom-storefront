@@ -12,7 +12,7 @@
 import { config, assertConfig, isMock } from '../config.js'
 import * as mock from './mock.js'
 import * as http from './http.js'
-import { cached, dedupe, invalidate, keyOf, peek as peekKey, TTL } from './cache.js'
+import { cached, dedupe, dropPersisted, invalidate, keyOf, peek as peekKey, TTL } from './cache.js'
 
 assertConfig()
 
@@ -23,13 +23,14 @@ const SURFACE = [
   'listProducts', 'getProduct', 'getRelated', 'listCategories', 'listCollections', 'getReviews',
   'getCart', 'addToCart', 'updateCartLine', 'removeCartLine', 'applyDiscount', 'clearCart',
   'checkout', 'listOrders', 'getOrder', 'lookupOrder',
-  'adminPlaceOrder', 'adminGetOrder',
-  'login', 'register', 'logout', 'getMe', 'updateMe', 'saveAddress', 'deleteAddress',
+  'getPaymentOptions', 'createPayment', 'paymentAction', 'getPayment',
+  'adminPlaceOrder', 'adminGetOrder', 'adminListOrders',
+  'login', 'register', 'logout', 'getMe', 'updateMe', 'saveAddress', 'deleteAddress', 'getCountry',
   'getWishlist', 'addToWishlist', 'removeFromWishlist',
   'subscribe', 'getDeliveryEstimate',
   'adminListProducts', 'adminSaveProduct', 'adminDeleteProduct',
   'adminSetInventory', 'adminAdjustInventory',
-  'adminSaveCategory', 'adminDeleteCategory',
+  'adminListCategories', 'adminSaveCategory', 'adminDeleteCategory',
   'listLibrary', 'saveLibraryItem', 'deleteLibraryItem',
   'adminRefundOrder', 'adminGetCredentials', 'adminSaveCredentials', 'adminSendTestNotification',
   'adminUpdateSettings', 'adminImport', 'adminExport', 'adminReset',
@@ -63,25 +64,43 @@ const CACHEABLE = {
   getReviews: TTL.reviews,
   getDeliveryEstimate: TTL.catalog,
   listSizeCharts: TTL.catalog,
+  getCountry: TTL.catalog,
   listAttributes: TTL.catalog,
   listLibrary: TTL.catalog,
 }
 
 /** A write to any of these drops the read namespaces it could have invalidated. */
+/**
+ * Reads whose prices depend on who is signed in.
+ *
+ * A customer pricelist, a trade discount or a different tax position can
+ * change every price the moment someone signs in or out, so the copies cached
+ * for the previous visitor have to go rather than wait out their window.
+ */
+const PRICED = ['listProducts', 'getProduct', 'getRelated', 'getBootstrap']
+
 const PURGES = {
+  login: PRICED, register: PRICED, logout: PRICED,
   addToCart: [], updateCartLine: [], removeCartLine: [], applyDiscount: [], clearCart: [],
   checkout: ['listProducts', 'getProduct', 'getBootstrap'],
+  // Options apply the address and delivery to the cart, so they are a write — never joined or cached.
+  getPaymentOptions: [],
+  // A payment that lands places the order and sells the stock, exactly like checkout.
+  createPayment: ['listProducts', 'getProduct', 'getBootstrap'],
+  paymentAction: ['listProducts', 'getProduct', 'getBootstrap'],
   // A save can teach the library a new attribute, so the vocabulary is stale too.
   adminSaveProduct: ['listProducts', 'getProduct', 'getRelated', 'getBootstrap', 'adminListProducts', 'adminGetProduct', 'listAttributes', 'listLibrary'],
   saveLibraryItem: ['listAttributes', 'listLibrary'],
   deleteLibraryItem: ['listAttributes', 'listLibrary'],
   adminSaveSizeChart: ['listSizeCharts', 'getProduct', 'adminGetProduct'],
-  adminUpdateOrder: ['listOrders', 'getOrder', 'adminGetOrder', 'listProducts', 'getProduct'],
+  // Shipping, delivering or recording a payment changes what the shopper and the
+  // order list see; cancelling returns stock, so the catalogue is stale too.
+  adminUpdateOrder: ['listOrders', 'getOrder', 'adminGetOrder', 'adminListOrders', 'listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
   // Placing an order sells stock, so the catalogue is stale as well as the
   // order lists.
-  adminPlaceOrder: ['listOrders', 'getOrder', 'adminGetOrder', 'getCart', 'listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
+  adminPlaceOrder: ['listOrders', 'getOrder', 'adminGetOrder', 'adminListOrders', 'getCart', 'listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
   // A refund can put stock back, so the catalogue is stale too.
-  adminRefundOrder: ['listOrders', 'getOrder', 'adminGetOrder', 'listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
+  adminRefundOrder: ['listOrders', 'getOrder', 'adminGetOrder', 'adminListOrders', 'listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
   adminSaveCredentials: ['adminGetCredentials'],
   // A successful lookup grants this browser access to that order.
   lookupOrder: ['getOrder'],
@@ -92,15 +111,27 @@ const PURGES = {
   adminDeleteProduct: ['listProducts', 'getProduct', 'getRelated', 'getBootstrap', 'adminListProducts'],
   adminSetInventory: ['listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
   adminAdjustInventory: ['listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
-  adminSaveCategory: ['listCategories', 'listProducts', 'getBootstrap'],
-  adminDeleteCategory: ['listCategories', 'listProducts', 'getBootstrap'],
+  adminSaveCategory: ['listCategories', 'adminListCategories', 'listProducts', 'getBootstrap'],
+  adminDeleteCategory: ['listCategories', 'adminListCategories', 'listProducts', 'getBootstrap'],
   adminUpdateSettings: ['getStorefront', 'getBootstrap'],
   adminImport: null,   // null = purge everything
   adminReset: null,
 }
 
+// "Off" is about a browser serving a response it fetched earlier. A server
+// render always caches: it cannot await, so it reads what `prime` fetched, and
+// without the cache every prerendered page comes out empty. (The prerenderer
+// defines a stand-in `window`, so ask Vite which bundle this is instead.)
+const cacheOn = config.api.cache || Boolean(import.meta.env?.SSR)
+
+// With the cache off, entries a previous session persisted must not be peeked
+// at either, or the first paint shows the data the switch was meant to avoid.
+// The server's seed for this page stays — it is what the markup was built from,
+// and dropping it makes hydration throw the server's work away.
+if (!cacheOn) dropPersisted()
+
 function wrap(name, fn) {
-  const ttl = CACHEABLE[name]
+  const ttl = cacheOn ? CACHEABLE[name] : 0
   const purges = PURGES[name]
 
   return async (...args) => {

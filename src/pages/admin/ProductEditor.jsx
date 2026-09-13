@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import api from '../../lib/api/index.js'
+import api, { isMock } from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
-import { Button, Icon, Skeleton } from '../../components/ui/index.jsx'
+import { Button, ErrorState, Icon, Skeleton } from '../../components/ui/index.jsx'
 import Media from '../../components/ui/Media.jsx'
 import * as media from '../../lib/media.js'
 import { Hint } from '../../components/admin/Tour.jsx'
@@ -10,6 +10,7 @@ import { useToast } from '../../store/ToastContext.jsx'
 import ProductPreview from '../../components/admin/ProductPreview.jsx'
 import EnrichmentTab from '../../components/admin/EnrichmentTab.jsx'
 import { formatMoney, toMinor, toMajor } from '../../lib/money.js'
+import { slugify, slugProblem } from '../../lib/slug.js'
 
 /**
  * The whole product record.
@@ -67,6 +68,63 @@ const TABS = [
   ['organise', 'Organise'],
 ]
 
+/*
+ * Unsaved work is kept in this browser until it is saved or discarded, so a
+ * reload — a dev server picking up a code change, a crashed tab — does not
+ * cost the product that was being typed in.
+ */
+const DRAFT_MAX_AGE = 7 * 24 * 3600 * 1000
+const draftKey = (id) => `loom.admin.draft.${id}`
+
+function readDraft(id) {
+  try {
+    const kept = JSON.parse(localStorage.getItem(draftKey(id)) || 'null')
+    return kept?.draft && Date.now() - kept.savedAt < DRAFT_MAX_AGE ? kept : null
+  } catch {
+    return null
+  }
+}
+
+function writeDraft(id, draft) {
+  try {
+    localStorage.setItem(draftKey(id), JSON.stringify({ savedAt: Date.now(), draft }))
+  } catch {
+    // Storage full or blocked: the editor still works, it just cannot survive a reload.
+  }
+}
+
+function forgetDraft(id) {
+  try {
+    localStorage.removeItem(draftKey(id))
+  } catch {
+    // Nothing to forget.
+  }
+}
+
+/** Where a refused save is fixed, so the toast is not the only clue. */
+const ERROR_TABS = {
+  missing_title: 'details',
+  invalid_slug: 'details',
+  slug_taken: 'details',
+  invalid_assurance: 'enrichment',
+  invalid_feature: 'enrichment',
+  composition_total: 'fit',
+  unknown_country: 'fit',
+  unknown_size_chart: 'fit',
+  unknown_variant: 'variants',
+  variant_prices: 'variants',
+  invalid_inventory: 'variants',
+  unknown_image: 'media',
+}
+const tabForError = (code = '') => ERROR_TABS[code] || (code.startsWith('invalid_spec') ? 'enrichment' : null)
+
+// A real backend stores photographs; the local demo also plays video.
+const UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+const UPLOAD_ACCEPT = isMock ? 'image/*,video/*' : UPLOAD_TYPES.join(',')
+
+/** "Oat · M", "One Size", "Navy" — whichever options the variant has. */
+const variantName = (v) => Object.values(v.options || {}).filter((x) => x != null).join(' · ')
+
 export default function ProductEditor() {
   const { id } = useParams()
   const isNew = id === 'new'
@@ -76,20 +134,38 @@ export default function ProductEditor() {
   const loaded = useAsync(() => api.adminGetProduct(id), [id], { skip: isNew })
   const charts = useAsync(() => api.listSizeCharts(), [])
   const vocab = useAsync(() => api.listAttributes(), [])
-  const cats = useAsync(() => api.listCategories(), [])
+  const cats = useAsync(() => api.adminListCategories(), [])
   // For the manual "You might also like" rail. Drafts included, because a
   // merchant preparing a launch wants to wire the rail before publishing.
   const catalogue = useAsync(() => api.adminListProducts({ perPage: 500 }), [])
 
-  const [draft, setDraft] = useState(isNew ? BLANK() : null)
+  const [draft, setDraft] = useState(() => (isNew ? readDraft('new')?.draft || BLANK() : null))
   const [tab, setTab] = useState('details')
   const [busy, setBusy] = useState(false)
-  const [dirty, setDirty] = useState(false)
+  const [dirty, setDirty] = useState(() => isNew && Boolean(readDraft('new')))
+  const [restoredAt, setRestoredAt] = useState(() => (isNew ? readDraft('new')?.savedAt : null) || null)
   const [previewing, setPreviewing] = useState(false)
 
   useEffect(() => {
-    if (loaded.data && !draft) setDraft(structuredClone(loaded.data))
-  }, [loaded.data, draft])
+    if (!loaded.data || draft) return
+    const kept = readDraft(id)
+    setDraft(kept ? kept.draft : structuredClone(loaded.data))
+    if (kept) {
+      setDirty(true)
+      setRestoredAt(kept.savedAt)
+    }
+  }, [loaded.data, draft, id])
+
+  useEffect(() => {
+    if (dirty && draft) writeDraft(id, draft)
+  }, [dirty, draft, id])
+
+  const discardChanges = () => {
+    forgetDraft(id)
+    setRestoredAt(null)
+    setDirty(false)
+    setDraft(isNew ? BLANK() : structuredClone(loaded.data))
+  }
 
   // Saving a new product replaces `new` in the URL with its id. The draft in
   // hand is already correct, so adopting the refetch would only throw away
@@ -139,9 +215,21 @@ export default function ProductEditor() {
       setTab('details')
       return false
     }
+    // A dash left over from typing is tidied here rather than refused.
+    const slug = slugify(draft.slug)
+    const problem = slugProblem(slug, { allowTrailingNumber: isMock })
+    if (problem) {
+      push(problem, { tone: 'error' })
+      setTab('details')
+      return false
+    }
+    const payload = slug === draft.slug ? draft : { ...draft, slug }
+    if (payload !== draft) setDraft(payload)
     setBusy(true)
     try {
-      const saved = await api.adminSaveProduct(draft)
+      const saved = await api.adminSaveProduct(payload)
+      forgetDraft(id)
+      setRestoredAt(null)
       setDirty(false)
       if (then === 'list') {
         push(isNew ? 'Product created' : 'Saved')
@@ -155,6 +243,8 @@ export default function ProductEditor() {
       return true
     } catch (err) {
       push(err.message, { tone: 'error' })
+      const fix = tabForError(err.code)
+      if (fix) setTab(fix)
       return false
     } finally {
       setBusy(false)
@@ -175,6 +265,7 @@ export default function ProductEditor() {
     setBusy(true)
     try {
       await api.adminDeleteProduct(draft.id || draft.slug)
+      forgetDraft(id)
       push('Product deleted')
       navigate('/admin/products')
     } catch (err) {
@@ -183,6 +274,7 @@ export default function ProductEditor() {
     }
   }
 
+  if (loaded.error && !draft) return <ErrorState error={loaded.error} onRetry={() => loaded.reload()} />
   if (loaded.loading || !draft) return <Skeleton className="h-96 w-full" />
 
   const props = {
@@ -255,6 +347,17 @@ export default function ProductEditor() {
           )}
         </div>
       </div>
+
+      {restoredAt && (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xs border border-line bg-sunken px-4 py-3 text-[13px]">
+          <span>
+            Unsaved changes from {new Date(restoredAt).toLocaleString()} were restored. Save to keep them.
+          </span>
+          <button type="button" onClick={discardChanges} className="text-[12px] text-muted link-underline">
+            Discard them
+          </button>
+        </div>
+      )}
 
       <div className="mt-7 flex gap-1 overflow-x-auto border-b border-line" role="tablist">
         {TABS.map(([k, label]) => (
@@ -335,9 +438,6 @@ export default function ProductEditor() {
 
 /* ── details ───────────────────────────────────────────────────────────── */
 
-const slugify = (s) =>
-  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-
 function DetailsTab({ draft, set, isNew }) {
   const currency = draft.price?.currency || 'USD'
   return (
@@ -357,7 +457,9 @@ function DetailsTab({ draft, set, isNew }) {
           label="Slug"
           mono
           value={draft.slug}
-          onChange={(v) => set('slug', slugify(v))}
+          onChange={(v) => set('slug', slugify(v, { typing: true }))}
+          onBlur={() => draft.slug !== slugify(draft.slug) && set('slug', slugify(draft.slug))}
+          error={slugProblem(slugify(draft.slug), { allowTrailingNumber: isMock })}
           hint="The web address: /product/your-slug. Changing it on a live product breaks existing links and ads."
         />
         <Text label="Subtitle" value={draft.subtitle} onChange={(v) => set('subtitle', v)}
@@ -399,9 +501,9 @@ function DetailsTab({ draft, set, isNew }) {
           placeholder="Machine wash cold, gentle" />
       </Panel>
 
-      <Panel title="Badges" note="Sale, sold-out and low-stock are derived from price and stock on save. These two are yours.">
+      <Panel title="Badges" note="Sale, sold-out and low-stock are worked out from price and stock. These two are yours.">
         <div className="flex flex-wrap gap-2">
-          {['new', 'bestseller', 'low-stock'].map((b) => {
+          {['new', 'bestseller'].map((b) => {
             const on = draft.badges?.includes(b)
             return (
               <button
@@ -459,6 +561,10 @@ function MediaTab({ draft, set }) {
     setBusy(true)
     const added = []
     for (const file of files) {
+      if (!isMock && !UPLOAD_TYPES.includes(file.type)) {
+        push(`${file.name}: only JPEG, PNG, WebP or GIF images can be uploaded.`, { tone: 'error' })
+        continue
+      }
       try {
         const m = await api.uploadMedia(file)
         added.push({
@@ -529,7 +635,7 @@ function MediaTab({ draft, set }) {
     <div className="space-y-8">
       <Panel
         title="Media"
-        note="Shot 4:5 (900 × 1125). The first is the card image; the second is what the grid swaps to on hover — a fabric detail works well. Video is supported and plays with controls on the product page."
+        note={`Shot 4:5 (900 × 1125). The first is the card image; the second is what the grid swaps to on hover — a fabric detail works well.${isMock ? ' Video is supported and plays with controls on the product page.' : ''}`}
       >
         {/* Drop zone. Also the upload button, because a drop target nobody can
             click is a drop target half the people who need it will miss. */}
@@ -553,10 +659,12 @@ function MediaTab({ draft, set }) {
         >
           <Icon name="package" size={22} className="mx-auto text-faint" />
           <p className="mt-3 text-[14px] text-ink">
-            {busy ? 'Processing…' : 'Drop images or video here'}
+            {busy ? 'Processing…' : isMock ? 'Drop images or video here' : 'Drop images here'}
           </p>
           <p className="mt-1 text-[12px] text-faint">
-            Several at once. Images are resized to 1600px and re-encoded; video up to 25MB.
+            {isMock
+              ? 'Several at once. Images are resized to 1600px and re-encoded; video up to 25MB.'
+              : 'Several at once. JPEG, PNG, WebP or GIF, up to 10MB each.'}
           </p>
           <Button
             size="sm"
@@ -571,7 +679,7 @@ function MediaTab({ draft, set }) {
           <input
             ref={inputRef}
             type="file"
-            accept="image/*,video/*"
+            accept={UPLOAD_ACCEPT}
             multiple
             className="sr-only"
             onChange={(e) => {
@@ -688,6 +796,9 @@ function MediaTab({ draft, set }) {
           </>
         )}
 
+        {/* Local data only. A real backend stores uploads, and a pasted link
+            is not something it can keep. */}
+        {isMock && (
         <details className="rounded-xs border border-line p-4">
           <summary className="cursor-pointer text-[13px] font-medium">Or paste a URL</summary>
           <p className="mt-2 text-[12px] leading-relaxed text-faint">
@@ -717,6 +828,7 @@ function MediaTab({ draft, set }) {
             />
           </div>
         </details>
+        )}
       </Panel>
     </div>
   )
@@ -757,26 +869,47 @@ function VariantsTab({ draft, set }) {
   const [bulk, setBulk] = useState({ mode: 'set-stock', value: '', scopeKey: 'all', scopeValue: '' })
   const { push } = useToast()
 
-  const setOption = (name, values) =>
-    set('options', [
-      { name: 'Color', values: name === 'Color' ? values : colorOpt.values },
-      { name: 'Size', values: name === 'Size' ? values : sizeOpt.values },
-    ])
+  /**
+   * Change one option's values.
+   *
+   * Only that option is touched: a third option such as Length is not on this
+   * screen, and rebuilding the list from Color and Size alone deleted it and
+   * its variants on save. Rows for a value that is gone go with it — a row
+   * pointing at a colour the product no longer has cannot be saved.
+   */
+  const setOption = (name, values) => {
+    const current = draft.options || []
+    set(
+      'options',
+      current.some((o) => o.name === name)
+        ? current.map((o) => (o.name === name ? { ...o, values } : o))
+        : [...current, { name, values }],
+    )
+    const orphaned = variants.filter((v) => v.options[name] != null && !values.includes(v.options[name]))
+    if (orphaned.length) {
+      removeVariants(orphaned.map((v) => v.id))
+      push(`${orphaned.length} variant${orphaned.length === 1 ? '' : 's'} removed with it`)
+    }
+  }
 
-  const makeVariant = (c, sz) => ({
-    id: `var_${draft.slug || 'new'}_${c}_${sz}`.toLowerCase().replace(/[^a-z0-9_]+/g, '-'),
-    sku: `${(draft.slug || 'SKU').slice(0, 6).toUpperCase()}-${c.slice(0, 3).toUpperCase()}-${sz}`,
-    options: { Color: c, Size: sz },
-    price: draft.price,
-    compareAtPrice: draft.compareAtPrice,
-    inventory: 0,
-    available: false,
-    // Prefer a shot tagged with this colour, so a store with per-colour
-    // photography wires itself up without anyone picking image ids.
-    imageId: images.find((img) => img.color === c)?.id || images[0]?.id || null,
-  })
+  /** A row for a colour, a size, or both — a scarf has no size and a belt may have no colour. */
+  const makeVariant = (c, sz) => {
+    const options = { ...(c != null && { Color: c }), ...(sz != null && { Size: sz }) }
+    return {
+      id: `var_${draft.slug || 'new'}_${Object.values(options).join('_')}`.toLowerCase().replace(/[^a-z0-9_]+/g, '-'),
+      sku: [(draft.slug || 'SKU').slice(0, 6).toUpperCase(), c?.slice(0, 3).toUpperCase(), sz].filter(Boolean).join('-'),
+      options,
+      price: draft.price,
+      compareAtPrice: draft.compareAtPrice,
+      inventory: 0,
+      available: false,
+      // Prefer a shot tagged with this colour, so a store with per-colour
+      // photography wires itself up without anyone picking image ids.
+      imageId: images.find((img) => c != null && img.color === c)?.id || images[0]?.id || null,
+    }
+  }
 
-  const key = (v) => `${v.options.Color}|${v.options.Size}`
+  const key = (v) => `${v.options.Color ?? ''}|${v.options.Size ?? ''}`
   const present = useMemo(() => new Set(variants.map(key)), [variants])
 
   /**
@@ -788,10 +921,13 @@ function VariantsTab({ draft, set }) {
    * wrong. Adding is explicit; nothing is resurrected behind your back.
    */
   const missing = useMemo(() => {
+    if (!colorOpt.values.length && !sizeOpt.values.length) return []
+    // An option with no values is not an axis, so a size-only product still
+    // lists its sizes instead of nothing.
     const out = []
-    for (const c of colorOpt.values) {
-      for (const sz of sizeOpt.values) {
-        if (!present.has(`${c}|${sz}`)) out.push({ color: c, size: sz })
+    for (const c of colorOpt.values.length ? colorOpt.values : [null]) {
+      for (const sz of sizeOpt.values.length ? sizeOpt.values : [null]) {
+        if (!present.has(`${c ?? ''}|${sz ?? ''}`)) out.push({ color: c, size: sz })
       }
     }
     return out
@@ -909,7 +1045,7 @@ function VariantsTab({ draft, set }) {
                     className="inline-flex items-center gap-1 rounded-xs border border-line px-2 py-1 text-[11px] text-faint transition-colors hover:border-ink hover:text-ink"
                   >
                     <Icon name="plus" size={10} />
-                    {m.color} · {m.size}
+                    {variantName({ options: { Color: m.color, Size: m.size } })}
                   </button>
                 </li>
               ))}
@@ -1044,7 +1180,7 @@ function VariantsTab({ draft, set }) {
                       <td className="p-2.5">
                         <input
                           type="checkbox"
-                          aria-label={`Select ${v.options.Color} ${v.options.Size}`}
+                          aria-label={`Select ${variantName(v)}`}
                           checked={picked.includes(v.id)}
                           onChange={() =>
                             setPicked((sel) => (sel.includes(v.id) ? sel.filter((x) => x !== v.id) : [...sel, v.id]))
@@ -1058,7 +1194,7 @@ function VariantsTab({ draft, set }) {
                             className="h-3 w-3 shrink-0 rounded-full ring-1 ring-inset ring-ink/15"
                             style={{ background: draft.swatches?.[v.options.Color] || '#ddd' }}
                           />
-                          {v.options.Color} · {v.options.Size}
+                          {variantName(v)}
                         </span>
                       </td>
                       <td className="p-2.5">
@@ -1094,7 +1230,7 @@ function VariantsTab({ draft, set }) {
                               id: m.id,
                               url: m.url,
                               type: m.type,
-                              alt: `${draft.title} in ${v.options.Color}`,
+                              alt: v.options.Color ? `${draft.title} in ${v.options.Color}` : draft.title,
                               color: v.options.Color,
                               width: m.width,
                               height: m.height,
@@ -1112,8 +1248,8 @@ function VariantsTab({ draft, set }) {
                         <button
                           type="button"
                           onClick={() => removeVariants([v.id])}
-                          aria-label={`Remove ${v.options.Color} ${v.options.Size}`}
-                          title={`Remove ${v.options.Color} ${v.options.Size}`}
+                          aria-label={`Remove ${variantName(v)}`}
+                          title={`Remove ${variantName(v)}`}
                           className="grid h-8 w-8 place-items-center rounded-xs text-faint transition-colors hover:bg-sale/10 hover:text-sale"
                         >
                           <Icon name="trash" size={14} />
@@ -1167,7 +1303,7 @@ function VariantImagePicker({ variant, images, onPick, onUpload }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label={`Image for ${variant.options.Color} ${variant.options.Size}`}
+        aria-label={`Image for ${variantName(variant)}`}
         className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xs border border-line transition-colors hover:border-ink"
       >
         {current ? (
@@ -1182,7 +1318,7 @@ function VariantImagePicker({ variant, images, onPick, onUpload }) {
           <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} role="presentation" />
           <div className="absolute right-0 z-30 mt-1 w-64 rounded-xs border border-line bg-surface p-3 shadow-card">
             <p className="text-[11px] uppercase tracking-[0.14em] text-faint">
-              {variant.options.Color} · {variant.options.Size}
+              {variantName(variant)}
             </p>
             {images.length > 0 && (
               <ul className="mt-2.5 grid grid-cols-4 gap-1.5">
@@ -1232,7 +1368,7 @@ function VariantImagePicker({ variant, images, onPick, onUpload }) {
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/*,video/*"
+                accept={UPLOAD_ACCEPT}
                 className="sr-only"
                 onChange={(e) => {
                   upload(e.target.files?.[0])
@@ -1273,6 +1409,19 @@ function FitTab({ draft, set, charts }) {
         <Area label="Fit note" rows={2} value={fit.note || ''} onChange={(v) => set('fit.note', v)}
           placeholder="Cut a half-size roomier through the chest than a dress shirt." />
 
+        {!isMock ? (
+          // Worked out from reviews by the backend. An editable copy here was
+          // accepted, ignored on save, and back to the real figures on reload.
+          <div>
+            <p className="mb-1.5 text-[13px] font-medium">Purchaser feedback</p>
+            <p className="text-[13px] text-muted">
+              {fit.sample
+                ? `${fb.small}% runs small · ${fb.true}% true to size · ${fb.large}% runs large, from ${fit.sample} review${fit.sample === 1 ? '' : 's'}.`
+                : 'No fit feedback yet.'}
+            </p>
+            <p className="mt-1 text-[12px] text-faint">From customer reviews in your back office, so it is read-only here.</p>
+          </div>
+        ) : (
         <div>
           <label className="mb-1.5 block text-[13px] font-medium">
             Purchaser feedback
@@ -1298,6 +1447,7 @@ function FitTab({ draft, set, charts }) {
           </p>
           <Text label="Sample size" type="number" value={fit.sample ?? 0} onChange={(v) => set('fit.sample', Number(v))} />
         </div>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-3">
           <Text label="Model height (cm)" type="number" value={fit.model?.height ?? ''} onChange={(v) => set('fit.model.height', Number(v))} />
@@ -1402,6 +1552,20 @@ function OrganiseTab({ draft, set, cats, catalogue = [] }) {
           suggestions={['cotton', 'linen', 'merino', 'cashmere', 'wool', 'silk', 'denim', 'leather', 'everyday', 'summer', 'winter', 'organic', 'recycled']} />
       </Panel>
 
+      {!isMock && (
+        // Counted from orders, wishlists and reviews by the backend. Editable
+        // inputs here were accepted, ignored on save, and reset on reload.
+        <Panel title="Demand and rating" note="Counted from orders, wishlists and reviews in your back office, so they are read-only here.">
+          <p className="text-[13px] text-muted">
+            {draft.social?.boughtLast30Days ?? 0} bought in 30 days · saved {draft.social?.savedCount ?? 0} times ·{' '}
+            {draft.rating?.count
+              ? `rated ${draft.rating.average} from ${draft.rating.count} review${draft.rating.count === 1 ? '' : 's'}`
+              : 'no reviews yet'}
+          </p>
+        </Panel>
+      )}
+
+      {isMock && (
       <Panel
         title="Demand"
         note="Shown under the buy button when it clears the threshold in Storefront settings. Real counts only — a shopper who spots one invented number stops believing the rest of the page."
@@ -1413,7 +1577,9 @@ function OrganiseTab({ draft, set, cats, catalogue = [] }) {
             onChange={(v) => set('social.savedCount', Number(v))} />
         </div>
       </Panel>
+      )}
 
+      {isMock && (
       <Panel title="Rating" note="Normally written by your review system. Editable here so a migrated catalogue can carry its history.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Text label="Average" type="number" step="0.1" min="0" max="5" value={draft.rating?.average ?? 0} onChange={(v) => set('rating.average', Number(v))} />
@@ -1423,6 +1589,7 @@ function OrganiseTab({ draft, set, cats, catalogue = [] }) {
           A perfect 5.0 converts worse than 4.8 — it reads as filtered.
         </p>
       </Panel>
+      )}
 
       <Panel
         title="You might also like"
@@ -1529,7 +1696,7 @@ function Panel({ title, note, children }) {
   )
 }
 
-function Text({ label, hint, mono, onChange, ...rest }) {
+function Text({ label, hint, mono, error, onChange, ...rest }) {
   const id = `f-${label.toLowerCase().replace(/\W+/g, '-')}`
   return (
     <div>
@@ -1537,8 +1704,10 @@ function Text({ label, hint, mono, onChange, ...rest }) {
         {label}
         {hint && <Hint>{hint}</Hint>}
       </label>
-      <input id={id} className={`field ${mono ? 'font-mono text-[13px]' : ''}`}
+      <input id={id} className={`field ${mono ? 'font-mono text-[13px]' : ''} ${error ? 'border-sale' : ''}`}
+        aria-invalid={error ? true : undefined}
         onChange={(e) => onChange(e.target.value)} {...rest} />
+      {error && <p className="mt-1.5 text-[12px] text-sale">{error}</p>}
     </div>
   )
 }
@@ -1698,9 +1867,11 @@ function CompositionEditor({ value, onChange }) {
       </ul>
       <div className="mt-2.5 flex items-center gap-3">
         <Button size="sm" variant="quiet" icon="plus" onClick={() => onChange([...value, ['', 0]])}>Add material</Button>
+        {/* A running total, not a gate: rows are filled in one at a time, and a
+            blank row just added is not a mistake yet. */}
         {value.length > 0 && (
-          <span className={`text-[12px] ${total === 100 ? 'text-faint' : 'text-sale'}`}>
-            {total}% {total === 100 ? '' : '— should be 100'}
+          <span className={`text-[12px] ${total === 100 || total === 0 ? 'text-faint' : 'text-sale'}`}>
+            {total}% {total === 100 || total === 0 ? '' : '— should add up to 100'}
           </span>
         )}
       </div>

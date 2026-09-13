@@ -1,15 +1,25 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect, useMemo, useRef } from 'react'
 import Seo from '../components/Seo.jsx'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { startCheckout } from '../lib/checkout.js'
+import api from '../lib/api/index.js'
+import { ApiError } from '../lib/api/contracts.js'
+import { paymentBody, returnUrls, runPayment, visibleMethods } from '../lib/payments/index.js'
+import { driverFor } from '../lib/payments/drivers/index.js'
 import { beginCheckout, purchase } from '../lib/analytics.js'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import Media from '../components/ui/Media.jsx'
+import PaymentStep from '../components/checkout/PaymentStep.jsx'
+import RegionField from '../components/address/RegionField.jsx'
+import { prefillCheckout } from '../lib/prefill.js'
 import { SIZES } from '../lib/images.js'
 import { useCart } from '../store/CartContext.jsx'
 import { useAuth } from '../store/AuthContext.jsx'
 import { Button, Empty, Icon } from '../components/ui/index.jsx'
 import { formatMoney } from '../lib/money.js'
+
+/** Form fields a backend error can point at, by the name it uses. */
+const FIELD_IDS = ['email', 'name', 'line1', 'line2', 'city', 'region', 'postalCode', 'country', 'phone']
 
 /**
  * Checkout stops at the point where a payment provider would take over.
@@ -18,6 +28,10 @@ import { formatMoney } from '../lib/money.js'
  * In production this form collects the address, then hands off to Stripe
  * Elements, Razorpay or whatever the merchant uses, and the order is created
  * server-side once payment confirms.
+ *
+ * In `payments` mode the hand-off happens on this page: the backend lists the
+ * methods it can take for this cart, and the gateway's own form (or modal)
+ * takes the card. See lib/payments.
  */
 export default function Checkout() {
   const { cart, refresh } = useCart()
@@ -25,25 +39,56 @@ export default function Checkout() {
   const config = useStorefront()
   const COUNTRIES = config.commerce?.countries || [['US', 'United States']]
   const SHIPPING = config.commerce?.shippingMethods || []
+  const payments = config.checkout?.mode === 'payments'
   const navigate = useNavigate()
+  const location = useLocation()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [method, setMethod] = useState(config.commerce?.shippingMethods?.[0]?.id || 'standard')
 
-  const defaultAddress = customer?.addresses?.find((a) => a.isDefault) || customer?.addresses?.[0]
-  const [form, setForm] = useState({
-    email: customer?.email || '',
-    name: defaultAddress?.name || '',
-    line1: defaultAddress?.line1 || '',
-    line2: defaultAddress?.line2 || '',
-    city: defaultAddress?.city || '',
-    region: defaultAddress?.region || '',
-    postalCode: defaultAddress?.postalCode || '',
-    country: defaultAddress?.country || 'US',
-    phone: defaultAddress?.phone || '',
-  })
+  // A guest starts in the store's own country rather than whichever sorts first.
+  const localeCountry = (config.pricing?.locale || '').split('-')[1]
+  const fallbackCountry = COUNTRIES.find(([code]) => code === localeCountry)?.[0] || COUNTRIES[0]?.[0] || 'US'
+  const [form, setForm] = useState(() => prefillCheckout({
+    email: '', name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country: fallbackCountry, phone: '',
+  }, customer))
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  // Payments mode only.
+  const [stage, setStage] = useState('details')
+  const [options, setOptions] = useState(null)
+  const [optionsLoading, setOptionsLoading] = useState(false)
+  const [optionsError, setOptionsError] = useState(null)
+  const [selected, setSelected] = useState(null)
+  const [demoInput, setDemoInput] = useState({ cardNumber: '4242 4242 4242 4242', outcome: 'done' })
+  const [notice, setNotice] = useState(location.state?.paymentMessage || null)
+  const [waiting, setWaiting] = useState(null)
+  const errorRef = useRef(null)
+  const latest = useRef({ form, method, cart, refresh })
+  latest.current = { form, method, cart, refresh }
+  const optionsRequest = useRef({ seq: 0, key: '' })
+
+  // Fields the shopper has typed into — an account that loads late never overwrites them.
+  const touched = useRef(new Set())
+  const set = (k) => (e) => {
+    const value = e.target.value
+    touched.current.add(k)
+    setForm((f) => ({ ...f, [k]: value }))
+  }
+
+  // A refreshed checkout renders before the account has loaded, so the form
+  // starts empty. Fill it with the default address when the customer arrives.
+  const prefilledFor = useRef(customer?.id || null)
+  useEffect(() => {
+    if (!customer || prefilledFor.current === customer.id) return
+    prefilledFor.current = customer.id
+    setForm((f) => prefillCheckout(f, customer, touched.current))
+  }, [customer])
+  // Stable, because the state field settles its value in an effect that depends on it.
+  const setRegion = useCallback((e) => {
+    const value = e.target.value
+    setForm((f) => ({ ...f, region: value }))
+  }, [])
+  const methods = useMemo(() => visibleMethods(options), [options])
 
   // Above the early returns: a hook after one runs in a different order on the
   // render where it fires. Once per arrival at the form, not per render — the funnel step is reaching
@@ -52,6 +97,55 @@ export default function Checkout() {
     if (cart?.lines?.length) beginCheckout(cart)
   }, [cart?.lines?.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Send focus to what went wrong: the field the backend named, or the message.
+  useEffect(() => {
+    if (!error) return
+    const fields = error.detail?.detail?.fields || error.detail?.fields || []
+    const field = error.code === 'email_required' ? 'email' : fields.find((f) => FIELD_IDS.includes(f))
+    const target = (field && document.getElementById(field)) || errorRef.current
+    target?.focus()
+  }, [error])
+
+  /**
+   * What can pay for this cart depends on where it is going and how, so the
+   * options follow the country and the delivery method. Other address edits do
+   * not change them, and the pay request sends the whole form anyway.
+   */
+  const loadOptions = async () => {
+    const { form: values, method: shipping, cart: current, refresh: reload } = latest.current
+    const request = (optionsRequest.current = { seq: optionsRequest.current.seq + 1, key: `${values.country}|${shipping}` })
+    setOptionsLoading(true)
+    setOptionsError(null)
+    try {
+      const { email, ...address } = values
+      const next = await api.getPaymentOptions(current?.id, {
+        email,
+        shippingAddress: address,
+        shippingMethod: shipping,
+        currency: current?.currency,
+      })
+      if (request !== optionsRequest.current) return
+      setOptions(next)
+      const list = visibleMethods(next)
+      setSelected((key) => (list.some((m) => m.key === key) ? key : list[0]?.key || null))
+      // The backend applied the address and delivery, so the totals may have moved.
+      reload().catch(() => {})
+    } catch (err) {
+      if (request !== optionsRequest.current) return
+      setOptions(null)
+      setOptionsError(err)
+    } finally {
+      if (request === optionsRequest.current) setOptionsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!payments || stage !== 'payment') return undefined
+    if (optionsRequest.current.key === `${form.country}|${method}`) return undefined
+    const first = !optionsRequest.current.key
+    const timer = setTimeout(loadOptions, first ? 0 : 500)
+    return () => clearTimeout(timer)
+  }, [payments, stage, form.country, method])
 
   // Guest checkout is the default. A store that requires an account sends the
   // shopper to sign in and back, rather than failing at submit.
@@ -70,8 +164,89 @@ export default function Checkout() {
     )
   }
 
+  const fail = (err) => {
+    setError(err)
+    setBusy(false)
+  }
+
+  const finish = async (payment) => {
+    await refresh().catch(() => {})
+    let order = null
+    try {
+      order = await api.getOrder(payment.order.id)
+    } catch {
+      /* the confirmation page fetches it itself */
+    }
+    if (order) purchase(order)
+    navigate(`/order/${payment.order.id}`, order ? { state: { order } } : undefined)
+  }
+
+  const pay = async () => {
+    const chosen = methods.find((m) => m.key === selected)
+    if (!chosen) {
+      fail(new ApiError('Choose how you would like to pay.', { code: 'payment_method_required' }))
+      return
+    }
+    const driver = chosen.saved ? null : driverFor(chosen.provider)
+    const problem = driver?.validate?.(demoInput)
+    if (problem) {
+      fail(new ApiError(problem, { code: 'invalid_card' }))
+      return
+    }
+
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    setWaiting(null)
+    try {
+      const { email, ...address } = form
+      const urls = returnUrls(config.checkout, window.location.origin)
+      const created = await api.createPayment(cart.id, paymentBody({
+        email,
+        shippingAddress: address,
+        shippingMethod: method,
+        currency: cart.currency,
+        method: chosen,
+        expectedTotal: options?.amount?.amount,
+        ...urls,
+      }))
+      const result = await runPayment(created, { api, input: driver?.needsInput ? demoInput : undefined })
+
+      if (result.kind === 'redirect') {
+        // Hand the browser to the gateway's own page. Nothing after this runs.
+        window.location.assign(result.url)
+        return
+      }
+      if (result.kind === 'order') {
+        await finish(result.payment)
+        return
+      }
+      if (result.kind === 'timeout') {
+        setWaiting(result.payment)
+        setBusy(false)
+        return
+      }
+      fail(new ApiError(result.message, { code: `payment_${result.payment.status}` }))
+    } catch (err) {
+      if (err.code === 'payment_cancelled') {
+        // Closing a payment window is a normal thing to do, not a failure.
+        setNotice(err.message)
+        setBusy(false)
+        return
+      }
+      if (err.code === 'cart_changed') loadOptions()
+      fail(err)
+    }
+  }
+
   const submit = async (e) => {
     e.preventDefault()
+    if (busy) return
+    if (payments) {
+      if (stage === 'payment') await pay()
+      else setStage('payment')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -96,6 +271,15 @@ export default function Checkout() {
       setBusy(false)
     }
   }
+
+  const payTotal = options?.amount || cart.total
+  const buttonLabel = busy
+    ? payments && stage === 'payment' ? 'Processing payment…' : 'Just a moment…'
+    : payments
+      ? stage === 'payment' ? `Pay · ${formatMoney(payTotal)}` : 'Continue to payment'
+      : config.checkout?.mode === 'redirect'
+        ? `Continue to payment · ${formatMoney(cart.total)}`
+        : `Place order · ${formatMoney(cart.total)}`
 
   return (
     <>
@@ -124,7 +308,7 @@ export default function Checkout() {
           <Field label="Apartment, suite (optional)" id="line2" value={form.line2} onChange={set('line2')} autoComplete="address-line2" />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="City" id="city" required value={form.city} onChange={set('city')} autoComplete="address-level2" />
-            <Field label="State / region" id="region" value={form.region} onChange={set('region')} autoComplete="address-level1" />
+            <RegionField id="region" country={form.country} value={form.region} onChange={setRegion} />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Postcode" id="postalCode" required value={form.postalCode} onChange={set('postalCode')} autoComplete="postal-code" />
@@ -169,18 +353,51 @@ export default function Checkout() {
           </div>
         </Section>
 
+        {payments && stage === 'payment' && (
+          <PaymentStep
+            methods={methods}
+            selected={selected}
+            onSelect={setSelected}
+            loading={optionsLoading}
+            error={optionsError}
+            disabled={busy}
+            demoInput={demoInput}
+            onDemoInput={setDemoInput}
+          />
+        )}
+
+        {notice && (
+          <p role="status" className="mt-6 flex items-start gap-2.5 rounded-xs border border-line bg-surface p-3.5 text-[13px] text-muted">
+            <Icon name="info" size={16} className="mt-px shrink-0 text-accent" />
+            <span>{notice}</span>
+          </p>
+        )}
+
+        {waiting && (
+          <div role="status" className="mt-6 rounded-xs border border-line bg-surface p-3.5 text-[13px] leading-relaxed text-muted">
+            We have not heard back from the payment provider yet. If the payment went through, we will email you a
+            confirmation — there is no need to pay again.
+            {waiting.order && (
+              <Link to={`/order/${waiting.order.id}`} className="ml-1 text-ink link-underline">View your order</Link>
+            )}
+          </div>
+        )}
+
         {error && (
-          <p className="mt-6 rounded-xs border border-sale/25 bg-surface p-3.5 text-[13px] text-sale">
+          <p ref={errorRef} tabIndex={-1} role="alert" className="mt-6 rounded-xs border border-sale/25 bg-surface p-3.5 text-[13px] text-sale outline-none">
             {error.message}
           </p>
         )}
 
-        <Button as="button" type="submit" size="lg" full className="mt-8" disabled={busy}>
-          {busy
-            ? 'Just a moment…'
-            : config.checkout?.mode === 'redirect'
-              ? `Continue to payment · ${formatMoney(cart.total)}`
-              : `Place order · ${formatMoney(cart.total)}`}
+        <Button
+          as="button"
+          type="submit"
+          size="lg"
+          full
+          className="mt-8"
+          disabled={busy || (payments && stage === 'payment' && (optionsLoading || !selected))}
+        >
+          {buttonLabel}
         </Button>
         {config.checkout?.termsUrl && (
           <p className="mt-4 text-center text-[12px] leading-relaxed text-faint">

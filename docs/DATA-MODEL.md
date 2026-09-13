@@ -242,6 +242,9 @@ Cart {
 ```
 
 The cart is server-owned. Every mutation returns the whole repriced cart.
+A customer has at most one open cart per store: `POST /carts {"fresh": true}`
+starts a new one after an order, and claiming a guest cart merges the customer's
+other open cart into it — see [API.md › Who owns a bag](API.md#who-owns-a-bag).
 
 ## Order
 
@@ -255,8 +258,94 @@ The cart is server-owned. Every mutation returns the whole repriced cart.
   shippingMethod: string
   email: string
   tracking: { carrier, code, url } | null
+  payment: {                        // null until the order has a payment
+    provider, method: string
+    status: string                  // pending|authorized|captured|cancelled|failed
+    amount: Money
+    capturedAt: string | null
+  } | null
 }
 ```
+
+## PaymentMethod
+
+One way to pay, from `POST /carts/:id/payment-options`, which answers
+`{ amount: Money, methods: PaymentMethod[], savedMethods, total }`.
+
+```ts
+{
+  id: string                        // "<providerId>-<methodId>"
+  providerId, methodId: string
+  provider: string                  // demo, razorpay, stripe, custom …
+  providerName, code, name: string
+  image: string | null
+  brands: { name: string, image: string }[]
+  flow: 'direct' | 'redirect' | 'offline'
+  test: boolean                     // the provider is in test mode
+  canSave: boolean
+  note: string | null               // offline instructions, plain text
+}
+```
+
+`savedMethods` entries are `{ id, providerId, provider, name, methodName }` and
+pay with `flow: "token"`.
+
+## Payment
+
+From `POST /carts/:id/payments`, `POST /payments/:id/actions/:action` and
+`GET /payments/:id`.
+
+```ts
+{
+  id: string                        // opaque; the only thing the browser keeps
+  reference: string                 // for people
+  provider: string
+  flow: 'direct' | 'redirect' | 'offline' | 'token'
+  status: 'draft' | 'pending' | 'authorized' | 'paid' | 'cancelled' | 'failed'
+  message: string | null
+  client: Record<string, unknown> | null   // public gateway values; create response only
+  redirect: { url: string } | null
+  order: { id: string, number: string } | null
+}
+```
+
+`paid` here is `captured` on `Order.payment` — the same payment in each route's
+own vocabulary.
+
+## AdminOrder
+
+An `Order` plus what the back office needs, from `GET /admin/orders` (with
+`counts`) and `GET` / `PATCH /admin/orders/:id`.
+
+```ts
+Order & {
+  backendId: string | null
+  backendUrl: string | null         // the order in the backend's own screens
+  customer: { name, email, phone: string }
+  orderState: 'quotation' | 'confirmed' | 'cancelled'
+  paymentStatus: 'paid' | 'authorized' | 'pending' | 'failed' | 'unpaid'
+  delivery: {
+    status: 'none' | 'to_ship' | 'shipped' | 'delivered' | 'cancelled'
+    method: string
+    shippedAt: string | null
+    deliveredAt: string | null
+    carrier, trackingCode, trackingUrl: string
+    references: string[]
+  }
+  actions: ('ship' | 'update_tracking' | 'deliver' | 'record_payment' | 'cancel')[]
+}
+
+// Each count is the `total` of its tab's filter, over every order:
+// toShip = delivery=to_ship, awaitingPayment = payment=awaiting (pending or
+// unpaid, not cancelled), shipped = delivery=shipped,
+// delivered = delivery=delivered, cancelled = status=cancelled.
+counts: { toShip, shipped, delivered, awaitingPayment, cancelled: number }
+```
+
+The `Order.status` it carries moves with fulfilment: `fulfilled` once shipped,
+`delivered` once delivered. The demo adapter derives these fields in
+`src/lib/admin-orders.js`; a real backend sends them. Actions and their effects:
+[API.md](API.md).
 
 ## Address
 
@@ -265,11 +354,25 @@ The cart is server-owned. Every mutation returns the whole repriced cart.
   id, name, line1: string
   line2?: string
   city: string
-  region?: string
+  region?: string                   // the state code when the country lists states
   postalCode: string
   country: string                   // ISO 3166-1 alpha-2
   phone?: string
   isDefault?: boolean
+}
+```
+
+## Country
+
+What an address form needs for one country, from `GET /countries/:code`.
+
+```ts
+{
+  code: string                      // ISO 3166-1 alpha-2
+  name: string
+  stateRequired: boolean
+  zipRequired: boolean
+  states: { code: string, name: string }[]   // empty: region is free text
 }
 ```
 

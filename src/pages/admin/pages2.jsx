@@ -1,16 +1,37 @@
 import { useMemo, useState } from 'react'
-import api from '../../lib/api/index.js'
+import api, { isMock } from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
-import { Button, Empty, Icon, Skeleton, Badge } from '../../components/ui/index.jsx'
+import { Button, ErrorState, Icon, Skeleton, Badge } from '../../components/ui/index.jsx'
 import { useToast } from '../../store/ToastContext.jsx'
 import RecordRow, { RowAction } from '../../components/admin/RecordRow.jsx'
 import ListToolbar, { matches } from '../../components/admin/ListToolbar.jsx'
 import { formatMoney } from '../../lib/money.js'
 
+/**
+ * A screen the store's own API does not serve.
+ *
+ * Against a real backend the write API covers the catalogue. Orders, discounts,
+ * settings and bulk import stay in the back office (Odoo, for a LOOM Storefront
+ * store), and saying so beats an empty list that looks like a shop with no orders.
+ */
+function ManagedInBackOffice({ title, body }) {
+  return (
+    <>
+      <h1 className="text-display-md">{title}</h1>
+      <div className="mt-8 max-w-xl rounded-xs border border-line bg-surface p-5">
+        <h2 className="text-[14px] font-medium">Managed in your back office</h2>
+        <p className="mt-2 text-[13px] leading-relaxed text-muted">{body}</p>
+      </div>
+    </>
+  )
+}
+
 /* ── categories ────────────────────────────────────────────────────────── */
 
 export function Categories() {
-  const { data, loading, reload } = useAsync(() => api.listCategories(), [])
+  // The admin list, not the shop's: the shop hides empty categories, and a
+  // category you just created is empty.
+  const { data, error, loading, reload } = useAsync(() => api.adminListCategories(), [])
   const [editing, setEditing] = useState(null)
   const [q, setQ] = useState('')
   const { push } = useToast()
@@ -42,6 +63,8 @@ export function Categories() {
       .filter(Boolean)
   }, [allRoots, q])
   const set = (k) => (e) => setEditing((c) => ({ ...c, [k]: e.target.value }))
+
+  if (error && !data) return <ErrorState error={error} onRetry={() => reload()} />
 
   return (
     <>
@@ -120,7 +143,7 @@ export function Categories() {
 /* ── size charts ───────────────────────────────────────────────────────── */
 
 export function SizeCharts() {
-  const { data, loading, reload } = useAsync(() => api.listSizeCharts(), [])
+  const { data, error, loading, reload } = useAsync(() => api.listSizeCharts(), [])
   const [editing, setEditing] = useState(null)
   const [q, setQ] = useState('')
   const { push } = useToast()
@@ -148,6 +171,7 @@ export function SizeCharts() {
       rows: ch.rows.map((row, i) => (i === r ? row.map((cell, k) => (k === c ? v : cell)) : row)),
     }))
 
+  if (error && !data) return <ErrorState error={error} onRetry={() => reload()} />
   if (loading) return <Skeleton className="h-64 w-full" />
 
   if (editing) {
@@ -261,255 +285,20 @@ export function SizeCharts() {
   )
 }
 
-/* ── orders ────────────────────────────────────────────────────────────── */
-
-const STATUSES = ['placed', 'paid', 'fulfilled', 'delivered', 'cancelled', 'refunded']
-
-export function Orders() {
-  const { data, loading, reload } = useAsync(() => api.listOrders(), [])
-  const { push } = useToast()
-  const [q, setQ] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [sort, setSort] = useState('newest')
-
-  const rows = useMemo(() => {
-    let items = (data?.items || []).filter((o) =>
-      matches(q, o.number, o.email, o.shippingAddress?.name, o.tracking?.code),
-    )
-    if (statusFilter !== 'all') items = items.filter((o) => o.status === statusFilter)
-    const by = {
-      newest: (a, b) => (a.placedAt < b.placedAt ? 1 : -1),
-      oldest: (a, b) => (a.placedAt > b.placedAt ? 1 : -1),
-      'total-desc': (a, b) => b.total.amount - a.total.amount,
-      'total-asc': (a, b) => a.total.amount - b.total.amount,
-    }
-    return items.slice().sort(by[sort] || by.newest)
-  }, [data, q, statusFilter, sort])
-
-  const [refunding, setRefunding] = useState(null)
-
-  const setStatus = async (id, status) => {
-    try {
-      await api.adminUpdateOrder(id, { status })
-      push(status === 'cancelled' ? 'Cancelled — stock returned' : `Marked ${status}`)
-      reload()
-    } catch (err) {
-      push(err.message, { tone: 'error' })
-    }
-  }
-  if (loading) return <Skeleton className="h-64 w-full" />
-  if (!data?.items.length) {
-    return <Empty icon="truck" title="No orders yet" body="Place one from the storefront and it will appear here." />
-  }
-  return (
-    <>
-      <h1 className="text-display-md">Orders</h1>
-      <p className="mt-3 text-[13px] text-muted">
-        Cancelling returns the stock. An order that disappears without giving its units back is how
-        a catalogue quietly loses inventory nobody can account for. Refunds are recorded per order,
-        because a partial refund is the common case and a flag cannot express one.
-      </p>
-
-      <ListToolbar
-        className="mt-6"
-        query={q}
-        onQuery={setQ}
-        placeholder="Search order number, email or tracking"
-        filters={[
-          {
-            label: 'Status',
-            value: statusFilter,
-            onChange: setStatusFilter,
-            options: [
-              { value: 'all', label: 'All statuses' },
-              ...STATUSES.map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })),
-            ],
-          },
-        ]}
-        sorts={[
-          { value: 'newest', label: 'Newest first' },
-          { value: 'oldest', label: 'Oldest first' },
-          { value: 'total-desc', label: 'Highest value' },
-          { value: 'total-asc', label: 'Lowest value' },
-        ]}
-        sort={sort}
-        onSort={setSort}
-        count={rows.length}
-        total={data?.items?.length ?? 0}
-      />
-
-      <div className="mt-6 overflow-x-auto rounded-xs border border-line bg-surface">
-        <table className="w-full border-collapse text-[14px]">
-          <thead>
-            <tr className="border-b border-line text-left">
-              <th className="p-3 font-medium">Order</th>
-              <th className="p-3 font-medium">Placed</th>
-              <th className="p-3 font-medium">Customer</th>
-              <th className="p-3 font-medium">Items</th>
-              <th className="p-3 font-medium">Status</th>
-              <th className="p-3 font-medium">Tracking</th>
-              <th className="p-3 font-medium text-right">Total</th>
-              <th className="p-3 font-medium text-right">Refunded</th>
-              <th className="p-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((o) => (
-              <tr key={o.id} className="border-b border-line last:border-0">
-                <td className="p-3 font-mono text-[12px]">{o.number}</td>
-                <td className="p-3 text-muted">{new Date(o.placedAt).toLocaleDateString()}</td>
-                <td className="p-3 text-muted">{o.email}</td>
-                <td className="p-3 tabular-nums">{o.lines.length}</td>
-                <td className="p-3">
-                  <select
-                    aria-label={`Status for ${o.number}`}
-                    value={o.status}
-                    onChange={(e) => setStatus(o.id, e.target.value)}
-                    className="field h-8 py-0 text-[12px]"
-                  >
-                    {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </td>
-                <td className="p-3 font-mono text-[11px] text-faint">{o.tracking?.code || '—'}</td>
-                <td className="p-3 text-right tabular-nums">{formatMoney(o.total)}</td>
-                <td className="p-3 text-right tabular-nums text-muted">
-                  {o.refundedTotal?.amount ? formatMoney(o.refundedTotal) : '—'}
-                </td>
-                <td className="p-3 text-right">
-                  {(o.refundedTotal?.amount ?? 0) < o.total.amount && (
-                    <Button size="sm" variant="quiet" onClick={() => setRefunding(o)}>
-                      Refund
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {refunding && (
-        <RefundDialog
-          order={refunding}
-          onClose={() => setRefunding(null)}
-          onDone={(message) => {
-            setRefunding(null)
-            push(message)
-            reload()
-          }}
-          onError={(message) => push(message, { tone: 'error' })}
-        />
-      )}
-    </>
-  )
-}
-
-/**
- * Refund some or all of an order.
- *
- * Defaults to the outstanding amount, because that is what "Refund" means when
- * nobody has typed a number, and shows what has already gone back so a second
- * refund is not issued from memory.
- *
- * Only a full refund offers to restock. Guessing which line a partial refund
- * refers to would put the wrong variant back on the shelf, and a phantom unit
- * in stock is worse than a missing one — it sells.
- */
-function RefundDialog({ order, onClose, onDone, onError }) {
-  const already = order.refundedTotal?.amount ?? 0
-  const remaining = order.total.amount - already
-  const currency = order.total.currency
-
-  const [amount, setAmount] = useState((remaining / 100).toFixed(2))
-  const [reason, setReason] = useState('')
-  const [restock, setRestock] = useState(true)
-  const [busy, setBusy] = useState(false)
-
-  const minor = Math.round(Number(amount) * 100)
-  const full = minor === remaining
-  const invalid = !Number.isFinite(minor) || minor <= 0 || minor > remaining
-
-  const submit = async (e) => {
-    e.preventDefault()
-    setBusy(true)
-    try {
-      await api.adminRefundOrder(order.id, { amount: minor, reason, restock: restock && full })
-      onDone(full ? 'Refunded in full' : `Refunded ${formatMoney({ amount: minor, currency })}`)
-    } catch (err) {
-      onError(err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-label="Refund order">
-      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-ink/40" />
-      <form onSubmit={submit} className="relative w-full max-w-md rounded-xs border border-line bg-page p-5">
-        <h2 className="text-[15px] font-medium">Refund {order.number}</h2>
-        <p className="mt-1.5 text-[12px] text-faint">
-          {formatMoney(order.total)} paid
-          {already > 0 && ` · ${formatMoney(order.refundedTotal)} already refunded`}
-        </p>
-
-        <label htmlFor="refund-amount" className="mb-1.5 mt-4 block text-[13px] font-medium">Amount</label>
-        <input
-          id="refund-amount"
-          type="number"
-          step="0.01"
-          min="0.01"
-          max={(remaining / 100).toFixed(2)}
-          className="field tabular-nums"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-        />
-        <p className={`mt-1 text-[11px] ${invalid ? 'text-sale' : 'text-faint'}`}>
-          {invalid
-            ? `Enter between 0.01 and ${(remaining / 100).toFixed(2)}`
-            : `${formatMoney({ amount: remaining, currency })} outstanding`}
-        </p>
-
-        <label htmlFor="refund-reason" className="mb-1.5 mt-4 block text-[13px] font-medium">
-          Reason <span className="font-normal text-faint">— for your records</span>
-        </label>
-        <input
-          id="refund-reason"
-          className="field"
-          placeholder="Returned, wrong size"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-        />
-
-        <label className={`mt-4 flex items-center gap-2.5 text-[13px] ${full ? '' : 'text-faint'}`}>
-          <input
-            type="checkbox"
-            checked={restock && full}
-            disabled={!full}
-            onChange={(e) => setRestock(e.target.checked)}
-            className="h-4 w-4 accent-[rgb(var(--accent))]"
-          />
-          Put the stock back
-        </label>
-        {!full && (
-          <p className="mt-1 text-[11px] text-faint">
-            Only on a full refund — a partial one does not say which item came back.
-          </p>
-        )}
-
-        <div className="mt-6 flex justify-end gap-2">
-          <Button type="button" variant="quiet" onClick={onClose}>Cancel</Button>
-          <Button as="button" type="submit" disabled={invalid || busy}>
-            {busy ? 'Refunding…' : 'Refund'}
-          </Button>
-        </div>
-      </form>
-    </div>
-  )
-}
-
 /* ── discounts ─────────────────────────────────────────────────────────── */
 
 export function Discounts() {
+  return isMock ? (
+    <DiscountsScreen />
+  ) : (
+    <ManagedInBackOffice
+      title="Discounts"
+      body="Discount codes are created in your back office (in Odoo: Website › eCommerce › Discounts & Loyalty). Codes made there work at checkout straight away."
+    />
+  )
+}
+
+function DiscountsScreen() {
   const { data, loading, reload } = useAsync(() => api.adminListDiscounts(), [])
   const [editing, setEditing] = useState(null)
   const [q, setQ] = useState('')
@@ -650,6 +439,17 @@ const TRISTATE = {
 }
 
 export function Storefront() {
+  return isMock ? (
+    <StorefrontScreen />
+  ) : (
+    <ManagedInBackOffice
+      title="Storefront"
+      body="Branding, navigation, the home page, pages and features are edited in your back office (in Odoo: Website › LOOM Storefront › Stores). The shop picks changes up on its next load."
+    />
+  )
+}
+
+function StorefrontScreen() {
   const { data, loading, reload } = useAsync(() => api.getStorefront(), [])
   const [draft, setDraft] = useState(null)
   const { push } = useToast()
@@ -850,6 +650,17 @@ export function Storefront() {
 /* ── data ──────────────────────────────────────────────────────────────── */
 
 export function Data() {
+  return isMock ? (
+    <DataScreen />
+  ) : (
+    <ManagedInBackOffice
+      title="Import and export"
+      body="Bulk import, export and reset work on the local demo data only. For a live catalogue use your back office's import tools (in Odoo: the Import action on any product list)."
+    />
+  )
+}
+
+function DataScreen() {
   const { push } = useToast()
   const [busy, setBusy] = useState(false)
 

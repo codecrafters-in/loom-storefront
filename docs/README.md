@@ -27,6 +27,8 @@ own backend by changing one environment variable.
 | Serve real traffic without melting | **[PERFORMANCE.md](PERFORMANCE.md)** |
 | Hand it to a merchant | **[USER-GUIDE.md](USER-GUIDE.md)** |
 | Understand an error you are seeing | **[ERRORS.md](ERRORS.md)** |
+| Run the tests, or check payments and fulfilment by hand | **[TESTING.md](TESTING.md)** |
+| See what changed recently | **[CHANGELOG.md](CHANGELOG.md)** |
 
 ## Three ways to run it
 

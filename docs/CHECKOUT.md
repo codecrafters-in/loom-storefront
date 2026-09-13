@@ -24,7 +24,7 @@ The address form in this theme is exactly the part that is safe to own.
 
 ---
 
-## The four modes
+## The five modes
 
 Set `checkout.mode` in your storefront config.
 
@@ -215,6 +215,81 @@ provider you integrate entirely server-side.
 
 ---
 
+### `payments` — the backend's gateways, on this page
+
+```json
+{ "checkout": { "mode": "payments", "successUrl": "/order/:orderId", "cancelUrl": "/cart" } }
+```
+
+For a backend that already integrates payment gateways — Odoo with the LOOM
+module is one. The backend lists what can pay for this cart; the shopper picks
+one on the checkout page; the backend creates the payment and is the only party
+that can say it was paid. The storefront stores nothing about the payment.
+
+The page runs in two steps. **Continue to payment** posts the address and
+delivery to `POST /carts/:id/payment-options` and lists the methods (re-fetched
+when the country or delivery method changes). **Pay** posts to
+`POST /carts/:id/payments`, then follows the method's `flow`:
+
+| `flow` | What happens | Examples |
+| --- | --- | --- |
+| `offline` | Nothing to do in the browser; the order is placed as pending | Cash on delivery, bank transfer |
+| `token` | The backend charges the saved method | Saved cards |
+| `direct` | A driver runs the gateway's own form or modal on this page | Razorpay, the demo card |
+| `redirect` | The browser goes to the gateway's hosted page, then back to `/checkout/return` | PayPal, Mollie, PayU |
+
+After that the page polls `GET /payments/:id` (1s, backing off to 5s) until the
+payment is final, then opens the order. After two minutes it stops and tells the
+shopper they will get an email, rather than spin. `/checkout/return?payment=…`
+does the same for a shopper coming back from a hosted page.
+
+A payment can be `paid` while `order` is still `null`: the money arrived and the
+backend is still confirming the order (it retries if that step failed). The page
+keeps polling and shows the backend's `message` — it is not a failure, and the
+shopper is never asked to pay again.
+
+`GET /payments/:id` reports a completed payment as `paid`; the order it created
+reports the same payment as `payment.status: "captured"`. Both mean the money
+moved.
+
+The address step's **State / region** is a dropdown when `GET /countries/:code`
+lists states for the chosen country and a text box otherwise, so the address the
+payment step posts is one the backend accepts — see [API.md](API.md).
+
+Card numbers still never touch this app: a `direct` driver hands the card to the
+gateway's own iframe or modal, and a `redirect` gateway takes it on its own site.
+
+#### Drivers
+
+A `direct` method is only offered if the storefront has a driver for its
+`provider`; a method without one is left out rather than failing at the pay
+button. Two ship: `demo` (a test card form and an outcome select) and `razorpay`
+(Razorpay Checkout's modal). Closing the modal is a cancel, not an error — the
+bag is untouched and the shopper can pick again.
+
+To add one, create `src/lib/payments/drivers/<provider>.js` and register it in
+`drivers/index.js`:
+
+```js
+export default {
+  provider: 'stripe',          // the backend's provider code
+  needsInput: false,           // true if the page collects something first
+  validate: (input) => null,   // optional: a message, or null when input is fine
+  async run({ payment, api, input }) {
+    // Mount or open the gateway's own form with payment.client (public values
+    // only). If the backend needs the gateway's result, send it with
+    // api.paymentAction(payment.id, '<action>', result) and return the answer.
+    return payment
+  },
+}
+```
+
+Return the backend's answer. Polling takes over from there, so a driver never
+decides that a payment succeeded. Its script loads through
+`lib/payments/load-script.js`, once.
+
+---
+
 ## What your server must do
 
 Regardless of mode, the checkout endpoint is responsible for the things a
@@ -255,6 +330,11 @@ response, so write it for the shopper:
 | `checkout_misconfigured` | `mode` is not `demo` but `createUrl` is empty |
 | `checkout_no_redirect` | `redirect` mode, response had no `url` |
 | `checkout_no_order` | `api` mode, response had no `id` |
+| `payment_cancelled` | `payments` mode, the shopper closed the gateway's window. Shown as a notice, not an error |
+| `payment_failed` | The gateway refused the payment. Message shown, shopper can pick again |
+| `cart_changed` | The total moved since the methods were listed. Options re-fetched |
+| `no_payment_methods` | Nothing the backend offers can take this cart to this address |
+| `payment_unsupported` | A `direct` method with no storefront driver was forced through |
 
 The last three are configuration mistakes and say so explicitly. See
 [ERRORS.md](ERRORS.md).

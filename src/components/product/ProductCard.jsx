@@ -46,7 +46,7 @@ export default function ProductCard({ product, priority = false, className = '' 
             type={product.images[0]?.type}
             alt={product.images[0]?.alt || product.title}
             loading={priority ? 'eager' : 'lazy'}
-            fetchPriority={priority ? 'high' : 'auto'}
+            fetchpriority={priority ? 'high' : 'auto'}
             decoding="async"
             width={product.images[0]?.width}
             height={product.images[0]?.height}

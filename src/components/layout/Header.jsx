@@ -10,6 +10,11 @@ import useAsync from '../../hooks/useAsync.js'
 import api from '../../lib/api/index.js'
 import { docsLinkVisible } from '../../lib/docs-link.js'
 
+// Submenu entries are categories ({ slug, name }) or links the merchant added
+// by hand ({ label, to }).
+const subTo = (c) => c.to || `/shop/${c.slug}`
+const subKey = (c) => c.slug || c.to
+
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -135,9 +140,9 @@ export default function Header() {
                         </Link>
                       </li>
                       {item.children.map((c) => (
-                        <li key={c.slug}>
-                          <Link to={`/shop/${c.slug}`} className="flex items-baseline justify-between rounded-xs px-3 py-2 text-[13px] text-muted hover:bg-sunken hover:text-ink">
-                            {c.name}
+                        <li key={subKey(c)}>
+                          <Link to={subTo(c)} className="flex items-baseline justify-between rounded-xs px-3 py-2 text-[13px] text-muted hover:bg-sunken hover:text-ink">
+                            {c.name || c.label}
                             <span className="text-[11px] text-faint tabular-nums">{c.count}</span>
                           </Link>
                         </li>
@@ -251,8 +256,8 @@ export default function Header() {
               {item.children.length > 0 && (
                 <ul className="pb-2 pl-3">
                   {item.children.map((c) => (
-                    <li key={c.slug}>
-                      <Link to={`/shop/${c.slug}`} className="block py-2 text-[13px] text-muted">{c.name}</Link>
+                    <li key={subKey(c)}>
+                      <Link to={subTo(c)} className="block py-2 text-[13px] text-muted">{c.name || c.label}</Link>
                     </li>
                   ))}
                 </ul>

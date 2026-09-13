@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import api from '../../lib/api/index.js'
+import api, { isMock } from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
-import { Button, Empty, Icon, Skeleton, Badge } from '../../components/ui/index.jsx'
+import { Button, Empty, ErrorState, Icon, Skeleton, Badge } from '../../components/ui/index.jsx'
 import { useToast } from '../../store/ToastContext.jsx'
 import { formatMoney } from '../../lib/money.js'
 import Tour, { Hint } from '../../components/admin/Tour.jsx'
@@ -13,22 +13,27 @@ import ListToolbar, { matches } from '../../components/admin/ListToolbar.jsx'
 
 export function Overview() {
   const products = useAsync(() => api.adminListProducts({ perPage: 500 }), [])
-  const orders = useAsync(() => api.listOrders(), [])
+  // Every order the store has taken, not the signed-in shopper's. Against a real
+  // backend only the tab counts are wanted, so one row is enough.
+  const orders = useAsync(() => api.adminListOrders({ perPage: isMock ? 100 : 1 }), [])
 
   const stats = useMemo(() => {
     const items = products.data?.items || []
     const variants = items.flatMap((p) => p.variants)
-    const revenue = (orders.data?.items || []).reduce((a, o) => a + o.total.amount, 0)
+    const revenue = (orders.data?.items || [])
+      .filter((o) => o.status !== 'cancelled')
+      .reduce((a, o) => a + o.total.amount, 0)
     return {
       products: items.length,
       variants: variants.length,
       outOfStock: variants.filter((v) => !v.available).length,
       lowStock: variants.filter((v) => v.available && v.inventory <= 2).length,
-      orders: orders.data?.items.length || 0,
+      orders: orders.data?.total || 0,
       revenue,
     }
   }, [products.data, orders.data])
 
+  if (products.error) return <ErrorState error={products.error} onRetry={() => products.reload()} />
   if (products.loading) return <Skeleton className="h-64 w-full" />
 
   const cards = [
@@ -36,8 +41,21 @@ export function Overview() {
     { label: 'Variants', value: stats.variants, to: '/admin/inventory' },
     { label: 'Out of stock', value: stats.outOfStock, to: '/admin/inventory', tone: stats.outOfStock ? 'sale' : null },
     { label: 'Low stock', value: stats.lowStock, to: '/admin/inventory', tone: stats.lowStock ? 'accent' : null },
-    { label: 'Orders', value: stats.orders, to: '/admin/orders' },
-    { label: 'Revenue', value: formatMoney({ amount: stats.revenue, currency: 'USD' }), to: '/admin/orders' },
+    // What needs doing today, in both modes. A backend that does not serve
+    // orders yet simply leaves these cards out.
+    ...(orders.data?.counts
+      ? [
+        { label: 'To ship', value: orders.data.counts.toShip, to: '/admin/orders?view=to_ship', tone: orders.data.counts.toShip ? 'accent' : null },
+        { label: 'Awaiting payment', value: orders.data.counts.awaitingPayment, to: '/admin/orders?view=awaiting' },
+      ]
+      : []),
+    // Totals the demo can add up from everything it holds; a real backend reports revenue elsewhere.
+    ...(isMock
+      ? [
+        { label: 'Orders', value: stats.orders, to: '/admin/orders' },
+        { label: 'Revenue', value: formatMoney({ amount: stats.revenue, currency: 'USD' }), to: '/admin/orders' },
+      ]
+      : []),
   ]
 
   return (
@@ -87,7 +105,7 @@ export function Products() {
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('all')
   const [sort, setSort] = useState('updated')
-  const { data, loading } = useAsync(() => api.adminListProducts({ perPage: 500 }), [])
+  const { data, error, loading, reload } = useAsync(() => api.adminListProducts({ perPage: 500 }), [])
   const navigate = useNavigate()
 
   const stockOf = (p) => p.variants.reduce((a, v) => a + v.inventory, 0)
@@ -146,7 +164,9 @@ export function Products() {
         total={data?.items?.length ?? 0}
       />
 
-      {loading ? (
+      {error && !data ? (
+        <div className="mt-6"><ErrorState error={error} onRetry={() => reload()} /></div>
+      ) : loading ? (
         <Skeleton className="mt-6 h-64 w-full" />
       ) : rows.length === 0 ? (
         <Empty icon="search" title="Nothing matches" body="Try a different search, or clear the filters." className="mt-6" />
@@ -220,7 +240,7 @@ export function Products() {
 /* ── inventory ─────────────────────────────────────────────────────────── */
 
 export function Inventory() {
-  const { data, loading, reload } = useAsync(() => api.adminListProducts({ perPage: 500 }), [])
+  const { data, error, loading, reload } = useAsync(() => api.adminListProducts({ perPage: 500 }), [])
   const [filter, setFilter] = useState('all')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('stock-asc')
@@ -296,7 +316,9 @@ export function Inventory() {
         total={all.length}
       />
 
-      {loading ? (
+      {error && !data ? (
+        <div className="mt-6"><ErrorState error={error} onRetry={() => reload()} /></div>
+      ) : loading ? (
         <Skeleton className="mt-6 h-64 w-full" />
       ) : rows.length === 0 ? (
         <Empty icon="package" title="Nothing here" body="No variants match that filter." className="mt-6" />

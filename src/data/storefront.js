@@ -247,6 +247,9 @@ export const storefront = {
    *             created server-side — the browser only ever sees `publicKey`.
    *   api       POSTs and expects an Order back. For merchants settling
    *             elsewhere: invoice, cash on delivery, wholesale terms.
+   *   payments  The backend's own gateways, chosen and paid on the checkout
+   *             page (docs/CHECKOUT.md). `createUrl`, `verifyUrl` and
+   *             `publicKey` are not used.
    *
    * `publicKey` is safe here and only here. Razorpay's `key_id` and Stripe's
    * publishable key are designed to be readable by anyone; their secret

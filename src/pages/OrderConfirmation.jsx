@@ -30,17 +30,37 @@ export default function OrderConfirmation() {
   }
   if (!order) return null
 
+  const stage = orderStage(order)
+  // Older demo orders stored the tracking number as a bare string.
+  const tracking = typeof order.tracking === 'string' ? { code: order.tracking } : order.tracking
+
   return (
     <>
       <div className="wrap max-w-2xl py-16">
-        <span className="grid h-12 w-12 place-items-center rounded-full bg-good/10 text-good">
-          <Icon name="check" size={22} />
+        <span className={`grid h-12 w-12 place-items-center rounded-full ${stage.tone === 'muted' ? 'bg-sunken text-muted' : 'bg-good/10 text-good'}`}>
+          <Icon name={stage.icon} size={22} />
         </span>
-        <h1 className="mt-6 text-display-lg">Thank you.</h1>
+        <h1 className="mt-6 text-display-lg">{stage.title}</h1>
         <p className="mt-4 text-[15px] leading-relaxed text-muted">
-          Order <strong className="text-ink">{order.number}</strong> is confirmed. A receipt is on its
-          way to {order.email}.
+          Order <strong className="text-ink">{order.number}</strong> {stage.body}
         </p>
+
+        {(tracking?.code || tracking?.url) && order.status !== 'cancelled' && (
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-xs border border-line bg-surface p-5">
+            <div className="min-w-0">
+              <p className="eyebrow">Tracking</p>
+              <p className="mt-2 text-[14px]">
+                {tracking.carrier && <span className="text-muted">{tracking.carrier} · </span>}
+                {tracking.code && <span className="font-mono">{tracking.code}</span>}
+              </p>
+            </div>
+            {tracking.url && (
+              <Button href={tracking.url} target="_blank" rel="noreferrer" size="sm" variant="quiet" iconRight="arrow-right">
+                Track parcel
+              </Button>
+            )}
+          </div>
+        )}
 
         <div className="mt-10 rounded-xs border border-line bg-surface">
           <ul className="divide-y divide-line px-6">
@@ -85,4 +105,25 @@ export default function OrderConfirmation() {
       <Promises />
     </>
   )
+}
+
+/**
+ * The headline follows the parcel. The same page is the receipt straight after
+ * checkout and the place a shopper comes back to from an email a week later, and
+ * "Thank you" above an order that has already arrived reads as if nothing moved.
+ */
+function orderStage(order) {
+  if (order.status === 'cancelled') {
+    return { icon: 'close', tone: 'muted', title: 'Order cancelled.', body: 'was cancelled. If you were charged, the refund goes back the way you paid.' }
+  }
+  if (order.status === 'delivered') {
+    return { icon: 'check', title: 'Delivered.', body: `has arrived. Questions about it? Reply to the email we sent to ${order.email}.` }
+  }
+  if (order.status === 'fulfilled') {
+    return { icon: 'truck', title: 'On its way.', body: 'has shipped. Follow it with the tracking below.' }
+  }
+  if (order.payment?.status === 'pending') {
+    return { icon: 'check', title: 'Thank you.', body: `is placed. ${order.payment.method ? `You pay by ${order.payment.method} — ` : ''}we confirm it by email to ${order.email}.` }
+  }
+  return { icon: 'check', title: 'Thank you.', body: `is confirmed. A receipt is on its way to ${order.email}.` }
 }

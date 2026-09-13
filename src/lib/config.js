@@ -21,6 +21,12 @@ export const config = {
     baseUrl: (env.VITE_API_BASE_URL || '').replace(/\/+$/, ''),
     token: env.VITE_API_TOKEN || '',
     timeout: num(env.VITE_API_TIMEOUT, 12000),
+    /**
+     * 'off' skips the response cache and the browser's HTTP cache, so an edit
+     * made in the backend shows on the next page load. For building a shop
+     * against a live backend; a real store keeps it on.
+     */
+    cache: (env.VITE_API_CACHE || 'on').toLowerCase() !== 'off',
   },
 
   store: {

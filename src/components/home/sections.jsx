@@ -24,7 +24,7 @@ function Hero({ section }) {
           <img
             src={section.image.url}
             alt={section.image.alt || ''}
-            fetchPriority="high"
+            fetchpriority="high"
             decoding="async"
             className="h-full w-full object-cover"
             style={{ objectPosition: section.focal || '50% 40%' }}

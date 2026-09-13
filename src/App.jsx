@@ -25,6 +25,7 @@ import { Skeleton } from './components/ui/index.jsx'
 const Cart = lazy(() => import('./pages/Cart.jsx'))
 const Wishlist = lazy(() => import('./pages/Wishlist.jsx'))
 const Checkout = lazy(() => import('./pages/Checkout.jsx'))
+const CheckoutReturn = lazy(() => import('./pages/CheckoutReturn.jsx'))
 const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation.jsx'))
 const OrderLookup = lazy(() => import('./pages/OrderLookup.jsx'))
 const Account = lazy(() => import('./pages/Account.jsx'))
@@ -38,7 +39,8 @@ const AdminOverview = lazy(() => import('./pages/admin/pages.jsx').then((m) => (
 const AdminProducts = lazy(() => import('./pages/admin/pages.jsx').then((m) => ({ default: m.Products })))
 const AdminInventory = lazy(() => import('./pages/admin/pages.jsx').then((m) => ({ default: m.Inventory })))
 const AdminCategories = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Categories })))
-const AdminOrders = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Orders })))
+const AdminOrders = lazy(() => import('./pages/admin/orders.jsx').then((m) => ({ default: m.Orders })))
+const AdminOrderDetail = lazy(() => import('./pages/admin/orders.jsx').then((m) => ({ default: m.OrderDetail })))
 const AdminStorefront = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Storefront })))
 const AdminData = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Data })))
 const AdminProductEditor = lazy(() => import('./pages/admin/ProductEditor.jsx'))
@@ -84,6 +86,8 @@ export default function App() {
                   <Route path="cart" element={<Cart />} />
                   <Route path="wishlist" element={<Wishlist />} />
                   <Route path="checkout" element={<Checkout />} />
+                  {/* Where a gateway's hosted page sends the shopper back. Never prerendered. */}
+                  <Route path="checkout/return" element={<CheckoutReturn />} />
                   <Route path="order/:id" element={<OrderConfirmation />} />
                   <Route path="orders/lookup" element={<OrderLookup />} />
                   <Route path="login" element={<Login />} />
@@ -113,6 +117,7 @@ export default function App() {
                   <Route path="categories" element={<AdminCategories />} />
                   <Route path="size-charts" element={<AdminSizeCharts />} />
                   <Route path="orders" element={<AdminOrders />} />
+                  <Route path="orders/:id" element={<AdminOrderDetail />} />
                   <Route path="discounts" element={<AdminDiscounts />} />
                   <Route path="storefront" element={<AdminStorefront />} />
                   <Route path="data" element={<AdminData />} />

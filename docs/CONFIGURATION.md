@@ -52,6 +52,7 @@ cp .env.example .env.local
 | `VITE_API_BASE_URL` | — | Required when `api`. No trailing slash |
 | `VITE_API_TOKEN` | — | `Authorization: Bearer`. Publishable keys only |
 | `VITE_API_TIMEOUT` | `12000` | Milliseconds before a request aborts |
+| `VITE_API_CACHE` | `on` | `off` stops the **browser** reusing API responses, so a backend edit shows on the next load. For development. Server rendering and the prerender always cache — a render cannot await, it reads what was fetched first — so the build is the same either way |
 | `VITE_STORE_NAME` | `LOOM` | |
 | `VITE_CURRENCY` | `USD` | ISO 4217 |
 | `VITE_LOCALE` | `en-US` | Number and date formatting |
@@ -152,6 +153,11 @@ whole point of it living here rather than in an environment variable.
 Shipping tab. `shippingMethods[0].price` is the standard rate the cart charges
 below the threshold.
 
+`countries` fills the country select at checkout and in the account's address
+book. The states are not in this document: the forms ask `GET /countries/:code`
+when the country changes and show a dropdown if it lists any — a store that ships
+to fifty countries does not send fifty state lists with every page.
+
 ### `features`
 
 ```json
@@ -201,6 +207,11 @@ Three ways to build the menu, in order of how much control you want:
 2. **`categorySlug`** — you choose the labels and order, and each entry pulls
    that category's children in as a submenu. No restating the tree.
 3. **`to` + `children`** — fully manual, for links that are not categories.
+
+A submenu entry is either a category, `{ slug, name }`, linked to
+`/shop/<slug>`, or a plain link, `{ label, to }`. A backend that lets a merchant
+add sub-items by hand sends the second shape — the Odoo module does — and hand-added
+children replace the ones a `categorySlug` would pull in.
 
 `announcement: null` removes the strip above the header. Additional messages
 after the first are hidden on small screens.
@@ -311,13 +322,15 @@ signed-out shopper to sign in first rather than failing at submit. `termsUrl`
 renders an agreement line under the place-order button; omit it and the line
 disappears.
 
-Three modes. Full guide with provider examples: **[CHECKOUT.md](CHECKOUT.md)**.
+Five modes. Full guide with provider examples: **[CHECKOUT.md](CHECKOUT.md)**.
 
 | Mode | What happens |
 | --- | --- |
 | `demo` | Places a fake order through the bundled adapter. Previews only |
+| `razorpay` | Opens Razorpay's modal over the page; your server creates the Razorpay order and verifies the signature |
 | `redirect` | POSTs to `createUrl`, expects `{ url }`, sends the browser there. **Recommended for real stores** |
 | `api` | POSTs to `createUrl`, expects an `Order` back. For invoicing, COD, wholesale terms |
+| `payments` | The backend lists its own payment gateways and the shopper pays on the checkout page. For backends that integrate gateways, such as Odoo |
 
 `createUrl` may be a full URL or a path on your API. `:cartId` is substituted.
 

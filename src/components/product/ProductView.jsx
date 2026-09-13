@@ -363,7 +363,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                   width={gallery[shot]?.width}
                   height={gallery[shot]?.height}
                   controls={gallery[shot]?.type === 'video'}
-                  fetchPriority="high"
+                  fetchpriority="high"
                   decoding="async"
                   sizes={SIZES.hero}
                   className="h-full w-full object-cover"

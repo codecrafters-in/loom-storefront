@@ -12,6 +12,7 @@
 export const docPages = [
   { slug: 'readme', file: 'README.md', title: 'Overview', group: 'Start' },
   { slug: 'user-guide', file: 'USER-GUIDE.md', title: 'Running the shop', group: 'Start' },
+  { slug: 'changelog', file: 'CHANGELOG.md', title: "What's new", group: 'Start' },
 
   { slug: 'api', file: 'API.md', title: 'API reference', group: 'Build' },
   { slug: 'data-model', file: 'DATA-MODEL.md', title: 'Data model', group: 'Build' },

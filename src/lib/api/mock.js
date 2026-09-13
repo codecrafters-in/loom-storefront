@@ -19,6 +19,8 @@ import * as db from '../db.js'
 import { railKey } from './railKey.js'
 import * as mediaStore from '../media.js'
 import { attributes, attributeGroups, assuranceTemplates, featureIcons } from '../../data/attributes.js'
+import { COUNTRY_DETAILS } from '../../data/regions.js'
+import { ORDER_ACTIONS, adminOrderView, filterOrders, orderCounts, trackingProblem } from '../admin-orders.js'
 import { config } from '../config.js'
 import { ApiError } from './contracts.js'
 import { invalidateAndNotify } from './cache.js'
@@ -71,6 +73,8 @@ const KEY = {
   // idempotency_key → order id. A provider retrying a webhook must not place a
   // second order for the same money.
   idempotency: 'loom.idempotency',
+  // On-site payments by id. A real backend keeps these as transactions.
+  payments: 'loom.payments',
 }
 
 async function latency() {
@@ -621,19 +625,16 @@ export async function clearCart() {
  * only thing standing between two shoppers and the same last unit, and a second
  * copy of it is a copy that will eventually stop matching the first.
  */
-function placeOrderFromCart(cart, { email, shippingAddress, shippingMethod = 'standard', payment }) {
-  if (!cart.lines.length) throw new ApiError('Your bag is empty.', { status: 422, code: 'empty_cart' })
-  if (!email) throw new ApiError('An email address is required.', { status: 422, code: 'email_required' })
-
-  /**
-   * Re-check stock against the catalogue, not against the cart.
-   *
-   * Availability was last checked when the line was added, which may have been
-   * yesterday. Without this, two shoppers who both add the last unit both get a
-   * confirmed order and one of them gets an email nobody can fulfil — and
-   * because the decrement below clamps at zero, nothing anywhere records that
-   * it happened.
-   */
+/**
+ * Re-check stock against the catalogue, not against the cart.
+ *
+ * Availability was last checked when the line was added, which may have been
+ * yesterday. Without this, two shoppers who both add the last unit both get a
+ * confirmed order and one of them gets an email nobody can fulfil — and
+ * because the decrement in `placeOrderFromCart` clamps at zero, nothing
+ * anywhere records that it happened.
+ */
+function checkStock(cart) {
   const short = []
   for (const line of cart.lines) {
     const variant = products.flatMap((p) => p.variants).find((v) => v.id === line.variantId)
@@ -655,6 +656,12 @@ function placeOrderFromCart(cart, { email, shippingAddress, shippingMethod = 'st
       { status: 409, code: 'out_of_stock', detail: { lines: short } },
     )
   }
+}
+
+function placeOrderFromCart(cart, { email, shippingAddress, shippingMethod = 'standard', payment }) {
+  if (!cart.lines.length) throw new ApiError('Your bag is empty.', { status: 422, code: 'empty_cart' })
+  if (!email) throw new ApiError('An email address is required.', { status: 422, code: 'email_required' })
+  checkStock(cart)
 
   const orders = read(KEY.orders, [])
   const order = {
@@ -713,6 +720,167 @@ export async function checkout({ email, shippingAddress, shippingMethod = 'stand
   return order
 }
 
+/* ── on-site payments (checkout.mode "payments") ───────────────────────── */
+
+/**
+ * The two kinds of method a real backend offers, so the payment step can be
+ * previewed without one: a test card taken on the page, and cash on delivery,
+ * which needs nothing from the shopper.
+ */
+const PAYMENT_METHODS = [
+  {
+    id: 'demo-card', providerId: 'demo', methodId: 'card', provider: 'demo', providerName: 'Demo',
+    code: 'card', name: 'Card', image: null, brands: [], flow: 'direct', test: true, canSave: false, note: null,
+  },
+  {
+    id: 'custom-cod', providerId: 'custom', methodId: 'cod', provider: 'custom', providerName: 'Cash on Delivery',
+    code: 'cash_on_delivery', name: 'Cash on delivery', image: null, brands: [], flow: 'offline', test: false,
+    canSave: false, note: 'Pay the courier in cash or by UPI when your parcel arrives.',
+  },
+]
+
+function paymentCart(cartId) {
+  const cart = priceCart(loadCart())
+  if (cartId && cart.id && cart.id !== cartId) {
+    throw new ApiError('That bag has expired. Please review it and try again.', { status: 404, code: 'cart_not_found' })
+  }
+  if (!cart.lines.length) throw new ApiError('Your bag is empty.', { status: 422, code: 'empty_cart' })
+  return cart
+}
+
+const loadPayments = () => read(KEY.payments, {})
+
+function savePayment(payment) {
+  const all = { ...loadPayments(), [payment.id]: payment }
+  // Keep the newest fifty; an abandoned attempt should not live in storage forever.
+  const newest = Object.values(all).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0, 50)
+  write(KEY.payments, Object.fromEntries(newest.map((p) => [p.id, p])))
+}
+
+function findPayment(paymentId) {
+  const payment = loadPayments()[paymentId]
+  if (!payment) throw new ApiError('We could not find that payment.', { status: 404, code: 'not_found' })
+  return payment
+}
+
+/** What the API answers with — never the cart id or the stored request. */
+const paymentView = ({ cartId: _cartId, request: _request, createdAt: _createdAt, ...payment }) => ({
+  message: null, client: {}, redirect: null, order: null, ...payment,
+})
+
+/** The money is taken (or promised, for cash on delivery): place the order exactly as checkout does. */
+function settlePayment(payment, status, message = null) {
+  const { email, shippingAddress, shippingMethod, methodName } = payment.request
+  const order = placeOrderFromCart(priceCart(loadCart()), {
+    email,
+    shippingAddress,
+    shippingMethod,
+    payment: {
+      provider: payment.provider,
+      status: status === 'paid' ? 'captured' : 'pending',
+      reference: payment.reference,
+      method: methodName,
+      capturedAt: status === 'paid' ? nowIso() : null,
+    },
+  })
+  write(KEY.placed, [order.id, ...read(KEY.placed, [])].slice(0, 50))
+  saveCart(emptyCart())
+  Object.assign(payment, { status, message, order: { id: order.id, number: order.number } })
+}
+
+export async function getPaymentOptions(cartId, { email } = {}) {
+  await latency()
+  const cart = paymentCart(cartId)
+  if (!email) throw new ApiError('Please enter your email address.', { status: 422, code: 'email_required' })
+  checkStock(cart)
+  return { amount: cart.total, methods: PAYMENT_METHODS, savedMethods: [], total: PAYMENT_METHODS.length }
+}
+
+export async function createPayment(cartId, body = {}) {
+  await latency()
+  const cart = paymentCart(cartId)
+  const method = PAYMENT_METHODS.find(
+    (m) => m.providerId === String(body.providerId) && m.methodId === String(body.methodId),
+  )
+  if (!method) {
+    throw new ApiError('That payment method is not available for this order.', { status: 422, code: 'invalid_payment_method' })
+  }
+  if (!body.email) throw new ApiError('Please enter your email address.', { status: 422, code: 'email_required' })
+  if (body.expectedTotal != null && body.expectedTotal !== cart.total.amount) {
+    throw new ApiError('Your bag changed while you were paying. Please check the total and try again.', {
+      status: 409,
+      code: 'cart_changed',
+    })
+  }
+  checkStock(cart)
+
+  const reference = `LM-PAY-${Date.now().toString(36).toUpperCase()}`
+  const payment = {
+    id: `pay_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`,
+    reference,
+    provider: method.provider,
+    flow: method.flow,
+    status: 'draft',
+    message: null,
+    client: method.flow === 'direct'
+      ? {
+        reference,
+        amount: cart.total.amount,
+        currency: cart.total.currency,
+        prefill: { name: body.shippingAddress?.name || '', email: body.email, contact: body.shippingAddress?.phone || '' },
+      }
+      : {},
+    redirect: null,
+    order: null,
+    cartId: cart.id,
+    createdAt: nowIso(),
+    request: {
+      email: body.email,
+      shippingAddress: body.shippingAddress,
+      shippingMethod: body.shippingMethod || 'standard',
+      methodName: method.name,
+    },
+  }
+  if (cart.total.amount === 0) settlePayment(payment, 'paid')
+  else if (method.flow === 'offline') settlePayment(payment, 'pending', method.note)
+  savePayment(payment)
+  return paymentView(payment)
+}
+
+export async function paymentAction(paymentId, action, body = {}) {
+  await latency()
+  const payment = findPayment(paymentId)
+  if (payment.provider !== 'demo' || action !== 'simulate') {
+    throw new ApiError(`"${action}" is not a step this payment takes.`, { status: 404, code: 'unsupported_action' })
+  }
+  // A replayed step changes nothing once the payment has an answer.
+  if (payment.status !== 'draft') return paymentView(payment)
+
+  switch (body.outcome) {
+    case 'done':
+      settlePayment(payment, 'paid')
+      break
+    case 'pending':
+      settlePayment(payment, 'pending', 'Your payment is being confirmed.')
+      break
+    case 'cancel':
+      Object.assign(payment, { status: 'cancelled', message: 'The payment was cancelled. Your bag is unchanged.' })
+      break
+    case 'error':
+      Object.assign(payment, { status: 'failed', message: 'The card was declined. This is a test — try another outcome.' })
+      break
+    default:
+      throw new ApiError('Choose what the test payment should do.', { status: 422, code: 'invalid_outcome' })
+  }
+  savePayment(payment)
+  return paymentView(payment)
+}
+
+export async function getPayment(paymentId) {
+  await latency()
+  return paymentView(findPayment(paymentId))
+}
+
 /**
  * Place an order on behalf of a payment that has already been taken.
  *
@@ -761,6 +929,38 @@ export async function adminPlaceOrder({ cartId, email, payment, idempotencyKey }
 }
 
 const ORDER_STATUSES = ['placed', 'paid', 'fulfilled', 'delivered', 'cancelled', 'refunded']
+
+/** The back-office view of an order: the stored Order plus what it needs next. */
+const adminView = (order) => adminOrderView(order, { shippingMethods: storefront.commerce?.shippingMethods || [] })
+
+const ACTION_DONE = {
+  ship: 'marked as shipped',
+  update_tracking: 'given tracking',
+  deliver: 'marked as delivered',
+  record_payment: 'marked as paid',
+  cancel: 'cancelled',
+}
+
+// The old `{ status }` body. These three statuses are actions now; the rest are set as before.
+const LEGACY_STATUS_ACTIONS = { fulfilled: 'ship', delivered: 'deliver', cancelled: 'cancel' }
+
+export async function adminListOrders({ q, status, payment, delivery, page = 1, perPage = 25 } = {}) {
+  await latency()
+  const views = read(KEY.orders, [])
+    .map(adminView)
+    .sort((a, b) => (a.placedAt < b.placedAt ? 1 : -1))
+  const size = Math.min(Math.max(Number(perPage) || 25, 1), 100)
+  const current = Math.max(Number(page) || 1, 1)
+  const matching = filterOrders(views, { q, status, payment, delivery })
+  return {
+    items: matching.slice((current - 1) * size, current * size),
+    total: matching.length,
+    page: current,
+    perPage: size,
+    // Over every order, whatever the filter — they label the tabs.
+    counts: orderCounts(views),
+  }
+}
 
 /* ── refunds ───────────────────────────────────────────────────────────── */
 
@@ -942,23 +1142,86 @@ export async function adminSaveCredentials(patch = {}) {
   return adminGetCredentials()
 }
 
-export async function adminUpdateOrder(orderId, patch) {
+/**
+ * Move an order along: ship it, track it, deliver it, take the cash, or cancel.
+ *
+ * One action per call, and only the ones the order's `actions` list allows —
+ * the same rule a real backend applies, so the demo cannot teach a flow the
+ * live store would refuse.
+ */
+export async function adminUpdateOrder(orderId, patch = {}) {
   await latency()
   const orders = read(KEY.orders, [])
   const i = orders.findIndex((o) => o.id === orderId || o.number === orderId)
   if (i < 0) throw new ApiError('Order not found.', { status: 404, code: 'not_found' })
-  if (patch.status && !ORDER_STATUSES.includes(patch.status)) {
-    throw new ApiError(`"${patch.status}" is not a valid status.`, { status: 422, code: 'invalid_status' })
+  const order = orders[i]
+
+  let action = patch.action
+  if (!action && patch.status) {
+    action = LEGACY_STATUS_ACTIONS[patch.status]
+    if (!action) {
+      if (!ORDER_STATUSES.includes(patch.status)) {
+        throw new ApiError(`"${patch.status}" is not a valid status.`, { status: 422, code: 'invalid_status' })
+      }
+      orders[i] = { ...order, status: patch.status, updatedAt: nowIso() }
+      write(KEY.orders, orders)
+      return adminView(orders[i])
+    }
   }
-  // Cancelling puts the stock back. An order that vanishes without returning
-  // its units is how a catalogue slowly loses inventory nobody can account for.
-  if (patch.status === 'cancelled' && orders[i].status !== 'cancelled') {
-    for (const line of orders[i].lines) db.adjustInventory(line.variantId, line.quantity)
-    adopt()
+  if (!ORDER_ACTIONS.includes(action)) {
+    throw new ApiError(`"${action}" is not something an order can do.`, { status: 422, code: 'invalid_action' })
   }
-  orders[i] = { ...orders[i], ...patch, updatedAt: new Date().toISOString() }
+  if (!adminView(order).actions.includes(action)) {
+    throw new ApiError(`${order.number} can't be ${ACTION_DONE[action]} right now.`, { status: 409, code: 'action_not_allowed' })
+  }
+  const tracking = patch.tracking || {}
+  const problem = trackingProblem(tracking)
+  if (problem) throw new ApiError(problem, { status: 422, code: 'invalid_tracking' })
+
+  const now = nowIso()
+  const next = { ...order, updatedAt: now }
+  const applyTracking = () => {
+    const current = typeof order.tracking === 'string' ? { code: order.tracking } : order.tracking || {}
+    const merged = { carrier: current.carrier || '', code: current.code || '', url: current.url || '' }
+    // A field left out is kept, so adding the link later does not wipe the number.
+    for (const key of ['carrier', 'code', 'url']) {
+      if (tracking[key] !== undefined) merged[key] = String(tracking[key] || '').trim()
+    }
+    next.tracking = merged.carrier || merged.code || merged.url ? merged : null
+  }
+
+  switch (action) {
+    case 'ship':
+      next.shippedAt = now
+      next.status = 'fulfilled'
+      applyTracking()
+      break
+    case 'update_tracking':
+      applyTracking()
+      break
+    case 'deliver':
+      next.shippedAt = order.shippedAt || now
+      next.deliveredAt = now
+      next.status = 'delivered'
+      break
+    case 'record_payment':
+      next.payment = { ...order.payment, status: 'captured', capturedAt: now }
+      if (order.status === 'placed') next.status = 'paid'
+      break
+    case 'cancel':
+      // Cancelling puts the stock back. An order that vanishes without returning
+      // its units is how a catalogue slowly loses inventory nobody can account for.
+      for (const line of order.lines) db.adjustInventory(line.variantId, line.quantity)
+      adopt()
+      next.status = 'cancelled'
+      next.cancelledAt = now
+      if (order.payment?.status === 'pending') next.payment = { ...order.payment, status: 'cancelled' }
+      break
+  }
+
+  orders[i] = next
   write(KEY.orders, orders)
-  return orders[i]
+  return adminView(next)
 }
 
 /**
@@ -1069,7 +1332,7 @@ export async function adminGetOrder(idOrNumber) {
   await latency()
   const order = read(KEY.orders, []).find((o) => o.id === idOrNumber || o.number === idOrNumber)
   if (!order) throw new ApiError('Order not found.', { status: 404, code: 'not_found' })
-  return order
+  return adminView(order)
 }
 
 /* ── account ───────────────────────────────────────────────────────────── */
@@ -1193,6 +1456,13 @@ export async function updateMe(patch) {
   const next = { ...customer, ...patch }
   write(KEY.customer, next)
   return next
+}
+
+export async function getCountry(code) {
+  await latency()
+  const details = COUNTRY_DETAILS[String(code || '').toUpperCase()]
+  if (!details) throw new ApiError('We could not find that country.', { status: 404, code: 'not_found' })
+  return details
 }
 
 export async function saveAddress(address) {
@@ -1328,6 +1598,12 @@ export async function adminSaveCategory(patch) {
 export async function adminDeleteCategory(slug) {
   await latency()
   return db.deleteCategory(slug)
+}
+
+/** The admin tree. The local catalogue already lists every category, empty ones included. */
+export async function adminListCategories() {
+  await latency()
+  return listCategoriesSync({ tree: true })
 }
 
 export async function adminUpdateSettings(patch) {

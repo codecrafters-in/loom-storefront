@@ -47,6 +47,10 @@ orders. Running `mock` or `api` mode? Skip to
                     │
                     └── products
 
+  orders ──< payments ──< refunds          orders ──< shipments
+  payment_methods  (what can pay; public configuration only)
+  countries ──< country_states             (addresses.country and .region hold their codes)
+
   admin_users ──< inventory_movements.created_by
   events ──< webhook_deliveries >── webhook_endpoints
 ```
@@ -132,6 +136,8 @@ CREATE TABLE stores (
   slug             text NOT NULL UNIQUE,
   name             text NOT NULL,
   default_currency currency_code NOT NULL DEFAULT 'USD',
+  payment_mode     text NOT NULL DEFAULT 'storefront'
+                     CHECK (payment_mode IN ('storefront','hosted')),
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now()
 );
@@ -149,6 +155,11 @@ whole, written whole, cached hard, and grows a key every time the theme grows a
 home-page section type (`src/data/storefront.js`). A column per key means a
 migration per section, and `PATCH /admin/storefront` is specified as a deep
 merge, which `||` and `jsonb_set` do natively.
+
+`payment_mode` is a column rather than a key in `document` because the API
+branches on it: `storefront` answers the on-site payment routes and serves
+`checkout.mode = "payments"`; `hosted` keeps checkout handing the shopper to a
+payment page of yours.
 
 ### Categories
 
@@ -596,6 +607,29 @@ partial unique index is the correct expression of "at most one default address";
 a `BEFORE INSERT` trigger that unsets the others is a race, this is a
 constraint.
 
+```sql
+CREATE TABLE countries (
+  code           char(2) PRIMARY KEY CHECK (code ~ '^[A-Z]{2}$'),   -- ISO 3166-1
+  name           text NOT NULL,
+  state_required boolean NOT NULL DEFAULT false,
+  zip_required   boolean NOT NULL DEFAULT true
+);
+CREATE TABLE country_states (
+  country_code char(2) NOT NULL REFERENCES countries(code) ON DELETE CASCADE,
+  code         text NOT NULL,                  -- 'GJ', 'NY'
+  name         text NOT NULL,                  -- 'Gujarat', 'New York'
+  PRIMARY KEY (country_code, code)
+);
+```
+
+`GET /countries/:code` is one read of these two tables, and the State / region
+dropdown at checkout and in the address book is built from it. **Store the state
+code in `addresses.region`** whenever the country has rows here, and validate
+the write against them: a free-text "Gujrat" is refused with
+`422 invalid_address` naming `region`, rather than reaching a courier label.
+`addresses.country` can reference `countries(code)` directly; the state cannot,
+because most countries have no states, so that check lives in the write path.
+
 ### Carts
 
 ```sql
@@ -606,6 +640,8 @@ CREATE TABLE carts (
   currency    currency_code NOT NULL,
   discount_id text REFERENCES discounts(id) ON DELETE SET NULL,
   converted_order_id text,
+  retired_at  timestamptz,                 -- merged into another bag; answers 404
+  merged_into text REFERENCES carts(id) ON DELETE SET NULL,
   expires_at  timestamptz NOT NULL DEFAULT now() + interval '30 days',
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
@@ -635,6 +671,29 @@ without capture makes the bag flicker.
 increment at the schema level. `ON DELETE RESTRICT` means you cannot hard-delete
 a variant sitting in somebody's cart — archive it, and the read query drops the
 line cleanly.
+
+**One open bag per customer per store.** A cart is *open* while
+`converted_order_id` and `retired_at` are both null. Enforce the rule where it
+cannot be bypassed:
+
+```sql
+CREATE UNIQUE INDEX carts_one_open_per_customer
+  ON carts (store_id, customer_id)
+  WHERE customer_id IS NOT NULL AND converted_order_id IS NULL AND retired_at IS NULL;
+```
+
+Guest carts have no `customer_id`, so any number can exist. The index bites at
+the moment a signed-in customer claims one — and that is where the merge
+happens, in one transaction: copy the customer's open cart lines into the
+claimed cart (`ON CONFLICT (cart_id, variant_id) DO UPDATE SET quantity =
+GREATEST(cart_lines.quantity, EXCLUDED.quantity)` — the higher quantity, never
+the sum), mark the old cart `retired_at = now(), merged_into = <claimed id>`,
+then set `customer_id` on the claimed cart. A retired or converted cart answers
+`404 cart_not_found`.
+
+`POST /carts` with `{ "fresh": true }` (sent after checkout) inserts a new cart
+instead of returning the customer's open one; since the paid cart already has
+`converted_order_id`, the index still holds.
 
 ### Discounts
 
@@ -744,6 +803,99 @@ means the invoice changes when the customer moves house.
 `orders_total_balances` catches arithmetic drift at write time: if the pricing
 code and the persistence code ever disagree, you find out on the insert rather
 than in a reconciliation.
+
+### Shipments
+
+```sql
+CREATE TABLE shipments (
+  id            text PRIMARY KEY,
+  order_id      text NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  status        text NOT NULL DEFAULT 'pending'
+                  CHECK (status IN ('pending','shipped','delivered','cancelled')),
+  carrier       text,
+  tracking_code text CHECK (tracking_code IS NULL OR length(tracking_code) <= 128),
+  tracking_url  text CHECK (tracking_url IS NULL OR tracking_url ~ '^https?://'),
+  delivery_refs text[] NOT NULL DEFAULT '{}',   -- the warehouse's own delivery ids
+  shipped_at    timestamptz,
+  delivered_at  timestamptz,
+  created_by    text,                           -- admin_users.id
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT shipments_shipped_dated CHECK (status NOT IN ('shipped','delivered') OR shipped_at IS NOT NULL),
+  CONSTRAINT shipments_delivered_dated CHECK (status <> 'delivered' OR delivered_at IS NOT NULL)
+);
+```
+
+**A shipment is a row, not three columns on `orders`.** One order can leave in
+two parcels, and "shipped" and "delivered" each carry a time and a person. With
+this table the `tracking_*` and `fulfilled_at` columns on `orders` become a
+snapshot of the latest shipment — keep them only if a read needs them without a
+join. The CHECKs refuse a `javascript:` tracking link and a delivery with no
+date, the same rules `PATCH /admin/orders/:id` answers `422 invalid_tracking`
+for.
+
+The fulfilment actions write here. Each is a transition guarded by the current
+state inside the same transaction, so a double click cannot ship twice:
+
+| Action | Precondition | Write |
+| --- | --- | --- |
+| `ship` | Order not cancelled; nothing shipped yet | `status = 'shipped'`, `shipped_at`, tracking; one stock movement per line |
+| `update_tracking` | A shipment is shipped or delivered | Tracking fields only |
+| `deliver` | Shipped, or ship first | `status = 'delivered'`, `delivered_at` |
+| `record_payment` | The latest payment is offline and pending | Payment `captured`, order confirmed |
+| `cancel` | Nothing shipped | Order `cancelled`, open shipments `cancelled`, stock movements reversed |
+
+### Order, payment and delivery status
+
+The admin order list shows three statuses and stores none of them twice.
+`orders.status` is the shopper-facing one; `paymentStatus` and `delivery.status`
+are derived:
+
+```sql
+CREATE VIEW order_admin_status AS
+SELECT o.id, o.store_id,
+  CASE
+    WHEN p.status IN ('captured','refunded','partially_refunded') THEN 'paid'
+    WHEN p.status = 'authorized'                                  THEN 'authorized'
+    WHEN p.status IN ('draft','pending')                          THEN 'pending'
+    WHEN p.status IN ('failed','cancelled')                       THEN 'failed'
+    ELSE 'unpaid'
+  END AS payment_status,
+  CASE
+    WHEN o.status = 'cancelled'            THEN 'cancelled'
+    WHEN bool_or(s.status = 'delivered')   THEN 'delivered'
+    WHEN bool_or(s.status = 'shipped')     THEN 'shipped'
+    ELSE 'to_ship'
+  END AS delivery_status
+FROM orders o
+LEFT JOIN LATERAL (
+  SELECT status FROM payments WHERE order_id = o.id ORDER BY created_at DESC LIMIT 1
+) p ON true
+LEFT JOIN shipments s ON s.order_id = o.id AND s.status <> 'cancelled'
+GROUP BY o.id, o.store_id, o.status, p.status;
+```
+
+`none` — an order with nothing to deliver — comes from its lines and is left out
+here for brevity. The tab counts are one scan, not one query per tab:
+
+```sql
+SELECT count(*) FILTER (WHERE delivery_status = 'to_ship')   AS to_ship,
+       count(*) FILTER (WHERE delivery_status = 'shipped')   AS shipped,
+       count(*) FILTER (WHERE delivery_status = 'delivered') AS delivered,
+       count(*) FILTER (WHERE payment_status IN ('pending','unpaid')
+                          AND delivery_status <> 'cancelled')  AS awaiting_payment,
+       count(*) FILTER (WHERE delivery_status = 'cancelled') AS cancelled
+FROM order_admin_status
+WHERE store_id = $1;
+```
+
+Each count is the same predicate as its list filter, so a tab's number always
+matches the orders it lists. `awaiting_payment` is the `payment=awaiting` filter:
+a payment still pending, or no payment recorded at all, on an order that is not
+cancelled.
+
+`orders.status` moves with fulfilment: `fulfilled` once a shipment is shipped,
+`delivered` once one is delivered.
 
 ### Wishlists
 
@@ -1007,18 +1159,45 @@ CREATE TABLE makers (
 -- looking like a delivery.
 CREATE TABLE payments (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id      uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  provider      text NOT NULL,                       -- razorpay, stripe, manual
-  status        text NOT NULL,                       -- pending | authorized | captured | failed | refunded | partially_refunded
+  order_id      text NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  provider      text NOT NULL,                       -- razorpay, stripe, custom (cash on delivery, transfer)
+  method        text,                                -- card, upi, netbanking, cash_on_delivery…
+  flow          text NOT NULL DEFAULT 'direct'
+                  CHECK (flow IN ('direct','redirect','offline','token')),
+  status        text NOT NULL,                       -- draft | pending | authorized | captured | cancelled | failed | refunded | partially_refunded
   reference     text,                                -- the provider's payment id
-  method        text,                                -- card, upi, netbanking…
   amount        bigint NOT NULL,
   currency      char(3) NOT NULL,
+  message       text,                                -- shown while pending, or after a failure
+  -- The browser holds an opaque random id for GET /payments/:id. Only its
+  -- sha256 is stored, so a copy of this table hands out no payment.
+  token_hash    text UNIQUE,
+  processed_at  timestamptz,                         -- the order was confirmed from this payment, exactly once
   captured_at   timestamptz,
   created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
   -- A provider retries its webhook, and a retry must not create a second
   -- payment for the same money. This is what makes the handler idempotent.
   UNIQUE (provider, reference)
+);
+
+-- What can pay, when the database rather than a payment platform owns the list.
+-- Public configuration only: whatever is here is served to every browser that
+-- reaches the payment step, so a secret key in it is a published secret.
+CREATE TABLE payment_methods (
+  id            text PRIMARY KEY,
+  store_id      text NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  provider      text NOT NULL,
+  code          text NOT NULL,
+  name          text NOT NULL,
+  flow          text NOT NULL CHECK (flow IN ('direct','redirect','offline','token')),
+  enabled       boolean NOT NULL DEFAULT true,
+  test_mode     boolean NOT NULL DEFAULT false,
+  public_config jsonb NOT NULL DEFAULT '{}'::jsonb,  -- publishable key, never a secret
+  countries     char(2)[],                           -- NULL: everywhere
+  currencies    char(3)[],                           -- NULL: every currency
+  position      integer NOT NULL DEFAULT 0,
+  UNIQUE (store_id, provider, code)
 );
 
 -- Refunds are a list, not a flag on the order.
@@ -1038,7 +1217,7 @@ CREATE TABLE refunds (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX ON payments (order_id);
+CREATE INDEX ON payments (order_id, created_at DESC);   -- the latest payment per order
 CREATE INDEX ON refunds (payment_id);
 
 -- Every message the store sent, and to whom.
@@ -1181,6 +1360,11 @@ CREATE INDEX order_lines_order_idx        ON order_lines (order_id);
 CREATE INDEX orders_customer_idx          ON orders (customer_id, placed_at DESC);
 CREATE INDEX reviews_product_idx          ON reviews (product_id, created_at DESC)
   WHERE status = 'published';
+
+-- The admin order list: newest first per store, and the fulfilment joins.
+CREATE INDEX orders_store_placed_idx ON orders (store_id, placed_at DESC, id);
+CREATE INDEX shipments_order_idx     ON shipments (order_id) WHERE status <> 'cancelled';
+CREATE INDEX shipments_tracking_idx  ON shipments (tracking_code) WHERE tracking_code IS NOT NULL;
 
 -- Partial: buyable variants only. The size picker asks this on every product
 -- page, and the index is a fraction of the full one because most of a mature

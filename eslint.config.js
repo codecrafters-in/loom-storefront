@@ -20,6 +20,10 @@ export default [
       ...hooks.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
+      // React 18 only passes the lowercase HTML attribute through; the camelCase
+      // `fetchPriority` the rule suggests is React 19's, and on 18 it logs an
+      // unknown-prop warning on every page with a hero image.
+      'react/no-unknown-property': ['error', { ignore: ['fetchpriority'] }],
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
