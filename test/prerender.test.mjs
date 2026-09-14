@@ -153,9 +153,11 @@ describe('prerendered output', { skip: built ? false : 'run `npm run build` firs
      */
     const vercel = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
     assert.equal(vercel.cleanUrls, true, 'without cleanUrls, /product/x never finds product/x.html')
-    const catchAll = vercel.rewrites?.find((r) => r.source === '/(.*)')
-    assert.ok(catchAll, 'deep links into the SPA routes need a fallback rewrite')
-    assert.notEqual(catchAll.destination, '/', 'rewriting to "/" serves the home page for every route')
+    // Every address without a file goes to the render handler, which renders it (server/handler.mjs).
+    const catchAll = vercel.rewrites?.find((r) => r.destination === '/api/render')
+    assert.ok(catchAll, 'addresses without a file need the render function')
+    assert.ok(!vercel.rewrites.some((r) => r.destination === '/'), 'rewriting to "/" serves the home page for every route')
+    assert.match(vercel.functions?.['api/render.js']?.includeFiles || '', /server-build/, 'the function needs the server bundle')
   })
 
   test('security headers are set on both hosts, not just one', () => {

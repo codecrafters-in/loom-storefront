@@ -6,6 +6,8 @@ import { SIZES } from '../../lib/images.js'
 import { optionsOf } from '../../lib/variants.js'
 import { useWishlist } from '../../store/WishlistContext.jsx'
 import { t } from '../../i18n/index.js'
+import api from '../../lib/api/index.js'
+import { selectItem } from '../../lib/analytics.js'
 
 // Downloaded the first time somebody asks for a quick look, not with the grid.
 const QuickView = lazy(() => import('./QuickView.jsx'))
@@ -51,11 +53,18 @@ export default function ProductCard({ product, priority = false, className = '' 
   return (
     <article className={`group relative ${className}`}>
       <div className="relative">
-        <Link to={`/product/${product.slug}`} className="block">
+        <Link
+          to={`/product/${product.slug}`}
+          className="block"
+          onClick={() => selectItem(product)}
+          // Starts loading the product while the pointer is on its way: the page opens with it already there.
+          onMouseEnter={() => api.getProduct(product.slug).catch(() => {})}
+        >
           <div className="shot relative rounded-xs">
             <Media
               sizes={SIZES.card}
               src={images[0]?.url}
+              srcset={images[0]?.srcset}
               type={images[0]?.type}
               provider={images[0]?.provider}
               alt={images[0]?.alt || product.title}

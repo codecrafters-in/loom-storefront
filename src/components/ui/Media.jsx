@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import * as media from '../../lib/media.js'
-import { responsive } from '../../lib/images.js'
+import { responsive, srcsetOf, viaCdn } from '../../lib/images.js'
 import { t } from '../../i18n/index.js'
 
 const VideoEmbed = lazy(() => import('./VideoEmbed.jsx'))
@@ -30,6 +30,8 @@ export default function Media({
   controls = false,
   autoPlay = false,
   sizes,
+  // `[{width, url}]`: the sizes the backend keeps of this image.
+  srcset,
   ...rest
 }) {
   const [resolved, setResolved] = useState(() => media.resolveSync(src))
@@ -89,6 +91,8 @@ export default function Media({
   // Only for a source the responsive script actually processed. Uploaded
   // files, CDN URLs and SVGs fall through to a plain img, which is the right
   // answer rather than a fallback.
+  const backend = resolved === src ? srcsetOf(srcset) : null
+  if (backend) return <img src={viaCdn(resolved, 1024)} srcSet={backend} sizes={sizes} alt={alt} className={className} {...rest} />
   const alternates = resolved === src ? responsive(src) : null
   if (!alternates) return <img src={resolved} alt={alt} className={className} {...rest} />
 

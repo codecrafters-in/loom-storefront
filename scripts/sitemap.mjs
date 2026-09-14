@@ -11,6 +11,14 @@ import { products, categories, collections } from '../src/data/catalog.js'
 import { storefront } from '../src/data/storefront.js'
 import { docPages, docPath } from '../src/data/docs.js'
 import { announceSiteUrl } from './lib/site-url.mjs'
+import { builtFor } from './lib/build-mode.mjs'
+
+// A live store's sitemap.xml is Odoo's, from its catalogue as it is now; the render handler serves it (server/handler.mjs).
+if (builtFor() === 'api') {
+  console.log('[sitemap] live store: sitemap.xml comes from Odoo through the render handler')
+  process.exit(0)
+}
+
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const seo = storefront.seo || {}

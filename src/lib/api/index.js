@@ -36,7 +36,8 @@ const SURFACE = [
   'getOrderPaymentOptions', 'createOrderPayment', 'cancelCartPayment', 'listPaymentMethods', 'deletePaymentMethod',
   'getExpressOptions', 'getShippingOptions', 'checkServiceability',
   'addCode', 'removeCode', 'claimReward', 'getGiftCard', 'getLoyalty', 'saveForLater',
-  'getDeliverySlots', 'getPickupLocations', 'setPickupLocation', 'setCartPricelist',
+  'getDeliverySlots', 'getPickupLocations', 'setPickupLocation', 'setCartPricelist', 'setCartAttribution',
+  'suggestSearch', 'popularSearches', 'logSearch',
   'adminPlaceOrder', 'adminGetOrder', 'adminListOrders',
   'login', 'register', 'logout', 'getMe', 'updateMe', 'saveAddress', 'deleteAddress', 'getCountry',
   'getWishlist', 'addToWishlist', 'removeFromWishlist',
@@ -93,6 +94,7 @@ const CACHEABLE = {
   getCountry: TTL.catalog,
   listAttributes: TTL.catalog,
   listLibrary: TTL.catalog,
+  suggestSearch: TTL.catalog,
 }
 
 /** A write to any of these drops the read namespaces it could have invalidated. */

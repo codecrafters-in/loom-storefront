@@ -31,47 +31,20 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
 import { siteUrl } from './lib/site-url.mjs'
+import { builtFor } from './lib/build-mode.mjs'
+import { installBrowserGlobals } from '../server/globals.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
-const SSR_OUT = path.join(ROOT, 'node_modules/.loom-ssr')
+// Kept after the build: the render handler (server/handler.mjs) imports it on every host.
+const SSR_OUT = path.join(ROOT, 'server-build')
 const ORIGIN = siteUrl().origin
-
-/* ── a browser, for Node ───────────────────────────────────────────────── */
-
-/**
- * The storefront reads `localStorage` and dispatches `storage` events. None of
- * that exists here, and none of it is worth a jsdom dependency — the demo
- * backend needs somewhere to keep a catalogue, and nothing more.
- */
-function installBrowserGlobals() {
-  const store = (map) => ({
-    getItem: (k) => (map.has(k) ? map.get(k) : null),
-    setItem: (k, v) => map.set(k, String(v)),
-    removeItem: (k) => map.delete(k),
-    clear: () => map.clear(),
-    key: (i) => [...map.keys()][i] ?? null,
-    get length() {
-      return map.size
-    },
-  })
-  globalThis.localStorage = store(new Map())
-  globalThis.sessionStorage = store(new Map())
-  globalThis.window = {
-    localStorage: globalThis.localStorage,
-    sessionStorage: globalThis.sessionStorage,
-    location: { origin: ORIGIN, search: '', href: `${ORIGIN}/` },
-    addEventListener() {},
-    removeEventListener() {},
-    matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
-  }
-  globalThis.document = { addEventListener() {}, removeEventListener() {}, body: { style: {} } }
-}
 
 /* ── the run ───────────────────────────────────────────────────────────── */
 
 async function main() {
-  installBrowserGlobals()
+  installBrowserGlobals(ORIGIN)
+  const live = builtFor() === 'api'
 
   console.log('[prerender] building the server bundle')
   await build({
@@ -80,6 +53,8 @@ async function main() {
       ssr: 'src/entry-server.jsx',
       outDir: path.relative(ROOT, SSR_OUT),
       emptyOutDir: true,
+      // Images and icons are dist/'s; the server bundle is code only.
+      copyPublicDir: false,
       rollupOptions: { output: { format: 'es' } },
     },
   })
@@ -90,6 +65,8 @@ async function main() {
   if (!raw.includes('<div id="root"></div>')) {
     throw new Error('dist/index.html has no <div id="root"></div> to render into.')
   }
+  // The page every request-time render starts from, before any route is written into dist/index.html.
+  await fs.writeFile(path.join(SSR_OUT, 'template.js'), `// Written by scripts/prerender.mjs from dist/index.html.\nexport default ${JSON.stringify(raw)}\n`)
 
   /**
    * Strip the template's own head tags before adding the route's.
@@ -102,7 +79,9 @@ async function main() {
     .replace(/^\s*<title>[\s\S]*?<\/title>\n?/m, '')
     .replace(/^\s*<meta (?:name|property)="(?:description|og:title|og:description|og:image|og:type|og:site_name|twitter:card|twitter:title|twitter:description|twitter:image)"[^>]*>\n?/gm, '')
 
-  const routes = await plan()
+  // A live store renders each page when it is asked for, so a product added after this build is a page too. Only the
+  // demo, whose catalogue is in the bundle, is written out as files.
+  const routes = live ? [] : await plan()
   let written = 0
   let empty = 0
 
@@ -148,7 +127,7 @@ async function main() {
     written += 1
   }
 
-  // Before the server bundle is removed: its lazy pages are imported from it.
+  // Lazy pages are imported from the server bundle.
   // Pages a visitor reaches with a bag or an account are lazy and never prerendered, so nothing above runs them.
   // Render each completely, writing nothing, so a page that throws on its first render fails the build instead of a
   // shopper's checkout.
@@ -162,7 +141,12 @@ async function main() {
   }
   console.log('[prerender] cart, checkout, sign-in, account, saved items, order lookup and order pages render without errors')
 
-  await fs.rm(SSR_OUT, { recursive: true, force: true })
+  if (live) {
+    // Static files win over the render function on every host: the SPA fallback and the demo's robots.txt would hide it.
+    for (const file of ['index.html', '_redirects', 'robots.txt', 'sitemap.xml']) await fs.rm(path.join(DIST, file), { force: true })
+    console.log('[prerender] live store: pages render on request (server-build/ + server/handler.mjs), nothing written to dist/')
+    return
+  }
   console.log(`[prerender] ${written} routes → dist/`)
   if (empty) {
     console.error(`[prerender] ${empty} of them rendered almost nothing — the data did not reach the render`)

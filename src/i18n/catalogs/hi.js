@@ -614,5 +614,9 @@ export default {
   "Show {count} results": {
     "one": "{count} परिणाम दिखाएँ",
     "other": "{count} परिणाम दिखाएँ"
-  }
+  },
+  "Category": "श्रेणी",
+  "Suggestions": "सुझाव",
+  "Popular searches": "लोकप्रिय खोजें",
+  "No exact match for “{q}”. Showing similar names.": "“{q}” के लिए कोई सटीक मिलान नहीं। मिलते-जुलते नाम दिखाए जा रहे हैं।",
 }

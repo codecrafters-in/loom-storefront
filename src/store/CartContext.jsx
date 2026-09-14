@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import api from '../lib/api/index.js'
 import { useToast } from './ToastContext.jsx'
 import { onExternalWrite, STORAGE_KEYS } from '../lib/crossTab.js'
-import { addToCart as trackAdd, removeFromCart as trackRemove } from '../lib/analytics.js'
+import { addToCart as trackAdd, consentState, removeFromCart as trackRemove } from '../lib/analytics.js'
 import { cartProblem } from '../lib/cart-lines.js'
 import { isMock } from '../lib/config.js'
 import { t } from '../i18n/index.js'
@@ -43,6 +43,20 @@ export function CartProvider({ children }) {
       alive = false
     }
   }, [push])
+
+  // Where the shopper came from goes on the order (its Campaign, Medium and Source in Odoo): once per bag, and again
+  // only when it changed. The demo keeps no orders.
+  useEffect(() => {
+    if (isMock || !cart?.id) return
+    const id = cart.id
+    import('../lib/attribution.js')
+      .then(({ alreadySent, attribution, markSent }) => {
+        const payload = attribution(consentState())
+        if (!payload || alreadySent(id, payload)) return undefined
+        return api.setCartAttribution(id, payload).then(() => markSent(id, payload))
+      })
+      .catch(() => {})
+  }, [cart?.id])
 
   // Adding to the bag in another tab has to show up here, or the header count
   // and this one disagree until something happens to remount.

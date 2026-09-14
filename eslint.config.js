@@ -32,6 +32,15 @@ export default [
     languageOptions: { ecmaVersion: 2022, globals: globals.node, sourceType: 'module' },
   },
   {
+    // The render handler and its host adapters: Node or a worker runtime, speaking the Fetch API.
+    files: ['server/**/*.mjs', 'api/**/*.js', 'netlify/**/*.mjs', 'functions/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: { ...globals.node, ...globals.serviceworker },
+      sourceType: 'module',
+    },
+  },
+  {
     // Tests install a browser onto `globalThis` before importing the app, so
     // they legitimately touch both environments.
     files: ['test/**/*.mjs'],

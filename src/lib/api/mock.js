@@ -24,6 +24,7 @@ import { ApiError } from './contracts.js'
 import { invalidateAndNotify } from './cache.js'
 import { comboState, keyOf, modelOf, optionsOf, variantFor } from '../variants.js'
 import { ruleOf } from '../quantity.js'
+import { flattenCategories } from '../categories.js'
 
 /**
  * The catalogue is read from the demo database, not from a static import.
@@ -1845,3 +1846,38 @@ export const deleteLibraryItem = later('deleteLibraryItem')
 export const adminSaveSizeChart = later('adminSaveSizeChart')
 export const adminGetProduct = later('adminGetProduct')
 export const adminReset = later('adminReset')
+
+/* ── attribution and search ───────────────────────────────────────────── */
+
+/** The demo keeps no orders, so there is no campaign to file. */
+export async function setCartAttribution() {
+  return { ok: true }
+}
+
+export async function suggestSearch(q, { limit = 6 } = {}) {
+  const term = String(q || '').trim()
+  if (term.length < 2) return { query: term, products: [], categories: [], brands: [], fuzzy: false }
+  const needle = term.toLowerCase()
+  const [found, tree, makers] = await Promise.all([listProducts({ q: term, perPage: limit }), listCategories(), listBrands()])
+  return {
+    query: term,
+    products: found.items.slice(0, limit).map((p) => ({
+      slug: p.slug, title: p.title, price: p.price, compareAtPrice: p.compareAtPrice || null, image: p.images?.[0] || null,
+    })),
+    categories: flattenCategories(tree.items || [])
+      .filter((c) => c.name?.toLowerCase().includes(needle))
+      .slice(0, limit)
+      .map((c) => ({ slug: c.slug, name: c.name, path: c.path || [] })),
+    brands: (makers.items || []).filter((b) => b.name?.toLowerCase().includes(needle)).slice(0, limit).map((b) => ({ slug: b.slug, name: b.name })),
+    fuzzy: false,
+  }
+}
+
+/** The demo keeps no search log. */
+export async function popularSearches() {
+  return []
+}
+
+export async function logSearch(q) {
+  return { term: String(q || '').trim().toLowerCase(), results: 0 }
+}

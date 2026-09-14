@@ -28,6 +28,30 @@ const devServer = ({ port, api, tag }) => ({
   },
 })
 
+/**
+ * The storefront as a host serves it: built, with pages rendered on request by server/handler.mjs. S-12 reads raw
+ * HTML from it, including a product created after the build.
+ */
+const renderServer = ({ port, api }) => ({
+  command: 'node e2e/support/render-server.mjs',
+  cwd: settings.storefrontRoot,
+  url: `http://localhost:${port}/cart`,
+  reuseExistingServer: !process.env.CI,
+  timeout: 300_000,
+  stdout: 'ignore',
+  stderr: 'pipe',
+  env: {
+    ...process.env,
+    PORT: String(port),
+    VITE_DATA_SOURCE: 'api',
+    VITE_API_BASE_URL: api,
+    VITE_API_TIMEOUT: '30000',
+    VITE_API_TOKEN: '',
+    LOOM_E2E_VITE_TAG: 'render',
+    SITE_URL: '',
+  },
+})
+
 export default defineConfig({
   testDir: './tests',
   // The scenarios share one Odoo database and some of them change prices, stock
@@ -56,5 +80,6 @@ export default defineConfig({
     : [
         devServer({ port: settings.port, api: settings.api, tag: 'store-e2e' }),
         devServer({ port: settings.port2, api: settings.api2, tag: 'store-e2e-kw' }),
+        ...(process.env.LOOM_E2E_CRAWL_URL ? [] : [renderServer({ port: settings.renderPort, api: settings.api })]),
       ],
 })

@@ -99,6 +99,9 @@ capability), a customer token, or an admin token — never interchangeable.
 | `GET` | `/categories`, `/collections` | none | public | [Catalogue](#catalogue) |
 | `POST` | `/products/:slug/combination` | none | no-store (the theme caches it with the product) | [Combinations](#post-productsslugcombination) |
 | `GET` | `/brands`, `/brands/:slug` | none | public | [Brands](#brands) |
+| `GET` | `/search/suggest`, `/search/popular` | none | public / never | [Search](#search) |
+| `POST` | `/search/log` | none; rate-limited | never | [Search](#search) |
+| `GET` | `/robots.txt`, `/sitemap.xml`, `/sitemaps/:kind-:page.xml`, `/redirects` | none | public / never | [Search engines](#search-engines) (read by the render handler, not the browser) |
 | `GET` | `/pages`, `/pages/:slug` | none | public | [Pages, contact, consent, access and blog](#pages-contact-consent-access-and-blog) |
 | `POST` | `/contact`, `/consents` | none / customer | never | [Pages, contact, consent, access and blog](#pages-contact-consent-access-and-blog) |
 | `POST` | `/access`, `/admin/access` | none / admin | never | [Pages, contact, consent, access and blog](#pages-contact-consent-access-and-blog) |
@@ -109,6 +112,7 @@ capability), a customer token, or an admin token — never interchangeable.
 | `GET` | `/delivery-estimate` | none | public | [Delivery estimate](#delivery-estimate) |
 | `POST` | `/carts` | none | no-store | [Cart](#cart) |
 | `GET` `POST` `PATCH` `DELETE` | `/carts/:id`, `/carts/:id/lines…`, `/carts/:id/discount` | cart id | no-store | [Cart](#cart) |
+| `POST` | `/carts/:id/attribution` | cart id | no-store | [Where the shopper came from](#where-the-shopper-came-from) |
 | `POST` | `/carts/:id/checkout` | cart id | no-store | [Checkout](#checkout) |
 | `POST` | `/carts/:id/payment-options`, `/carts/:id/payments` | cart id | no-store | [On-site payments](#on-site-payments) |
 | `POST` | `/payments/:id/actions/:action` | payment id | no-store | [On-site payments](#on-site-payments) |
@@ -879,9 +883,76 @@ Three rules the theme depends on:
 Trees have any depth, and every category carries `path: [{ slug, name }]`, root
 to itself. Category pages title themselves and build their breadcrumbs from it
 (or from the parents, when it is missing).
-### `GET /collections` → `{ items: [{ slug, title, blurb, image, count }], total }`
+### `GET /collections` → `{ items: [{ slug, title, blurb, image, count, seo }], total }`
 
 ---
+
+## Search engines
+
+A live store is rendered on request (`server/handler.mjs`, [Deploying](DEPLOY.md)): the server renders each public
+address with its data and head, so the backend has to say what search engines and link previews should read.
+
+**Every page's `seo` block.** `GET /products/:slug`, every item of `GET /categories` and `GET /collections`,
+`GET /brands/:slug`, `GET /pages/:slug` and `GET /blog/:slug` carry:
+
+```json
+{ "seo": { "title": "Merino Crew | Loom", "description": "Soft wool, made to last.", "image": "https://…/image_1024", "noindex": false } }
+```
+
+`title` is final (the store's title template already applied) and becomes `<title>`, `og:title` and `twitter:title`;
+`description` must never be empty (a page without text of its own gets a sentence naming it); `image` is the preview
+for shared links; `noindex: true` writes `robots: noindex` and leaves the page's language alternates out. Without the
+block (a backend that has not added it) the theme names pages from their title and the settings' `seo.titleTemplate`.
+
+**Images in sizes.** An image may list the sizes the backend keeps, `srcset: [{width, url}]`; the theme turns them into
+a `srcset` so a phone downloads a smaller copy, through the store's image CDN when `media.imageUrlTemplate` is set
+([Configuration](CONFIGURATION.md#media)).
+
+**Structured data.** From the same data the theme writes `Product` (brand, SKU, `gtin` from each variant's `barcode`,
+one offer per variant, returns window from `commerce.returnsWindowDays` and free delivery over
+`commerce.freeShippingOver`), `BreadcrumbList`, `ItemList` on listings, `BlogPosting`, and on the home page
+`Organization` (logo, social profiles) and `WebSite` with a search box.
+
+**Read by the render handler, not the browser**, on the storefront's own domain:
+
+| Route | Answer |
+| --- | --- |
+| `GET /robots.txt`, `GET /sitemap.xml`, `GET /sitemaps/:kind-:page.xml` | Text or XML, passed through unchanged. Every address in them must be a storefront address |
+| `GET /redirects?path=/product/old` | `{ to: "/product/new", code: 301 }` or 404. Asked before the handler answers 404; the language prefix is left off the path and put back on the answer |
+
+## Search
+
+`GET /products?q=` searches names, descriptions, tags, references and barcodes. When nothing matches, the backend may
+return products with a similar name and say so with `fuzzy: true`; the search page then shows "No exact match for
+…". Pages of 24 (`page`).
+
+| Route | Answer |
+| --- | --- |
+| `GET /search/suggest?q=swea&limit=5` | `{ query, products: [{ slug, title, price, compareAtPrice, image }], categories: [{ slug, name, path }], brands: [{ slug, name }], fuzzy }` for the header search box. Fewer than two characters: empty lists |
+| `GET /search/popular?limit=8` | `{ items: ["merino crew", …] }`: the most searched terms that find something, shown on an empty search page |
+| `POST /search/log` `{ q }` | Counts one search for the merchant's report; the backend counts the results itself. Sent once per results page |
+
+The header box is a combobox: arrow keys move through the suggestions (`aria-activedescendant`), Enter opens one or
+searches, Escape closes the list. The suggestions code loads the first time somebody types.
+
+## Where the shopper came from
+
+The theme keeps the campaign tags (`utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`) and click IDs
+(`gclid`, `gbraid`, `wbraid`, `fbclid`, `ttclid`, `msclkid`, `epik`) of the first and the latest visit that brought
+any, with the landing path, the referring site and the time (`src/lib/attribution.js`). A reload or a link inside the
+shop changes nothing. Once a bag exists it sends them, once per bag and again when they change:
+
+```http
+POST /carts/:id/attribution
+{ "first": { "source": "newsletter", "medium": "email", "campaign": "Spring", "landing": "/shop", "at": "2026-09-01T10:00:00.000Z" },
+  "last":  { "gclid": "Cj0KCQ…", "landing": "/product/merino-crew", "referrer": "https://www.google.com/", "at": "…" },
+  "gaClientId": "123456789.1712345678", "fbp": "fb.1.1712345678901.123", "consent": { "analytics": true, "marketing": false } }
+```
+
+`gaClientId` comes from the `_ga` cookie and `fbp`/`fbc` from Meta's cookies, so a backend that reports purchases
+itself (GA4 Measurement Protocol, Meta Conversions API) reports them for the same visitor; the theme's own `purchase`
+event uses the order number as its ID, so each platform counts the order once. `consent` is only sent when the store
+shows a cookie banner. Answer `{ ok: true }`; a backend that ignores it loses nothing but the campaign.
 
 ## Cart
 

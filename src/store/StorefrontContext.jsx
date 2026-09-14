@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import api, { peek } from '../lib/api/index.js'
 import { configureAnalytics } from '../lib/analytics.js'
+import { setImageTemplate } from '../lib/images.js'
 import { config, isMock } from '../lib/config.js'
 import { ACCESS_EVENT, accessToken } from '../lib/access.js'
 import { storefront as demo } from '../data/storefront.js'
@@ -122,6 +123,8 @@ export function StorefrontProvider({ children }) {
   const cfg = useMemo(() => merge(merge(defaults, fromEnv()), remote), [remote])
   // Before anything below formats a price: amounts divide by each currency's own decimals (3 for KWD).
   registerCurrencies(cfg.pricing)
+  // Image addresses through the store's image CDN, when it has one: before any image renders.
+  setImageTemplate(cfg.media?.imageUrlTemplate)
   // Wording the merchant changed in Odoo, for the language on screen: before anything below renders a word.
   setOverrides(cfg.uiStrings?.[currentLanguage()] || null)
 
@@ -139,11 +142,14 @@ export function StorefrontProvider({ children }) {
   // Settings decide whether anything is sent at all, so this runs before the
   // first event rather than on the first render that happens to need one.
   useEffect(() => {
+    // Not with the defaults before the store's own settings arrive: events wait for these.
+    if (!ready) return
     configureAnalytics({
       ...(cfg.analytics || {}),
       consentRequired: Boolean(cfg.consent?.enabled && cfg.consent.mode !== 'opt-out'),
+      consentEnabled: Boolean(cfg.consent?.enabled),
     })
-  }, [cfg])
+  }, [cfg, ready])
 
   const mode = cfg.access?.mode || 'open'
   const closed = mode !== 'open' && (locked || !hasAccess)

@@ -273,40 +273,25 @@ palette changes the whole store.
 
 ## Deploying
 
-Static output — anything that serves files will do.
-
 ```bash
-npm run build        # → dist/
-npm run preview
+npm run build        # → dist/ (files) and server-build/ (the render handler's bundle)
+npm start            # the Node server: dist/ plus pages rendered on request
 ```
 
-**Set the site URL, or canonical tags point at nothing.** Sitemap entries,
-canonical links and Open Graph URLs have to be absolute, and they are resolved
-at build time:
+**A live store renders each page when it is asked for** (`server/handler.mjs`), so a product added in Odoo after the
+build is a real page for crawlers: its own title, description, Open Graph tags and structured data, a `404` for an
+address that is nothing, a `301` for a changed slug, and robots.txt and the sitemap from Odoo. Adapters are in the
+repository for **Vercel** (`vercel.json`, `api/render.js`), **Netlify** (`netlify.toml`,
+`netlify/functions/render.mjs`), **Cloudflare Pages** (`functions/[[path]].js`) and any **Node** host or **Docker**
+(`server/node.mjs`, `Dockerfile`). Step by step, with the environment variables: [docs/DEPLOY.md](docs/DEPLOY.md).
 
-```bash
-SITE_URL=https://yourshop.com npm run build
-```
+**The demo** is written out as files at build time and runs on any static host. Set the site URL, or its canonical tags
+point at a placeholder: `SITE_URL=https://yourshop.com npm run build` (Vercel's `VERCEL_PROJECT_PRODUCTION_URL` is
+picked up on its own). `vercel.json` sets `cleanUrls` so `/product/x` finds `product/x.html`; `public/_redirects` does
+the same on Netlify and Cloudflare Pages; with nginx, `try_files $uri $uri.html $uri/ /index.html;`.
 
-On Vercel you can skip it — `VERCEL_PROJECT_PRODUCTION_URL` is picked up
-automatically, so a fork that clicks Deploy still canonicalises to its own
-domain. Anywhere else, set `SITE_URL` or `seo.siteUrl` in Settings; the build
-warns and falls back to a placeholder rather than guessing.
-
-Client-side routing needs a rewrite so deep links do not 404:
-
-- **Vercel** — `vercel.json` is in the repo. It sets `cleanUrls` so `/product/x`
-  finds the prerendered `product/x.html`, and only falls back to the SPA for
-  routes that have no file.
-- **Netlify / Cloudflare Pages** — `public/_redirects` and `public/_headers` are
-  in the repo and do the same.
-- **nginx** — `try_files $uri $uri/ /index.html;` is already correct: it tries
-  the prerendered file first and only falls through when there is none.
-
-> **Do not add a catch-all rewrite above those.** `/(.*) → /` serves the home
-> page for all 53 prerendered routes. It looks correct locally, because the
-> browser routes around it, and it is invisible until you check what a crawler
-> actually received.
+> **Do not add a catch-all rewrite to `/` above those.** It serves the home page for every address. It looks correct
+> in a browser, which routes around it, and is invisible until you check what a crawler actually received.
 
 ---
 

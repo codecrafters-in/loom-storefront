@@ -398,6 +398,29 @@ export async function setCartPricelist(pricelistId) {
   return assertCart(await post(`/carts/${cart.id}/pricelist`, { pricelist_id: pricelistId }), 'POST /carts/:id/pricelist')
 }
 
+/** Where the shopper came from, for the order's Campaign, Medium and Source (src/lib/attribution.js). */
+export const setCartAttribution = (cartIdArg, payload) => post(`/carts/${encodeURIComponent(cartIdArg)}/attribution`, payload || {})
+
+/* ── search ────────────────────────────────────────────────────────────── */
+
+/** Products, categories and brands for the header search box while a shopper types. */
+export async function suggestSearch(q, { limit = 6 } = {}) {
+  const res = await get('/search/suggest', { q, limit })
+  return {
+    query: res?.query || '',
+    products: Array.isArray(res?.products) ? res.products : [],
+    categories: Array.isArray(res?.categories) ? res.categories : [],
+    brands: Array.isArray(res?.brands) ? res.brands : [],
+    fuzzy: Boolean(res?.fuzzy),
+  }
+}
+
+/** The store's most searched terms that find something. */
+export const popularSearches = ({ limit = 8 } = {}) => get('/search/popular', { limit }).then((res) => (Array.isArray(res?.items) ? res.items : []))
+
+/** Count one search for the merchant's Search terms report; the backend counts the results itself. */
+export const logSearch = (q) => post('/search/log', { q })
+
 export async function applyDiscount(code) {
   const cart = await ensureCart()
   return assertCart(await post(`/carts/${cart.id}/discount`, { code }), 'POST /carts/:id/discount')

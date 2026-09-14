@@ -52,3 +52,20 @@ test('every sizes hint names a real breakpoint', () => {
   }
   assert.match(SIZES.card, /min-width/, 'a grid card must narrow on small screens')
 })
+
+test('backend images get a srcset, through the image CDN when the store has one', async () => {
+  const { setImageTemplate, srcsetOf, viaCdn } = await import('../src/lib/images.js')
+  const sizes = [
+    { width: 256, url: 'https://odoo.test/web/image/product.template/1/image_256' },
+    { width: 512, url: 'https://odoo.test/web/image/product.template/1/image_512' },
+  ]
+  assert.equal(srcsetOf(sizes), 'https://odoo.test/web/image/product.template/1/image_256 256w, https://odoo.test/web/image/product.template/1/image_512 512w')
+  assert.equal(srcsetOf([]), null)
+  assert.equal(srcsetOf(undefined), null)
+
+  setImageTemplate('https://cdn.test/cdn-cgi/image/width={width},format=auto/{url}')
+  assert.equal(viaCdn('https://odoo.test/a.jpg', 512), 'https://cdn.test/cdn-cgi/image/width=512,format=auto/https://odoo.test/a.jpg')
+  assert.equal(viaCdn('/images/local.jpg', 512), '/images/local.jpg', 'a bundled photograph stays as it is')
+  setImageTemplate('http://insecure.test/{url}')
+  assert.equal(viaCdn('https://odoo.test/a.jpg', 512), 'https://odoo.test/a.jpg', 'only an https template with {url}')
+})

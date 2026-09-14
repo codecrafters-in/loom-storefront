@@ -614,5 +614,9 @@ export default {
   "Show {count} results": {
     "one": "{count} resultaat tonen",
     "other": "{count} resultaten tonen"
-  }
+  },
+  "Category": "Categorie",
+  "Suggestions": "Suggesties",
+  "Popular searches": "Populaire zoekopdrachten",
+  "No exact match for “{q}”. Showing similar names.": "Geen exacte overeenkomst voor ‘{q}’. Vergelijkbare namen worden getoond.",
 }

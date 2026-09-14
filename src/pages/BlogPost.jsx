@@ -1,5 +1,5 @@
 import { Navigate, useParams } from 'react-router-dom'
-import api from '../lib/api/index.js'
+import api, { peek } from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import Seo from '../components/Seo.jsx'
 import { Breadcrumbs, ErrorState, Skeleton } from '../components/ui/index.jsx'
@@ -10,7 +10,7 @@ import { useStorefront } from '../store/StorefrontContext.jsx'
 export default function BlogPost() {
   const { slug } = useParams()
   const config = useStorefront()
-  const { data: post, error, loading, reload } = useAsync(() => api.getBlogPost(slug), [slug])
+  const { data: post, error, loading, reload } = useAsync(() => api.getBlogPost(slug), [slug], { initial: peek.getBlogPost(slug) })
 
   if (error?.status === 404) return <Navigate to="/404" replace />
   if (error) return <div className="wrap max-w-3xl py-20"><ErrorState error={error} onRetry={reload} /></div>
@@ -29,7 +29,7 @@ export default function BlogPost() {
 
   return (
     <>
-      <Seo title={post.seo?.title || post.title} description={post.seo?.description || post.teaser} image={post.image?.url} type="article" />
+      <Seo seo={post.seo} title={post.title} description={post.teaser} image={post.image?.url} type="article" article={post} />
       <article className="wrap max-w-3xl py-10 pb-20">
         <Breadcrumbs trail={[{ label: t('Blog'), to: '/blog' }, { label: post.title }]} />
         <h1 className="mt-6 text-display-lg">{post.title}</h1>

@@ -15,6 +15,8 @@ const env = process.env
 const api = trim(env.LOOM_E2E_API || 'http://localhost:8074/loom/api/v1/e2e')
 const port = Number(env.LOOM_E2E_PORT || 5174)
 const port2 = Number(env.LOOM_E2E_PORT2 || 5175)
+/** The storefront served by the render handler (S-12), built by support/render-server.mjs. */
+const renderPort = Number(env.LOOM_E2E_RENDER_PORT || 5176)
 const storefrontUrl = trim(env.LOOM_E2E_STOREFRONT_URL || `http://localhost:${port}`)
 
 export const settings = {
@@ -33,8 +35,9 @@ export const settings = {
   port2,
   storefrontUrl,
   storefront2Url: trim(env.LOOM_E2E_STOREFRONT2_URL || `http://localhost:${port2}`),
-  /** Where S-12 fetches raw HTML from. A deployed preview can be pointed at instead of the dev server. */
-  crawlUrl: trim(env.LOOM_E2E_CRAWL_URL || storefrontUrl),
+  renderPort,
+  /** Where S-12 fetches raw HTML from: the render handler's server, or a deployment. */
+  crawlUrl: trim(env.LOOM_E2E_CRAWL_URL || `http://localhost:${renderPort}`),
   /** Set to 1 to use storefronts you started yourself (or a deployment) instead of Vite dev servers. */
   skipWebServer: env.LOOM_E2E_SKIP_WEBSERVER === '1',
 

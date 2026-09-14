@@ -24,12 +24,21 @@ import { toMajor } from './money.js'
  *    for, and a shop that ignores it is telling on itself.
  */
 
-let settings = { enabled: false, respectDoNotTrack: true, debug: false, consentRequired: false }
+let settings = { enabled: false, respectDoNotTrack: true, debug: false, consentRequired: false, consentEnabled: false, providers: {} }
 let consented = null
+// Marketing consent (Meta, TikTok, Pinterest), separate from analytics consent.
+let consentedMarketing = null
+let tags = null
+// Events sent before the store's settings arrived: the first page view and the product a visitor landed on happen
+// before the settings request answers, and dropping them lost every tag's first page.
+let configured = false
+const pending = []
 
-/** Called once from the storefront provider, when settings arrive. */
+/** Called from the storefront provider once the store's settings are known. */
 export function configureAnalytics(next = {}) {
   settings = { ...settings, ...next }
+  configured = true
+  for (const [event, params] of pending.splice(0)) track(event, params)
 }
 
 /**
@@ -39,16 +48,18 @@ export function configureAnalytics(next = {}) {
  * consent banner should not silently record nothing. A store that needs consent
  * calls `setConsent(false)` until it has it, and no event is sent before then.
  */
-export function setConsent(value) {
+export function setConsent(value, marketing = value) {
   consented = value
+  consentedMarketing = marketing
 }
 
-function allowed() {
+function allowed(category = 'analytics') {
   if (typeof window === 'undefined') return false
   if (!settings.enabled) return false
-  if (consented === false) return false
+  const choice = category === 'marketing' ? consentedMarketing : consented
+  if (choice === false) return false
   // A store that asks for opt-in consent sends nothing until the visitor agrees.
-  if (settings.consentRequired && consented !== true) return false
+  if (settings.consentRequired && choice !== true) return false
   if (settings.respectDoNotTrack !== false && doNotTrack()) return false
   return true
 }
@@ -67,19 +78,57 @@ function doNotTrack() {
 }
 
 export function track(event, params = {}) {
+  if (!configured) {
+    if (pending.length < 50) pending.push([event, params])
+    return
+  }
   if (settings.debug && typeof console !== 'undefined') {
     console.debug('[analytics]', event, params)
   }
-  if (!allowed()) return
-
-  try {
-    window.dataLayer = window.dataLayer || []
-    window.dataLayer.push({ event, ...params })
-  } catch {
-    // Analytics must never be the reason a page fails. This is the one place
-    // in the codebase where swallowing an error is the correct behaviour.
+  if (allowed('analytics')) {
+    try {
+      window.dataLayer = window.dataLayer || []
+      window.dataLayer.push({ event, ...params })
+    } catch {
+      // Analytics must never be the reason a page fails. This is the one place
+      // in the codebase where swallowing an error is the correct behaviour.
+    }
   }
+  toTags(event, params)
 }
+
+/**
+ * The tags the merchant set in Odoo (GA4, Tag Manager, Meta, TikTok, Pinterest), each within its consent category.
+ * Their code is a separate chunk, fetched only by a store that has one and a visitor who allows it.
+ */
+function toTags(event, params) {
+  const providers = settings.providers || {}
+  if (!Object.keys(providers).length) return
+  const permitted = { analytics: allowed('analytics'), marketing: allowed('marketing') }
+  if (!permitted.analytics && !permitted.marketing) return
+  ;(tags ||= import('./tags.js'))
+    .then((module) => module.send(event, params, providers, permitted))
+    .catch(() => {
+      tags = null
+    })
+}
+
+/**
+ * The visitor's consent as the backend wants it with the bag (`{analytics, marketing}`), or undefined when the store
+ * shows no cookie banner. Odoo reports a purchase to Google or Meta only with the matching consent.
+ */
+export function consentState() {
+  if (!settings.consentEnabled) return undefined
+  return { analytics: allowed('analytics'), marketing: allowed('marketing') }
+}
+
+/** A route change in the single-page app. */
+export const pageView = (path) =>
+  track('page_view', {
+    page_path: path,
+    page_location: typeof window !== 'undefined' ? window.location?.href : undefined,
+    page_title: typeof document !== 'undefined' ? document.title : undefined,
+  })
 
 /* ── the shapes, so call sites do not each invent one ──────────────────── */
 
@@ -95,7 +144,7 @@ export const itemOf = (product, extra = {}) => ({
   item_id: product?.slug,
   item_name: product?.title,
   price: product?.price ? toMajor(product.price) : undefined,
-  item_brand: config.store?.name,
+  item_brand: product?.brand?.name || config.store?.name,
   item_category: product?.categories?.[0],
   ...extra,
 })
@@ -163,3 +212,14 @@ export const addToWishlist = (product) =>
   track('add_to_wishlist', { ...money(product?.price), items: [itemOf(product)] })
 
 export const search = (term, results) => track('search', { search_term: term, results })
+
+export const viewCart = (cart) =>
+  track('view_cart', { ...money(cart?.total), items: (cart?.lines || []).map((l) => lineItem(l)) })
+
+/** The delivery method was chosen at checkout. */
+export const addShippingInfo = (cart, method) =>
+  track('add_shipping_info', { ...money(cart?.total), shipping_tier: method, items: (cart?.lines || []).map((l) => lineItem(l)) })
+
+/** The shopper started paying (`type`: the payment method's name). */
+export const addPaymentInfo = (cart, type) =>
+  track('add_payment_info', { ...money(cart?.total), payment_type: type, items: (cart?.lines || []).map((l) => lineItem(l)) })

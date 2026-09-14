@@ -17,6 +17,9 @@ import Product from './pages/Product.jsx'
 // code-split ships a skeleton to the crawler.
 import StaticPage from './pages/StaticPage.jsx'
 import Docs from './pages/Docs.jsx'
+// Eager too: the render handler answers an unknown address with this page and a 404, and a lazy page renders only
+// its loading fallback on the server, with no title.
+import NotFound from './pages/NotFound.jsx'
 import { Skeleton } from './components/ui/index.jsx'
 import { isMock } from './lib/config.js'
 import { useLanguage } from './i18n/index.js'
@@ -37,7 +40,6 @@ const Compare = lazy(() => import('./pages/Compare.jsx'))
 const Brands = lazy(() => import('./pages/Brands.jsx'))
 const Blog = lazy(() => import('./pages/Blog.jsx'))
 const BlogPost = lazy(() => import('./pages/BlogPost.jsx'))
-const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 
 // The admin panel is a separate chunk. A shopper never downloads it.
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout.jsx'))

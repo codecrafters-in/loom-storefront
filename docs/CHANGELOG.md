@@ -2,7 +2,27 @@
 
 Newest first. Each entry links to the page with the detail.
 
-## What's new — Phase 6: money, countries and languages (in progress)
+## What's new — Phase 7: found on Google, and marketing that works
+
+- **Pages rendered on request** (`server/handler.mjs`): a product added in the backend after the build is a real page
+  for crawlers and link previews, with its own head and data; `404` for an address that is nothing, `301` for a changed
+  slug, `503` in maintenance; the browser adopts the server's markup (hydration). Adapters for Vercel, Netlify,
+  Cloudflare Pages, Node and Docker. [DEPLOY.md](DEPLOY.md)
+- **robots.txt and sitemaps from the backend** on a live store, through the render handler.
+- **Heads from the backend:** every page's `seo` block (title through the store's template, description, preview image,
+  noindex), canonical links with the language prefix, and `hreflang` alternates. [API.md](API.md#search-engines)
+- **Structured data:** per-variant offers with GTIN, returns window and free delivery, breadcrumbs, product lists,
+  blog posts, organization and site search; its code loads after the page in the browser.
+- **Images in sizes** from the backend (`srcset`), optionally through an image CDN (`media.imageUrlTemplate`).
+- **Analytics and ad tags** the merchant sets (GA4, Tag Manager, Meta, TikTok, Pinterest), loaded by consent category,
+  and the full set of shop events. [CONFIGURATION.md](CONFIGURATION.md#analytics)
+- **Campaigns on orders:** UTM tags and click IDs of the first and last visit go with the bag.
+  [API.md](API.md#where-the-shopper-came-from)
+- **Search:** suggestions under the header box, pages of results, similar names for a typo, popular searches, and a
+  search log for the merchant. [API.md](API.md#search)
+- Product pages start loading when a card is hovered.
+
+## What's new — Phase 6: money, countries and languages
 
 - **Every currency's decimals:** prices, the price filter and analytics use the decimals the backend reports, so a
   dinar store shows 24.560 KWD, not 245.60. No more assumed dollars in the price filter or product structured data.

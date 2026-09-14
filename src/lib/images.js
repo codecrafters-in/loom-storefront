@@ -42,3 +42,29 @@ export const SIZES = {
   /** Full-bleed editorial bands. */
   full: '100vw',
 }
+
+/* ── images from the backend ─────────────────────────────────────────────── */
+
+let imageTemplate = ''
+
+/** The store's image CDN (`storefront.media.imageUrlTemplate`), set by the storefront provider before anything renders. */
+export function setImageTemplate(value) {
+  imageTemplate = typeof value === 'string' && value.startsWith('https://') && value.includes('{url}') ? value : ''
+}
+
+/** An image's address through the store's image CDN at `width`; unchanged without one, and for relative addresses. */
+export function viaCdn(url, width) {
+  if (!imageTemplate || !/^https?:\/\//.test(url || '')) return url
+  return imageTemplate.replaceAll('{width}', String(width)).replaceAll('{url}', url)
+}
+
+/**
+ * `srcset` for the sizes the backend keeps of an image (`[{width, url}]`, 256 to 1920 px), or null.
+ *
+ * A phone showing a two-up grid downloads the 512 px copy rather than the 1024 px one; `sizes` (from `SIZES`) is what
+ * lets the browser choose.
+ */
+export function srcsetOf(sizes) {
+  const usable = (Array.isArray(sizes) ? sizes : []).filter((size) => size?.url && Number(size.width) > 0)
+  return usable.length ? usable.map((size) => `${viaCdn(size.url, size.width)} ${size.width}w`).join(', ') : null
+}

@@ -287,6 +287,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                     centre keeps the collar and the face. */}
                 <Media
                   src={current?.url}
+                  srcset={current?.srcset}
                   type={current?.type}
                   provider={current?.provider}
                   embedUrl={current?.embedUrl}

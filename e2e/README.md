@@ -104,7 +104,7 @@ because the confirmation email fails to render. CI installs `wkhtmltopdf` and ke
 | `LOOM_E2E_ADMIN_LOGIN`, `LOOM_E2E_ADMIN_PASSWORD` | `admin`, `admin` |
 | `LOOM_E2E_PORT`, `LOOM_E2E_PORT2` | `5174`, `5175` |
 | `LOOM_E2E_STOREFRONT_URL`, `LOOM_E2E_STOREFRONT2_URL` | `http://localhost:<port>` |
-| `LOOM_E2E_CRAWL_URL` | the store `e2e` storefront; point S-12 at a deployment instead |
+| `LOOM_E2E_CRAWL_URL` | the storefront S-12 reads raw HTML from: by default a build of store `e2e` served by the render handler (`support/render-server.mjs`, port `LOOM_E2E_RENDER_PORT`, 5176); point it at a deployment instead |
 | `LOOM_E2E_SKIP_WEBSERVER` | `1` to use storefronts you started yourself |
 
 Odoo only answers the storefront origins the seed configured. If you change a port or host, re-run

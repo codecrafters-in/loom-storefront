@@ -99,7 +99,7 @@ function Body({ product, onClose }) {
   return (
     <div className="grid gap-6 p-5 sm:grid-cols-2 sm:p-6">
       <div className="shot overflow-hidden rounded-xs bg-sunken">
-        <Media src={image?.url} alt={image?.alt || product.title} sizes={SIZES.card} className="h-full w-full object-cover" />
+        <Media src={image?.url} srcset={image?.srcset} alt={image?.alt || product.title} sizes={SIZES.card} className="h-full w-full object-cover" />
       </div>
       <div className="min-w-0">
         {product.brand && <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{product.brand.name}</p>}

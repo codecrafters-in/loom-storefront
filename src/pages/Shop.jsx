@@ -10,6 +10,7 @@ import { useBootstrap, useStorefront } from '../store/StorefrontContext.jsx'
 import { categoryTrail, flattenCategories } from '../lib/categories.js'
 import { Breadcrumbs, Button, Empty, ErrorState, Icon, Pagination } from '../components/ui/index.jsx'
 import { t, plural, mark } from '../i18n/index.js'
+import { viewItemList } from '../lib/analytics.js'
 
 const SORTS = [
   ['featured', mark('Featured')],
@@ -49,6 +50,21 @@ export const listingQuery = (extra = {}) => ({
 const csv = (params, key) => params.get(key)?.split(',').filter(Boolean) || []
 const price = (params, key) => (params.get(key) ? Number(params.get(key)) : undefined)
 
+/** The filters in a page address. Exported for the render handler, which reads the same page the browser will. */
+export const filtersFromParams = (params) => ({
+  sizes: csv(params, 'sizes'),
+  colors: csv(params, 'colors'),
+  tags: csv(params, 'tags'),
+  attr: params.getAll('attr').filter(Boolean),
+  spec: params.getAll('spec').filter(Boolean),
+  brand: csv(params, 'brand'),
+  inStock: params.get('in_stock') === '1',
+  minPrice: price(params, 'min_price'),
+  maxPrice: price(params, 'max_price'),
+  sort: params.get('sort') || 'featured',
+  page: Number(params.get('page') || 1),
+})
+
 /**
  * Filter state lives in the URL, not in React.
  *
@@ -63,22 +79,7 @@ const price = (params, key) => (params.get(key) ? Number(params.get(key)) : unde
 function useFilters() {
   const [params, setParams] = useSearchParams()
 
-  const value = useMemo(
-    () => ({
-      sizes: csv(params, 'sizes'),
-      colors: csv(params, 'colors'),
-      tags: csv(params, 'tags'),
-      attr: params.getAll('attr').filter(Boolean),
-      spec: params.getAll('spec').filter(Boolean),
-      brand: csv(params, 'brand'),
-      inStock: params.get('in_stock') === '1',
-      minPrice: price(params, 'min_price'),
-      maxPrice: price(params, 'max_price'),
-      sort: params.get('sort') || 'featured',
-      page: Number(params.get('page') || 1),
-    }),
-    [params],
-  )
+  const value = useMemo(() => filtersFromParams(params), [params])
 
   const set = useCallback(
     (next) => {
@@ -144,6 +145,11 @@ export default function Shop({ mode = 'category' }) {
     { initial: peek.listProducts(query) },
   )
 
+  // What a shopper was shown, once per listing that loads (a filter change is a new listing).
+  useEffect(() => {
+    if (data?.items?.length) viewItemList(data.items, slug || 'shop')
+  }, [data]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const collectionMeta = useAsync(() => api.listCollections(), [], {
     skip: mode !== 'collection',
     // The heading and the page title come from this record, so without it a
@@ -151,7 +157,7 @@ export default function Shop({ mode = 'category' }) {
     initial: peek.listCollections(),
   })
   const col = collectionMeta.data?.items.find((c) => c.slug === collection)
-  const brandMeta = useAsync(() => api.getBrand(brand), [brand], { skip: !brand })
+  const brandMeta = useAsync(() => api.getBrand(brand), [brand], { skip: !brand, initial: brand ? peek.getBrand(brand) : null })
   const maker = brandMeta.data
 
   useEffect(() => {
@@ -179,7 +185,7 @@ export default function Shop({ mode = 'category' }) {
 
   return (
     <>
-      <Seo title={maker?.seo?.title || title} description={maker?.seo?.description || blurb} />
+      <Seo seo={brand ? maker?.seo : col?.seo || meta?.seo} title={title} description={blurb} itemList={data?.items} />
       <div className="wrap pt-8">
         <Breadcrumbs
           trail={[

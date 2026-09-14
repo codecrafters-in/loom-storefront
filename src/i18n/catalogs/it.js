@@ -630,5 +630,9 @@ export default {
     "one": "Mostra {count} risultato",
     "many": "Mostra {count} di risultati",
     "other": "Mostra {count} risultati"
-  }
+  },
+  "Category": "Categoria",
+  "Suggestions": "Suggerimenti",
+  "Popular searches": "Ricerche popolari",
+  "No exact match for “{q}”. Showing similar names.": "Nessuna corrispondenza esatta per «{q}». Ecco nomi simili.",
 }

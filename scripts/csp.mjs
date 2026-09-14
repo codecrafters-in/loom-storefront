@@ -17,6 +17,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadEnv } from 'vite'
 import { apiOriginFrom, applyCsp, inlineHandlers, inlineScriptHashes } from './lib/csp.mjs'
+import { builtFor } from './lib/build-mode.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
@@ -32,6 +33,11 @@ async function htmlFiles(dir) {
 }
 
 async function main() {
+  if (builtFor() === 'api') {
+    // Every page of a live store is rendered on request, with its own data script: the handler sends the policy as a header.
+    console.log('[csp] live store: the render handler sends the policy with each page')
+    return
+  }
   const env = { ...loadEnv('production', ROOT, 'VITE_') }
   const apiOrigin = apiOriginFrom(env)
 

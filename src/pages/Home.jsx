@@ -13,7 +13,7 @@ export default function Home() {
   const { home = [] } = useStorefront()
   return (
     <>
-      <Seo />
+      <Seo site />
       {home.map((section, i) => (
         <Section key={`${section.type}-${i}`} section={section} />
       ))}

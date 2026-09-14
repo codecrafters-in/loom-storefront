@@ -17,6 +17,8 @@ import { t } from '../../i18n/index.js'
 const CurrencySwitcher = isMock ? null : lazy(() => import('./CurrencySwitcher.jsx'))
 // Only a store whose website has several languages shows it; loaded then.
 const LanguageSwitcher = lazy(() => import('./LanguageSwitcher.jsx'))
+// Suggestions under the search box, loaded the first time somebody types there.
+const SearchSuggest = lazy(() => import('./SearchSuggest.jsx'))
 
 // Submenu entries are categories ({ slug, name }) or links the merchant added
 // by hand ({ label, to }).
@@ -27,6 +29,10 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [q, setQ] = useState('')
+  // Which search box shows suggestions ('desktop' or 'mobile'), and the option the arrow keys are on.
+  const [suggest, setSuggest] = useState('')
+  const [activeOption, setActiveOption] = useState()
+  const suggestKeys = useRef(null)
   const [scrolled, setScrolled] = useState(false)
   const searchRef = useRef(null)
   const navigate = useNavigate()
@@ -91,9 +97,28 @@ export default function Header() {
 
   const submit = (e) => {
     e.preventDefault()
+    setSuggest('')
     if (!q.trim()) return
     navigate(`/search?q=${encodeURIComponent(q.trim())}`)
   }
+
+  /** The search input as a combobox with a suggestions list (SearchSuggest). */
+  const combobox = (where) => ({
+    role: 'combobox',
+    'aria-autocomplete': 'list',
+    'aria-expanded': suggest === where && q.trim().length >= 2,
+    'aria-controls': `search-suggestions-${where}`,
+    'aria-activedescendant': suggest === where ? activeOption : undefined,
+    onFocus: () => setSuggest(where),
+    onBlur: () => setSuggest((current) => (current === where ? '' : current)),
+    onKeyDown: (event) => suggestKeys.current?.(event),
+  })
+  const suggestions = (where) =>
+    suggest === where && q.trim().length >= 2 ? (
+      <Suspense fallback={null}>
+        <SearchSuggest q={q} listId={`search-suggestions-${where}`} keysRef={suggestKeys} onActive={setActiveOption} onClose={() => setSuggest('')} />
+      </Suspense>
+    ) : null
 
   const iconBtn =
     'relative grid h-10 w-10 place-items-center rounded-xs text-ink transition-colors hover:bg-sunken'
@@ -180,7 +205,9 @@ export default function Header() {
                   onChange={(e) => setQ(e.target.value)}
                   placeholder={t('Search')}
                   className="field h-10 w-44 ps-9 transition-[width] focus:w-64"
+                  {...combobox('desktop')}
                 />
+                {suggestions('desktop')}
               </div>
             </form>
             )}
@@ -251,8 +278,11 @@ export default function Header() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder={t('Search products')}
+                aria-label={t('Search products')}
                 className="field ps-9"
+                {...combobox('mobile')}
               />
+              {suggestions('mobile')}
             </div>
           </form>
         )}

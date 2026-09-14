@@ -13,6 +13,14 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { storefront } from '../src/data/storefront.js'
 import { siteUrl } from './lib/site-url.mjs'
+import { builtFor } from './lib/build-mode.mjs'
+
+// A live store's robots.txt is Odoo's, from its catalogue as it is now; the render handler serves it (server/handler.mjs).
+if (builtFor() === 'api') {
+  console.log('[robots] live store: robots.txt comes from Odoo through the render handler')
+  process.exit(0)
+}
+
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const seo = storefront.seo || {}

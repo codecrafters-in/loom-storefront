@@ -38,6 +38,16 @@ export default function Product() {
   // the deepest of its categories found in the tree the bootstrap already sent.
   const { categories: tree } = useBootstrap()
   const trail = useMemo(() => (product ? productTrail(product, tree) : []), [product, tree])
+  // The same trail as structured data, so a search result shows "Shop › Knitwear" instead of the address.
+  const crumbs = useMemo(
+    () => (product ? [
+      { name: t('Home'), path: '/' },
+      { name: t('Shop'), path: '/shop' },
+      ...trail.map((c) => ({ name: c.name, path: `/shop/${c.slug}` })),
+      { name: product.title },
+    ] : null),
+    [product, trail],
+  )
 
   // Keyed on the slug, so navigating between products reports each one — and
   // not on every render, which would report the same view a dozen times.
@@ -71,6 +81,8 @@ export default function Product() {
   return (
     <>
       <Seo
+        seo={product.seo}
+        breadcrumbs={crumbs}
         title={product.title}
         description={product.subtitle ? `${product.subtitle}. ${product.description}`.slice(0, 300) : product.description?.slice(0, 300)}
         image={product.images?.[0]?.url}

@@ -678,5 +678,9 @@ export default {
     "few": "عرض {count} نتائج",
     "many": "عرض {count} نتيجة",
     "other": "عرض {count} نتيجة"
-  }
+  },
+  "Category": "فئة",
+  "Suggestions": "اقتراحات",
+  "Popular searches": "عمليات البحث الشائعة",
+  "No exact match for “{q}”. Showing similar names.": "لا توجد نتيجة مطابقة تمامًا لـ «{q}». نعرض أسماء مشابهة.",
 }

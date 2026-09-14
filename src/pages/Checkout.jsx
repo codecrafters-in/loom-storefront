@@ -6,7 +6,7 @@ import api from '../lib/api/index.js'
 import { ApiError } from '../lib/api/contracts.js'
 import { driverInput, paymentBody, payableTotal, returnUrls, runPayment, visibleMethods } from '../lib/payments/index.js'
 import { driverFor } from '../lib/payments/drivers/index.js'
-import { beginCheckout, purchase } from '../lib/analytics.js'
+import { addPaymentInfo, addShippingInfo, beginCheckout, purchase } from '../lib/analytics.js'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import Media from '../components/ui/Media.jsx'
 import PaymentStep from '../components/checkout/PaymentStep.jsx'
@@ -313,6 +313,7 @@ export default function Checkout() {
     try {
       const { email, ...address } = form
       const urls = returnUrls(config.checkout, window.location.origin + addressPrefix())
+      addPaymentInfo(cart, chosen.provider || chosen.key)
       const created = await api.createPayment(cart.id, paymentBody({
         email,
         shippingAddress: address,
@@ -552,7 +553,10 @@ export default function Checkout() {
                   name="shipping"
                   value={s.id}
                   checked={method === s.id}
-                  onChange={() => setMethod(s.id)}
+                  onChange={() => {
+                    setMethod(s.id)
+                    addShippingInfo(cart, s.id)
+                  }}
                   className="h-4 w-4 accent-[rgb(var(--accent))]"
                 />
                 <span className="flex-1">

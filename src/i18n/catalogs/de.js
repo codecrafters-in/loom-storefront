@@ -614,5 +614,9 @@ export default {
   "Show {count} results": {
     "one": "{count} Ergebnis anzeigen",
     "other": "{count} Ergebnisse anzeigen"
-  }
+  },
+  "Category": "Kategorie",
+  "Suggestions": "Vorschläge",
+  "Popular searches": "Beliebte Suchen",
+  "No exact match for “{q}”. Showing similar names.": "Keine genaue Übereinstimmung für „{q}“. Ähnliche Namen werden angezeigt.",
 }

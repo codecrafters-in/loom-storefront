@@ -1,15 +1,16 @@
-import { Writable } from 'node:stream'
-import { renderToPipeableStream, renderToString } from 'react-dom/server'
+// A namespace import: worker runtimes resolve react-dom/server to a build without renderToPipeableStream.
+import * as ReactDOMServer from 'react-dom/server'
 import { StaticRouter } from 'react-router-dom/server'
 import App from './App.jsx'
 import api, { peek } from './lib/api/index.js'
-import { keyOf } from './lib/api/cache.js'
+import { clearAll, keyOf } from './lib/api/cache.js'
 import { startCollecting, stopCollecting, renderHead } from './lib/head.js'
-import { listingQuery } from './pages/Shop.jsx'
+import { filtersFromParams, listingQuery } from './pages/Shop.jsx'
 import { loadDoc } from './pages/Docs.jsx'
 import { docPages, docPath } from './data/docs.js'
 import { flattenCategories } from './lib/categories.js'
-import { isMock } from './lib/config.js'
+import { config, isMock } from './lib/config.js'
+import { currentLanguage, isRightToLeft, languageFromPath, setLanguage } from './i18n/index.js'
 import { fontsHref, themeCss } from './lib/theme.js'
 
 /**
@@ -96,16 +97,120 @@ export async function routes() {
   ]
 }
 
+/* ── at request time: server/handler.mjs ──────────────────────────────── */
+
+/** The API the render handler asks about redirects and passes robots.txt and sitemaps from; '' on the demo data. */
+export const apiBaseUrl = isMock ? '' : config.api.baseUrl
+
+// Different for every visitor: the app's shell, rendered in their browser and never cached.
+const PRIVATE = /^\/(?:cart|checkout|order|orders|login|account|wishlist|search|compare|admin)(?:\/|$)/
+
+const listing = (params, extra) => ['listProducts', [listingQuery({ ...filtersFromParams(params), ...extra })]]
+
+/**
+ * What a public address reads before it can render, or `null` when the address is nothing.
+ *
+ * The reads are the calls the page makes with the same arguments, so the browser finds the data under the keys its
+ * components ask for. A 404 from the API on the thing the address names (a product, a page) is thrown and means the
+ * address is nothing.
+ */
+async function readsFor(path, params, boot) {
+  const [, section = '', slug, ...rest] = path.split('/')
+  if (rest.length) return null
+  if (path === '/') return []
+  if (section === 'shop') {
+    if (!slug) return [listing(params, {})]
+    const tree = boot?.categories || (await api.listCategories()).items
+    return flattenCategories(tree).some((c) => c.slug === slug) ? [listing(params, { category: slug })] : null
+  }
+  if (section === 'collections' && slug) {
+    const { items } = await api.listCollections()
+    return items.some((c) => c.slug === slug) ? [listing(params, { collection: slug }), ['listCollections', []]] : null
+  }
+  if (section === 'brands') {
+    if (!slug) return [['listBrands', []]]
+    await api.getBrand(slug)
+    return [listing(params, { inBrand: slug }), ['getBrand', [slug]]]
+  }
+  if (section === 'product' && slug) {
+    await api.getProduct(slug)
+    return [['getProduct', [slug]]]
+  }
+  if (section === 'pages' && slug) {
+    await api.getPage(slug)
+    return [['getPage', [slug]]]
+  }
+  if (section === 'blog') {
+    if (slug) {
+      await api.getBlogPost(slug)
+      return [['getBlogPost', [slug]]]
+    }
+    const query = { page: Number(params.get('page')) || 1, perPage: 12, tag: params.get('tag') || undefined }
+    await api.listBlogPosts(query)
+    return [['listBlogPosts', [query]]]
+  }
+  if (section === '404') return null
+  return null
+}
+
+/**
+ * One address, rendered for the request that asked for it.
+ *
+ * Answers `{kind, html, head, payload, language, direction, prefix, path, seedLanguage}`: `kind` is `page`,
+ * `not-found` (rendered as the not-found page; `path` is what to look up in the redirect table), `private` (the
+ * shell), or `maintenance`. The handler turns that into a status and headers. It runs one request at a time, because
+ * the API cache and the language here are module state, as they are in a browser tab.
+ */
+export async function page(target) {
+  const url = new URL(target, 'http://storefront.local')
+  const prefix = languageFromPath(url.pathname)
+  const path = (prefix ? url.pathname.slice(prefix.length + 1) : url.pathname).replace(/(.)\/+$/, '$1') || '/'
+  const basename = prefix ? `/${prefix}` : undefined
+
+  clearAll()
+  await setLanguage(prefix || 'en', { address: Boolean(prefix) })
+  const about = () => ({ prefix, path, language: currentLanguage(), direction: isRightToLeft() ? 'rtl' : 'ltr' })
+  if (PRIVATE.test(path)) return { kind: 'private', ...about() }
+
+  let boot
+  try {
+    boot = await api.getBootstrap()
+  } catch (err) {
+    if (err.code === 'store_maintenance') return { kind: 'maintenance', ...about() }
+    if (err.code === 'store_locked') return { kind: 'private', ...about() }
+    throw err
+  }
+  // No language in the address: the store's default, as the browser will show it (seeded so it starts in it too).
+  let seedLanguage
+  const preferred = boot?.storefront?.i18n?.default
+  if (!prefix && preferred && preferred !== currentLanguage()) {
+    await setLanguage(preferred)
+    if (currentLanguage() !== 'en') seedLanguage = currentLanguage()
+  }
+
+  let reads
+  try {
+    reads = await readsFor(path, url.searchParams, boot)
+  } catch (err) {
+    if (err.status !== 404) throw err
+    reads = null
+  }
+  const payload = await prime(reads || [])
+  const location = reads ? `${url.pathname}${url.search}` : `${basename || ''}/404`
+  const { html, head } = render(location, { basename })
+  return { kind: reads ? 'page' : 'not-found', html, head, payload, seedLanguage, ...about() }
+}
+
 /**
  * `StaticRouter` rather than `BrowserRouter`, and no `StrictMode` — a double
  * render would collect every head tag twice.
  */
-export function render(url, { docs } = {}) {
+export function render(url, { docs, basename } = {}) {
   globalThis.__LOOM_DOCS__ = docs
   startCollecting()
   try {
-    const html = renderToString(
-      <StaticRouter location={url} future={{ v7_relativeSplatPath: true }}>
+    const html = ReactDOMServer.renderToString(
+      <StaticRouter basename={basename} location={url} future={{ v7_relativeSplatPath: true }}>
         <App />
       </StaticRouter>,
     )
@@ -133,10 +238,11 @@ export function render(url, { docs } = {}) {
  * code. This streams the route and waits for every lazy page, then resolves with the size of the HTML or rejects
  * with the first error.
  */
-export function smoke(url) {
+export async function smoke(url) {
+  const { Writable } = await import('node:stream')
   return new Promise((resolve, reject) => {
     let failure = null
-    const { pipe } = renderToPipeableStream(
+    const { pipe } = ReactDOMServer.renderToPipeableStream(
       <StaticRouter location={url} future={{ v7_relativeSplatPath: true }}>
         <App />
       </StaticRouter>,

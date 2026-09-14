@@ -63,7 +63,7 @@ export function startConsent(consent) {
   const optIn = consent.mode !== 'opt-out'
   const choices = saved || { analytics: !optIn, marketing: !optIn }
   signal('default', choices)
-  setConsent(choices.analytics)
+  setConsent(choices.analytics, choices.marketing)
   return saved
 }
 
@@ -78,7 +78,7 @@ export async function chooseConsent(consent, choices) {
     // Asked again next visit.
   }
   signal('update', clean)
-  setConsent(clean.analytics)
+  setConsent(clean.analytics, clean.marketing)
   try {
     await api.recordConsent({ anonymousId: visitorId(), choices: clean, policyVersion: consent.policyVersion })
   } catch {

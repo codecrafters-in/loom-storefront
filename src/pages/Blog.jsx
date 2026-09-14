@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import api from '../lib/api/index.js'
+import api, { peek } from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import Seo from '../components/Seo.jsx'
 import { Empty, ErrorState, Pagination, Skeleton } from '../components/ui/index.jsx'
@@ -12,7 +12,9 @@ export default function Blog() {
   const [params, setParams] = useSearchParams()
   const page = Number(params.get('page')) || 1
   const tag = params.get('tag') || undefined
-  const { data, error, loading, reload } = useAsync(() => api.listBlogPosts({ page, perPage: 12, tag }), [page, tag])
+  const { data, error, loading, reload } = useAsync(() => api.listBlogPosts({ page, perPage: 12, tag }), [page, tag], {
+    initial: peek.listBlogPosts({ page, perPage: 12, tag }),
+  })
   const date = (iso) => (iso ? new Date(iso).toLocaleDateString(config.pricing?.locale || 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : '')
   const go = (next) => {
     const p = new URLSearchParams(params)

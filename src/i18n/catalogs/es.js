@@ -630,5 +630,9 @@ export default {
     "other": "Mostrar {count} resultados"
   },
   "runs small": "talla pequeña",
-  "runs large": "talla grande"
+  "runs large": "talla grande",
+  "Category": "Categoría",
+  "Suggestions": "Sugerencias",
+  "Popular searches": "Búsquedas populares",
+  "No exact match for “{q}”. Showing similar names.": "No hay coincidencias exactas para «{q}». Mostramos nombres parecidos.",
 }

@@ -35,6 +35,15 @@ export const collecting = () => sink !== null
 export function applyHead(tags) {
   if (typeof document === 'undefined') return
 
+  // A whole page's head: drop the previous page's language alternates this page does not have (a noindex page has
+  // none). A partial update (the structured data, loaded later) leaves them alone.
+  if (tags.some((tag) => tag.kind === 'link' && tag.rel === 'canonical')) {
+    const languages = new Set(tags.filter((tag) => tag.kind === 'link' && tag.hreflang).map((tag) => tag.hreflang))
+    for (const el of document.head.querySelectorAll('link[rel="alternate"][hreflang]')) {
+      if (!languages.has(el.getAttribute('hreflang'))) el.remove()
+    }
+  }
+
   for (const tag of tags) {
     if (tag.kind === 'title') {
       document.title = tag.text
@@ -44,8 +53,11 @@ export function applyHead(tags) {
         el.setAttribute('content', tag.content || '')
       })
     } else if (tag.kind === 'link') {
-      upsert(`link[rel="${tag.rel}"]`, 'link', (el) => {
+      // One link per rel, or per rel and language for `alternate` links (hreflang).
+      const selector = tag.hreflang ? `link[rel="${tag.rel}"][hreflang="${tag.hreflang}"]` : `link[rel="${tag.rel}"]:not([hreflang])`
+      upsert(selector, 'link', (el) => {
         el.setAttribute('rel', tag.rel)
+        if (tag.hreflang) el.setAttribute('hreflang', tag.hreflang)
         el.setAttribute('href', tag.href)
       })
     } else if (tag.kind === 'jsonld') {
@@ -101,7 +113,7 @@ const escapeAttr = (value) =>
  * prerendering was supposed to fix.
  */
 const identity = (tag) =>
-  tag.kind === 'meta' ? `meta:${tag.attr}:${tag.key}` : tag.kind === 'link' ? `link:${tag.rel}` : tag.kind
+  tag.kind === 'meta' ? `meta:${tag.attr}:${tag.key}` : tag.kind === 'link' ? `link:${tag.rel}:${tag.hreflang || ''}` : tag.kind
 
 export function renderHead(tags) {
   const last = new Map()
@@ -111,7 +123,10 @@ export function renderHead(tags) {
   for (const tag of last.values()) {
     if (tag.kind === 'title') out.push(`<title>${escapeAttr(tag.text)}</title>`)
     else if (tag.kind === 'meta') out.push(`<meta ${tag.attr}="${escapeAttr(tag.key)}" content="${escapeAttr(tag.content)}">`)
-    else if (tag.kind === 'link') out.push(`<link rel="${escapeAttr(tag.rel)}" href="${escapeAttr(tag.href)}">`)
+    else if (tag.kind === 'link') {
+      const lang = tag.hreflang ? ` hreflang="${escapeAttr(tag.hreflang)}"` : ''
+      out.push(`<link rel="${escapeAttr(tag.rel)}"${lang} href="${escapeAttr(tag.href)}">`)
+    }
     else if (tag.kind === 'jsonld' && tag.data)
       out.push(`<script type="application/ld+json" id="${JSONLD_ID}">${escapeJson(tag.data)}</script>`)
   }

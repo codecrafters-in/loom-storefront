@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import api from '../lib/api/index.js'
+import api, { peek } from '../lib/api/index.js'
 import Seo from '../components/Seo.jsx'
 import useAsync from '../hooks/useAsync.js'
 import Promises from '../components/layout/Promises.jsx'
@@ -13,7 +13,7 @@ import { t, plural } from '../i18n/index.js'
  * rest — so a card never leads to an empty page.
  */
 export default function Brands() {
-  const { data, error, loading, reload } = useAsync(() => api.listBrands(), [])
+  const { data, error, loading, reload } = useAsync(() => api.listBrands(), [], { initial: peek.listBrands() })
   const brands = data?.items || []
 
   return (

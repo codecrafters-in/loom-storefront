@@ -1,0 +1,8 @@
+# Netlify: the build writes dist/ (static files) and server-build/ (the render handler's bundle, imported by
+# netlify/functions/render.mjs). Set VITE_DATA_SOURCE, VITE_API_BASE_URL and SITE_URL in the site's environment.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  node_bundler = "esbuild"

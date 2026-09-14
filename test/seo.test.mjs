@@ -30,6 +30,8 @@ const SETTINGS = path.join(ROOT, 'src/data/storefront.js')
 const ENV = { ...process.env }
 delete ENV.SITE_URL
 delete ENV.VERCEL_PROJECT_PRODUCTION_URL
+// The scripts leave a live build's robots.txt and sitemap to Odoo; these tests are about the demo's.
+ENV.LOOM_BUILD_MODE = 'mock'
 
 function robotsWith(seo, env = {}) {
   const original = fs.readFileSync(SETTINGS, 'utf8')

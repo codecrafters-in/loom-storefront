@@ -7,6 +7,7 @@ import DemoBar from '../DemoBar.jsx'
 import CompareTray from '../product/CompareTray.jsx'
 import { useStorefrontState } from '../../store/StorefrontContext.jsx'
 import { t } from '../../i18n/index.js'
+import { pageView } from '../../lib/analytics.js'
 
 // Rarely shown, so not in every visitor's first download.
 const StoreGate = lazy(() => import('./StoreGate.jsx'))
@@ -21,6 +22,11 @@ export default function Layout() {
   // down it where the previous one happened to be scrolled.
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' })
+  }, [pathname])
+
+  // A single-page app has one page load; each route is a page view for analytics and ad tags.
+  useEffect(() => {
+    pageView(pathname)
   }, [pathname])
 
   if (state.unavailable || state.closed) {

@@ -124,7 +124,7 @@ export default function StaticPage() {
 
   return (
     <>
-      <Seo title={page.seo?.title || page.title} description={page.seo?.description || page.intro} path={`/pages/${slug}`} />
+      <Seo seo={page.seo} title={page.title} description={page.intro} />
       <div className="wrap max-w-3xl py-10 pb-20">
         <Breadcrumbs trail={[{ label: t('Home'), to: '/' }, { label: page.title }]} />
         <h1 className="mt-6 text-display-lg">{page.title}</h1>

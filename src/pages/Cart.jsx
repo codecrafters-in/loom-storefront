@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import Seo from '../components/Seo.jsx'
 import { Link } from 'react-router-dom'
 import { useCart } from '../store/CartContext.jsx'
@@ -17,6 +17,7 @@ import { stepperProps } from '../lib/quantity.js'
 import LineDetails from '../components/cart/LineDetails.jsx'
 import PaymentLock from '../components/cart/PaymentLock.jsx'
 import { t, plural } from '../i18n/index.js'
+import { viewCart } from '../lib/analytics.js'
 
 const ExpressCheckout = lazy(() => import('../components/checkout/ExpressCheckout.jsx'))
 
@@ -27,6 +28,11 @@ export default function Cart() {
   const [working, setWorking] = useState(false)
   const [giftCode, setGiftCode] = useState('')
   const [gift, setGift] = useState(null)
+
+  // Once per bag opened on this page, not on every quantity change.
+  useEffect(() => {
+    if (cart?.lines?.length) viewCart(cart)
+  }, [cart?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** A code or reward action: the backend answers the new bag, the page takes it and says what happened. */
   const act = async (work, said) => {

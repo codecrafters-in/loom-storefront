@@ -1,5 +1,7 @@
 node_modules
 dist
+# The render handler's bundle, written by npm run build (scripts/prerender.mjs)
+server-build
 .env
 .env.local
 .DS_Store
@@ -9,3 +11,4 @@ dist
 e2e/test-results/
 e2e/playwright-report/
 e2e/blob-report/
+e2e/.render/

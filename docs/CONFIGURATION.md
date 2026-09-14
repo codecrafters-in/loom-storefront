@@ -100,8 +100,13 @@ real header in both, next to `X-Frame-Options: DENY`: nobody may frame the shop.
 | `style-src` | `'self'`, inline styles, Google Fonts |
 | `font-src` | `'self'`, `data:`, Google Fonts |
 | `frame-src` | Razorpay, Turnstile, reCAPTCHA |
+| Analytics and ad tags | `script-src` and `connect-src` also allow Google Tag Manager and Analytics, Meta, TikTok and Pinterest, so a tag the merchant switches on is not refused. They load only when named in `analytics.providers` |
 | `form-action` | `'self'` and the API origin |
 | `base-uri`, `object-src` | `'self'`, `'none'` |
+
+**A live store** (`VITE_DATA_SOURCE=api`) renders pages on request, so there are no HTML files to write a meta tag
+into: the render handler (`server/handler.mjs`) sends the same policy as a `Content-Security-Policy` header with each
+page, with the hash of that page's data script and `frame-ancestors 'none'` ([Deploying](DEPLOY.md)).
 
 The API origin is read from `VITE_DATA_SOURCE` and `VITE_API_BASE_URL` the way
 Vite reads them — the environment first, then the `.env` files — so it is always
@@ -433,14 +438,20 @@ Five modes. Full guide with provider examples: **[CHECKOUT.md](CHECKOUT.md)**.
     "disallow": ["/checkout", "/account", "/cart", "/orders/lookup", "/admin"],
     "aiCrawlers": "allow",
     "crawlers": { "GPTBot": true, "ClaudeBot": true, "CCBot": false },
-    "sitemapImages": true
+    "sitemapImages": true,
+    "title": "Loom | Considered clothing",
+    "description": "Clothing made to be kept.",
+    "titleTemplate": "{title} | {store}",
+    "image": "https://…/og.jpg"
   }
 }
 ```
 
-`robots.txt` and `sitemap.xml` are **generated from these at build time**. They
-used to be a static file, which made one of its lines a decision the theme had
-taken on the merchant's behalf.
+**On a live store** the backend's `robots.txt` and sitemaps are served on the storefront's domain by the render handler
+([Deploying](DEPLOY.md)), and `title`, `description` and `image` are the home page's head; `titleTemplate` names pages
+that have no `seo` block of their own ([API](API.md#search-engines)). **In the demo** `robots.txt` and `sitemap.xml`
+are **generated from these at build time**. They used to be a static file, which made one of its lines a decision the
+theme had taken on the merchant's behalf.
 
 **`siteUrl` is the one setting with no sensible default.** A sitemap, a
 canonical tag and an Open Graph image all need absolute URLs; a relative one is
@@ -467,17 +478,33 @@ inside a JavaScript-rendered gallery.
 ### `analytics`
 
 ```json
-{ "analytics": { "enabled": false, "respectDoNotTrack": true, "debug": false } }
+{
+  "analytics": {
+    "enabled": false, "respectDoNotTrack": true, "debug": false,
+    "providers": { "ga4": "G-A1B2C3D4E5", "gtm": "GTM-A1B2C3D", "metaPixel": "123456789012345", "tiktok": "C4A1…", "pinterest": "2612345678901" },
+    "serverPurchase": { "ga4": true, "meta": false }
+  }
+}
 ```
 
 Events are pushed to `window.dataLayer` in GA4's ecommerce vocabulary —
-`view_item`, `add_to_cart`, `begin_checkout`, `purchase`, `search`,
-`add_to_wishlist`, `app_error`. A tag manager reads that array natively and
-anything else can be pointed at it.
+`page_view`, `view_item_list`, `select_item`, `view_item`, `add_to_wishlist`,
+`add_to_cart`, `remove_from_cart`, `view_cart`, `begin_checkout`,
+`add_shipping_info`, `add_payment_info`, `purchase`, `search`, `app_error`. A tag
+manager reads that array natively and anything else can be pointed at it.
 
-**No vendor script ships with the theme**, and that is the point. A store
-already has GTM, or Plausible, or a self-hosted Umami; a theme that bundles a
-competing one is something to rip out rather than something to configure.
+**No vendor script ships with the theme.** A store already has GTM, or
+Plausible, or a self-hosted Umami; a theme that bundles a competing one is
+something to rip out rather than something to configure. When the backend names
+tags in `providers` (Odoo: the store's analytics IDs), the theme loads those and
+nothing else (`src/lib/tags.js`, its own chunk): Google Analytics 4 and Tag
+Manager count as **analytics**, Meta Pixel, TikTok Pixel and Pinterest Tag as
+**marketing**, and with a consent banner each waits for its category. The same
+events reach them in each platform's words (Meta `ViewContent`, `AddToCart`,
+`InitiateCheckout`, `Purchase`…); a purchase carries the order number as its
+event ID, so a purchase also reported by the server (`serverPurchase`) counts
+once. Leave GA4 empty when Tag Manager already sends to Google Analytics, or
+purchases count twice.
 
 The names follow GA4 rather than being invented, because a store's analytics
 people already have reports built on them — calling it `product_viewed` means
@@ -492,6 +519,16 @@ rewriting every one.
 Consent, if you gather it, goes through `setConsent(false)` until you have it.
 Nobody having been asked is treated as allowed — a shop with no banner should
 not silently record nothing.
+
+### `media`
+
+```json
+{ "media": { "imageUrlTemplate": "https://shop.example.com/cdn-cgi/image/width={width},format=auto/{url}" } }
+```
+
+Optional. Images the backend sends with sizes (`srcset`) are requested through this image CDN, which resizes them and
+converts them to WebP or AVIF: `{url}` is the image's address and `{width}` the width wanted. Only an `https://`
+template containing `{url}` is used; bundled photographs are left alone.
 
 ### `notifications`
 

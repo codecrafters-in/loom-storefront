@@ -26,6 +26,7 @@ export const docPages = [
   { slug: 'schema-prompt', file: 'SCHEMA-PROMPT.md', title: 'Database prompt', group: 'AI prompts' },
 
   { slug: 'configuration', file: 'CONFIGURATION.md', title: 'Configuration', group: 'Operate' },
+  { slug: 'deploy', file: 'DEPLOY.md', title: 'Deploying', group: 'Operate' },
   { slug: 'performance', file: 'PERFORMANCE.md', title: 'Performance & scale', group: 'Operate' },
   { slug: 'cro', file: 'CRO.md', title: 'Trust & conversion', group: 'Operate' },
   { slug: 'theming', file: 'THEMING.md', title: 'Theming', group: 'Operate' },
