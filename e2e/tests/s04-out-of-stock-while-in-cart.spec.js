@@ -1,11 +1,11 @@
 /**
  * S-4 — The last pieces sell elsewhere while an item sits in the bag.
  *
- * Checklist: E3 F11 B13. Gap report §6: 🟡 — caught at checkout, but which line
- * is out of stock isn't shown (no gap number). The part that works has its own
+ * Checklist: E3 F11 B13. Gap report §6: 🟡 — caught at checkout; which line is
+ * out of stock is named since Phase 5. The part that works has its own
  * test, so a regression there is not hidden behind the expected failure.
  */
-import { test, expect, gaps } from '../support/fixtures.js'
+import { test, expect } from '../support/fixtures.js'
 import { uniqueEmail } from '../support/env.js'
 
 /** Bag an item, empty its shelf in Odoo, and try to pay. Answers the problem the checkout shows. */
@@ -42,9 +42,9 @@ test('S-4 item goes out of stock while in the bag: checkout stops before payment
   }
 })
 
-test.fail(
+test(
   'S-4 item goes out of stock while in the bag: the shopper is told which item sold out',
-  gaps('@S-4', '§6 S-4 row (no gap number): the out-of-stock error at checkout does not say which item'),
+  { tag: '@S-4' },
   async ({ page, shop, store, odoo }) => {
     const variant = await store.variant('e2e-oxford-shirt', { Color: 'Blue', Size: 'M' })
     try {

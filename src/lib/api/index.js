@@ -34,7 +34,9 @@ const SURFACE = [
   'checkout', 'listOrders', 'getOrder', 'lookupOrder', 'downloadFile',
   'getPaymentOptions', 'createPayment', 'paymentAction', 'getPayment',
   'getOrderPaymentOptions', 'createOrderPayment', 'cancelCartPayment', 'listPaymentMethods', 'deletePaymentMethod',
-  'getExpressOptions', 'getShippingOptions',
+  'getExpressOptions', 'getShippingOptions', 'checkServiceability',
+  'addCode', 'removeCode', 'claimReward', 'getGiftCard', 'getLoyalty', 'saveForLater',
+  'getDeliverySlots', 'getPickupLocations', 'setPickupLocation',
   'adminPlaceOrder', 'adminGetOrder', 'adminListOrders',
   'login', 'register', 'logout', 'getMe', 'updateMe', 'saveAddress', 'deleteAddress', 'getCountry',
   'getWishlist', 'addToWishlist', 'removeFromWishlist',
@@ -50,11 +52,15 @@ const SURFACE = [
   'uploadMedia', 'listMedia', 'deleteMedia',
 ]
 
-const missing = SURFACE.filter((name) => typeof adapter[name] !== 'function')
-if (missing.length) {
-  throw new Error(
-    `The "${config.dataSource}" adapter is missing: ${missing.join(', ')}. Both adapters must implement the whole surface — see docs/API.md.`,
-  )
+// A developer's check, left out of built bundles (test/adapters.test.mjs runs it for both adapters instead).
+// eslint-disable-next-line no-undef
+if (typeof __LOOM_DEV__ === 'boolean' ? __LOOM_DEV__ : true) {
+  const missing = SURFACE.filter((name) => typeof adapter[name] !== 'function')
+  if (missing.length) {
+    throw new Error(
+      `The "${config.dataSource}" adapter is missing: ${missing.join(', ')}. Both adapters must implement the whole surface — see docs/API.md.`,
+    )
+  }
 }
 
 /**

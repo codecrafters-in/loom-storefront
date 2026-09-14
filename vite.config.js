@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig(({ isSsrBuild, mode }) => ({
+export default defineConfig(({ command, isSsrBuild, mode }) => ({
   plugins: [react()],
   /**
    * Which data layer this build talks to, as a constant the bundler can read.
@@ -15,6 +15,9 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
    */
   define: {
     __LOOM_API__: JSON.stringify((loadEnv(mode, process.cwd(), 'VITE_').VITE_DATA_SOURCE || 'mock').toLowerCase() === 'api'),
+    // True under `vite` (the dev server), false in a build: checks meant for whoever is changing the code
+    // stay out of what a shopper downloads. test/adapters.test.mjs repeats them on every `npm test`.
+    __LOOM_DEV__: JSON.stringify(command === 'serve'),
   },
   build: {
     // The manifest names the entry chunk and everything it pulls in, which is

@@ -39,7 +39,10 @@ import { loadScript } from './payments/load-script.js'
 const template = (str, vars) =>
   String(str || '').replace(/:([a-zA-Z]+)/g, (m, key) => (vars[key] ?? m))
 
-export async function startCheckout({ config, cart, email, shippingAddress, shippingMethod }) {
+export async function startCheckout({
+  config, cart, email, shippingAddress, shippingMethod, billingAddress, companyName, vat, note, giftMessage, giftWrap, acceptTerms,
+  deliverySlot,
+}) {
   const checkout = config?.checkout || {}
   const mode = checkout.mode || 'demo'
 
@@ -70,6 +73,14 @@ export async function startCheckout({ config, cart, email, shippingAddress, ship
     shipping_address: shippingAddress,
     shipping_method: shippingMethod,
     currency: cart?.currency,
+    billing_address: billingAddress,
+    company_name: companyName,
+    vat,
+    note,
+    gift_message: giftMessage,
+    gift_wrap: giftWrap,
+    accept_terms: acceptTerms,
+    delivery_slot: deliverySlot,
     // Absolute, because the payment provider redirects a browser back here from
     // its own domain and a relative path would resolve against theirs.
     success_url: absolute(template(checkout.successUrl, { orderId: '{ORDER_ID}' })),

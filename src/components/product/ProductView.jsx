@@ -347,6 +347,19 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               <Rating value={product.rating.average} count={product.rating.count} />
             </a>
           </div>
+          {!isMock && product.priceTiers?.length > 0 && (
+            <table className="mt-3 text-[13px]">
+              <caption className="sr-only">Price per item by quantity</caption>
+              <tbody>
+                {product.priceTiers.map((tier) => (
+                  <tr key={tier.minQuantity}>
+                    <td className="pr-4 text-muted">{tier.minQuantity}+ items</td>
+                    <td className="tabular-nums">{formatMoney(tier.price)} each</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
 
           {/* A lede, not the whole description. The rest lives in Details,
               where someone who wants it will look for it. */}

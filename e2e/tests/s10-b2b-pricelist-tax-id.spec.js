@@ -2,11 +2,13 @@
  * S-10 — A B2B customer signs in and sees their own prices; their tax ID is on
  * the invoice.
  *
- * Checklist: D6 F9 I11. Gap report §6: 🟡 — pricelist works; checkout has no
- * company or VAT field (#16). The seeded trade buyer's company already has a VAT
- * number in Odoo; the second test is the buyer who has to give it at checkout.
+ * Checklist: D6 F9 I11. Gap report §6: ✅ since Phase 5 — pricelist works, and
+ * checkout takes a company name and VAT (#16). The seeded trade buyer's company
+ * already has a VAT number in Odoo; the second test is the buyer who gives it at
+ * checkout, where it goes on their contact as the company name and tax ID that
+ * Odoo prints on the invoice.
  */
-import { test, expect, gaps } from '../support/fixtures.js'
+import { test, expect } from '../support/fixtures.js'
 import { settings, uniqueEmail } from '../support/env.js'
 
 test('S-10 B2B customer signs in, sees the trade pricelist, and the invoice carries the company tax ID', { tag: '@S-10' }, async ({ page, shop, odoo }) => {
@@ -38,9 +40,9 @@ test('S-10 B2B customer signs in, sees the trade pricelist, and the invoice carr
   expect(partner.vat).toBe(vat)
 })
 
-test.fail(
+test(
   'S-10 business buyer enters company name and VAT at checkout; both are on the invoice',
-  gaps('@S-10', '#16 no separate billing address, company name, or VAT/GSTIN field at checkout'),
+  { tag: '@S-10' },
   async ({ page, shop, odoo }) => {
     const company = 'Acme Imports LLC'
     const vat = 'US555666777'
@@ -51,8 +53,9 @@ test.fail(
     await shop.addToBag()
     await shop.checkoutFromBag()
     await shop.fillCheckout({ email: uniqueEmail('s10-business') })
-    await page.getByLabel(/company/i).first().fill(company)
-    await page.getByLabel(/vat|tax id|gstin/i).first().fill(vat)
+    await page.getByLabel(/buying for a business/i).check()
+    await page.getByLabel('Company name').fill(company)
+    await page.getByLabel(/tax id/i).fill(vat)
     await shop.continueToPayment()
     await shop.choosePayment(/^Cash on Delivery/)
     await shop.pay()
@@ -60,7 +63,7 @@ test.fail(
 
     const order = await odoo.orderByNumber(number)
     const [invoice] = await odoo.invoiceOrder(order.id)
-    const [partner] = await odoo.read('res.partner', [invoice.commercial_partner_id[0]], ['name', 'vat'])
-    expect(partner).toMatchObject({ name: company, vat })
+    const [partner] = await odoo.read('res.partner', [invoice.commercial_partner_id[0]], ['commercial_company_name', 'vat'])
+    expect(partner).toMatchObject({ commercial_company_name: company, vat })
   },
 )

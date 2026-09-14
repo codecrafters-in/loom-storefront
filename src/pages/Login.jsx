@@ -2,19 +2,24 @@ import { useState } from 'react'
 import Seo from '../components/Seo.jsx'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../store/AuthContext.jsx'
+import { useCart } from '../store/CartContext.jsx'
+import { useWishlist } from '../store/WishlistContext.jsx'
 import { Button, Icon } from '../components/ui/index.jsx'
 import { isMock } from '../lib/api/index.js'
 import { useCaptcha } from '../components/Captcha.jsx'
 import { withCaptcha } from '../lib/captcha.js'
 
 export default function Login() {
-  const [mode, setMode] = useState('login')
-  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '' })
+  // Checkout and the order page send shoppers here with where to return, and the order page with an email to register.
+  const { state } = useLocation()
+  const [mode, setMode] = useState(state?.mode === 'register' ? 'register' : 'login')
+  const [form, setForm] = useState({ email: state?.email || '', password: '', firstName: '', lastName: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const { login, register } = useAuth()
+  const { refresh } = useCart()
+  const wishlist = useWishlist()
   const navigate = useNavigate()
-  const { state } = useLocation()
   // The modes are named like the captcha actions, so the check follows the form.
   const captcha = useCaptcha(mode)
 
@@ -28,6 +33,8 @@ export default function Login() {
       const captchaToken = await captcha.getToken()
       if (mode === 'login') await login(withCaptcha({ email: form.email, password: form.password }, captchaToken))
       else await register(withCaptcha(form, captchaToken))
+      // Signing in merges the guest bag and saved items into the account's: show the merged ones now, not after a reload.
+      await Promise.all([refresh().catch(() => {}), wishlist.reload()])
       navigate(state?.from || '/account', { replace: true })
     } catch (err) {
       // The token was spent on the attempt, right or wrong.

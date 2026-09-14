@@ -223,6 +223,21 @@ and have nothing to rank.
 - [ ] Inventory re-checked at checkout, not trusted from the cart
 
 
+## Bundle budgets
+
+`npm run build` fails when the first download grows past its budget (`scripts/budget.mjs`, gzipped, the entry chunk and
+everything it imports). There are two, read from `VITE_DATA_SOURCE` the way `vite.config.js` reads it:
+
+| Build | JavaScript | CSS |
+| --- | --- | --- |
+| Live store (`api`) | 115 KB | 12 KB |
+| Demo (`mock`) | 130 KB | 12 KB |
+
+The live-store number is the one shoppers feel, so it is the tight one. The demo's first download also carries the
+demo backend, which a live store never ships. Screens only a live store shows (click & collect, delivery slots, wallet
+buttons, the postcode checker) are lazy and behind `isMock`, so they cost the demo nothing. Raise a budget only with a
+reason in the commit message.
+
 ## Prerendering
 
 `npm run build` writes real HTML for the 53 routes worth indexing — home, the

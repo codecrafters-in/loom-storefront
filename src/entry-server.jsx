@@ -1,4 +1,5 @@
-import { renderToString } from 'react-dom/server'
+import { Writable } from 'node:stream'
+import { renderToPipeableStream, renderToString } from 'react-dom/server'
 import { StaticRouter } from 'react-router-dom/server'
 import App from './App.jsx'
 import api, { peek } from './lib/api/index.js'
@@ -121,4 +122,44 @@ export function render(url, { docs } = {}) {
   } finally {
     globalThis.__LOOM_DOCS__ = undefined
   }
+}
+
+/**
+ * Render a route completely, lazy pages included, only to find out whether it throws.
+ *
+ * `render` uses `renderToString`, which paints a lazy page's fallback and never runs the page. The pages a visitor
+ * reaches with a bag or an account (checkout, cart, sign-in) are all lazy and never prerendered, so a crash in their
+ * first render (a variable used before it is declared, say) reached a browser without any build step running that
+ * code. This streams the route and waits for every lazy page, then resolves with the size of the HTML or rejects
+ * with the first error.
+ */
+export function smoke(url) {
+  return new Promise((resolve, reject) => {
+    let failure = null
+    const { pipe } = renderToPipeableStream(
+      <StaticRouter location={url} future={{ v7_relativeSplatPath: true }}>
+        <App />
+      </StaticRouter>,
+      {
+        onAllReady() {
+          if (failure) return reject(failure)
+          let size = 0
+          pipe(new Writable({
+            write(chunk, _encoding, done) {
+              size += chunk.length
+              done()
+            },
+            final(done) {
+              resolve(size)
+              done()
+            },
+          }))
+        },
+        onShellError: reject,
+        onError(err) {
+          failure = failure || err
+        },
+      },
+    )
+  })
 }

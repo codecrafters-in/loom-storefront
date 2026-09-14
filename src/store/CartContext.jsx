@@ -16,6 +16,14 @@ import { isMock } from '../lib/config.js'
  */
 const CartContext = createContext(null)
 
+/** What the bag changed on its own (a price moved, a product left the shop), said once. The demo never does. */
+const tell = isMock
+  ? (_push, cart) => cart
+  : (push, cart) => {
+      for (const notice of cart?.notices || []) push(notice.message, { duration: 6000 })
+      return cart
+    }
+
 export function CartProvider({ children }) {
   const [cart, setCart] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -27,22 +35,22 @@ export function CartProvider({ children }) {
     let alive = true
     api
       .getCart()
-      .then((c) => alive && setCart(c))
+      .then((c) => alive && setCart(tell(push, c)))
       .catch(() => alive && setCart(null))
       .finally(() => alive && setLoading(false))
     return () => {
       alive = false
     }
-  }, [])
+  }, [push])
 
   // Adding to the bag in another tab has to show up here, or the header count
   // and this one disagree until something happens to remount.
   useEffect(
     () =>
       onExternalWrite(STORAGE_KEYS.cart, () => {
-        api.getCart().then(setCart).catch(() => {})
+        api.getCart().then((c) => setCart(tell(push, c))).catch(() => {})
       }),
-    [],
+    [push],
   )
 
   const run = useCallback(
@@ -50,7 +58,7 @@ export function CartProvider({ children }) {
       setBusy(true)
       try {
         const next = await work()
-        setCart(next)
+        setCart(tell(push, next))
         if (successMessage) push(successMessage)
         if (openDrawer) setOpen(true)
         return next
@@ -106,9 +114,9 @@ export function CartProvider({ children }) {
       applyDiscount: (code) => run(() => api.applyDiscount(code), { successMessage: 'Code applied' }),
       clear: () => run(() => api.clearCart()),
       cancelPayment: () => run(() => api.cancelCartPayment(), { successMessage: 'Payment cancelled. You can change your bag now.' }),
-      refresh: () => api.getCart().then(setCart),
+      refresh: () => api.getCart().then((c) => setCart(tell(push, c))),
     }),
-    [cart, loading, busy, open, run],
+    [cart, loading, busy, open, run, push],
   )
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>

@@ -366,6 +366,19 @@ export async function updateCartLine(lineId, quantity) {
   )
 }
 
+/**
+ * Save for later. Signed in, the line moves to the account's saved items in one request; a guest's product is
+ * saved in this browser (see the wishlist below) and the line removed.
+ */
+export async function saveForLater(lineId, productSlug) {
+  const cart = await ensureCart()
+  if (customerToken()) {
+    return assertCart(await post(`/carts/${cart.id}/lines/${lineId}/save`, {}), 'POST /carts/:id/lines/:lineId/save')
+  }
+  if (productSlug) await addToWishlist(productSlug)
+  return removeCartLine(lineId)
+}
+
 export async function removeCartLine(lineId) {
   const cart = await ensureCart()
   return assertCart(await del(`/carts/${cart.id}/lines/${lineId}`), 'DELETE /carts/:id/lines/:lineId')
@@ -375,6 +388,29 @@ export async function applyDiscount(code) {
   const cart = await ensureCart()
   return assertCart(await post(`/carts/${cart.id}/discount`, { code }), 'POST /carts/:id/discount')
 }
+
+/** Add a code, keeping the ones already on the bag. */
+export async function addCode(code) {
+  const cart = await ensureCart()
+  return assertCart(await post(`/carts/${cart.id}/codes`, { code }), 'POST /carts/:id/codes')
+}
+
+export async function removeCode(code) {
+  const cart = await ensureCart()
+  return assertCart(await del(`/carts/${cart.id}/codes/${encodeURIComponent(code)}`), 'DELETE /carts/:id/codes/:code')
+}
+
+/** Claim one of the bag's `claimableRewards`: a free product to pick, or a reward the shopper's points pay for. */
+export async function claimReward({ couponId, rewardId, variantId } = {}) {
+  const cart = await ensureCart()
+  return assertCart(
+    await post(`/carts/${cart.id}/rewards`, { coupon_id: couponId, reward_id: rewardId, variant_id: variantId }),
+    'POST /carts/:id/rewards',
+  )
+}
+
+/** A gift card's balance, for "check a gift card". */
+export const getGiftCard = (code) => get(`/gift-cards/${encodeURIComponent(code)}`)
 
 export async function clearCart() {
   const cart = await ensureCart()
@@ -406,6 +442,18 @@ const checkoutFields = (body = {}) => ({
   shipping_address: body.shippingAddress,
   shipping_method: body.shippingMethod,
   currency: body.currency,
+  // Optional: a billing address other than the delivery one, and a business's company name and tax ID.
+  billing_address: body.billingAddress,
+  company_name: body.companyName,
+  vat: body.vat,
+  // Optional, as far as the store's checkout settings allow: delivery instructions, gift message and wrapping, and
+  // the terms checkbox when the store requires it.
+  note: body.note,
+  gift_message: body.giftMessage,
+  gift_wrap: body.giftWrap,
+  accept_terms: body.acceptTerms,
+  // One of `getDeliverySlots`, when the delivery method offers slots.
+  delivery_slot: body.deliverySlot,
 })
 
 function assertPayment(payment, where) {
@@ -491,6 +539,32 @@ export async function getExpressOptions(cartIdArg) {
 }
 
 /** Delivery methods priced for a (possibly partial) address, and the bag's total with `method` applied. */
+/** `{ required, slots, selected }` for a delivery method (its code), when the store offers delivery slots. */
+export async function getDeliverySlots(cartIdArg, method) {
+  const id = cartIdArg || (await ensureCart()).id
+  const result = await get(`/carts/${encodeURIComponent(id)}/slots`, { method })
+  if (!result || !Array.isArray(result.slots)) {
+    throw new ContractError('GET /carts/:id/slots', 'an object with a "slots" array', result)
+  }
+  return result
+}
+
+/** Shops an in-store method collects from, nearest first to `postalCode` + `country`, else to the bag's address. */
+export async function getPickupLocations(cartIdArg, { method, postalCode, country } = {}) {
+  const id = cartIdArg || (await ensureCart()).id
+  const result = await get(`/carts/${encodeURIComponent(id)}/pickup-locations`, { method, zip: postalCode || undefined, country: postalCode ? country : undefined })
+  if (!result || !Array.isArray(result.locations)) {
+    throw new ContractError('GET /carts/:id/pickup-locations', 'an object with a "locations" array', result)
+  }
+  return result
+}
+
+/** Collect the bag from a shop: sets the in-store method and its shop, and answers the bag. */
+export async function setPickupLocation(cartIdArg, { method, locationId }) {
+  const id = cartIdArg || (await ensureCart()).id
+  return assertCart(await post(`/carts/${encodeURIComponent(id)}/pickup-location`, { method, location_id: locationId }), 'POST /carts/:id/pickup-location')
+}
+
 export async function getShippingOptions(cartIdArg, { address, method } = {}) {
   const id = cartIdArg || (await ensureCart()).id
   const result = await post(`/carts/${encodeURIComponent(id)}/shipping-options`, { address, method })
@@ -505,6 +579,9 @@ export async function cancelCartPayment() {
   const cart = await ensureCart()
   return assertCart(await post(`/carts/${cart.id}/cancel-payment`, {}), 'POST /carts/:id/cancel-payment')
 }
+
+/** The customer's loyalty points and store credit, with recent history. */
+export const getLoyalty = () => get('/me/loyalty').then((r) => assertList(r, 'GET /me/loyalty'))
 
 /** Cards and accounts the payment providers saved for the signed-in customer. */
 export const listPaymentMethods = () =>
@@ -523,8 +600,22 @@ function storeSession(res) {
   return res
 }
 
-export const login = (body) => post('/auth/login', body).then(storeSession)
-export const register = (body) => post('/auth/register', body).then(storeSession)
+/** What a guest saved joins the account on sign-in; kept for the next try if that fails. */
+async function mergeGuestWishlist(res) {
+  const slugs = guestSlugs()
+  if (slugs.length) {
+    try {
+      await post('/me/wishlist/merge', { product_slugs: slugs.slice(0, 100) })
+      setGuestSlugs([])
+    } catch {
+      /* still in this browser; the next sign-in tries again */
+    }
+  }
+  return res
+}
+
+export const login = (body) => post('/auth/login', body).then(storeSession).then(mergeGuestWishlist)
+export const register = (body) => post('/auth/register', body).then(storeSession).then(mergeGuestWishlist)
 export async function logout() {
   try {
     await post('/auth/logout', {})
@@ -576,12 +667,47 @@ export const deleteAddress = (addressId) => del(`/me/addresses/${addressId}`)
 
 /* ── wishlist ──────────────────────────────────────────────────────────── */
 
-export const getWishlist = () =>
+/*
+ * A guest's saved items live in this browser, newest first, and join the account when they sign in
+ * (`POST /me/wishlist/merge`). The key is the one other tabs watch, so a heart filled here fills there.
+ */
+const GUEST_WISHLIST_KEY = 'loom.wishlist'
+function guestSlugs() {
+  try {
+    const slugs = JSON.parse(localStorage.getItem(GUEST_WISHLIST_KEY) || '[]')
+    return Array.isArray(slugs) ? slugs.filter((slug) => typeof slug === 'string') : []
+  } catch {
+    return []
+  }
+}
+function setGuestSlugs(slugs) {
+  try {
+    if (slugs.length) localStorage.setItem(GUEST_WISHLIST_KEY, JSON.stringify(slugs))
+    else localStorage.removeItem(GUEST_WISHLIST_KEY)
+  } catch {
+    /* storage unavailable — saved for this page only */
+  }
+  return slugs
+}
+
+export async function getWishlist() {
+  if (customerToken()) return get('/me/wishlist').then((r) => assertList(r, 'GET /me/wishlist'))
+  const slugs = guestSlugs()
+  if (!slugs.length) return { items: [], total: 0 }
+  const res = assertList(await get('/products', { slugs: slugs.join(','), per_page: 100 }), 'GET /products?slugs=')
+  // In the order they were saved; a product no longer sold simply drops out.
+  const bySlug = new Map(res.items.map((product) => [product.slug, product]))
+  const items = slugs.map((slug) => bySlug.get(slug)).filter(Boolean)
+  return { items, total: items.length }
+}
+export const addToWishlist = (slug) =>
   customerToken()
-    ? get('/me/wishlist').then((r) => assertList(r, 'GET /me/wishlist'))
-    : Promise.reject(unauthenticated())
-export const addToWishlist = (slug) => post('/me/wishlist', { product_slug: slug })
-export const removeFromWishlist = (slug) => del(`/me/wishlist/${encodeURIComponent(slug)}`)
+    ? post('/me/wishlist', { product_slug: slug })
+    : Promise.resolve({ ok: true, slugs: setGuestSlugs([slug, ...guestSlugs().filter((s) => s !== slug)]) })
+export const removeFromWishlist = (slug) =>
+  customerToken()
+    ? del(`/me/wishlist/${encodeURIComponent(slug)}`)
+    : Promise.resolve({ ok: true, slugs: setGuestSlugs(guestSlugs().filter((s) => s !== slug)) })
 
 /* ── misc ──────────────────────────────────────────────────────────────── */
 
@@ -596,6 +722,10 @@ export const subscribe = (email, { captchaToken } = {}) =>
 /** Optional. If the endpoint 404s the caller falls back to the shipping copy. */
 export const getDeliveryEstimate = ({ method = 'standard', country = 'US' } = {}) =>
   get('/delivery-estimate', { method, country })
+
+/** Whether the store delivers to an address (a postcode is enough), with each method's arrival date. */
+export const checkServiceability = ({ country, region, postalCode, variantId } = {}) =>
+  get('/serviceability', { country, region, postal_code: postalCode, variant_id: variantId })
 
 /**
  * Everything the first screen needs, in one round trip.

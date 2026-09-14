@@ -20,18 +20,27 @@ import fs from 'node:fs'
 import path from 'node:path'
 import zlib from 'node:zlib'
 import { fileURLToPath } from 'node:url'
+import { loadEnv } from 'vite'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
 
 /**
- * Budgets in gzipped bytes, with roughly 15% headroom over today's build.
+ * Budgets in gzipped bytes.
  *
  * Raise one only with a reason in the commit message. That sentence is the
  * point of the whole file.
+ *
+ * Two JavaScript budgets, because two different things get built, read from the
+ * same setting vite.config.js reads. A live store (`VITE_DATA_SOURCE=api`) is
+ * what shoppers download, so it has the tight number: about 6% over its build
+ * when this was split. The demo also carries the whole demo backend (`mock.js`)
+ * in its first download, which no live store ships; it had crept up to the old
+ * shared 125 KB, so it gets 130 KB, and the live number came down from 125 to 115.
  */
+const LIVE = (loadEnv('production', ROOT, 'VITE_').VITE_DATA_SOURCE || 'mock').toLowerCase() === 'api'
 const BUDGET = {
-  js: 125 * 1024,
+  js: (LIVE ? 115 : 130) * 1024,
   css: 12 * 1024,
 }
 
@@ -71,7 +80,7 @@ const kb = (bytes) => `${(bytes / 1024).toFixed(1)} KB`
 
 // Always print, not only on failure. A budget that says nothing while it passes
 // teaches nobody where the headroom went.
-console.log('[budget] the initial download:')
+console.log(`[budget] the initial download (${LIVE ? 'live store' : 'demo'} build):`)
 for (const row of [...js, ...css].sort((a, b) => b.size - a.size)) {
   console.log(`  ${row.file.padEnd(42)} ${kb(row.size).padStart(9)}`)
 }

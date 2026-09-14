@@ -17,30 +17,23 @@ export function WishlistProvider({ children }) {
   const [slugs, setSlugs] = useState([])
   const { push } = useToast()
 
-  useEffect(() => {
-    let alive = true
-    api
-      .getWishlist()
-      .then((r) => alive && setSlugs(r.items.map((p) => p.slug)))
-      .catch(() => {
-        /* signed out against a real API — an empty list is the right answer */
-      })
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  // A heart filled in another tab is filled here too.
-  useEffect(
+  // Also after signing in, when what a guest saved has joined the account's list.
+  const reload = useCallback(
     () =>
-      onExternalWrite(STORAGE_KEYS.wishlist, () => {
-        api
-          .getWishlist()
-          .then((r) => setSlugs(r.items.map((p) => p.slug)))
-          .catch(() => {})
-      }),
+      api
+        .getWishlist()
+        .then((r) => setSlugs(r.items.map((p) => p.slug)))
+        .catch(() => {
+          /* nothing to show — an empty list is the right answer */
+        }),
     [],
   )
+  useEffect(() => {
+    reload()
+  }, [reload])
+
+  // A heart filled in another tab is filled here too.
+  useEffect(() => onExternalWrite(STORAGE_KEYS.wishlist, reload), [reload])
 
   const toggle = useCallback(
     async (slug, title = 'Item') => {
@@ -63,8 +56,8 @@ export function WishlistProvider({ children }) {
   )
 
   const value = useMemo(
-    () => ({ slugs, count: slugs.length, has: (slug) => slugs.includes(slug), toggle }),
-    [slugs, toggle],
+    () => ({ slugs, count: slugs.length, has: (slug) => slugs.includes(slug), toggle, reload }),
+    [slugs, toggle, reload],
   )
 
   return <WishlistContext.Provider value={value}>{children}</WishlistContext.Provider>

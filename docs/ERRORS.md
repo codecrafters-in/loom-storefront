@@ -59,6 +59,16 @@ The `payments` checkout mode. Flows in [CHECKOUT.md](CHECKOUT.md), routes in
 | `cart_changed` | 409 | The total moved since the methods were listed; options are fetched again |
 | `payment_in_progress` | 409 | A payment for this bag is under way (another tab, or a gateway page left open); the bag shows **Cancel payment** |
 | `already_paid` | 409 | The bag was paid already; the order opens |
+| `checkout_in_progress` | 409 | The bag is being checked out in another tab; try again in a moment |
+| `invalid_reward` | 422 | The reward cannot be claimed for this bag; toast |
+| `invalid_slugs` | 422 | Merging a guest's saved items sent something other than a list of up to 100 slugs; kept for the next sign-in |
+| `pickup_location_required` | 422 | The in-store delivery method has no shop chosen yet; checkout shows the shop list |
+| `invalid_pickup_location` | 422 | That shop does not collect for this method; the list reloads |
+| `pickup_unavailable` | 404 | The backend has no click & collect; the method should not have been offered |
+| `slot_required` | 422 | The delivery method needs a slot (`detail.fields: ["delivery_slot"]`); focus moves to the slots |
+| `slot_unavailable` | 409 | The slot filled up while the shopper was checking out; they choose another |
+| `minimum_not_met` | 409 | The bag is under the store's minimum order (`detail.minimum`, `detail.remaining` in minor units); checkout says how much more |
+| `terms_required` | 422 | The store requires the terms box (`detail.fields: ["accept_terms"]`); focus moves to it |
 | `nothing_to_pay` | 409 | Pay now on an order that is already paid; the page reloads the order |
 | `nothing_to_refund` | 409 | Admin refund on an order with nothing left to refund |
 | `refund_in_odoo` | 409 | The payment cannot be refunded from the admin; the message says to use Odoo |

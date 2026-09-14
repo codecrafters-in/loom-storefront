@@ -2,6 +2,9 @@ import { lazy, Suspense, useState } from 'react'
 import Seo from '../components/Seo.jsx'
 import { Link } from 'react-router-dom'
 import { useCart } from '../store/CartContext.jsx'
+import { useToast } from '../store/ToastContext.jsx'
+import { useWishlist } from '../store/WishlistContext.jsx'
+import api from '../lib/api/index.js'
 import { Button, Empty, Icon, QuantityStepper, Skeleton } from '../components/ui/index.jsx'
 import Promises from '../components/layout/Promises.jsx'
 import { formatMoney } from '../lib/money.js'
@@ -17,9 +20,34 @@ import PaymentLock from '../components/cart/PaymentLock.jsx'
 const ExpressCheckout = lazy(() => import('../components/checkout/ExpressCheckout.jsx'))
 
 export default function Cart() {
-  const { cart, loading, busy, update, remove, applyDiscount } = useCart()
+  const { cart, loading, busy, update, remove, refresh } = useCart()
+  const { push } = useToast()
   const [code, setCode] = useState('')
+  const [working, setWorking] = useState(false)
+  const [giftCode, setGiftCode] = useState('')
+  const [gift, setGift] = useState(null)
+
+  /** A code or reward action: the backend answers the new bag, the page takes it and says what happened. */
+  const act = async (work, said) => {
+    setWorking(true)
+    try {
+      const next = await work()
+      await refresh()
+      const message = typeof said === 'function' ? said(next) : said
+      if (message) push(message)
+      return next
+    } catch (err) {
+      push(err.message, { tone: 'error' })
+      return null
+    } finally {
+      setWorking(false)
+    }
+  }
+  const signature = (c) => JSON.stringify([c?.codes, c?.discount?.amount, c?.lines?.length, c?.claimableRewards?.length])
   const config = useStorefront()
+  const wishlist = useWishlist()
+  // Under the store's minimum order (`minimumOrder`, from Odoo): checkout would refuse it, so it is not offered.
+  const short = cart?.minimumOrder?.remaining?.amount > 0
 
   if (loading) {
     return (
@@ -81,14 +109,32 @@ export default function Cart() {
                   <span className="shrink-0 text-[15px] tabular-nums">{formatMoney(line.lineTotal)}</span>
                 </div>
                 <div className="mt-auto flex items-center justify-between pt-4">
-                  <QuantityStepper value={line.quantity} onChange={(q) => update(line.id, q)} disabled={busy} {...stepperProps(line.quantityRule)} />
-                  <button
-                    type="button"
-                    onClick={() => remove(line.id)}
-                    className="inline-flex items-center gap-1.5 text-[13px] text-faint transition-colors hover:text-sale"
-                  >
-                    <Icon name="trash" size={14} /> Remove
-                  </button>
+                  {line.isReward ? (
+                    <span className="text-[13px] text-good">Free · {line.rewardLabel || 'Reward'}</span>
+                  ) : (
+                    <>
+                      <QuantityStepper value={line.quantity} onChange={(q) => update(line.id, q)} disabled={busy} {...stepperProps(line.quantityRule)} />
+                      <span className="flex items-center gap-4">
+                        {config.features?.wishlist !== false && !line.linkedTo && (
+                          <button
+                            type="button"
+                            disabled={busy || working}
+                            onClick={() => act(() => api.saveForLater(line.id, line.productSlug), `${line.title} saved for later`).then(wishlist.reload)}
+                            className="inline-flex items-center gap-1.5 text-[13px] text-faint transition-colors hover:text-ink"
+                          >
+                            <Icon name="heart" size={14} /> Save for later
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => remove(line.id)}
+                          className="inline-flex items-center gap-1.5 text-[13px] text-faint transition-colors hover:text-sale"
+                        >
+                          <Icon name="trash" size={14} /> Remove
+                        </button>
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             </li>
@@ -108,7 +154,8 @@ export default function Cart() {
                   <div
                     className="h-full bg-accent transition-[width] duration-500"
                     style={{
-                      width: `${Math.min(100, (cart.subtotal.amount / cart.freeShippingThreshold.amount) * 100)}%`,
+                      // Odoo's own measure when the API sends it (the total without delivery), not the subtotal.
+                      width: `${cart.freeShippingProgress?.percent ?? Math.min(100, (cart.subtotal.amount / cart.freeShippingThreshold.amount) * 100)}%`,
                     }}
                   />
                 </div>
@@ -118,7 +165,14 @@ export default function Cart() {
             {config.features?.discountCodes !== false && (
             <>
             <form
-              onSubmit={(e) => { e.preventDefault(); applyDiscount(code).catch(() => {}) }}
+              onSubmit={async (e) => {
+                e.preventDefault()
+                const entered = code.trim()
+                if (!entered) return
+                const before = signature(cart)
+                const next = await act(() => api.addCode(entered), (after) => (signature(after) === before ? 'That code didn’t change your bag.' : 'Code applied'))
+                if (next) setCode('')
+              }}
               className="mt-5 flex gap-2"
             >
               <label className="sr-only" htmlFor="discount">Discount code</label>
@@ -129,13 +183,58 @@ export default function Cart() {
                 placeholder="Discount code"
                 className="field h-10 text-[13px]"
               />
-              <Button as="button" type="submit" variant="quiet" size="sm" disabled={busy} className="shrink-0 h-10">
+              <Button as="button" type="submit" variant="quiet" size="sm" disabled={busy || working} className="shrink-0 h-10">
                 Apply
               </Button>
             </form>
-            {cart.discountCode && (
-              <p className="mt-2 flex items-center gap-1.5 text-[12px] text-good">
-                <Icon name="check" size={13} /> {cart.discountCode.code} — {cart.discountCode.label}
+            {(cart.codes?.length ? cart.codes : cart.discountCode ? [cart.discountCode] : []).map((c) => (
+              <p key={c.code} className="mt-2 flex items-center gap-1.5 text-[12px] text-good">
+                <Icon name="check" size={13} />
+                <span className="min-w-0 flex-1">{c.code} — {c.label}</span>
+                <button
+                  type="button"
+                  className="text-faint link-underline hover:text-sale"
+                  disabled={working}
+                  onClick={() => act(() => api.removeCode(c.code), 'Code removed')}
+                >
+                  Remove
+                </button>
+              </p>
+            ))}
+            {cart.claimableRewards?.length > 0 && (
+              <div className="mt-4 rounded-xs border border-line p-3.5">
+                <p className="text-[13px] font-medium">Choose your reward</p>
+                <ul className="mt-2 space-y-2">
+                  {cart.claimableRewards.map((reward) => (
+                    <RewardChoice
+                      key={reward.id}
+                      reward={reward}
+                      disabled={working}
+                      onClaim={(variantId) => act(() => api.claimReward({ couponId: reward.couponId, rewardId: reward.rewardId, variantId }), 'Reward added')}
+                    />
+                  ))}
+                </ul>
+              </div>
+            )}
+            <form
+              className="mt-4 flex gap-2"
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (!giftCode.trim()) return
+                try {
+                  setGift({ code: giftCode.trim(), ...(await api.getGiftCard(giftCode.trim())) })
+                } catch (err) {
+                  setGift({ code: giftCode.trim(), error: err.message })
+                }
+              }}
+            >
+              <label className="sr-only" htmlFor="gift-card">Gift card code</label>
+              <input id="gift-card" value={giftCode} onChange={(e) => setGiftCode(e.target.value)} placeholder="Check a gift card" className="field h-10 text-[13px]" />
+              <Button as="button" type="submit" variant="quiet" size="sm" className="shrink-0 h-10">Check</Button>
+            </form>
+            {gift && (
+              <p role="status" className={`mt-2 text-[12px] ${gift.error ? 'text-sale' : 'text-muted'}`}>
+                {gift.error || `Balance on ${gift.code}: ${formatMoney(gift.balance)}. Enter it as a code to use it.`}
               </p>
             )}
             {isMock && <p className="mt-2 text-[11px] text-faint">Demo codes: LOOM10, WELCOME15, FREESHIP</p>}
@@ -144,7 +243,12 @@ export default function Cart() {
 
             <dl className="mt-6 space-y-2.5 border-t border-line pt-5 text-sm">
               <Row label="Subtotal" value={formatMoney(cart.subtotal)} />
-              {cart.discount.amount > 0 && (
+              {cart.codes || cart.promotions ? (
+                [...(cart.codes || []).map((c) => ({ key: `code-${c.code}`, label: c.label || c.code, amount: c.amount })),
+                  ...(cart.promotions || []).map((p) => ({ key: `promo-${p.name}`, label: p.name, amount: p.amount }))]
+                  .filter((row) => row.amount?.amount > 0)
+                  .map((row) => <Row key={row.key} label={row.label} value={`−${formatMoney(row.amount)}`} tone="sale" />)
+              ) : cart.discount.amount > 0 && (
                 <Row label={cart.discountCode?.label || 'Discount'} value={`−${formatMoney(cart.discount)}`} tone="sale" />
               )}
               <Row label="Shipping" value={cart.shipping.amount === 0 ? 'Free' : formatMoney(cart.shipping)} />
@@ -158,12 +262,20 @@ export default function Cart() {
               <span className="tabular-nums">{formatMoney(cart.total)}</span>
             </p>
 
-            {!isMock && config.checkout?.mode === 'payments' && (
+            {short && (
+              <p role="status" className="mt-5 rounded-xs bg-accent-soft/60 p-3.5 text-[13px] text-accent">
+                Orders start at {formatMoney(cart.minimumOrder.amount)}. Add {formatMoney(cart.minimumOrder.remaining)} more to check out.
+              </p>
+            )}
+            {/* A wallet sheet has no terms checkbox and no minimum: those orders go through the checkout form. */}
+            {!isMock && config.checkout?.mode === 'payments' && !config.checkout?.termsRequired && !short && (
               <Suspense fallback={null}>
                 <ExpressCheckout className="mt-6" />
               </Suspense>
             )}
-            <Button to="/checkout" full size="lg" className="mt-6">Checkout</Button>
+            {short
+              ? <Button as="button" type="button" full size="lg" className="mt-6" disabled>Checkout</Button>
+              : <Button to="/checkout" full size="lg" className="mt-6">Checkout</Button>}
             <Link to="/shop" className="mt-4 block text-center text-[13px] text-muted link-underline">
               Continue shopping
             </Link>
@@ -184,3 +296,23 @@ function Row({ label, value, tone }) {
     </div>
   )
 }
+
+/** One reward the bag can claim: a button, or a product to pick first when there is a choice. */
+function RewardChoice({ reward, disabled, onClaim }) {
+  const [variantId, setVariantId] = useState(reward.products?.[0]?.variantId || '')
+  const many = (reward.products?.length || 0) > 1
+  return (
+    <li className="flex flex-wrap items-center gap-2 text-[13px]">
+      <span className="min-w-0 flex-1">{reward.description}</span>
+      {many && (
+        <select aria-label={`Choose for ${reward.description}`} className="field h-9 w-auto text-[13px]" value={variantId} onChange={(e) => setVariantId(e.target.value)}>
+          {reward.products.map((p) => <option key={p.variantId} value={p.variantId}>{p.title}</option>)}
+        </select>
+      )}
+      <Button as="button" type="button" size="sm" variant="quiet" disabled={disabled} onClick={() => onClaim(variantId || undefined)}>
+        Add
+      </Button>
+    </li>
+  )
+}
+

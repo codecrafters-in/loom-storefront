@@ -1,9 +1,13 @@
+import { lazy, Suspense } from 'react'
 import api from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
 import { Icon } from '../ui/index.jsx'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { formatMoney } from '../../lib/money.js'
 import { isMock } from '../../lib/config.js'
+
+// Only a real backend can say whether a postcode is served; the demo build leaves the checker out.
+const DeliveryCheck = isMock ? null : lazy(() => import('./DeliveryCheck.jsx'))
 
 /**
  * The reassurance block, immediately under the buy button.
@@ -66,6 +70,11 @@ export default function TrustRow({ flat = false }) {
           </li>
         ))}
       </ul>
+      {!isMock && (
+        <Suspense fallback={null}>
+          <DeliveryCheck />
+        </Suspense>
+      )}
 
     </div>
   )

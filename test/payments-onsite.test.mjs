@@ -583,3 +583,26 @@ test('no wallet buttons without a wallet method, or when nothing can be delivere
   assert.equal((await api.getExpressOptions()).methods.length, 0, 'the demo has no wallet')
 })
 
+/* ── delivery ──────────────────────────────────────────────────────────── */
+
+test('the demo says it delivers wherever it lists a delivery method', async () => {
+  const answer = await api.checkServiceability({ country: 'IN', postalCode: '380001' })
+  assert.equal(answer.deliverable, true)
+  assert.equal(answer.postalCode, '380001')
+  assert.ok(answer.methods.length > 0)
+  assert.ok(answer.methods.every((m) => m.id && m.label))
+})
+
+/* ── codes, rewards and gift cards (demo answers) ──────────────────────── */
+
+test('the demo keeps one code: adding applies it, removing clears it, and the new calls answer like a backend', async () => {
+  await fill('cotton-cap')
+  const applied = await api.addCode('LOOM10')
+  assert.equal(applied.discountCode?.code, 'LOOM10')
+  const cleared = await api.removeCode('LOOM10')
+  assert.equal(cleared.discountCode, null)
+  await assert.rejects(api.claimReward({ couponId: '1', rewardId: '1' }), (err) => err.status === 422 && err.code === 'invalid_reward')
+  await assert.rejects(api.getGiftCard('NOPE'), (err) => err.status === 404)
+  await api.clearCart()
+})
+

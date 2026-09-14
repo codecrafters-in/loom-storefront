@@ -8,6 +8,7 @@ import Media from '../components/ui/Media.jsx'
 import { SIZES } from '../lib/images.js'
 import { formatMoney } from '../lib/money.js'
 import { config } from '../lib/config.js'
+import { useAuth } from '../store/AuthContext.jsx'
 import { nestLines } from '../lib/cart-lines.js'
 import LineDetails from '../components/cart/LineDetails.jsx'
 
@@ -47,6 +48,7 @@ async function saveDownload(event, download) {
 
 export default function OrderConfirmation() {
   const { id } = useParams()
+  const { signedIn } = useAuth()
   const { state } = useLocation()
   // Checkout hands the order over in router state, so the confirmation renders
   // instantly; the fetch is the fallback for a refresh or a shared link.
@@ -148,10 +150,16 @@ export default function OrderConfirmation() {
           </ul>
           <dl className="space-y-2.5 border-t border-line px-6 py-5 text-sm">
             <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd className="tabular-nums">{formatMoney(order.subtotal)}</dd></div>
+            {order.discount?.amount > 0 && (
+              <div className="flex justify-between text-sale"><dt>{order.discountCode?.label || 'Discount'}</dt><dd className="tabular-nums">−{formatMoney(order.discount)}</dd></div>
+            )}
             <div className="flex justify-between"><dt className="text-muted">Shipping</dt><dd className="tabular-nums">{order.shipping.amount === 0 ? 'Free' : formatMoney(order.shipping)}</dd></div>
             <div className="flex justify-between"><dt className="text-muted">Tax</dt><dd className="tabular-nums">{formatMoney(order.tax)}</dd></div>
             {order.fee?.amount > 0 && (
               <div className="flex justify-between"><dt className="text-muted">Cash on delivery fee</dt><dd className="tabular-nums">{formatMoney(order.fee)}</dd></div>
+            )}
+            {order.giftWrap?.amount > 0 && (
+              <div className="flex justify-between"><dt className="text-muted">Gift wrapping</dt><dd className="tabular-nums">{formatMoney(order.giftWrap)}</dd></div>
             )}
             <div className="flex justify-between border-t border-line pt-3 text-base"><dt>Total</dt><dd className="tabular-nums">{formatMoney(order.total)}</dd></div>
             {order.refundedTotal?.amount > 0 && (
@@ -161,18 +169,68 @@ export default function OrderConfirmation() {
         </div>
 
         <div className="mt-8 rounded-xs border border-line p-6">
-          <h2 className="eyebrow">Shipping to</h2>
+          <h2 className="eyebrow">{order.pickupLocation ? 'Collect from' : 'Shipping to'}</h2>
           <address className="mt-3 not-italic text-[14px] leading-relaxed text-muted">
-            {order.shippingAddress.name}<br />
-            {order.shippingAddress.line1}{order.shippingAddress.line2 ? `, ${order.shippingAddress.line2}` : ''}<br />
-            {order.shippingAddress.city}{order.shippingAddress.region ? `, ${order.shippingAddress.region}` : ''} {order.shippingAddress.postalCode}<br />
-            {order.shippingAddress.country}
+            {order.pickupLocation ? (
+              <>
+                {order.pickupLocation.name}<br />
+                {order.pickupLocation.street}<br />
+                {order.pickupLocation.city} {order.pickupLocation.postalCode}
+              </>
+            ) : (
+              <>
+                {order.shippingAddress.name}<br />
+                {order.shippingAddress.line1}{order.shippingAddress.line2 ? `, ${order.shippingAddress.line2}` : ''}<br />
+                {order.shippingAddress.city}{order.shippingAddress.region ? `, ${order.shippingAddress.region}` : ''} {order.shippingAddress.postalCode}<br />
+                {order.shippingAddress.country}
+              </>
+            )}
           </address>
+          {order.deliverySlot && (
+            <p className="mt-3 text-[14px] text-muted">
+              Delivery slot: <span className="text-ink">{order.deliverySlot.date} · {order.deliverySlot.from}–{order.deliverySlot.to}</span>
+            </p>
+          )}
         </div>
+
+        {(order.billingAddress || order.company || order.vat) && (
+          <div className="mt-4 rounded-xs border border-line p-6">
+            <h2 className="eyebrow">Billing</h2>
+            <address className="mt-3 not-italic text-[14px] leading-relaxed text-muted">
+              {order.company && <>{order.company}<br /></>}
+              {order.billingAddress && (
+                <>
+                  {order.billingAddress.name}<br />
+                  {order.billingAddress.line1}{order.billingAddress.line2 ? `, ${order.billingAddress.line2}` : ''}<br />
+                  {order.billingAddress.city}{order.billingAddress.region ? `, ${order.billingAddress.region}` : ''} {order.billingAddress.postalCode}<br />
+                  {order.billingAddress.country}
+                  {order.vat && <br />}
+                </>
+              )}
+              {order.vat && <>Tax ID {order.vat}</>}
+            </address>
+          </div>
+        )}
+
+        {(order.note || order.giftMessage || order.giftWrapped) && (
+          <div className="mt-6 rounded-xs border border-line p-6 text-[14px] leading-relaxed text-muted">
+            <h2 className="eyebrow">Your notes</h2>
+            {order.note && <p className="mt-3 whitespace-pre-line"><span className="text-ink">Delivery instructions:</span> {order.note}</p>}
+            {order.giftWrapped && <p className="mt-3 text-ink">Gift wrapped</p>}
+            {order.giftMessage && <p className="mt-3 whitespace-pre-line"><span className="text-ink">Gift message:</span> {order.giftMessage}</p>}
+          </div>
+        )}
 
         <div className="mt-10 flex flex-wrap gap-3">
           <Button to="/shop" size="lg">Keep shopping</Button>
-          <Button to="/account/orders" variant="outline" size="lg">Your orders</Button>
+          {signedIn || config.features?.accounts === false ? (
+            <Button to="/account/orders" variant="outline" size="lg">Your orders</Button>
+          ) : (
+            // After a guest order: an account for next time, with the email already filled in.
+            <Button to="/login" state={{ mode: 'register', email: order.email, from: '/account' }} variant="outline" size="lg">
+              Create an account
+            </Button>
+          )}
         </div>
       </div>
       <Promises />

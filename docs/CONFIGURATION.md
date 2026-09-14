@@ -197,7 +197,9 @@ whole point of it living here rather than in an environment variable.
 
 `returnsWindowDays` appears in the trust block on the product page and in the
 Shipping tab. `shippingMethods[0].price` is the standard rate the cart charges
-below the threshold.
+below the threshold. A method may also say `"pickup": true` (collected from a shop: checkout lists the shops) or
+`"slots": true` (checkout asks for a delivery slot); the Odoo backend sets both from the store's delivery methods, and
+the demo never does.
 
 `countries` fills the country select at checkout and in the account's address
 book. The states are not in this document: the forms ask `GET /countries/:code`
@@ -363,7 +365,13 @@ top-level one on purpose — "another merino thing" is a better suggestion than
 }
 ```
 
-`collectPhone: false` drops the phone field. `requireAccount: true` sends a
+`termsRequired: true` replaces the agreement line with a checkbox the shopper must tick (sent as `acceptTerms`), and
+hides Apple Pay and Google Pay; `termsVersion` is informational. `minimumOrder` (minor units) is the store's minimum;
+the bag's own `minimumOrder.remaining` decides whether checkout is offered. `orderNote` and `giftMessage` show optional
+boxes, and `giftWrap: { price }` a "Gift wrap this order" checkbox. The Odoo backend sends all of them from the store.
+
+`collectPhone: false` drops the phone field; `phoneRequired: true` makes it
+required (the Odoo backend sends the store's setting), and `false` labels it optional. `requireAccount: true` sends a
 signed-out shopper to sign in first rather than failing at submit. `termsUrl`
 renders an agreement line under the place-order button; omit it and the line
 disappears.

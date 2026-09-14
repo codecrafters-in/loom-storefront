@@ -2,10 +2,10 @@
  * S-14 — A shopper fills a bag as a guest, then signs in to an account that
  * already had something in its bag. The bag now holds both.
  *
- * Checklist: E2. Gap report §6: ✅ — the bag in the UI lags until a reload
- * (§4 P1 "Cart UI not refreshed after login merge"), which has its own test.
+ * Checklist: E2. Gap report §6: ✅ — and since Phase 5 the header shows the
+ * merged bag straight after signing in, without a reload.
  */
-import { test, expect, gaps } from '../support/fixtures.js'
+import { test, expect } from '../support/fixtures.js'
 import { uniqueEmail } from '../support/env.js'
 
 /** The account already has a Merino Crew in its bag; the guest adds an Oxford Shirt and signs in. */
@@ -40,9 +40,9 @@ test('S-14 guest bag merges into the account bag on sign-in', { tag: '@S-14' }, 
   expect(serverCart.lines.map((l) => l.title).sort()).toEqual(['E2E Merino Crew', 'E2E Oxford Shirt'])
 })
 
-test.fail(
+test(
   'S-14 the header bag shows the merged bag straight after sign-in, without a reload',
-  gaps('@S-14', 'P1 §4: cart UI not refreshed after login merge (E2)'),
+  { tag: '@S-14' },
   async ({ page, shop, store }) => {
     await guestBagThenSignIn({ page, shop, store })
     await shop.expectBagCount(2, { timeout: 10_000 })

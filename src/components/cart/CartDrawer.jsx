@@ -133,7 +133,9 @@ export default function CartDrawer() {
                     </div>
                     <LineDetails line={line} />
                     <div className="mt-2.5 flex items-center justify-between">
-                      <QuantityStepper size="sm" value={line.quantity} onChange={(q) => update(line.id, q)} disabled={busy} {...stepperProps(line.quantityRule)} />
+                      {!isMock && line.isReward
+                        ? <span className="text-[12px] text-good">Free</span>
+                        : <QuantityStepper size="sm" value={line.quantity} onChange={(q) => update(line.id, q)} disabled={busy} {...stepperProps(line.quantityRule)} />}
                       <span className="text-sm tabular-nums">{formatMoney(line.lineTotal)}</span>
                     </div>
                   </div>

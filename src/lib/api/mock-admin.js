@@ -30,6 +30,9 @@ import {
   loadCart,
   saveCart,
   placeOrderFromCart,
+  applyDiscount,
+  addToWishlist,
+  removeCartLine,
 } from './mock.js'
 
 /**
@@ -216,6 +219,55 @@ export async function getOrderPaymentOptions() {
 }
 
 export const createOrderPayment = getOrderPaymentOptions
+
+/** The demo keeps one code at a time: adding one replaces it, removing clears it. */
+export const addCode = (code) => applyDiscount(code)
+export const removeCode = () => applyDiscount('')
+
+export async function claimReward() {
+  await latency()
+  throw new ApiError('That reward is not available for this bag.', { status: 422, code: 'invalid_reward' })
+}
+
+export async function getGiftCard() {
+  await latency()
+  throw new ApiError('We could not find that gift card.', { status: 404, code: 'not_found' })
+}
+
+/** The demo has no delivery slots and no shops to collect from; its checkout never asks for them. */
+export async function getDeliverySlots() {
+  await latency()
+  return { required: false, slots: [], selected: null }
+}
+export async function getPickupLocations() {
+  await latency()
+  return { locations: [], selected: null }
+}
+export async function setPickupLocation() {
+  await latency()
+  throw new ApiError('The demo has no shops to collect from.', { status: 422, code: 'invalid_pickup_location' })
+}
+
+/** Save for later in the demo: the product is saved and the line leaves the bag. */
+export async function saveForLater(lineId, productSlug) {
+  if (productSlug) await addToWishlist(productSlug)
+  return removeCartLine(lineId)
+}
+
+export async function getLoyalty() {
+  await latency()
+  if (!read(KEY.customer, null)) throw new ApiError('Sign in to see your rewards.', { status: 401, code: 'unauthenticated' })
+  return { items: [], total: 0 }
+}
+
+/** The demo delivers everywhere it lists a delivery method. */
+export async function checkServiceability({ country = '', postalCode = '' } = {}) {
+  await latency()
+  const methods = (storefront.commerce?.shippingMethods || []).map((m) => ({
+    id: m.id, label: m.label, note: m.note || '', price: m.price, arrivesAt: null,
+  }))
+  return { deliverable: methods.length > 0, country, postalCode, methods }
+}
 
 /** The demo has no wallet: no express buttons. */
 export async function getExpressOptions() {

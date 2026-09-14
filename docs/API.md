@@ -890,8 +890,16 @@ client that recalculates them will eventually disagree with the invoice.
 | `POST` | `/carts/:id/lines` | `{ variant_id, quantity }`, or `{ product_slug, choice_ids, quantity }` with the extras below |
 | `PATCH` | `/carts/:id/lines/:lineId` | `{ quantity }` |
 | `DELETE` | `/carts/:id/lines/:lineId` | |
+| `POST` | `/carts/:id/lines/:lineId/save` | Save for later, signed in: the product joins saved items and the line leaves the bag (a guest's is saved in the browser and the line deleted) |
+| `GET` | `/carts/:id/slots?method=` | `{ required, slots: [{ id, label, date, from, to, startsAt, endsAt, remaining }], selected }` — delivery slots for a method |
+| `GET` | `/carts/:id/pickup-locations?method=&zip=&country=` | `{ locations: [{ id, name, street, city, region, postalCode, country, distanceKm, inStock }], selected }` — shops to collect from, nearest first |
+| `POST` | `/carts/:id/pickup-location` | `{ method, location_id }` — collect from that shop; returns `Cart` |
 | `DELETE` | `/carts/:id/lines` | Empties the cart |
 | `POST` | `/carts/:id/discount` | `{ code }` — `""` clears it |
+| `POST` | `/carts/:id/codes` | `{ code }` — adds a code, keeping the others |
+| `DELETE` | `/carts/:id/codes/:code` | Removes one code |
+| `POST` | `/carts/:id/rewards` | `{ coupon_id, reward_id, variant_id? }` — claims one of `claimableRewards` |
+| `GET` | `/gift-cards/:code` | `{ balance, expiresAt }` |
 
 ```json
 {
@@ -917,15 +925,67 @@ client that recalculates them will eventually disagree with the invoice.
   "total": { "amount": 32659, "currency": "USD" },
   "discountCode": { "code": "LOOM10", "label": "10% off" },
   "freeShippingThreshold": { "amount": 15000, "currency": "USD" },
-  "freeShippingRemaining": { "amount": 0, "currency": "USD" }
+  "freeShippingRemaining": { "amount": 0, "currency": "USD" },
+  "freeShippingProgress": {
+    "method": "standard",
+    "threshold": { "amount": 15000, "currency": "USD" },
+    "remaining": { "amount": 0, "currency": "USD" },
+    "percent": 100,
+    "reached": true
+  },
+  "minimumOrder": null
 }
 ```
 
-`freeShippingRemaining` drives the progress bar in the cart and drawer. Return
-zero when it does not apply.
+`freeShippingRemaining` drives the "away from free shipping" line in the cart and drawer; return zero when it does not
+apply. `freeShippingProgress` (optional, `null` when nothing ships free) fills the cart's bar with `percent`, measured
+by the backend; without it the bar falls back to `subtotal / freeShippingThreshold`. `minimumOrder` (optional,
+`{ amount, remaining }` or `null`): while `remaining` is above zero the cart and checkout say how much more is needed
+and do not offer checkout. `giftWrap` (optional money) is a gift wrapping charge added at checkout, shown as its own
+row. `pickupLocation` (optional, `{ id, name, street, city, region, postalCode, country }` or `null`) is the shop chosen
+for a collection method, and `deliverySlot` (optional, `{ id, label, date, from, to, startsAt, endsAt }` or `null`) the
+slot booked at checkout; orders carry both too.
+
+A delivery method marked `pickup: true` in `commerce.shippingMethods` makes checkout list shops
+(`getPickupLocations`) and set one (`setPickupLocation`) before the order can be placed; one marked `slots: true` makes
+it list slots (`getDeliverySlots`) and send the chosen `delivery_slot`. Neither applies to the demo, and wallet buttons
+never offer those methods.
 
 Expected errors: `409 insufficient_inventory`, `409 out_of_stock`,
 `422 invalid_discount`.
+
+**The bag follows the backend.** A backend may reprice a bag and drop products
+that are no longer on sale whenever it is read or changed. It says so in
+`notices` — what changed in that answer, in words for the shopper — and the
+theme shows each `message` once as a toast:
+
+```json
+"notices": [
+  { "type": "price_changed", "lineId": "41", "title": "Merino Crew",
+    "from": { "amount": 11500, "currency": "USD" }, "to": { "amount": 17250, "currency": "USD" },
+    "message": "The price of Merino Crew changed to $172.50." },
+  { "type": "removed", "title": "Wool Scarf", "message": "Wool Scarf is no longer available and was taken out of your bag." }
+]
+```
+
+`notices` is optional; a cart without it shows nothing.
+
+**Delivery for an address.** Checkout prices delivery for the address as it is
+typed with `POST /carts/:id/shipping-options` (`{ address, method? }`), and the
+product page's postcode checker asks
+`GET /serviceability?country=&region=&postal_code=&variant_id=` →
+`{ deliverable, country, region, postalCode, methods: [{ id, label, note, price, arrivesAt, cutoff, shipsToday, guaranteed }] }`
+(`price` is `null` when the method is priced per bag).
+
+**Codes, promotions and rewards.** A cart may carry `codes: [{ code, label, amount }]`
+(each code with what it takes off), `promotions: [{ name, amount }]` (automatic
+discounts), `claimableRewards: [{ id, couponId, rewardId, type, description, products: [{ variantId, title }] }]`
+(shown as **Choose your reward**) and free-product lines with `isReward: true`
+and `rewardLabel`, which the bag shows without a quantity stepper. "Code
+applied" is said only when the cart changed.
+
+**Quantity prices.** A product detail may carry `priceTiers: [{ minQuantity, price }]`,
+shown under the price as "5+ items · $80.00 each".
 
 ### Adding any product
 
@@ -1033,7 +1093,8 @@ checkout page. The storefront never records a payment — it asks.
 | `POST` | `/carts/:id/shipping-options` | `{ options, selected, shipping, tax, total }` for `{ address?, method? }` |
 
 `payment-options` takes the checkout body (`email`, `shipping_address`,
-`shipping_method`, `currency`) and applies it to the cart, because what can pay
+`shipping_method`, `currency`, and optionally `billing_address`, `company_name`,
+`vat`, `note`, `gift_message`, `gift_wrap`, `accept_terms` and `delivery_slot`) and applies it to the cart, because what can pay
 depends on where the parcel is going and what it costs:
 
 ```json
@@ -1181,6 +1242,7 @@ See [CHECKOUT.md](CHECKOUT.md) for the flows and how to add a gateway driver.
 | `DELETE` | `/me/addresses/:id` | `Customer` |
 | `GET` | `/me/payment-methods` | `{ items: [{ id, name, provider, method }], total }` — saved by the payment providers |
 | `DELETE` | `/me/payment-methods/:id` | The same list, without that one |
+| `GET` | `/me/loyalty` | `{ items: [{ id, program, type, points, pointName, balance, expiresAt, history }], total }` — **Account → Rewards** |
 | `GET` | `/countries/:code` | `Country` — states and required address fields. Public, cacheable |
 
 Address endpoints return the **whole customer**, not the address, so the account
@@ -1238,7 +1300,9 @@ its code the next time the form opens. The demo adapter answers from
 **Pay now** for it (never for cash on delivery, which is paid at the door).
 `refundedTotal` is money given back; the page lists it under the total. `fee`,
 `amountDue`, `canPay` and `refundedTotal` are optional: an order without them
-shows neither.
+shows neither. `billingAddress` (when it is not the delivery address), `company`
+and `vat` show a Billing block on the order page. The Customer carries `company`
+and `vat`, and each address a `type` (`shipping` or `billing`).
 
 A paid order with digital products adds `downloads: [{ id, name, url }]`, listed
 on the order page. `url` is `GET /orders/:orderId/downloads/:documentId`; a bare
@@ -1284,9 +1348,14 @@ of its own; the demo's live in `src/data/storefront.js` and `src/data/pages.js` 
 | `GET` | `/me/wishlist` | `{ items: Product[], total }` |
 | `POST` | `/me/wishlist` | `{ product_slug }` |
 | `DELETE` | `/me/wishlist/:slug` | |
+| `POST` | `/me/wishlist/merge` | `{ product_slugs }` — what a guest saved joins the account; called right after sign-in |
 
 The heart button updates optimistically and rolls back if the call fails, so
 these can be slow without the grid feeling slow.
+
+A guest can save items too. The API adapter keeps their slugs in `localStorage` (`loom.wishlist`), lists them with
+`GET /products?slugs=a,b` (at most 100), and merges them into the account after `login` or `register`. A merge that
+fails keeps them for the next sign-in.
 
 ---
 

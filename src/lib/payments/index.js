@@ -161,12 +161,23 @@ export async function runPayment(payment, { api, input, deps, poll = {} } = {}) 
 }
 
 /** The request body for `createPayment`, from what the checkout form holds. */
-export function paymentBody({ email, shippingAddress, shippingMethod, currency, method, expectedTotal, successUrl, cancelUrl, saveMethod }) {
+export function paymentBody({
+  email, shippingAddress, shippingMethod, currency, method, expectedTotal, successUrl, cancelUrl, saveMethod,
+  billingAddress, companyName, vat, note, giftMessage, giftWrap, acceptTerms, deliverySlot,
+}) {
   return {
     email,
     shippingAddress,
     shippingMethod,
     currency,
+    billingAddress,
+    companyName,
+    vat,
+    note,
+    giftMessage,
+    giftWrap,
+    acceptTerms,
+    deliverySlot,
     ...(method?.saved ? { tokenId: method.id } : { providerId: method?.providerId, methodId: method?.methodId }),
     saveMethod: Boolean(saveMethod),
     expectedTotal,

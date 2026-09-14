@@ -4,6 +4,34 @@ Newest first. Each entry links to the page with the detail.
 
 ## What's new — 2026-09-14
 
+### Bag and checkout
+
+- **Bag notices:** when the backend reprices the bag or removes something no longer on sale, each `notices` message is
+  shown once. [API.md](API.md#cart)
+- **Phone** is required or optional as the backend says (`checkout.phoneRequired`).
+- The order page shows the discount, and "sold out at checkout" names the item.
+- **Delivery for the address:** checkout prices delivery methods as the address is typed; the product page has a
+  postcode checker (`GET /serviceability`).
+- **Billing:** a different billing address, and a company name and tax ID for businesses, at checkout and in the
+  account; addresses are for deliveries or invoices.
+- **Promotions:** several codes with remove buttons, **Choose your reward**, free-product lines, promotions by name,
+  gift card balance check, **Account → Rewards**, and quantity prices on the product page.
+- **Checkout extras:** delivery instructions, gift message and wrapping, a required terms checkbox, and a minimum order
+  message that holds back checkout (`checkout.orderNote`, `giftMessage`, `giftWrap`, `termsRequired`, `minimumOrder`).
+  [CONFIGURATION.md](CONFIGURATION.md)
+- **Free delivery bar** follows the backend's `freeShippingProgress.percent`.
+- **Accounts in checkout:** "Have an account? Sign in" returns to checkout, the header bag shows the merged bag right
+  after signing in, and a guest's order page offers **Create an account**.
+- **Saved items for guests** in API mode (kept in the browser, merged on sign-in) and **Save for later** in the bag.
+  [API.md](API.md#wishlist)
+- **Click & collect and delivery slots** at checkout, for methods the backend marks `pickup` or `slots`: a shop list
+  nearest the postcode, and slot choices by day; the order page shows the shop or slot. [API.md](API.md#cart)
+- **The build renders cart, checkout, sign-in, account, saved items and order pages** once on the server, writing
+  nothing, so a page that throws on its first render fails `npm run build` (a checkout crash had slipped through: those
+  pages are never prerendered). [PERFORMANCE.md](PERFORMANCE.md#prerendering)
+- **Bundle budgets per build:** a live store's first download must stay under 115 KB of JavaScript (it was 125 KB for
+  both); the demo, which also carries the demo backend, under 130 KB. [PERFORMANCE.md](PERFORMANCE.md)
+
 ### Payments made simple
 
 - **Stripe on the checkout page:** Stripe's Payment Element appears when the method is picked, checks the card on

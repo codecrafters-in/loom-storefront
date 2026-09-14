@@ -2,8 +2,10 @@
 export const ADDRESS_FIELDS = ['name', 'line1', 'line2', 'city', 'region', 'postalCode', 'country', 'phone']
 
 /** The address checkout should start with: the default one, else the first saved. */
-export const defaultAddressOf = (customer) =>
-  customer?.addresses?.find((a) => a.isDefault) || customer?.addresses?.[0] || null
+export const defaultAddressOf = (customer) => {
+  const shipping = (customer?.addresses || []).filter((a) => a.type !== 'billing')
+  return shipping.find((a) => a.isDefault) || shipping[0] || null
+}
 
 /**
  * The checkout form, filled from the signed-in customer.

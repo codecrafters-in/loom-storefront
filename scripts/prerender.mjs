@@ -84,7 +84,7 @@ async function main() {
     },
   })
 
-  const { render, prime, routes: plan } = await import(path.join(SSR_OUT, 'entry-server.js'))
+  const { render, prime, routes: plan, smoke } = await import(path.join(SSR_OUT, 'entry-server.js'))
 
   const raw = await fs.readFile(path.join(DIST, 'index.html'), 'utf8')
   if (!raw.includes('<div id="root"></div>')) {
@@ -147,6 +147,20 @@ async function main() {
     await fs.writeFile(path.join(DIST, file), html)
     written += 1
   }
+
+  // Before the server bundle is removed: its lazy pages are imported from it.
+  // Pages a visitor reaches with a bag or an account are lazy and never prerendered, so nothing above runs them.
+  // Render each completely, writing nothing, so a page that throws on its first render fails the build instead of a
+  // shopper's checkout.
+  for (const url of ['/cart', '/checkout', '/login', '/account', '/wishlist', '/orders/lookup', '/order/preview']) {
+    try {
+      await smoke(url)
+    } catch (err) {
+      console.error(`[prerender] ${url} throws when rendered: ${err.message}`)
+      process.exitCode = 1
+    }
+  }
+  console.log('[prerender] cart, checkout, sign-in, account, saved items, order lookup and order pages render without errors')
 
   await fs.rm(SSR_OUT, { recursive: true, force: true })
   console.log(`[prerender] ${written} routes → dist/`)

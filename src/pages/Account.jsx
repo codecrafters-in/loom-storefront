@@ -10,6 +10,7 @@ import { useStorefront } from '../store/StorefrontContext.jsx'
 import { useWishlist } from '../store/WishlistContext.jsx'
 import { Badge, Button, Empty, ErrorState, Icon, Skeleton } from '../components/ui/index.jsx'
 import { formatMoney } from '../lib/money.js'
+import { isMock } from '../lib/config.js'
 
 const TABS = [
   { to: '/account', end: true, label: 'Overview', icon: 'user' },
@@ -18,6 +19,8 @@ const TABS = [
 ]
 // Only where the store takes payments on the storefront: that is where "Save for next time" is offered.
 const PAYMENT_TAB = { to: '/account/payment-methods', label: 'Payment methods', icon: 'shield' }
+// Points and store credit from the backend's loyalty programs; the demo has none.
+const REWARDS_TAB = { to: '/account/rewards', label: 'Rewards', icon: 'award' }
 
 const STATUS_TONE = { placed: 'new', paid: 'bestseller', fulfilled: 'bestseller', delivered: 'bestseller', cancelled: 'sold-out', refunded: 'sold-out' }
 const STATUS_LABEL = { placed: 'Placed', pending: 'Awaiting payment', paid: 'Paid', fulfilled: 'On its way', delivered: 'Delivered', cancelled: 'Cancelled', refunded: 'Refunded' }
@@ -44,7 +47,8 @@ const countryName = (countries, code) => countries.find(([c]) => c === code)?.[1
 export default function Account() {
   const { customer, loading, logout } = useAuth()
   const navigate = useNavigate()
-  const tabs = useStorefront().checkout?.mode === 'payments' ? [...TABS, PAYMENT_TAB] : TABS
+  const checkoutMode = useStorefront().checkout?.mode
+  const tabs = [...TABS, ...(checkoutMode === 'payments' ? [PAYMENT_TAB] : []), ...(isMock ? [] : [REWARDS_TAB])]
 
   if (loading) return <div className="wrap py-16"><Skeleton className="h-72 w-full" /></div>
   if (!customer) return <Navigate to="/login" state={{ from: '/account' }} replace />
@@ -111,6 +115,7 @@ export default function Account() {
             <Route path="orders" element={<Orders />} />
             <Route path="addresses" element={<Addresses />} />
             <Route path="payment-methods" element={<PaymentMethods />} />
+            <Route path="rewards" element={<Rewards />} />
             <Route path="*" element={<Navigate to="/account" replace />} />
           </Routes>
         </div>
@@ -301,7 +306,10 @@ function PersonalDetails() {
   const [busy, setBusy] = useState(false)
 
   const start = () =>
-    setForm({ firstName: customer.firstName || '', lastName: customer.lastName || '', phone: customer.phone || '' })
+    setForm({
+      firstName: customer.firstName || '', lastName: customer.lastName || '', phone: customer.phone || '',
+      company: customer.company || '', vat: customer.vat || '',
+    })
   const set = (k) => (e) => {
     const value = e.target.value
     setForm((f) => ({ ...f, [k]: value }))
@@ -332,6 +340,10 @@ function PersonalDetails() {
             <AddressField id="ln" label="Last name" value={form.lastName} onChange={set('lastName')} autoComplete="family-name" />
           </div>
           <AddressField id="ph" label="Phone" type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <AddressField id="co" label="Company (optional)" value={form.company} onChange={set('company')} autoComplete="organization" />
+            <AddressField id="vat" label="Tax ID (optional)" value={form.vat} onChange={set('vat')} />
+          </div>
           <p className="text-[12px] text-faint">Your email, {customer.email}, is how you sign in, so it can’t be changed here.</p>
           <div className="flex gap-3">
             <Button as="button" type="submit" size="sm" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>
@@ -343,6 +355,7 @@ function PersonalDetails() {
           <Detail label="Name" value={name} empty="Add your name" onAdd={start} />
           <Detail label="Email" value={customer.email} />
           <Detail label="Phone" value={customer.phone} empty="Add a phone number" onAdd={start} />
+          {(customer.company || customer.vat) && <Detail label="Company" value={[customer.company, customer.vat && `Tax ID ${customer.vat}`].filter(Boolean).join(' · ')} />}
         </dl>
       )}
     </Card>
@@ -391,7 +404,7 @@ const ADDRESS_LABELS = {
 }
 
 const blankAddress = (country) => ({
-  name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country, phone: '', isDefault: false,
+  name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country, phone: '', isDefault: false, type: 'shipping',
 })
 
 function AddressField({ id, label, invalid, ...rest }) {
@@ -513,6 +526,22 @@ function Addresses() {
             </div>
           </div>
           <AddressField id="a-phone" label="Phone (for delivery updates)" type="tel" value={editing.phone || ''} onChange={set('phone')} autoComplete="tel" />
+          <div>
+            <label htmlFor="a-type" className="mb-1.5 block text-[13px] font-medium">Use this address for</label>
+            <select
+              id="a-type"
+              className="field"
+              value={editing.type === 'billing' ? 'billing' : 'shipping'}
+              onChange={(e) => {
+                const type = e.target.value
+                setEditing((a) => ({ ...a, type, isDefault: type === 'billing' ? false : a.isDefault }))
+              }}
+            >
+              <option value="shipping">Deliveries</option>
+              <option value="billing">Invoices (billing address)</option>
+            </select>
+          </div>
+          {editing.type !== 'billing' && (
           <label className="flex items-center gap-2.5 text-[13px] text-muted">
             <input
               type="checkbox"
@@ -522,6 +551,7 @@ function Addresses() {
             />
             Use as my default address
           </label>
+          )}
           {problems.length > 0 && (
             <p role="alert" className="text-[13px] text-sale">
               {problems.includes('region') && editing.region
@@ -558,6 +588,7 @@ function Addresses() {
             <div className="flex items-start justify-between gap-3">
               <AddressLines address={a} countries={countries} />
               {a.isDefault && <Badge kind="bestseller">Default</Badge>}
+              {a.type === 'billing' && <Badge kind="new">Billing</Badge>}
             </div>
             <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-5">
               {confirming === a.id ? (
@@ -569,7 +600,7 @@ function Addresses() {
               ) : (
                 <>
                   <TextAction onClick={() => open(a)}>Edit</TextAction>
-                  {!a.isDefault && <TextAction onClick={() => makeDefault(a)}>Set as default</TextAction>}
+                  {!a.isDefault && a.type !== 'billing' && <TextAction onClick={() => makeDefault(a)}>Set as default</TextAction>}
                   <TextAction tone="danger" onClick={() => setConfirming(a.id)}>Remove</TextAction>
                 </>
               )}
@@ -648,3 +679,47 @@ function PaymentMethods() {
     </>
   )
 }
+
+/* ── rewards ─────────────────────────────────────────────────────────────── */
+
+function Rewards() {
+  const { locale } = useAccountLocale()
+  const { data, error, loading, reload } = useAsync(() => api.getLoyalty(), [])
+  if (loading) return <Skeleton className="h-40 w-full" />
+  if (error) return <ErrorState error={error} onRetry={reload} />
+  if (!data?.items.length) {
+    return <Empty icon="award" title="No rewards yet" body="Points and store credit you earn with your orders appear here." />
+  }
+  const points = (value) => new Intl.NumberFormat(locale).format(value)
+  return (
+    <>
+      <PageHeading title="Rewards" note="Your points and store credit. Use them in your bag at checkout." />
+      <ul className="mt-6 space-y-4">
+        {data.items.map((card) => (
+          <li key={card.id} className="rounded-xs border border-line bg-surface p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <p className="text-[15px] font-medium">{card.program}</p>
+              <p className="text-[20px] tabular-nums">
+                {card.balance ? formatMoney(card.balance) : `${points(card.points)} ${card.pointName || 'points'}`}
+              </p>
+            </div>
+            {card.expiresAt && <p className="mt-1 text-[12px] text-faint">Valid until {formatDate(card.expiresAt, locale)}</p>}
+            {card.history?.length > 0 && (
+              <ul className="mt-4 divide-y divide-line border-t border-line text-[13px]">
+                {card.history.map((entry, index) => (
+                  <li key={`${entry.date}-${index}`} className="flex justify-between gap-3 py-2">
+                    <span className="min-w-0 text-muted">{formatDate(entry.date, locale)} · {entry.description}</span>
+                    <span className="shrink-0 tabular-nums">
+                      {entry.issued ? `+${points(entry.issued)}` : ''}{entry.used ? ` −${points(entry.used)}` : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
