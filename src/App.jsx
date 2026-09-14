@@ -32,6 +32,7 @@ const Account = lazy(() => import('./pages/Account.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Search = lazy(() => import('./pages/Search.jsx'))
 const Compare = lazy(() => import('./pages/Compare.jsx'))
+const Brands = lazy(() => import('./pages/Brands.jsx'))
 const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 
 // The admin panel is a separate chunk. A shopper never downloads it.
@@ -83,6 +84,7 @@ export default function App() {
                   <Route path="shop" element={<Shop />} />
                   <Route path="shop/:slug" element={<Shop mode="category" />} />
                   <Route path="collections/:slug" element={<Shop mode="collection" />} />
+                  <Route path="brands" element={<Brands />} />
                   <Route path="brands/:slug" element={<Shop mode="brand" />} />
                   <Route path="compare" element={<Compare />} />
                   <Route path="product/:slug" element={<Product />} />

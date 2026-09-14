@@ -30,7 +30,7 @@ const SURFACE = [
   'listProducts', 'getProduct', 'getRelated', 'listCategories', 'listCollections', 'getReviews',
   'getCombination', 'listBrands', 'getBrand',
   'getCart', 'addToCart', 'updateCartLine', 'removeCartLine', 'applyDiscount', 'clearCart',
-  'checkout', 'listOrders', 'getOrder', 'lookupOrder',
+  'checkout', 'listOrders', 'getOrder', 'lookupOrder', 'downloadFile',
   'getPaymentOptions', 'createPayment', 'paymentAction', 'getPayment',
   'adminPlaceOrder', 'adminGetOrder', 'adminListOrders',
   'login', 'register', 'logout', 'getMe', 'updateMe', 'saveAddress', 'deleteAddress', 'getCountry',

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
@@ -10,13 +10,17 @@ import { SIZES } from '../../lib/images.js'
 import { ExtraOptions, OptionPicker } from './VariantPicker.jsx'
 import { CompareToggle } from './CompareTray.jsx'
 
+const OptionalOffer = lazy(() => import('./OptionalOffer.jsx'))
+
 /**
  * A look at a product without leaving the grid.
  *
  * The same picker and the same `useProductChoice` as the product page, so a
  * choice that is struck through there is struck through here. A set is the one
  * thing it sends to the full page: choosing one item from each group inside a
- * dialog over a grid is where a purchase gets lost.
+ * dialog over a grid is where a purchase gets lost. The store's optional
+ * products are offered here too, as on the product page, so they are added
+ * with the product and linked to its line.
  *
  * Its own chunk, loaded on the first press of Quick view.
  */
@@ -72,12 +76,20 @@ function Body({ product, onClose }) {
   const { add, busy } = useCart()
   const image = choice.gallery.find((i) => i.type !== 'video') || product.images[0]
 
-  const buy = () =>
-    add(choice.request(), choice.qty, `${product.title} added to your bag`)
+  const [offer, setOffer] = useState(null)
+
+  const submit = (request) =>
+    add(request, request.quantity ?? choice.qty, `${product.title} added to your bag`)
       .then(onClose)
       .catch(() => {
         /* the bag has already said why */
       })
+
+  const buy = () => {
+    const request = choice.request()
+    if (product.optionalProducts?.length) setOffer(request)
+    else submit(request)
+  }
 
   return (
     <div className="grid gap-6 p-5 sm:grid-cols-2 sm:p-6">
@@ -112,6 +124,20 @@ function Body({ product, onClose }) {
           <CompareToggle slug={product.slug} />
         </div>
       </div>
+
+      {offer && (
+        <Suspense fallback={null}>
+          <OptionalOffer
+            product={product}
+            busy={busy}
+            onClose={() => setOffer(null)}
+            onConfirm={(optionalProducts) => {
+              setOffer(null)
+              submit(optionalProducts.length ? { ...offer, optionalProducts } : offer)
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

@@ -43,10 +43,11 @@ export async function prime(reads = []) {
  * match, and a silently empty grid on every category page.
  */
 export async function routes() {
-  const [products, categories, collections] = await Promise.all([
+  const [products, categories, collections, brands] = await Promise.all([
     api.listProducts({ perPage: 500 }),
     api.listCategories(),
     api.listCollections(),
+    api.listBrands(),
   ])
   // Any depth: a third-level category is a page like any other.
   const flatCategories = flattenCategories(categories.items)
@@ -60,6 +61,11 @@ export async function routes() {
     ...collections.items.map((c) => ({
       url: `/collections/${c.slug}`,
       reads: [...listing({ collection: c.slug }), ['listCollections', []]],
+    })),
+    // A brand is the page's scope (`inBrand`), and its name and description come from the brand record.
+    ...brands.items.map((b) => ({
+      url: `/brands/${b.slug}`,
+      reads: [...listing({ inBrand: b.slug }), ['getBrand', [b.slug]]],
     })),
     ...products.items.map((p) => ({
       url: `/product/${p.slug}`,

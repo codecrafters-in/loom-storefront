@@ -613,6 +613,11 @@ export async function getBootstrap() {
 
 /* brands and combinations */
 
+/** The demo's downloads are static files the browser follows as plain links. */
+export async function downloadFile() {
+  return null
+}
+
 export async function listBrands() {
   await latency()
   const items = brands.map((b) => ({

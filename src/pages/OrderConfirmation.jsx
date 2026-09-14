@@ -17,6 +17,31 @@ import LineDetails from '../components/cart/LineDetails.jsx'
  */
 const downloadUrl = (url = '') => (/^\/orders\//.test(url) ? `${config.api.baseUrl}${url}` : url)
 
+/**
+ * Save a download with the customer's token when it is an API route (see
+ * `downloadFile`); anything else, or a failure, falls back to the plain link.
+ */
+async function saveDownload(event, download) {
+  const href = downloadUrl(download.url)
+  event.preventDefault()
+  try {
+    const blob = await api.downloadFile(href)
+    if (!blob) {
+      window.location.assign(href)
+      return
+    }
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = download.name
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(link.href), 30_000)
+  } catch {
+    window.location.assign(href)
+  }
+}
+
 export default function OrderConfirmation() {
   const { id } = useParams()
   const { state } = useLocation()
@@ -79,7 +104,7 @@ export default function OrderConfirmation() {
             <ul className="mt-3 space-y-2">
               {order.downloads.map((d) => (
                 <li key={d.id}>
-                  <a href={downloadUrl(d.url)} download className="inline-flex items-center gap-2 text-[14px] text-accent link-underline">
+                  <a href={downloadUrl(d.url)} download onClick={(e) => saveDownload(e, d)} className="inline-flex items-center gap-2 text-[14px] text-accent link-underline">
                     <Icon name="package" size={15} />
                     {d.name}
                   </a>

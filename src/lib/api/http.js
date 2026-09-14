@@ -172,6 +172,26 @@ export async function getCombination(slug, choiceIds = []) {
 }
 
 export const listBrands = () => get('/brands').then((r) => assertList(r, 'GET /brands'))
+
+/**
+ * A file bought with an order, as a Blob, or null when `href` is not an API route
+ * (the browser can follow it as a plain link).
+ *
+ * `GET /orders/:id/downloads/:doc` answers to the order's owner or to whoever holds
+ * the guest order link, which expires after 30 days. A plain link sends no token,
+ * so a signed-in customer's older order would answer 404; fetching it with the
+ * customer's token keeps every one of their downloads working.
+ */
+export async function downloadFile(href) {
+  const base = config.api.baseUrl
+  if (!href || !href.startsWith(base)) return null
+  const path = href.slice(base.length)
+  const res = await send('GET', path, { auth: customerToken() })
+  if (!res.ok) {
+    throw new ApiError(`GET ${path} failed with ${res.status}.`, { status: res.status, code: `http_${res.status}` })
+  }
+  return res.blob()
+}
 export const getBrand = (slug) => get(`/brands/${encodeURIComponent(slug)}`)
 
 export async function getRelated(slug, { limit = 4, strategy = 'automatic' } = {}) {

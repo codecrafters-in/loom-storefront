@@ -32,6 +32,11 @@ Newest first. Each entry links to the page with the detail.
   are a "Frequently bought together" rail on the product page and in the bag
   drawer; alternatives feed "You might also like". Bag lines show extras, typed
   text and a set's contents everywhere a line is shown. [API.md](API.md#cart)
+- **Brands, downloads and quick view.** `/brands` lists every brand with a
+  product, brand pages are prerendered and scoped with `in_brand` (their filters
+  describe that brand only), quick view offers the optional products too, and a
+  signed-in customer's downloads are fetched with their token, so they keep
+  working after the 30-day guest order link expires (`downloadFile`).
 - **Filters for any catalogue.** The filter panel renders every attribute,
   specification facet and brand the backend sends (`attr=`, `spec=`, `brand=`,
   kept in the URL), and the price filter has a lowest and a highest end in the
