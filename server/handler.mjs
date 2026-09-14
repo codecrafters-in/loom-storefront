@@ -20,6 +20,7 @@
 import { buildPolicy, inlineScriptHashes } from '../scripts/lib/csp.mjs'
 import { etagFetch } from './etag-fetch.mjs'
 import { clearStorage, installBrowserGlobals, setLocation } from './globals.mjs'
+import { envelope, parseDsn } from '../src/lib/sentry-envelope.js'
 
 /** Odoo's robots.txt and sitemaps, answered on the storefront's own domain. */
 export const PASS_THROUGH = /^\/(?:robots\.txt|sitemap\.xml|sitemaps\/[a-z]+-\d+\.xml)$/
@@ -163,8 +164,35 @@ export function createHandler({ loadBundle, template, env = {}, fetch: fetchImpl
     }
   }
 
+  /** A render that failed, to Sentry when `SENTRY_DSN` is set. Never awaited long: the shopper's answer comes first. */
+  function reportFailure(err, url) {
+    const target = parseDsn(env.SENTRY_DSN)
+    if (!target) return
+    const { body } = envelope(err, env.SENTRY_DSN, { platform: 'node', environment: env.SENTRY_ENVIRONMENT || 'production', url: String(url), tags: { kind: 'render' } })
+    Promise.resolve(upstream(target.url, { method: 'POST', body, headers: { 'content-type': 'text/plain;charset=UTF-8' } })).catch(() => {})
+  }
+
+  /** `/__loom/health`: the handler runs, its bundle loads, and the store's API answers (and how fast). */
+  async function health(head) {
+    const started = Date.now()
+    let api = { ok: false }
+    try {
+      const { bundle } = await load()
+      if (!bundle.apiBaseUrl) api = { ok: true, demo: true }
+      else {
+        const response = await upstream(`${bundle.apiBaseUrl}/health`, { headers: { accept: 'application/json' } })
+        api = { ok: response.ok, status: response.status, ms: Date.now() - started }
+      }
+    } catch (err) {
+      api = { ok: false, error: String(err?.message || err).slice(0, 200) }
+    }
+    const body = JSON.stringify({ status: api.ok ? 'ok' : 'degraded', api })
+    return new Response(head ? null : body, { status: api.ok ? 200 : 503, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } })
+  }
+
   return async function handle(request) {
     const url = new URL(request.url)
+    if (url.pathname === '/__loom/health') return health(request.method === 'HEAD')
     const head = request.method === 'HEAD'
     if (request.method !== 'GET' && !head) {
       return new Response('Method not allowed', { status: 405, headers: { ...SECURITY_HEADERS, allow: 'GET, HEAD' } })
@@ -189,6 +217,7 @@ export function createHandler({ loadBundle, template, env = {}, fetch: fetchImpl
       })
     } catch (err) {
       console.error(`[render] ${url.pathname}${url.search} failed: ${err?.message || err}`)
+      reportFailure(err, url)
       result = { kind: 'error' }
     }
 
@@ -212,7 +241,7 @@ export function createHandler({ loadBundle, template, env = {}, fetch: fetchImpl
     const headers = {
       'content-type': 'text/html; charset=utf-8',
       // A header rather than the build's meta tag: the hash of this response's data script changes with every page.
-      'content-security-policy': `${buildPolicy({ hashes: inlineScriptHashes(body), apiOrigin: originOf(apiBase) })}; frame-ancestors 'none'`,
+      'content-security-policy': `${buildPolicy({ hashes: inlineScriptHashes(body), apiOrigin: originOf(apiBase), connect: [originOf(bundle.sentryDsn || '')].filter(Boolean) })}; frame-ancestors 'none'`,
       ...cacheHeaders(result.kind, settings),
     }
     if (result.kind !== 'page') headers['x-robots-tag'] = 'noindex'

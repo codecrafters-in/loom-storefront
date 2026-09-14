@@ -52,7 +52,7 @@ function staticHeaders(file, dist) {
   return {
     ...SECURITY_HEADERS,
     'content-type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream',
-    'cache-control': rel.startsWith(`assets${path.sep}`) || rel.startsWith(`images${path.sep}`)
+    'cache-control': rel === 'sw.js' ? 'no-cache' : rel.startsWith(`assets${path.sep}`) || rel.startsWith(`images${path.sep}`)
       ? 'public, max-age=31536000, immutable'
       : file.endsWith('.html') ? 'public, max-age=0, must-revalidate' : 'public, max-age=3600',
   }

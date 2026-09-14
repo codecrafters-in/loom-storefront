@@ -619,4 +619,5 @@ export default {
   "Suggestions": "Vorschläge",
   "Popular searches": "Beliebte Suchen",
   "No exact match for “{q}”. Showing similar names.": "Keine genaue Übereinstimmung für „{q}“. Ähnliche Namen werden angezeigt.",
+  "Reference: {id}": "Referenz: {id}",
 }

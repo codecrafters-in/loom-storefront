@@ -3,6 +3,7 @@ import { Button } from './ui/index.jsx'
 import { track } from '../lib/analytics.js'
 import { describeError, shouldReset } from '../lib/errors.js'
 import { t } from '../i18n/index.js'
+import { config } from '../lib/config.js'
 
 /**
  * What a shopper sees when a render throws.
@@ -41,6 +42,11 @@ export default class ErrorBoundary extends Component {
       message: describeError(error),
       route: typeof window !== 'undefined' ? window.location.pathname : '',
     })
+    if (config.monitoring.sentryDsn) {
+      import('../lib/monitoring.js')
+        .then((module) => module.reportError(error, { tags: { kind: 'render' }, extra: { componentStack: info?.componentStack?.slice(0, 2000) } }))
+        .catch(() => {})
+    }
   }
 
   componentDidUpdate(previous) {

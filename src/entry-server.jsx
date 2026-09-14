@@ -101,6 +101,8 @@ export async function routes() {
 
 /** The API the render handler asks about redirects and passes robots.txt and sitemaps from; '' on the demo data. */
 export const apiBaseUrl = isMock ? '' : config.api.baseUrl
+/** Where the browser sends error reports, for the page's Content-Security-Policy. */
+export const sentryDsn = config.monitoring.sentryDsn
 
 // Different for every visitor: the app's shell, rendered in their browser and never cached.
 const PRIVATE = /^\/(?:cart|checkout|order|orders|login|account|wishlist|search|compare|admin)(?:\/|$)/

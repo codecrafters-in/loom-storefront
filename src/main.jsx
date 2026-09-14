@@ -3,6 +3,7 @@ import { createRoot, hydrateRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { languageFromPath, setLanguage } from './i18n/index.js'
+import { config } from './lib/config.js'
 import './index.css'
 
 // `/fr/...` is the storefront in French: its catalog loads before the first render, and the router works below the prefix.
@@ -15,6 +16,26 @@ const root = document.getElementById('root')
 import('./lib/attribution.js')
   .then((module) => module.captureVisit())
   .catch(() => {})
+
+// Errors nothing caught, to Sentry, when the build has a DSN.
+if (config.monitoring.sentryDsn) {
+  import('./lib/monitoring.js')
+    .then((module) => module.watchErrors())
+    .catch(() => {})
+}
+
+// Web vitals of this page load, reported to analytics when the page is hidden. Loaded once the page is idle.
+const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500))
+idle(() => {
+  Promise.all([import('./lib/vitals.js'), import('./lib/analytics.js')])
+    .then(([vitals, analytics]) => vitals.watchVitals(analytics.webVital))
+    .catch(() => {})
+})
+
+// The offline shell, for a build that asks for it (VITE_PWA=on).
+if (import.meta.env.VITE_PWA === 'on' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
+}
 
 setLanguage(language || rendered, { address: Boolean(language) }).finally(() => {
   const app = (

@@ -203,6 +203,10 @@ export function ErrorState({ error, onRetry }) {
       <p className="mt-3 text-[15px] leading-relaxed text-ink">
         {error?.message || t('Something went wrong.')}
       </p>
+      {error?.detail?.errorId && (
+        // What support needs to find this failure in Odoo's log.
+        <p className="mt-2 font-mono text-[11px] text-faint">{t('Reference: {id}', { id: error.detail.errorId })}</p>
+      )}
       {onRetry && (
         <Button variant="quiet" size="sm" className="mt-5" onClick={onRetry}>
           {t('Try again')}

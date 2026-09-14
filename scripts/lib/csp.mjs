@@ -63,6 +63,15 @@ export function inlineScriptHashes(html) {
  * Read from the same VITE_ variables the bundle was built with. A relative base
  * URL is the site's own origin, which `'self'` already covers.
  */
+/** The Sentry host error reports go to, when the build has a DSN (src/lib/monitoring.js). */
+export function sentryOriginFrom(env = {}) {
+  try {
+    return env.VITE_SENTRY_DSN ? new URL(env.VITE_SENTRY_DSN).origin : ''
+  } catch {
+    return ''
+  }
+}
+
 export function apiOriginFrom(env = {}) {
   if ((env.VITE_DATA_SOURCE || '').toLowerCase() !== 'api' || !env.VITE_API_BASE_URL) return ''
   try {
@@ -84,14 +93,14 @@ export function apiOriginFrom(env = {}) {
  * the theme cannot know about, and the API origin is added so a store on plain
  * http (Odoo on localhost:8069) still shows its pictures.
  */
-export function buildPolicy({ hashes = [], apiOrigin = '' } = {}) {
+export function buildPolicy({ hashes = [], apiOrigin = '', connect = [] } = {}) {
   const api = apiOrigin ? [apiOrigin] : []
   const directives = [
     ['default-src', "'self'"],
     ['base-uri', "'self'"],
     ['object-src', "'none'"],
     ['script-src', "'self'", ...hashes, ...THIRD_PARTY.script],
-    ['connect-src', "'self'", ...api, ...THIRD_PARTY.connect],
+    ['connect-src', "'self'", ...api, ...THIRD_PARTY.connect, ...connect],
     ['img-src', "'self'", 'data:', 'blob:', 'https:', ...api],
     ['media-src', "'self'", 'data:', 'blob:', 'https:', ...api],
     ['style-src', "'self'", "'unsafe-inline'", ...THIRD_PARTY.style],
@@ -111,9 +120,9 @@ const EXISTING = /\s*<meta http-equiv="Content-Security-Policy"[^>]*>/gi
  * parser reaches after it, so it must come before the first script, and the
  * charset has to stay within the first kilobyte.
  */
-export function applyCsp(html, { apiOrigin = '' } = {}) {
+export function applyCsp(html, { apiOrigin = '', connect = [] } = {}) {
   const clean = html.replace(EXISTING, '')
-  const policy = buildPolicy({ hashes: inlineScriptHashes(clean), apiOrigin })
+  const policy = buildPolicy({ hashes: inlineScriptHashes(clean), apiOrigin, connect })
   const tag = `<meta http-equiv="${META_NAME}" content="${policy}" />`
 
   const charset = clean.match(/<meta charset[^>]*>/i)

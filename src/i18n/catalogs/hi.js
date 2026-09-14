@@ -619,4 +619,5 @@ export default {
   "Suggestions": "सुझाव",
   "Popular searches": "लोकप्रिय खोजें",
   "No exact match for “{q}”. Showing similar names.": "“{q}” के लिए कोई सटीक मिलान नहीं। मिलते-जुलते नाम दिखाए जा रहे हैं।",
+  "Reference: {id}": "संदर्भ: {id}",
 }

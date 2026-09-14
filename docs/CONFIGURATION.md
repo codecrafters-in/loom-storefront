@@ -60,6 +60,10 @@ cp .env.example .env.local
 | `VITE_REPO_URL` | this repo | Footer source link |
 | `VITE_ADMIN_USER` | `admin` | Demo back-office username. **Mock mode only** |
 | `VITE_ADMIN_PASSWORD` | `admin` | Demo back-office password. **Mock mode only** |
+| `VITE_SENTRY_DSN` | — | A Sentry project's DSN: render errors, uncaught errors and failed API answers (with the backend's `errorId`) are reported there. Empty sends nothing. A DSN is public by design |
+| `VITE_SENTRY_ENVIRONMENT` | `production` | The environment the reports are filed under (`staging`, …) |
+| `VITE_RELEASE` | — | A release name for the reports, e.g. the commit |
+| `VITE_PWA` | `off` | `on` registers the offline shell (`public/sw.js`): pages still always come from the network, and a shopper without a connection gets `offline.html` instead of the browser's error |
 
 In `api` mode those two variables are ignored: the admin login page has a single
 **Sign in with Odoo** button, and the password is typed on Odoo's own page. They

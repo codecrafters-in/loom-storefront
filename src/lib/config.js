@@ -40,6 +40,13 @@ export const config = {
   // The theme's source, linked from the demo's footer only (see Footer.jsx).
   repoUrl: env.VITE_REPO_URL || '',
 
+  /** Error reports to Sentry (src/lib/monitoring.js); empty sends nothing. The DSN is public by design. */
+  monitoring: {
+    sentryDsn: env.VITE_SENTRY_DSN || '',
+    environment: env.VITE_SENTRY_ENVIRONMENT || (env.PROD ? 'production' : 'development'),
+    release: env.VITE_RELEASE || '',
+  },
+
   /**
    * Demo admin credential. Mock mode only.
    *

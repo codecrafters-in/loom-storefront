@@ -122,8 +122,8 @@ whichever it is given.
 Caps that matter:
 
 - **Clamp `per_page` server-side.** A client asking for 10,000 is either a bug
-  or a scraper. 48 is a sensible ceiling; the theme never asks for more than
-  200, and only from admin.
+  or a scraper. The Odoo backend caps store and admin routes at 100; the theme's
+  shop pages ask for 12 or 24.
 - **Return `total` from an estimate above a few hundred thousand rows.** An
   exact `COUNT(*)` on a large filtered set is often slower than the query it
   belongs to. `PostgreSQL`'s `reltuples` or a cached count is enough for a
@@ -322,3 +322,28 @@ It is keyed on the pathname, because a boundary that never resets stays broken
 for the rest of the session and makes every subsequent page look broken too.
 The message says what to do; the stack goes to the console and an `app_error`
 event goes to analytics.
+
+---
+
+## Large catalogues on Odoo
+
+The Odoo backend answers a listing of up to 250 products exactly as a shopper sees it (their pricelist, taxes and
+live stock). Above that — a whole shop of 20,000 products — it filters, counts, sorts and pages in the database and
+reads only the page's products, with facets and counts from grouped queries. Price sorting and the price filter then
+use each product's cheapest list price, and "in stock" means stock on hand. Cached answers are validated against a
+catalogue version that costs one query. Its benchmark (`loom_storefront/tools/bench_seed.py` and `tools/bench.mjs`)
+measures each endpoint on 20,000 products and 100,000 variants.
+
+## Measuring real visitors
+
+Once the page is idle the theme starts watching Core Web Vitals (`src/lib/vitals.js`, a chunk of its own) and, when
+the page is hidden, sends one `web_vitals` event per metric to analytics: `metric_name` (`LCP`, `CLS`, `INP`, `FCP`,
+`TTFB`), `metric_value` (milliseconds, or the shift score for CLS), `metric_rating` (`good`, `needs-improvement`,
+`poor`, by Google's thresholds) and `page_path`. They follow the same consent and Do Not Track rules as every other
+event, and reach Google Analytics 4 when the store has it.
+
+## Health checks
+
+`/__loom/health` on the storefront says whether the render handler runs and the store's API answers, and how fast;
+`/loom/health` on Odoo says whether Odoo and its database answer. Both answer `503` when unwell ([Deploying](DEPLOY.md)).
+

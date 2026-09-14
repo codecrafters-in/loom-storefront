@@ -40,6 +40,8 @@ Read at **run** time by the render handler (all optional):
 | `LOOM_STALE_SECONDS` | `86400` | How long the CDN may keep serving the previous copy while it renders a fresh one |
 | `LOOM_API_ETAGS` | `on` | `off` stops remembering Odoo's answers between renders (`If-None-Match`) |
 | `PORT` | `3000` | Node server only |
+| `SENTRY_DSN` | — | A Sentry project's DSN for pages that fail to render on the server |
+| `SENTRY_ENVIRONMENT` | `production` | The environment those reports are filed under |
 
 In Odoo, the store's **Storefront URL** must be the deployed origin: Odoo allows the storefront's calls from it (CORS),
 sends shoppers back to it from payment, and writes it into the sitemap.
@@ -124,6 +126,18 @@ server {
 Private pages (bag, checkout, account) answer `Cache-Control: private, no-store`; with `proxy_ignore_headers
 Cache-Control` add `proxy_no_cache $upstream_http_cache_control ~ private;` via a `map`, or leave `proxy_cache` off and
 use a CDN.
+
+## Health and errors
+
+- **`/__loom/health`** answers `200 {"status": "ok", "api": {"ok": true, "status": 200, "ms": 41}}` when the render
+  handler runs and the store's API answers, `503` with `"status": "degraded"` when it does not. Point an uptime check or
+  a load balancer at it; Odoo's own is `https://<odoo>/loom/health`.
+- **Errors:** with `SENTRY_DSN` a page that fails to render on the server is reported; with `VITE_SENTRY_DSN` (a build
+  variable) the browser reports render errors, uncaught errors and failed API answers. An Odoo failure carries a
+  reference (`errorId`) that is also in Odoo's log and in the report.
+- **Offline shell:** a build with `VITE_PWA=on` registers `/sw.js`. The Node server sends it with `Cache-Control:
+  no-cache`; on Vercel, Netlify or Cloudflare add the same header for `/sw.js`, or a fix to it can take a day to reach
+  visitors.
 
 ## Check a deployment
 

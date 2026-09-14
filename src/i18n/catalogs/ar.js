@@ -683,4 +683,5 @@ export default {
   "Suggestions": "اقتراحات",
   "Popular searches": "عمليات البحث الشائعة",
   "No exact match for “{q}”. Showing similar names.": "لا توجد نتيجة مطابقة تمامًا لـ «{q}». نعرض أسماء مشابهة.",
+  "Reference: {id}": "المرجع: {id}",
 }

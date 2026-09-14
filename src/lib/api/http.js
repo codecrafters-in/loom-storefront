@@ -127,6 +127,15 @@ async function request(method, path, { query, body } = {}) {
 
   if (!res.ok) {
     if (payload?.code === 'store_locked' || payload?.code === 'store_maintenance') accessRequired(payload.code)
+    if (res.status >= 500 && config.monitoring.sentryDsn) {
+      // Odoo's reference (`errorId`) goes with the report, so the storefront's and Odoo's logs point at each other.
+      import('../monitoring.js')
+        .then((module) => module.reportError(new Error(`${method} ${path} failed with ${res.status}`), {
+          tags: { kind: 'api', status: String(res.status), code: payload?.code || '' },
+          extra: { errorId: payload?.errorId },
+        }))
+        .catch(() => {})
+    }
     throw new ApiError(payload?.message || payload?.error || `${method} ${path} failed with ${res.status}.`, {
       status: res.status,
       code: payload?.code || `http_${res.status}`,

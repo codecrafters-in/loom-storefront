@@ -16,7 +16,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadEnv } from 'vite'
-import { apiOriginFrom, applyCsp, inlineHandlers, inlineScriptHashes } from './lib/csp.mjs'
+import { apiOriginFrom, applyCsp, inlineHandlers, inlineScriptHashes, sentryOriginFrom } from './lib/csp.mjs'
 import { builtFor } from './lib/build-mode.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -52,7 +52,7 @@ async function main() {
     for (const handler of inlineHandlers(html)) {
       console.warn(`[csp] ${path.relative(DIST, file)} has an inline event handler the policy will block: ${handler.slice(0, 80)}`)
     }
-    const out = applyCsp(html, { apiOrigin })
+    const out = applyCsp(html, { apiOrigin, connect: [sentryOriginFrom(env)].filter(Boolean) })
     hashes += inlineScriptHashes(out).length
     await fs.writeFile(file, out)
   }

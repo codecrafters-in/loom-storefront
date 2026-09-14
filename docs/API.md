@@ -56,6 +56,10 @@ variable is compiled into the JavaScript bundle for anyone to read.
 fails with an opaque network error. The storefront never sends cookies, so do not
 send `Access-Control-Allow-Credentials`.
 
+**Server failures carry a reference.** A `500` answer may include `errorId`; the theme shows it under the error
+("Reference: 3f2a9c0d1e4b") and sends it with its Sentry report, so the shopper, the storefront's report and the
+backend's log all name the same failure.
+
 **Pagination.** List endpoints take `page` (1-based) and `per_page`, and return:
 
 ```json

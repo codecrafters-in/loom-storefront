@@ -189,6 +189,46 @@ describe('render handler', () => {
   })
 })
 
+describe('render handler health and error reports', () => {
+  test('/__loom/health answers whether the store API does, and how fast', async () => {
+    const up = handler(bundle({}), upstream({ [`${API}/health`]: { body: '{"status":"ok"}' } }))
+    const ok = await get(up, '/__loom/health')
+    assert.equal(ok.status, 200)
+    assert.equal(ok.headers.get('cache-control'), 'no-store')
+    const body = await ok.json()
+    assert.equal(body.status, 'ok')
+    assert.equal(body.api.status, 200)
+
+    const down = await get(handler(bundle({})), '/__loom/health')
+    assert.equal(down.status, 503)
+    assert.equal((await down.json()).status, 'degraded')
+  })
+
+  test('a render that fails is reported to Sentry when SENTRY_DSN is set, and the policy allows the browser to report', async () => {
+    const seen = []
+    const fetch = async (url, init) => {
+      seen.push({ url: String(url), body: init?.body })
+      return new Response('{}')
+    }
+    const fake = { ...bundle({ '/pages/about': new Error('Odoo timed out') }), sentryDsn: 'https://pub@o9.ingest.sentry.io/5' }
+    const handle = handler(fake, fetch, { SENTRY_DSN: 'https://srv@o9.ingest.sentry.io/6' })
+    const original = console.error
+    console.error = () => {}
+    try {
+      assert.equal((await get(handle, '/pages/about')).status, 503)
+    } finally {
+      console.error = original
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const report = seen.find((call) => call.url.startsWith('https://o9.ingest.sentry.io/api/6/envelope/'))
+    assert.ok(report, 'reported')
+    assert.match(report.body, /Odoo timed out/)
+
+    const rendered = await get(handler({ ...bundle({ '/': page() }), sentryDsn: 'https://pub@o9.ingest.sentry.io/5' }), '/')
+    assert.match(rendered.headers.get('content-security-policy'), /connect-src [^;]*https:\/\/o9\.ingest\.sentry\.io/)
+  })
+})
+
 describe('ETag memory for API calls', () => {
   test('a second call asks with If-None-Match and a 304 gives back the kept answer', async () => {
     const sent = []

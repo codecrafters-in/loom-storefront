@@ -2,6 +2,16 @@
 
 Newest first. Each entry links to the page with the detail.
 
+## What's new — Phase 8: monitoring and large catalogues
+
+- **Error reports to Sentry** without its SDK (`VITE_SENTRY_DSN`; `SENTRY_DSN` for the render handler): render errors,
+  uncaught errors, failed API answers with the backend's reference, which error screens now show.
+  [CONFIGURATION.md](CONFIGURATION.md#environment-variables)
+- **Web vitals** (LCP, CLS, INP, FCP, TTFB) to analytics as `web_vitals` events. [PERFORMANCE.md](PERFORMANCE.md#measuring-real-visitors)
+- **Health check** at `/__loom/health`. [DEPLOY.md](DEPLOY.md#health-and-errors)
+- **Offline shell** for a build with `VITE_PWA=on`.
+- The Odoo backend now pages, sorts and filters very large catalogues in the database and caps `per_page` at 100.
+
 ## What's new — Phase 7: found on Google, and marketing that works
 
 - **Pages rendered on request** (`server/handler.mjs`): a product added in the backend after the build is a real page

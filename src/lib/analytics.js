@@ -223,3 +223,12 @@ export const addShippingInfo = (cart, method) =>
 /** The shopper started paying (`type`: the payment method's name). */
 export const addPaymentInfo = (cart, type) =>
   track('add_payment_info', { ...money(cart?.total), payment_type: type, items: (cart?.lines || []).map((l) => lineItem(l)) })
+
+/** One Core Web Vital of this page load (src/lib/vitals.js). */
+export const webVital = (metric) =>
+  track('web_vitals', {
+    metric_name: metric.name,
+    metric_value: metric.value,
+    metric_rating: metric.rating,
+    page_path: typeof window !== 'undefined' ? window.location?.pathname : undefined,
+  })
