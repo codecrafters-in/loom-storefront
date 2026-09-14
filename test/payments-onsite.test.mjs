@@ -14,6 +14,9 @@ const { api } = await loadApp()
 const payments = await import('../src/lib/payments/index.js')
 const { driverFor } = await import('../src/lib/payments/drivers/index.js')
 const razorpay = (await import('../src/lib/payments/drivers/razorpay.js')).default
+const stripeModule = await import('../src/lib/payments/drivers/stripe.js')
+const stripe = stripeModule.default
+const express = await import('../src/lib/payments/express.js')
 
 const order = { id: 'order_1', number: 'LM-1' }
 const pay = (over = {}) => ({ id: 'pay_1', reference: 'R1', provider: 'demo', flow: 'direct', status: 'draft', client: {}, redirect: null, order: null, ...over })
@@ -23,7 +26,7 @@ const pay = (over = {}) => ({ id: 'pay_1', reference: 'R1', provider: 'demo', fl
 test('saved methods come first, and an on-page method with no driver is not offered', () => {
   const list = payments.visibleMethods({
     methods: [
-      { id: '1-1', provider: 'stripe', flow: 'direct', name: 'Card' },
+      { id: '1-1', provider: 'adyen', flow: 'direct', name: 'Card' },
       { id: '2-2', provider: 'razorpay', flow: 'direct', name: 'UPI' },
       { id: '3-3', provider: 'paypal', flow: 'redirect', name: 'PayPal' },
       { id: '4-4', provider: 'custom', flow: 'offline', name: 'Cash on delivery' },
@@ -288,3 +291,295 @@ test('a changed bag, an unknown step and an unknown payment are refused clearly'
   await assert.rejects(api.getPayment('pay_nope'), (err) => err.status === 404)
   await api.clearCart()
 })
+
+/* ── Phase 4: fees, paying later, a gateway page left open, saved methods ── */
+
+test('a cash-on-delivery fee is added to what the shopper pays, and nothing else changes the total', () => {
+  const total = { amount: 12000, currency: 'INR' }
+  assert.deepEqual(payments.payableTotal(total, { fee: { amount: 5000, currency: 'INR' } }), { amount: 17000, currency: 'INR' })
+  assert.equal(payments.payableTotal(total, { fee: null }), total)
+  assert.equal(payments.payableTotal(total, undefined), total)
+  assert.equal(payments.payableTotal(null, { fee: { amount: 1 } }), null)
+})
+
+test('the demo answers the new payment calls the way a real backend does when there is nothing to do', async () => {
+  await assert.rejects(api.getOrderPaymentOptions('order_1'), (err) => err.status === 409 && err.code === 'nothing_to_pay')
+  await assert.rejects(api.createOrderPayment('order_1', {}), (err) => err.status === 409 && err.code === 'nothing_to_pay')
+  const bag = await api.cancelCartPayment()
+  assert.ok(Array.isArray(bag.lines), 'cancelling a payment answers the bag')
+  await assert.rejects(api.deletePaymentMethod('7'), (err) => err.status === 404)
+})
+
+/* ── stripe ────────────────────────────────────────────────────────────── */
+
+function fakeStripe({ submitError = null, confirmResult } = {}) {
+  const seen = { updates: [] }
+  const element = { mount: (el) => { seen.mountedOn = el }, destroy: () => { seen.destroyed = true } }
+  const elements = {
+    create: (type, options) => { seen.created = { type, options }; return element },
+    update: (options) => seen.updates.push(options),
+    submit: async () => (submitError ? { error: { message: submitError } } : {}),
+  }
+  const Stripe = (key, options) => {
+    seen.key = key
+    seen.stripeOptions = options
+    return {
+      elements: (options_) => { seen.elementsOptions = options_; return elements },
+      confirmPayment: async (args) => { seen.confirm = args; return confirmResult || { paymentIntent: { id: 'pi_1', status: 'succeeded' } } },
+    }
+  }
+  return { Stripe, seen }
+}
+
+const stripeMethod = {
+  key: 'method:9-1', provider: 'stripe', flow: 'direct',
+  config: {
+    publishableKey: 'pk_test_1', apiVersion: '2019-05-16', currency: 'usd', amount: 12000, captureMethod: 'automatic',
+    paymentMethodType: 'card', billingDetails: { name: 'A Buyer' }, tokenizationRequired: false,
+  },
+}
+const stripeDeps = (Stripe) => ({ Stripe, loadScript: async () => {}, appearance: { theme: 'stripe' } })
+
+test('stripe shows its card form for the order amount, and saving a card is passed to Stripe', async () => {
+  const { Stripe, seen } = fakeStripe()
+  const box = {}
+  const handle = await stripe.mount(box, stripeMethod, { deps: stripeDeps(Stripe) })
+  assert.equal(seen.key, 'pk_test_1')
+  assert.deepEqual(seen.stripeOptions, { apiVersion: '2019-05-16' })
+  assert.deepEqual(seen.elementsOptions, {
+    mode: 'payment', amount: 12000, currency: 'usd', captureMethod: 'automatic', paymentMethodTypes: ['card'], appearance: { theme: 'stripe' },
+  })
+  assert.equal(seen.created.type, 'payment')
+  assert.deepEqual(seen.created.options.defaultValues.billingDetails, { name: 'A Buyer' })
+  assert.equal(seen.mountedOn, box)
+
+  handle.setSaveMethod(true)
+  handle.setSaveMethod(false)
+  assert.deepEqual(seen.updates, [{ setupFutureUsage: 'off_session' }, { setupFutureUsage: null }])
+  assert.equal(await handle.submit(), null)
+  handle.destroy()
+  assert.equal(seen.destroyed, true)
+})
+
+test('stripe checks the card before anything is created, and a problem is said plainly', async () => {
+  const { Stripe } = fakeStripe({ submitError: 'Your card number is incomplete.' })
+  const handle = await stripe.mount({}, stripeMethod, { deps: stripeDeps(Stripe) })
+  assert.deepEqual(await payments.driverInput(stripe, { mounted: handle }), { problem: 'Your card number is incomplete.' })
+  assert.match((await payments.driverInput(stripe, {})).problem, /still loading/)
+  const ok = await stripe.mount({}, stripeMethod, { deps: stripeDeps(fakeStripe().Stripe) })
+  assert.equal((await payments.driverInput(stripe, { mounted: ok })).input, ok)
+})
+
+test('the demo card and razorpay need no mounted form', async () => {
+  const demoDriver = driverFor('demo')
+  assert.deepEqual(await payments.driverInput(demoDriver, { demoInput: { cardNumber: '4242 4242 4242 4242', outcome: 'done' } }), {
+    input: { cardNumber: '4242 4242 4242 4242', outcome: 'done' },
+  })
+  assert.deepEqual(await payments.driverInput(razorpay, {}), { input: undefined })
+  assert.deepEqual(await payments.driverInput(null, {}), { input: undefined })
+})
+
+test('stripe confirms with the payment\'s secret on this page, then the backend checks it with Stripe', async () => {
+  const { Stripe, seen } = fakeStripe()
+  const handle = await stripe.mount({}, stripeMethod, { deps: stripeDeps(Stripe) })
+  const sent = []
+  const result = await stripe.run({
+    payment: pay({ provider: 'stripe', client: { client_secret: 'pi_1_secret_x', return_url: 'https://shop.test/checkout/return?payment=pay_1' } }),
+    api: { paymentAction: async (...args) => { sent.push(args); return pay({ status: 'paid', order }) } },
+    input: handle,
+  })
+  assert.equal(seen.confirm.clientSecret, 'pi_1_secret_x')
+  assert.equal(seen.confirm.elements, handle.elements)
+  assert.equal(seen.confirm.redirect, 'if_required')
+  assert.deepEqual(seen.confirm.confirmParams, { return_url: 'https://shop.test/checkout/return?payment=pay_1' })
+  assert.deepEqual(sent, [['pay_1', 'complete', { payment_intent: 'pi_1' }]])
+  assert.equal(result.status, 'paid')
+})
+
+test('a card stripe declines is a failure with its reason, and nothing is posted', async () => {
+  const { Stripe } = fakeStripe({ confirmResult: { error: { type: 'card_error', message: 'Your card was declined.' } } })
+  const handle = await stripe.mount({}, stripeMethod, { deps: stripeDeps(Stripe) })
+  let posted = false
+  await assert.rejects(
+    stripe.run({
+      payment: pay({ provider: 'stripe', client: { client_secret: 'pi_1_secret_x', return_url: 'https://shop.test/r' } }),
+      api: { paymentAction: async () => { posted = true } },
+      input: handle,
+    }),
+    (err) => err.code === 'payment_failed' && err.message === 'Your card was declined.',
+  )
+  assert.equal(posted, false)
+})
+
+test('stripe without keys is a setup problem, said plainly', async () => {
+  await assert.rejects(stripe.mount({}, { provider: 'stripe', config: {} }, { deps: stripeDeps(fakeStripe().Stripe) }), (err) => err.code === 'payment_misconfigured')
+  await assert.rejects(stripe.run({ payment: pay({ provider: 'stripe', client: {} }), api: {}, input: null }), (err) => err.code === 'payment_misconfigured')
+  assert.equal(stripeModule.elementsOptions({ ...stripeMethod.config, tokenizationRequired: true }).setupFutureUsage, 'off_session')
+})
+
+/* ── apple pay / google pay (stripe express checkout) ──────────────────── */
+
+function fakeWallet({ confirmResult } = {}) {
+  const seen = { updates: [], handlers: {} }
+  const element = {
+    on: (name, fn) => { seen.handlers[name] = fn },
+    mount: (el) => { seen.mountedOn = el },
+    destroy: () => { seen.destroyed = true },
+  }
+  const elements = {
+    create: (type, options) => { seen.created = { type, options }; return element },
+    update: (options) => seen.updates.push(options),
+    submit: async () => ({}),
+  }
+  const Stripe = (key) => {
+    seen.key = key
+    return {
+      elements: (options) => { seen.elementsOptions = options; return elements },
+      confirmPayment: async (args) => { seen.confirm = args; return confirmResult || { paymentIntent: { id: 'pi_w' } } },
+    }
+  }
+  return { Stripe, seen }
+}
+
+const walletExpress = {
+  amount: { amount: 12400, currency: 'USD' },
+  shippingRequired: true,
+  methods: [{ providerId: '9', methodId: '1', provider: 'stripe', config: { ...stripeMethod.config, billingDetails: {}, merchantName: 'Loom' } }],
+}
+const walletCart = { id: 'cart_w', currency: 'USD' }
+
+function walletApi(calls) {
+  return {
+    getShippingOptions: async (cartId, body) => {
+      calls.push(['shipping', cartId, body])
+      if (body.address?.country === 'ZZ') return { options: [], total: { amount: 0 } }
+      const express_ = body.method === 'express'
+      return {
+        options: [{ id: 'standard', label: 'Standard', amount: 400 }, { id: 'express', label: 'Express', amount: 1500 }],
+        selected: express_ ? 'express' : 'standard',
+        total: { amount: express_ ? 13500 : 12400, currency: 'USD' },
+      }
+    },
+    createPayment: async (cartId, body) => {
+      calls.push(['create', cartId, body])
+      return pay({ provider: 'stripe', client: { client_secret: 'pi_w_secret', return_url: 'https://shop.test/checkout/return?payment=pay_1' } })
+    },
+    paymentAction: async (...args) => { calls.push(['action', ...args]); return pay({ status: 'paid', order }) },
+    getPayment: async () => pay({ status: 'paid', order }),
+  }
+}
+
+test('wallet buttons open with the bag total and the store\'s delivery prices, and ask for contact details', async () => {
+  const { Stripe, seen } = fakeWallet()
+  const calls = []
+  const handle = await express.mountExpressCheckout({
+    container: 'box', express: walletExpress, cart: walletCart, api: walletApi(calls),
+    deps: { Stripe, loadScript: async () => {}, appearance: { theme: 'stripe' } },
+  })
+  assert.ok(handle)
+  assert.equal(seen.key, 'pk_test_1')
+  assert.equal(seen.elementsOptions.amount, 12400)
+  assert.equal(seen.elementsOptions.currency, 'usd')
+  assert.equal(seen.created.type, 'expressCheckout')
+  assert.equal(seen.created.options.emailRequired, true)
+  assert.equal(seen.created.options.phoneNumberRequired, true)
+  assert.equal(seen.created.options.shippingAddressRequired, true)
+  assert.deepEqual(seen.created.options.shippingRates, [{ id: 'standard', displayName: 'Standard', amount: 400 }, { id: 'express', displayName: 'Express', amount: 1500 }])
+  assert.equal(seen.mountedOn, 'box')
+
+  let resolved = false
+  seen.handlers.click({ resolve: () => { resolved = true } })
+  assert.equal(resolved, true, 'the sheet opens at once')
+
+  let available = null
+  const second = fakeWallet()
+  await express.mountExpressCheckout({
+    container: 'b2', express: walletExpress, cart: walletCart, api: walletApi([]),
+    deps: { Stripe: second.Stripe, loadScript: async () => {}, appearance: {} },
+    onAvailable: (ok) => { available = ok },
+  })
+  second.seen.handlers.ready({ availablePaymentMethods: { applePay: false, googlePay: true } })
+  assert.equal(available, true, 'a browser with a wallet shows the buttons')
+  second.seen.handlers.ready({ availablePaymentMethods: null })
+  assert.equal(available, false, 'a browser without one shows nothing')
+})
+
+test('the wallet\'s address and delivery choice reprice the sheet from the backend', async () => {
+  const { Stripe, seen } = fakeWallet()
+  const calls = []
+  await express.mountExpressCheckout({
+    container: 'box', express: walletExpress, cart: walletCart, api: walletApi(calls),
+    deps: { Stripe, loadScript: async () => {}, appearance: {} },
+  })
+  let rates = null
+  await seen.handlers.shippingaddresschange({
+    address: { city: 'New York', state: 'NY', postal_code: '10012', country: 'us' },
+    resolve: (payload) => { rates = payload.shippingRates },
+    reject: () => assert.fail('a valid address is not rejected'),
+  })
+  assert.deepEqual(calls.at(-1), ['shipping', 'cart_w', { address: { city: 'New York', region: 'NY', postalCode: '10012', country: 'US' } }])
+  assert.equal(rates.length, 2)
+
+  let resolved = false
+  await seen.handlers.shippingratechange({ shippingRate: { id: 'express' }, resolve: () => { resolved = true }, reject: () => assert.fail() })
+  assert.equal(resolved, true)
+  assert.deepEqual(calls.at(-1)[2], { address: { city: 'New York', region: 'NY', postalCode: '10012', country: 'US' }, method: 'express' })
+  assert.deepEqual(seen.updates.at(-1), { amount: 13500 }, 'the sheet charges what the backend computed')
+
+  let rejected = false
+  await seen.handlers.shippingaddresschange({ address: { country: 'ZZ' }, resolve: () => assert.fail(), reject: () => { rejected = true } })
+  assert.equal(rejected, true, 'an address with no delivery is refused in the sheet')
+})
+
+test('confirming the wallet creates the payment with its details, confirms with Stripe and places the order', async () => {
+  const { Stripe, seen } = fakeWallet()
+  const calls = []
+  let done = null
+  await express.mountExpressCheckout({
+    container: 'box', express: walletExpress, cart: walletCart, api: walletApi(calls),
+    urls: { successUrl: 'https://shop.test/order/{ORDER_ID}', cancelUrl: 'https://shop.test/cart' },
+    deps: { Stripe, loadScript: async () => {}, appearance: {} },
+    onDone: (payment) => { done = payment },
+  })
+  await seen.handlers.confirm({
+    billingDetails: { name: 'Sam Rivera', email: 'sam@example.com', phone: '+1 555 0134', address: { country: 'US' } },
+    shippingAddress: { name: 'Sam Rivera', address: { line1: '117 Mercer St', line2: '', city: 'New York', state: 'NY', postal_code: '10012', country: 'US' } },
+    shippingRate: { id: 'standard' },
+    paymentFailed: () => assert.fail('a good payment does not fail'),
+  })
+  const [, cartId, body] = calls.find((c) => c[0] === 'create')
+  assert.equal(cartId, 'cart_w')
+  assert.equal(body.email, 'sam@example.com')
+  assert.equal(body.shippingMethod, 'standard')
+  assert.equal(body.providerId, '9')
+  assert.equal(body.expectedTotal, 12400)
+  assert.deepEqual(body.shippingAddress, { name: 'Sam Rivera', line1: '117 Mercer St', line2: '', city: 'New York', region: 'NY', postalCode: '10012', country: 'US', phone: '+1 555 0134' })
+  assert.equal(seen.confirm.clientSecret, 'pi_w_secret')
+  assert.equal(seen.confirm.redirect, 'if_required')
+  assert.deepEqual(calls.find((c) => c[0] === 'action'), ['action', 'pay_1', 'complete', { payment_intent: 'pi_w' }])
+  assert.equal(done.order.id, 'order_1')
+})
+
+test('a wallet payment stripe declines is reported to the sheet', async () => {
+  const { Stripe, seen } = fakeWallet({ confirmResult: { error: { message: 'Your card was declined.' } } })
+  let failed = null
+  let reported = null
+  await express.mountExpressCheckout({
+    container: 'box', express: walletExpress, cart: walletCart, api: walletApi([]),
+    deps: { Stripe, loadScript: async () => {}, appearance: {} },
+    onError: (err) => { reported = err },
+  })
+  await seen.handlers.confirm({ billingDetails: { email: 'a@b.c' }, shippingRate: { id: 'standard' }, paymentFailed: (p) => { failed = p } })
+  assert.equal(failed.reason, 'fail')
+  assert.equal(reported.message, 'Your card was declined.')
+})
+
+test('no wallet buttons without a wallet method, or when nothing can be delivered', async () => {
+  assert.equal(await express.mountExpressCheckout({ container: 'x', express: { methods: [] }, cart: walletCart, api: {} }), null)
+  const api_ = { getShippingOptions: async () => ({ options: [], total: { amount: 0 } }) }
+  assert.equal(await express.mountExpressCheckout({
+    container: 'x', express: walletExpress, cart: walletCart, api: api_, deps: { Stripe: fakeWallet().Stripe, loadScript: async () => {}, appearance: {} },
+  }), null)
+  assert.equal((await api.getExpressOptions()).methods.length, 0, 'the demo has no wallet')
+})
+

@@ -11,7 +11,9 @@ import useAsync from '../../hooks/useAsync.js'
 import { nestLines } from '../../lib/cart-lines.js'
 import { stepperProps } from '../../lib/quantity.js'
 import LineDetails from './LineDetails.jsx'
+import PaymentLock from './PaymentLock.jsx'
 import useFocusTrap from '../../hooks/useFocusTrap.js'
+import { isMock } from '../../lib/config.js'
 
 /** Slides in after every add. Nothing here is decorative — it is the fastest
  *  path from "added" to "checkout", which is the only job of a cart drawer. */
@@ -105,6 +107,8 @@ export default function CartDrawer() {
               </p>
             )}
 
+            {/* The demo never opens a gateway page, so its build leaves this out. */}
+            {!isMock && <PaymentLock className="mx-5 mt-3" />}
             <ul className="flex-1 divide-y divide-line overflow-y-auto px-5">
               {nestLines(lines).map(({ line, depth }) => (
                 <li key={line.id} className={`flex gap-3.5 py-4 ${depth ? 'pl-6' : ''}`}>

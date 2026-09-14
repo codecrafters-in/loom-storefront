@@ -456,6 +456,62 @@ export async function getPayment(paymentId) {
   return forgetSpentCart(assertPayment(await get(paymentPath(paymentId)), 'GET /payments/:id'))
 }
 
+/* ── paying for a placed order ("Pay now"), and a gateway page left open ── */
+
+/** Ways to pay what is left on an order: a quotation from the shop, or an order confirmed without payment. */
+export async function getOrderPaymentOptions(orderId) {
+  const options = await post(`/orders/${encodeURIComponent(orderId)}/payment-options`, {})
+  if (!options || !Array.isArray(options.methods)) {
+    throw new ContractError('POST /orders/:id/payment-options', 'an object with a "methods" array', options)
+  }
+  return options
+}
+
+export async function createOrderPayment(orderId, body = {}) {
+  const payment = await post(`/orders/${encodeURIComponent(orderId)}/payments`, {
+    provider_id: body.providerId,
+    method_id: body.methodId,
+    token_id: body.tokenId,
+    save_method: Boolean(body.saveMethod),
+    success_url: body.successUrl,
+    cancel_url: body.cancelUrl,
+  })
+  // Not `forgetSpentCart`: this order was placed long ago, and the shopper's current bag is another one.
+  return assertPayment(payment, 'POST /orders/:id/payments')
+}
+
+/** Wallet buttons for the bag (Apple Pay, Google Pay), before any address: `{ amount, shippingRequired, methods }`. */
+export async function getExpressOptions(cartIdArg) {
+  const id = cartIdArg || (await ensureCart()).id
+  const options = await post(`/carts/${encodeURIComponent(id)}/express-options`, {})
+  if (!options || !Array.isArray(options.methods)) {
+    throw new ContractError('POST /carts/:id/express-options', 'an object with a "methods" array', options)
+  }
+  return options
+}
+
+/** Delivery methods priced for a (possibly partial) address, and the bag's total with `method` applied. */
+export async function getShippingOptions(cartIdArg, { address, method } = {}) {
+  const id = cartIdArg || (await ensureCart()).id
+  const result = await post(`/carts/${encodeURIComponent(id)}/shipping-options`, { address, method })
+  if (!result || !Array.isArray(result.options)) {
+    throw new ContractError('POST /carts/:id/shipping-options', 'an object with an "options" array', result)
+  }
+  return result
+}
+
+/** Cancel a payment started on a gateway's own page, so the bag can change again. */
+export async function cancelCartPayment() {
+  const cart = await ensureCart()
+  return assertCart(await post(`/carts/${cart.id}/cancel-payment`, {}), 'POST /carts/:id/cancel-payment')
+}
+
+/** Cards and accounts the payment providers saved for the signed-in customer. */
+export const listPaymentMethods = () =>
+  get('/me/payment-methods').then((r) => assertList(r, 'GET /me/payment-methods'))
+export const deletePaymentMethod = (id) =>
+  del(`/me/payment-methods/${encodeURIComponent(id)}`).then((r) => assertList(r, 'DELETE /me/payment-methods/:id'))
+
 /* ── account ───────────────────────────────────────────────────────────── */
 
 function storeSession(res) {

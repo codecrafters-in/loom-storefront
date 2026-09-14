@@ -30,6 +30,8 @@ export const ORDER_VIEWS = [
 export const ORDER_STATE_LABELS = { quotation: 'Quotation', confirmed: 'Confirmed', cancelled: 'Cancelled' }
 export const PAYMENT_LABELS = {
   paid: 'Paid',
+  partially_refunded: 'Partly refunded',
+  refunded: 'Refunded',
   authorized: 'Authorised',
   pending: 'Awaiting payment',
   failed: 'Payment failed',
@@ -44,7 +46,7 @@ export const DELIVERY_LABELS = {
 }
 
 /** Tones name the theme's colour tokens; the admin UI turns them into classes. */
-export const PAYMENT_TONES = { paid: 'good', authorized: 'accent', pending: 'accent', failed: 'sale', unpaid: 'muted' }
+export const PAYMENT_TONES = { paid: 'good', partially_refunded: 'accent', refunded: 'muted', authorized: 'accent', pending: 'accent', failed: 'sale', unpaid: 'muted' }
 export const DELIVERY_TONES = { none: 'muted', to_ship: 'accent', shipped: 'ink', delivered: 'good', cancelled: 'faint' }
 export const ORDER_STATE_TONES = { quotation: 'accent', confirmed: 'ink', cancelled: 'faint' }
 

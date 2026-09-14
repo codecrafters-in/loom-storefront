@@ -78,6 +78,20 @@ The suite covers the logic. These confirm the wiring against a real backend.
    reason.
 5. **A changed bag.** Change the bag in another tab between listing methods and
    paying, and expect `409 cart_changed` and fresh options.
+6. **A fee.** With a cash on delivery fee set in Odoo, the method says "Adds a …
+   fee", the total and the button include it, and the placed order lists it.
+7. **A payment page left open.** Start a hosted payment and come back without
+   finishing: the bag shows the message with **Cancel payment**, changing it is
+   refused until you cancel.
+8. **Pay now.** Open an unpaid order (a quotation sent from Odoo) at
+   `/order/:id?pay=1`: the **Amount due** panel lists the methods; paying turns the order
+   paid and the panel goes.
+9. **Saved methods.** Signed in, tick **Save for next time**; the method shows
+   under **Account → Payment methods** and can be removed.
+10. **Stripe in test mode** (Stripe test keys in the backend). Pick **Card**:
+    Stripe's form appears. `4242 4242 4242 4242` pays; `4000 0027 6000 3184`
+    opens 3-D Secure on the page; `4000 0000 0000 0002` is declined with
+    Stripe's message and the bag stays.
 
 **Fulfilment** (`/admin/orders`):
 
@@ -90,6 +104,9 @@ The suite covers the logic. These confirm the wiring against a real backend.
    turns paid.
 4. Cancel an unshipped order and confirm its stock came back; cancelling a
    shipped one must be refused.
+5. **Refund** part of a card-paid order: payment *Partly refunded*, the customer's
+   order lists *Refunded*. Refund the rest: *Refunded*, no Refund button. A staff
+   user without Invoicing rights sees no Refund button.
 
 **The bag after an order.**
 

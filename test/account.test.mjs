@@ -53,6 +53,7 @@ test('signing out closes the order history', async () => {
   await api.logout()
   await assert.rejects(() => api.getMe())
   await assert.rejects(() => api.listOrders(), (err) => err.code === 'unauthenticated')
+  await assert.rejects(() => api.listPaymentMethods(), (err) => err.status === 401)
 })
 
 test('a guest can still open the confirmation for the order they just placed', async () => {

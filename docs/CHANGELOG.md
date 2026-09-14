@@ -4,6 +4,23 @@ Newest first. Each entry links to the page with the detail.
 
 ## What's new — 2026-09-14
 
+### Payments made simple
+
+- **Stripe on the checkout page:** Stripe's Payment Element appears when the method is picked, checks the card on
+  **Pay**, and confirms with 3-D Secure in place; a bank that needs its own page comes back to `/checkout/return`.
+  Drivers can now `mount` a gateway form before the payment exists. [CHECKOUT.md](CHECKOUT.md#drivers)
+- **Apple Pay and Google Pay** buttons in the bag and at checkout (Stripe's Express Checkout Element), priced by the
+  backend for the wallet's address (`POST /carts/:id/express-options`, `POST /carts/:id/shipping-options`).
+- **Cash on delivery fee** shown on the method, in the total and on the order; the button says **Place order**
+  for a method paid later. [API.md](API.md#on-site-payments)
+- **Pay now** on an order that is placed but unpaid (`canPay`, `amountDue`), opened ready to pay by
+  `/order/:id?pay=1`; a failed hosted payment of an order returns to it.
+- **A bag with a payment page open** says so, with **Cancel payment** (`paymentInProgress`,
+  `POST /carts/:id/cancel-payment`).
+- **Save for next time** at checkout and **Account → Payment methods** to remove saved methods.
+- **Refunds from the admin against Odoo** (`refund` action, `refundable`), with *Refunded* and *Partly refunded*
+  payment statuses; orders list what was refunded and a refunded order says so.
+
 ### Your store's content, not the demo's
 
 - **No demo on a live store.** Pages, footer copy, promises, logo mark, page title, icons and link card no longer come

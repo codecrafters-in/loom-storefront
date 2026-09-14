@@ -137,7 +137,8 @@ export class Shop {
   }
 
   payButton() {
-    return this.page.getByRole('button', { name: /^Pay · / })
+    // A method paid later (cash on delivery, bank transfer) places the order instead of paying.
+    return this.page.getByRole('button', { name: /^(Pay|Place order) · / })
   }
 
   async pay() {

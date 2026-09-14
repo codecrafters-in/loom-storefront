@@ -1,4 +1,5 @@
-import { useLocation, useParams, Link } from 'react-router-dom'
+import { lazy, Suspense, useState } from 'react'
+import { useLocation, useParams, useSearchParams, Link } from 'react-router-dom'
 import api from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import { Button, Empty, ErrorState, Icon, Skeleton } from '../components/ui/index.jsx'
@@ -9,6 +10,8 @@ import { formatMoney } from '../lib/money.js'
 import { config } from '../lib/config.js'
 import { nestLines } from '../lib/cart-lines.js'
 import LineDetails from '../components/cart/LineDetails.jsx'
+
+const PayNow = lazy(() => import('../components/checkout/PayNow.jsx'))
 
 /**
  * A download link as the backend gave it. `GET /orders/:id/downloads/:doc` is a
@@ -51,7 +54,10 @@ export default function OrderConfirmation() {
     skip: !!state?.order,
     initial: state?.order || null,
   })
-  const order = state?.order || data
+  const [params] = useSearchParams()
+  // The order as it stands after paying on this page.
+  const [fresh, setFresh] = useState(null)
+  const order = fresh || state?.order || data
 
   if (loading) return <div className="wrap py-16"><Skeleton className="h-96 w-full" /></div>
   if (error) {
@@ -79,6 +85,17 @@ export default function OrderConfirmation() {
         <p className="mt-4 text-[15px] leading-relaxed text-muted">
           Order <strong className="text-ink">{order.number}</strong> {stage.body}
         </p>
+
+        {order.canPay && (
+          <Suspense fallback={<Skeleton className="mt-8 h-24 w-full" />}>
+            <PayNow
+              order={order}
+              autoOpen={params.get('pay') === '1'}
+              notice={state?.paymentMessage}
+              onPaid={() => api.getOrder(id).then(setFresh).catch(reload)}
+            />
+          </Suspense>
+        )}
 
         {(tracking?.code || tracking?.url) && order.status !== 'cancelled' && (
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-xs border border-line bg-surface p-5">
@@ -133,7 +150,13 @@ export default function OrderConfirmation() {
             <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd className="tabular-nums">{formatMoney(order.subtotal)}</dd></div>
             <div className="flex justify-between"><dt className="text-muted">Shipping</dt><dd className="tabular-nums">{order.shipping.amount === 0 ? 'Free' : formatMoney(order.shipping)}</dd></div>
             <div className="flex justify-between"><dt className="text-muted">Tax</dt><dd className="tabular-nums">{formatMoney(order.tax)}</dd></div>
+            {order.fee?.amount > 0 && (
+              <div className="flex justify-between"><dt className="text-muted">Cash on delivery fee</dt><dd className="tabular-nums">{formatMoney(order.fee)}</dd></div>
+            )}
             <div className="flex justify-between border-t border-line pt-3 text-base"><dt>Total</dt><dd className="tabular-nums">{formatMoney(order.total)}</dd></div>
+            {order.refundedTotal?.amount > 0 && (
+              <div className="flex justify-between text-muted"><dt>Refunded</dt><dd className="tabular-nums">−{formatMoney(order.refundedTotal)}</dd></div>
+            )}
           </dl>
         </div>
 
@@ -165,6 +188,12 @@ export default function OrderConfirmation() {
 function orderStage(order) {
   if (order.status === 'cancelled') {
     return { icon: 'close', tone: 'muted', title: 'Order cancelled.', body: 'was cancelled. If you were charged, the refund goes back the way you paid.' }
+  }
+  if (order.status === 'refunded') {
+    return { icon: 'refresh', tone: 'muted', title: 'Refunded.', body: 'was refunded. The money goes back the way you paid; your bank can take a few days to show it.' }
+  }
+  if (order.canPay) {
+    return { icon: 'info', tone: 'muted', title: 'Payment due.', body: `is waiting for a payment of ${formatMoney(order.amountDue)}.` }
   }
   if (order.status === 'delivered') {
     return { icon: 'check', title: 'Delivered.', body: `has arrived. Questions about it? Reply to the email we sent to ${order.email}.` }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import Seo from '../components/Seo.jsx'
 import { Link } from 'react-router-dom'
 import { useCart } from '../store/CartContext.jsx'
@@ -12,6 +12,9 @@ import { SIZES } from '../lib/images.js'
 import { nestLines } from '../lib/cart-lines.js'
 import { stepperProps } from '../lib/quantity.js'
 import LineDetails from '../components/cart/LineDetails.jsx'
+import PaymentLock from '../components/cart/PaymentLock.jsx'
+
+const ExpressCheckout = lazy(() => import('../components/checkout/ExpressCheckout.jsx'))
 
 export default function Cart() {
   const { cart, loading, busy, update, remove, applyDiscount } = useCart()
@@ -54,6 +57,7 @@ export default function Cart() {
         <p className="mt-3 text-[15px] text-muted">
           {cart.lines.length} {cart.lines.length === 1 ? 'item' : 'items'}
         </p>
+        <PaymentLock className="mt-6" />
       </div>
 
       <div className="wrap grid items-start gap-12 pb-20 lg:grid-cols-[1fr_22rem]">
@@ -154,6 +158,11 @@ export default function Cart() {
               <span className="tabular-nums">{formatMoney(cart.total)}</span>
             </p>
 
+            {!isMock && config.checkout?.mode === 'payments' && (
+              <Suspense fallback={null}>
+                <ExpressCheckout className="mt-6" />
+              </Suspense>
+            )}
             <Button to="/checkout" full size="lg" className="mt-6">Checkout</Button>
             <Link to="/shop" className="mt-4 block text-center text-[13px] text-muted link-underline">
               Continue shopping

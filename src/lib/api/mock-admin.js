@@ -204,6 +204,53 @@ const formatMinor = (amount) => `${(amount / 100).toFixed(2)} ${CURRENCY}`
 
 /* ── notifications ─────────────────────────────────────────────────────── */
 
+/* ── shopper calls with nothing to do in the demo ─────────────────────────
+ * Every demo order is paid on the page or cash on delivery, so none is left to
+ * pay later; no gateway page is ever opened, and no card is saved. The answers
+ * are the ones a real backend gives in the same situation.
+ */
+
+export async function getOrderPaymentOptions() {
+  await latency()
+  throw new ApiError('This order has nothing left to pay.', { status: 409, code: 'nothing_to_pay' })
+}
+
+export const createOrderPayment = getOrderPaymentOptions
+
+/** The demo has no wallet: no express buttons. */
+export async function getExpressOptions() {
+  await latency()
+  const cart = priceCart(loadCart())
+  return { amount: cart.total, shippingRequired: true, methods: [] }
+}
+
+/** The store's delivery methods at their listed prices; the demo does not price by address. */
+export async function getShippingOptions(_cartId, { method } = {}) {
+  await latency()
+  const cart = priceCart(loadCart())
+  const options = (storefront.commerce?.shippingMethods || []).map((m) => ({ id: m.id, label: m.label, note: m.note || '', amount: m.price }))
+  const selected = options.find((o) => o.id === method)?.id || options[0]?.id || null
+  return { options, selected, shipping: cart.shipping, tax: cart.tax, total: cart.total }
+}
+
+export async function cancelCartPayment() {
+  await latency()
+  return priceCart(loadCart())
+}
+
+export async function listPaymentMethods() {
+  await latency()
+  if (!read(KEY.customer, null)) {
+    throw new ApiError('Sign in to see your saved payment methods.', { status: 401, code: 'unauthenticated' })
+  }
+  return { items: [], total: 0 }
+}
+
+export async function deletePaymentMethod() {
+  await latency()
+  throw new ApiError('We could not find that payment method.', { status: 404, code: 'not_found' })
+}
+
 /**
  * What the store would send, and when.
  *

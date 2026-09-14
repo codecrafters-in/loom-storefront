@@ -1026,6 +1026,11 @@ checkout page. The storefront never records a payment — it asks.
 | `POST` | `/carts/:id/payments` | `Payment` |
 | `POST` | `/payments/:paymentId/actions/:action` | `Payment` |
 | `GET` | `/payments/:paymentId` | `Payment` — never cached |
+| `POST` | `/orders/:id/payment-options` | `{ amount, methods, savedMethods, total }` for what is left to pay |
+| `POST` | `/orders/:id/payments` | `Payment` for a placed order ("Pay now") |
+| `POST` | `/carts/:id/cancel-payment` | `Cart` — cancels a hosted-page payment left open |
+| `POST` | `/carts/:id/express-options` | `{ amount, shippingRequired, methods }` — wallet buttons before any address |
+| `POST` | `/carts/:id/shipping-options` | `{ options, selected, shipping, tax, total }` for `{ address?, method? }` |
 
 `payment-options` takes the checkout body (`email`, `shipping_address`,
 `shipping_method`, `currency`) and applies it to the cart, because what can pay
@@ -1039,7 +1044,7 @@ depends on where the parcel is going and what it costs:
       "id": "3-12", "providerId": "3", "methodId": "12",
       "provider": "razorpay", "providerName": "Razorpay",
       "code": "upi", "name": "UPI", "image": "https://…", "brands": [],
-      "flow": "direct", "test": false, "canSave": false, "note": null
+      "flow": "direct", "test": false, "canSave": false, "note": null, "fee": null, "config": null
     }
   ],
   "savedMethods": [{ "id": "7", "providerId": "3", "provider": "stripe", "name": "•••• 4242", "methodName": "Card" }],
@@ -1049,7 +1054,20 @@ depends on where the parcel is going and what it costs:
 
 `flow` decides what the page does: `direct` runs a driver on this page,
 `redirect` sends the browser to the gateway's hosted page, `offline` (cash on
-delivery, bank transfer) needs nothing from the shopper.
+delivery, bank transfer) needs nothing from the shopper. A backend leaves out a
+method the storefront has no way to show, rather than offer one that can only fail.
+
+`fee` is an extra charge for that method (`{ amount, currency }`, typically cash
+on delivery), or `null`. The payment step shows it on the method, and the page's
+total and **Pay** button include it; paying with the method adds it to the order,
+where cart and order answer it as `fee`. `canSave` shows **Save for next time**,
+sent as `save_method`.
+
+`config` holds public values a driver needs to show the gateway's own form
+before the payment exists, else `null`. For `stripe`: `{ publishableKey,
+apiVersion, currency, amount, captureMethod, paymentMethodType, billingDetails,
+tokenizationRequired }`. A Stripe payment's `client` then carries that
+PaymentIntent's `client_secret` and a `return_url` on the storefront.
 
 `payments` takes the same body plus `provider_id` and `method_id` (or
 `token_id`), `save_method`, `success_url`, `cancel_url` and `expected_total` in
@@ -1067,7 +1085,8 @@ minor units:
 }
 ```
 
-`status` is `draft`, `pending`, `authorized`, `paid`, `cancelled` or `failed`.
+`status` is `draft`, `pending`, `authorized`, `paid`, `cancelled` or `failed`;
+`reason` is `cancelled` or `declined` for the last two, else `null`.
 `order` (`{ id, number }`) appears once the order is confirmed — or sent, for a
 method that settles later. `client` holds only values a gateway designs to be
 public. `id` is the only thing the browser keeps; `reference` is for people.
@@ -1084,9 +1103,11 @@ payment or offer to pay again.
 
 `actions` are the gateway steps a browser cannot send to the backend's own
 payment routes: `demo`/`simulate` with `{ outcome, cardNumber }` (last four
-digits), and `razorpay`/`complete` with Razorpay's
+digits), `razorpay`/`complete` with Razorpay's
 `razorpay_payment_id`, `razorpay_order_id` and `razorpay_signature`, which the
-backend verifies before the payment counts.
+backend verifies before the payment counts, and `stripe`/`complete` with
+`{ payment_intent }`, after which the backend reads that PaymentIntent from
+Stripe and checks it is this payment's.
 
 **A hosted payment page comes back through the backend.** For
 `flow: "redirect"` the browser follows `redirect.url`; when the gateway returns
@@ -1114,6 +1135,28 @@ What the backend must do, whatever its payment system:
   then fails, keep the payment, answer `paid` with `order: null` and a message,
   and retry the confirmation (on the next status read and in the background).
 
+**Apple Pay and Google Pay.** `express-options` lists wallet methods (Stripe
+with Express Checkout) with the same `config` as the card form. The bag and
+checkout pages mount Stripe's Express Checkout Element with them
+(`lib/payments/express.js`). While the sheet is open the wallet shares only a
+partial address (`{ city, region, postalCode, country }`), which
+`shipping-options` prices; its `total` becomes the sheet's amount. On confirm
+the full address, email and phone go through `POST /carts/:id/payments` with
+`expected_total`, exactly like checkout. `shipping-options` is also the route
+for address-aware delivery prices generally.
+
+**A bag with a payment page open cannot change.** While a `redirect` payment of
+the bag is open (Odoo: 30 minutes), cart edits answer `409 payment_in_progress`
+and the cart carries `paymentInProgress: true`. The bag and the drawer show the
+message with **Cancel payment**, which posts `/carts/:id/cancel-payment`.
+
+**Paying for a placed order.** An `Order` with `canPay: true` shows **Payment
+due** and **Pay now** on its page. `POST /orders/:id/payment-options` (body `{}`)
+and `POST /orders/:id/payments` (`provider_id` and `method_id` or `token_id`,
+`save_method`, `success_url`, `cancel_url`) work like the cart routes for
+`amountDue`. `/order/:id?pay=1` opens the methods straight away; a failed hosted
+payment of an order returns there. `409 nothing_to_pay` once it is paid.
+
 Expected errors: the checkout errors, `422 no_payment_methods`,
 `422 invalid_payment_method`, `409 cart_changed`, `409 payment_in_progress`,
 `409 already_paid`, `403 invalid_signature`, `404 unsupported_action`,
@@ -1136,6 +1179,8 @@ See [CHECKOUT.md](CHECKOUT.md) for the flows and how to add a gateway driver.
 | `POST` | `/me/addresses` | `Customer` |
 | `PATCH` | `/me/addresses/:id` | `Customer` |
 | `DELETE` | `/me/addresses/:id` | `Customer` |
+| `GET` | `/me/payment-methods` | `{ items: [{ id, name, provider, method }], total }` — saved by the payment providers |
+| `DELETE` | `/me/payment-methods/:id` | The same list, without that one |
 | `GET` | `/countries/:code` | `Country` — states and required address fields. Public, cacheable |
 
 Address endpoints return the **whole customer**, not the address, so the account
@@ -1180,11 +1225,20 @@ its code the next time the form opens. The demo adapter answers from
   "subtotal": {}, "discount": {}, "shipping": {}, "tax": {}, "total": {},
   "shippingAddress": { }, "email": "sam@example.com",
   "tracking": { "carrier": "DHL", "code": "JD014600…", "url": "https://…" },
-  "payment": { "provider": "demo", "status": "captured", "method": "Card", "amount": {}, "capturedAt": "2026-09-09T10:15:02.000Z" }
+  "payment": { "provider": "demo", "status": "captured", "method": "Card", "amount": {}, "capturedAt": "2026-09-09T10:15:02.000Z" },
+  "fee": { "amount": 0, "currency": "INR" },
+  "amountDue": { "amount": 0, "currency": "INR" }, "canPay": false,
+  "refundedTotal": { "amount": 0, "currency": "INR" }
 }
 ```
 
-`status` — `placed` `paid` `fulfilled` `delivered` `cancelled`.
+`status` — `placed` `paid` `fulfilled` `delivered` `cancelled` `refunded`.
+
+`amountDue` is what is left to pay, and `canPay` says the order page may offer
+**Pay now** for it (never for cash on delivery, which is paid at the door).
+`refundedTotal` is money given back; the page lists it under the total. `fee`,
+`amountDue`, `canPay` and `refundedTotal` are optional: an order without them
+shows neither.
 
 A paid order with digital products adds `downloads: [{ id, name, url }]`, listed
 on the order page. `url` is `GET /orders/:orderId/downloads/:documentId`; a bare
@@ -1307,9 +1361,10 @@ along:
 | Field | Values |
 | --- | --- |
 | `orderState` | `quotation` `confirmed` `cancelled` |
-| `paymentStatus` | `paid` `authorized` `pending` (incl. cash on delivery) `failed` `unpaid` |
+| `paymentStatus` | `paid` `partially_refunded` `refunded` `authorized` `pending` (incl. cash on delivery) `failed` `unpaid` |
 | `delivery.status` | `none` (nothing to deliver) `to_ship` `shipped` `delivered` `cancelled` |
-| `actions` | Allowed right now, in display order: `ship` `update_tracking` `deliver` `record_payment` `cancel` |
+| `actions` | Allowed right now, in display order: `ship` `update_tracking` `deliver` `record_payment` `cancel` `refund` |
+| `refundable` | `{ amount, currency }` still refundable; the refund dialog's maximum |
 
 `backendId` and `backendUrl` are `null` in the demo.
 

@@ -12,7 +12,8 @@ import useProductChoice from '../../hooks/useProductChoice.js'
 import { useCart } from '../../store/CartContext.jsx'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { useWishlist } from '../../store/WishlistContext.jsx'
-import { FitBlock, FabricBlock, SizeChartModal } from './FitBlock.jsx'
+import { ChartTable, FitBlock, FabricBlock, SizeChartModal } from './FitBlock.jsx'
+import { isMock } from '../../lib/config.js'
 import { ExtraOptions, OptionPicker } from './VariantPicker.jsx'
 import { CompareToggle } from './CompareTray.jsx'
 import TrustRow, { PaymentsRow, SocialProof } from './TrustRow.jsx'
@@ -177,16 +178,17 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
   const current = gallery[shot]
   const openChart = () => (onOpenChart ? onOpenChart() : setChartOpen(true))
 
-  // Beside the option whose role is size, and nowhere else: a size guide under
-  // a phone's storage options is a link to a page about shirts.
+  // Beside the option whose role is size. A product with a chart but no size to
+  // choose (a sofa's dimensions, a ring-size table) shows it as its own panel below.
+  const hasSizeOption = model.options.some((o) => o.role === 'size')
   const sizeAside = (option, onClick = openChart) =>
     option.role !== 'size' ? null : product.sizeChart ? (
       <button type="button" onClick={onClick} className="text-[12px] text-accent link-underline">
-        Size chart
+        {product.sizeChart.name || 'Size chart'}
       </button>
-    ) : (
+    ) : isMock ? (
       <Link to="/pages/size-guide" className="text-[12px] text-muted link-underline">Size guide</Link>
-    )
+    ) : null
 
   const submit = (request) =>
     add(request, request.quantity, `${product.title} added to your bag`).catch(() => {
@@ -487,6 +489,12 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             {model.options.some((o) => o.role === 'size') && product.fit && (
               <Accordion title="Fit & sizing" defaultOpen>
                 <FitBlock product={product} flat onOpenChart={openChart} />
+              </Accordion>
+            )}
+
+            {product.sizeChart && !hasSizeOption && (
+              <Accordion title={product.sizeChart.name || 'Measurements'}>
+                <ChartTable chart={product.sizeChart} />
               </Accordion>
             )}
 

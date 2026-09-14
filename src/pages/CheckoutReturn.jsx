@@ -36,7 +36,9 @@ export default function CheckoutReturn() {
           return
         }
         if (payment && isFailed(payment)) {
-          navigate('/checkout', { replace: true, state: { paymentMessage: failureMessage(payment) } })
+          // Paying for a placed order goes back to that order; paying for a bag, back to checkout.
+          const back = payment.order ? `/order/${payment.order.id}?pay=1` : '/checkout'
+          navigate(back, { replace: true, state: { paymentMessage: failureMessage(payment) } })
           return
         }
         setState({ phase: timedOut ? 'timeout' : 'missing', payment })

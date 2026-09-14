@@ -259,22 +259,47 @@ payment step posts is one the backend accepts — see [API.md](API.md).
 Card numbers still never touch this app: a `direct` driver hands the card to the
 gateway's own iframe or modal, and a `redirect` gateway takes it on its own site.
 
+#### Apple Pay and Google Pay
+
+`components/checkout/ExpressCheckout.jsx` (bag and checkout pages, `payments`
+mode only) asks `api.getExpressOptions(cart.id)`; with a wallet method it mounts
+Stripe's Express Checkout Element through `mountExpressCheckout` in
+`lib/payments/express.js`. The sheet asks for email, phone and a shipping
+address; each address or delivery change is priced by
+`api.getShippingOptions`, and the element's amount is updated to the backend's
+total before the sheet is answered. Confirm creates the payment with the
+wallet's details and confirms it with Stripe like the card form. Nothing shows
+unless the browser has a wallet, and the storefront's domain must be registered
+with Stripe (the backend's store form does it).
+
 #### Drivers
 
 A `direct` method is only offered if the storefront has a driver for its
 `provider`; a method without one is left out rather than failing at the pay
-button. Two ship: `demo` (a test card form and an outcome select) and `razorpay`
-(Razorpay Checkout's modal). Closing the modal is a cancel, not an error — the
-bag is untouched and the shopper can pick again.
+button. Three ship: `demo` (a test card form and an outcome select), `razorpay`
+(Razorpay Checkout's modal) and `stripe` (Stripe's Payment Element, shown on
+the page as soon as the method is picked; 3-D Secure opens in place). Closing
+the Razorpay modal is a cancel, not an error — the bag is untouched and the
+shopper can pick again.
+
+A driver that shows the gateway's form before the payment exists has a
+`mount(container, method, { saveMethod })`. The payment step calls it when the
+method is picked, with the method's `config` (public values from the backend),
+and keeps what it returns. On **Pay** the page calls that handle's `submit()`
+(the gateway's own check of the card), creates the payment, and hands the
+handle to `run` as `input`. Stripe's `run` confirms the PaymentIntent with the
+payment's `client_secret` and then asks the backend to `complete`, which reads
+the PaymentIntent from Stripe before anything counts.
 
 To add one, create `src/lib/payments/drivers/<provider>.js` and register it in
 `drivers/index.js`:
 
 ```js
 export default {
-  provider: 'stripe',          // the backend's provider code
+  provider: 'mygateway',       // the backend's provider code
   needsInput: false,           // true if the page collects something first
   validate: (input) => null,   // optional: a message, or null when input is fine
+  // optional: async mount(container, method, { saveMethod }) → { submit(), setSaveMethod?(on), destroy() }
   async run({ payment, api, input }) {
     // Mount or open the gateway's own form with payment.client (public values
     // only). If the backend needs the gateway's result, send it with
@@ -358,6 +383,12 @@ from "my Stripe keys work", and those fail differently.
 ```
 POST /admin/orders/:id/refunds  { amount?, reason?, restock? }  → the Order
 ```
+
+**Against Odoo** the admin's **Refund** appears when the order's `actions`
+include `refund`, and the dialog's maximum is `refundable`. Odoo refunds through
+the payment provider when it can, otherwise with a credit note for a full refund
+of an invoiced order, otherwise answers `409 refund_in_odoo`. `restock` is the
+demo's: with Odoo, goods coming back are received as a return in Odoo.
 
 Omit `amount` to refund whatever is outstanding, which is what "Refund" means
 when nobody has typed a number.

@@ -33,6 +33,12 @@ export function failureMessage(payment) {
     : 'The payment did not go through. Please try again or choose another way to pay.'
 }
 
+/** What the shopper pays with this method: a cash-on-delivery fee comes on top of the order. */
+export function payableTotal(amount, method) {
+  if (!amount || !method?.fee?.amount) return amount
+  return { ...amount, amount: amount.amount + method.fee.amount }
+}
+
 /**
  * The methods the page can take, saved ones first.
  *
@@ -50,6 +56,26 @@ export function visibleMethods(options, hasDriver = (provider) => Boolean(driver
     .filter((method) => method.flow !== 'direct' || hasDriver(method.provider))
     .map((method) => ({ ...method, key: `method:${method.id}` }))
   return [...saved, ...methods]
+}
+
+/**
+ * What a driver needs from the page before the payment is created: the test card's details, or a
+ * mounted gateway form that has checked itself. `{ input }`, or `{ problem }` to show the shopper.
+ */
+export async function driverInput(driver, { demoInput, mounted } = {}) {
+  if (!driver) return { input: undefined }
+  if (driver.mount) {
+    if (!mounted) return { problem: 'The card form is still loading. Please wait a moment and try again.' }
+    try {
+      const problem = await mounted.submit()
+      return problem ? { problem } : { input: mounted }
+    } catch (err) {
+      return { problem: err?.message || 'Please check your card details.' }
+    }
+  }
+  const problem = driver.validate?.(demoInput)
+  if (problem) return { problem }
+  return { input: driver.needsInput ? demoInput : undefined }
 }
 
 /** What the page does with a payment the backend just answered with. */

@@ -299,14 +299,16 @@ export function OrderDetail() {
         </aside>
       </div>
 
-      {isMock && refunding && (
+      {refunding && (
         <RefundDialog
           order={order}
           onClose={() => setRefunding(false)}
-          onDone={(message) => {
+          onDone={(message, next) => {
             setRefunding(false)
             push(message)
-            reload()
+            // Odoo answers with the order as it now stands; the demo answers with the refund.
+            if (next?.actions) setOrder(next)
+            else reload()
           }}
           onError={(message) => push(message, { tone: 'error' })}
         />
@@ -635,7 +637,7 @@ function CustomerCard({ order }) {
 function PaymentCard({ order, can, busy, run, problem, onRefund }) {
   const payment = order.payment
   const [confirming, setConfirming] = useState(false)
-  const refundable = (order.total?.amount ?? 0) - (order.refundedTotal?.amount ?? 0)
+  const refundable = order.refundable?.amount ?? (order.total?.amount ?? 0) - (order.refundedTotal?.amount ?? 0)
 
   const record = async () => {
     if (await run('record_payment', {}, { area: 'payment', done: 'Payment recorded' })) setConfirming(false)
@@ -674,21 +676,8 @@ function PaymentCard({ order, can, busy, run, problem, onRefund }) {
           </>
         ))}
 
-      {isMock ? (
-        order.paymentStatus === 'paid' && refundable > 0 && (
-          <Button className="mt-4" size="sm" variant="quiet" onClick={onRefund} disabled={Boolean(busy)}>Refund</Button>
-        )
-      ) : (
-        <p className="mt-4 text-[12px] leading-relaxed text-faint">
-          Refunds are issued in Odoo
-          {order.backendUrl && (
-            <>
-              {' — '}
-              <a href={order.backendUrl} target="_blank" rel="noreferrer" className="link-underline">open this order there</a>
-            </>
-          )}
-          .
-        </p>
+      {(isMock ? order.paymentStatus === 'paid' && refundable > 0 : can('refund')) && (
+        <Button className="mt-4" size="sm" variant="quiet" onClick={onRefund} disabled={Boolean(busy)}>Refund</Button>
       )}
     </Card>
   )
@@ -712,7 +701,7 @@ function CancelCard({ order, busy, run, problem }) {
       {confirming ? (
         <Confirm
           danger
-          message={`Cancel ${order.number}?${paid ? ` It was paid — issue the refund ${isMock ? 'under Payment' : 'in Odoo'} as well.` : ''}`}
+          message={`Cancel ${order.number}?${paid ? ` It was paid — refund it under Payment afterwards.` : ''}`}
           confirmLabel="Cancel order"
           busy={busy === 'cancel'}
           problem={problem}
@@ -732,8 +721,9 @@ function CancelCard({ order, busy, run, problem }) {
 }
 
 /**
- * Refund some or all of an order — demo only. Against a real backend refunds go
- * through the payment provider from the back office.
+ * Refund some or all of an order. Odoo gives the money back through the payment
+ * provider when it can, and otherwise with a credit note for a full refund; the
+ * demo records it. Returned goods are received in Odoo, which knows what came back.
  *
  * Defaults to the outstanding amount, because that is what "Refund" means when
  * nobody has typed a number, and shows what has already gone back so a second
@@ -743,7 +733,7 @@ function CancelCard({ order, busy, run, problem }) {
  */
 function RefundDialog({ order, onClose, onDone, onError }) {
   const already = order.refundedTotal?.amount ?? 0
-  const remaining = order.total.amount - already
+  const remaining = order.refundable?.amount ?? order.total.amount - already
   const currency = order.total.currency
 
   const [amount, setAmount] = useState((remaining / 100).toFixed(2))
@@ -759,8 +749,8 @@ function RefundDialog({ order, onClose, onDone, onError }) {
     e.preventDefault()
     setBusy(true)
     try {
-      await api.adminRefundOrder(order.id, { amount: minor, reason, restock: restock && full })
-      onDone(full ? 'Refunded in full' : `Refunded ${formatMoney({ amount: minor, currency })}`)
+      const next = await api.adminRefundOrder(order.id, isMock ? { amount: minor, reason, restock: restock && full } : { amount: minor, reason })
+      onDone(full ? 'Refunded in full' : `Refunded ${formatMoney({ amount: minor, currency })}`, next)
     } catch (err) {
       onError(err.message)
     } finally {
@@ -806,19 +796,27 @@ function RefundDialog({ order, onClose, onDone, onError }) {
           onChange={(e) => setReason(e.target.value)}
         />
 
-        <label className={`mt-4 flex items-center gap-2.5 text-[13px] ${full ? '' : 'text-faint'}`}>
-          <input
-            type="checkbox"
-            checked={restock && full}
-            disabled={!full}
-            onChange={(e) => setRestock(e.target.checked)}
-            className="h-4 w-4 accent-[rgb(var(--accent))]"
-          />
-          Put the stock back
-        </label>
-        {!full && (
-          <p className="mt-1 text-[11px] text-faint">
-            Only on a full refund — a partial one does not say which item came back.
+        {isMock ? (
+          <>
+            <label className={`mt-4 flex items-center gap-2.5 text-[13px] ${full ? '' : 'text-faint'}`}>
+              <input
+                type="checkbox"
+                checked={restock && full}
+                disabled={!full}
+                onChange={(e) => setRestock(e.target.checked)}
+                className="h-4 w-4 accent-[rgb(var(--accent))]"
+              />
+              Put the stock back
+            </label>
+            {!full && (
+              <p className="mt-1 text-[11px] text-faint">
+                Only on a full refund — a partial one does not say which item came back.
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="mt-4 text-[12px] leading-relaxed text-faint">
+            The money goes back the way the customer paid. If the items come back, receive the return in Odoo so the stock is right.
           </p>
         )}
 

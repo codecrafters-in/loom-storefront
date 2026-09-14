@@ -57,8 +57,12 @@ The `payments` checkout mode. Flows in [CHECKOUT.md](CHECKOUT.md), routes in
 | `no_payment_methods` | 422 | Payment step: nothing the backend offers can take this cart to this address |
 | `invalid_payment_method` | 422 | The chosen method or saved card cannot pay this order; pick another |
 | `cart_changed` | 409 | The total moved since the methods were listed; options are fetched again |
-| `payment_in_progress` | 409 | Another tab is paying for this bag; wait, then check the order |
+| `payment_in_progress` | 409 | A payment for this bag is under way (another tab, or a gateway page left open); the bag shows **Cancel payment** |
 | `already_paid` | 409 | The bag was paid already; the order opens |
+| `nothing_to_pay` | 409 | Pay now on an order that is already paid; the page reloads the order |
+| `nothing_to_refund` | 409 | Admin refund on an order with nothing left to refund |
+| `refund_in_odoo` | 409 | The payment cannot be refunded from the admin; the message says to use Odoo |
+| `refund_failed` | 409 | The payment provider refused the refund; its message is shown |
 | `invalid_signature` | 403 | A gateway result that failed verification; the payment does not count |
 | `unsupported_action` | 404 | A gateway step this payment does not take |
 | `invalid_outcome` | 422 | Demo card only: no test outcome was chosen |

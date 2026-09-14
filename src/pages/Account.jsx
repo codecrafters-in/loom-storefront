@@ -16,9 +16,11 @@ const TABS = [
   { to: '/account/orders', label: 'Orders', icon: 'package' },
   { to: '/account/addresses', label: 'Addresses', icon: 'map-pin' },
 ]
+// Only where the store takes payments on the storefront: that is where "Save for next time" is offered.
+const PAYMENT_TAB = { to: '/account/payment-methods', label: 'Payment methods', icon: 'shield' }
 
-const STATUS_TONE = { placed: 'new', paid: 'bestseller', fulfilled: 'bestseller', delivered: 'bestseller', cancelled: 'sold-out' }
-const STATUS_LABEL = { placed: 'Placed', pending: 'Awaiting payment', paid: 'Paid', fulfilled: 'On its way', delivered: 'Delivered', cancelled: 'Cancelled' }
+const STATUS_TONE = { placed: 'new', paid: 'bestseller', fulfilled: 'bestseller', delivered: 'bestseller', cancelled: 'sold-out', refunded: 'sold-out' }
+const STATUS_LABEL = { placed: 'Placed', pending: 'Awaiting payment', paid: 'Paid', fulfilled: 'On its way', delivered: 'Delivered', cancelled: 'Cancelled', refunded: 'Refunded' }
 
 const statusLabel = (status) => STATUS_LABEL[status] || (status ? status[0].toUpperCase() + status.slice(1) : '')
 
@@ -42,6 +44,7 @@ const countryName = (countries, code) => countries.find(([c]) => c === code)?.[1
 export default function Account() {
   const { customer, loading, logout } = useAuth()
   const navigate = useNavigate()
+  const tabs = useStorefront().checkout?.mode === 'payments' ? [...TABS, PAYMENT_TAB] : TABS
 
   if (loading) return <div className="wrap py-16"><Skeleton className="h-72 w-full" /></div>
   if (!customer) return <Navigate to="/login" state={{ from: '/account' }} replace />
@@ -83,7 +86,7 @@ export default function Account() {
           whose whole purpose is to get someone to their orders.
         */}
         <nav aria-label="Account" className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <NavLink
               key={t.to}
               to={t.to}
@@ -107,6 +110,7 @@ export default function Account() {
             <Route index element={<Overview />} />
             <Route path="orders" element={<Orders />} />
             <Route path="addresses" element={<Addresses />} />
+            <Route path="payment-methods" element={<PaymentMethods />} />
             <Route path="*" element={<Navigate to="/account" replace />} />
           </Routes>
         </div>
@@ -582,6 +586,64 @@ function Addresses() {
             Add a new address
           </button>
         </li>
+      </ul>
+    </>
+  )
+}
+
+/* ── payment methods ─────────────────────────────────────────────────────── */
+
+function PaymentMethods() {
+  const { push } = useToast()
+  const { data, error, loading, reload } = useAsync(() => api.listPaymentMethods(), [])
+  const [items, setItems] = useState(null)
+  const [confirming, setConfirming] = useState(null)
+  const list = items || data?.items || []
+
+  const remove = async (method) => {
+    try {
+      setItems((await api.deletePaymentMethod(method.id)).items)
+      push('Payment method removed')
+    } catch (err) {
+      push(err.message, { tone: 'error' })
+    } finally {
+      setConfirming(null)
+    }
+  }
+
+  if (loading) return <Skeleton className="h-40 w-full" />
+  if (error) return <ErrorState error={error} onRetry={reload} />
+  if (!list.length) {
+    return (
+      <Empty
+        icon="shield"
+        title="No saved payment methods"
+        body={'Tick "Save for next time" when you pay, and the card or account appears here for a faster checkout.'}
+      />
+    )
+  }
+
+  return (
+    <>
+      <PageHeading title="Payment methods" note="Kept by the payment provider. This shop never sees or stores your full card number." />
+      <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+        {list.map((m) => (
+          <li key={m.id} className="flex flex-col rounded-xs border border-line bg-surface p-5">
+            <p className="text-[15px] font-medium">{m.name}</p>
+            <p className="mt-1 text-[13px] text-muted">{[m.method, m.provider].filter(Boolean).join(' · ')}</p>
+            <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-5">
+              {confirming === m.id ? (
+                <>
+                  <span className="text-[13px] text-ink">Remove this payment method?</span>
+                  <TextAction tone="danger" onClick={() => remove(m)}>Remove</TextAction>
+                  <TextAction onClick={() => setConfirming(null)}>Keep</TextAction>
+                </>
+              ) : (
+                <TextAction tone="danger" onClick={() => setConfirming(m.id)}>Remove</TextAction>
+              )}
+            </div>
+          </li>
+        ))}
       </ul>
     </>
   )

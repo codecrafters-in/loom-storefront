@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Icon } from '../ui/index.jsx'
+import { isMock } from '../../lib/config.js'
 
 /**
  * Fit and fabric — the two blocks that decide whether an apparel order sticks.
@@ -40,7 +41,7 @@ export function FitBlock({ product, onOpenChart, flat = false }) {
             className="ml-auto inline-flex items-center gap-1.5 text-[13px] text-accent link-underline"
           >
             <Icon name="filter" size={14} />
-            Size chart & measurements
+            {product.sizeChart.name || 'Size chart'}
           </button>
         )}
       </div>
@@ -130,7 +131,42 @@ function Fact({ label, value }) {
   )
 }
 
-/** The measurements themselves, in a dialog so they never push the buy button down. */
+/**
+ * A store's chart: clothing sizes, ring sizes, furniture dimensions, pack sizes.
+ * The first column names each row; the others carry the chart's unit, if any.
+ */
+export function ChartTable({ chart }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-[14px]">
+        <thead>
+          <tr className="border-b border-line text-left">
+            {chart.columns.map((c, i) => (
+              <th key={c} className="py-2.5 pr-4 font-medium">
+                {c}
+                {i > 0 && chart.unit && <span className="ml-1 text-[11px] font-normal text-faint">{chart.unit}</span>}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {chart.rows.map((row) => (
+            <tr key={row[0]} className="border-b border-line">
+              {row.map((cell, i) => (
+                <td key={i} className={`py-2.5 pr-4 tabular-nums ${i === 0 ? 'font-medium text-ink' : 'text-muted'}`}>
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {chart.note && <p className="mt-4 text-[13px] leading-relaxed text-muted">{chart.note}</p>}
+    </div>
+  )
+}
+
+/** The chart, in a dialog so it never pushes the buy button down. */
 export function SizeChartModal({ product, open, onClose }) {
   const chart = product.sizeChart
 
@@ -153,12 +189,12 @@ export function SizeChartModal({ product, open, onClose }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Size chart"
+        aria-label={chart.name || 'Size chart'}
         className="relative max-h-[88dvh] w-full overflow-y-auto rounded-t-xl bg-page p-6 shadow-panel sm:max-w-2xl sm:rounded-xs"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="font-display text-xl">Size chart</h2>
+            <h2 className="font-display text-xl">{chart.name || 'Size chart'}</h2>
             <p className="mt-1 text-[13px] text-muted">{product.title}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="text-muted hover:text-ink">
@@ -166,42 +202,20 @@ export function SizeChartModal({ product, open, onClose }) {
           </button>
         </div>
 
-        <div className="mt-6 overflow-x-auto">
-          <table className="w-full border-collapse text-[14px]">
-            <thead>
-              <tr className="border-b border-line text-left">
-                {chart.columns.map((c) => (
-                  <th key={c} className="py-2.5 pr-4 font-medium">
-                    {c}
-                    {c !== 'Size' && <span className="ml-1 text-[11px] font-normal text-faint">{chart.unit}</span>}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {chart.rows.map((row) => (
-                <tr key={row[0]} className="border-b border-line">
-                  {row.map((cell, i) => (
-                    <td key={i} className={`py-2.5 pr-4 tabular-nums ${i === 0 ? 'font-medium text-ink' : 'text-muted'}`}>
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-6">
+          <ChartTable chart={chart} />
         </div>
 
-        <p className="mt-5 text-[13px] leading-relaxed text-muted">{chart.note}</p>
-
-        <div className="mt-5 rounded-xs bg-accent-soft/60 p-4">
-          <p className="text-[13px] font-medium text-accent">The one measurement worth taking</p>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-accent/90">
-            Find a garment you already own and like the fit of. Lay it flat and measure across the
-            chest, 2.5cm below the armhole. Double it, and match that number to the table above.
-            It transfers between brands in a way that a letter size does not.
-          </p>
-        </div>
+        {isMock && (
+          <div className="mt-5 rounded-xs bg-accent-soft/60 p-4">
+            <p className="text-[13px] font-medium text-accent">The one measurement worth taking</p>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-accent/90">
+              Find a garment you already own and like the fit of. Lay it flat and measure across the
+              chest, 2.5cm below the armhole. Double it, and match that number to the table above.
+              It transfers between brands in a way that a letter size does not.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

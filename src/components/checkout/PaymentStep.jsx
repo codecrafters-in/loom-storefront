@@ -1,5 +1,8 @@
+import { useEffect, useRef, useState } from 'react'
 import { Icon, Skeleton } from '../ui/index.jsx'
+import { driverFor } from '../../lib/payments/drivers/index.js'
 import { OUTCOMES } from '../../lib/payments/drivers/demo.js'
+import { formatMoney } from '../../lib/money.js'
 
 /**
  * The payment methods the backend offers for this cart.
@@ -17,6 +20,9 @@ export default function PaymentStep({
   disabled,
   demoInput,
   onDemoInput,
+  saveMethod,
+  onSaveMethod,
+  onDriverReady,
 }) {
   return (
     <fieldset className="mt-10" disabled={disabled} aria-busy={loading || undefined}>
@@ -62,6 +68,9 @@ export default function PaymentStep({
                   <span className="block text-[13px] text-faint">
                     {method.saved ? `Saved ${method.methodName || 'method'}` : method.providerName !== method.name ? method.providerName : ''}
                   </span>
+                  {method.fee?.amount > 0 && (
+                    <span className="block text-[13px] text-muted">Adds a {formatMoney(method.fee)} fee</span>
+                  )}
                 </span>
                 <MethodMarks method={method} />
               </label>
@@ -71,6 +80,27 @@ export default function PaymentStep({
                   <Icon name="info" size={15} className="mt-0.5 shrink-0 text-accent" />
                   {method.note}
                 </p>
+              )}
+
+              {checked && !method.saved && method.canSave && onSaveMethod && (
+                <label className="flex items-center gap-2.5 border-t border-line px-4 py-3 text-[13px] text-muted">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(saveMethod)}
+                    onChange={(e) => onSaveMethod(e.target.checked)}
+                    className="h-4 w-4 accent-[rgb(var(--accent))]"
+                  />
+                  Save for next time
+                </label>
+              )}
+
+              {checked && !method.saved && driverFor(method.provider)?.mount && (
+                <MountedForm
+                  driver={driverFor(method.provider)}
+                  method={method}
+                  saveMethod={saveMethod}
+                  onReady={onDriverReady}
+                />
               )}
 
               {checked && !method.saved && method.provider === 'demo' && (
@@ -130,3 +160,51 @@ function DemoCardFields({ value, onChange }) {
     </div>
   )
 }
+
+/**
+ * A gateway's own form (Stripe's card fields), shown while its method is picked. The gateway draws it in its
+ * own iframe; the page only keeps the handle the driver returns, for Pay.
+ */
+function MountedForm({ driver, method, saveMethod, onReady }) {
+  const container = useRef(null)
+  const handle = useRef(null)
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    setError(null)
+    setLoading(true)
+    driver
+      .mount(container.current, method, { saveMethod: Boolean(saveMethod) })
+      .then((mounted) => {
+        if (!alive) {
+          mounted?.destroy?.()
+          return
+        }
+        handle.current = mounted
+        onReady?.(mounted)
+      })
+      .catch((err) => alive && setError(err))
+      .finally(() => alive && setLoading(false))
+    return () => {
+      alive = false
+      handle.current?.destroy?.()
+      handle.current = null
+      onReady?.(null)
+    }
+  }, [driver, method.key]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    handle.current?.setSaveMethod?.(Boolean(saveMethod))
+  }, [saveMethod])
+
+  return (
+    <div className="border-t border-line px-4 py-4">
+      {loading && !error && <Skeleton className="h-24 w-full" />}
+      <div ref={container} />
+      {error && <p role="alert" className="mt-2 text-[13px] text-sale">{error.message}</p>}
+    </div>
+  )
+}
+

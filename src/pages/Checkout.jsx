@@ -1,10 +1,10 @@
-import { useCallback, useState, useEffect, useMemo, useRef } from 'react'
+import { lazy, Suspense, useCallback, useState, useEffect, useMemo, useRef } from 'react'
 import Seo from '../components/Seo.jsx'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { startCheckout } from '../lib/checkout.js'
 import api from '../lib/api/index.js'
 import { ApiError } from '../lib/api/contracts.js'
-import { paymentBody, returnUrls, runPayment, visibleMethods } from '../lib/payments/index.js'
+import { driverInput, paymentBody, payableTotal, returnUrls, runPayment, visibleMethods } from '../lib/payments/index.js'
 import { driverFor } from '../lib/payments/drivers/index.js'
 import { beginCheckout, purchase } from '../lib/analytics.js'
 import { useStorefront } from '../store/StorefrontContext.jsx'
@@ -19,6 +19,9 @@ import { Button, Empty, Icon } from '../components/ui/index.jsx'
 import { formatMoney } from '../lib/money.js'
 import { nestLines } from '../lib/cart-lines.js'
 import LineDetails from '../components/cart/LineDetails.jsx'
+import { isMock } from '../lib/config.js'
+
+const ExpressCheckout = lazy(() => import('../components/checkout/ExpressCheckout.jsx'))
 
 /** Form fields a backend error can point at, by the name it uses. */
 const FIELD_IDS = ['email', 'name', 'line1', 'line2', 'city', 'region', 'postalCode', 'country', 'phone']
@@ -62,6 +65,9 @@ export default function Checkout() {
   const [optionsError, setOptionsError] = useState(null)
   const [selected, setSelected] = useState(null)
   const [demoInput, setDemoInput] = useState({ cardNumber: '4242 4242 4242 4242', outcome: 'done' })
+  const [saveMethod, setSaveMethod] = useState(false)
+  // A gateway form mounted on the page (Stripe's card fields), for Pay.
+  const mounted = useRef(null)
   const [notice, setNotice] = useState(location.state?.paymentMessage || null)
   const [waiting, setWaiting] = useState(null)
   const errorRef = useRef(null)
@@ -190,16 +196,15 @@ export default function Checkout() {
       return
     }
     const driver = chosen.saved ? null : driverFor(chosen.provider)
-    const problem = driver?.validate?.(demoInput)
-    if (problem) {
-      fail(new ApiError(problem, { code: 'invalid_card' }))
-      return
-    }
-
     setBusy(true)
     setError(null)
     setNotice(null)
     setWaiting(null)
+    const { input, problem } = await driverInput(driver, { demoInput, mounted: mounted.current })
+    if (problem) {
+      fail(new ApiError(problem, { code: 'invalid_card' }))
+      return
+    }
     try {
       const { email, ...address } = form
       const urls = returnUrls(config.checkout, window.location.origin)
@@ -209,10 +214,11 @@ export default function Checkout() {
         shippingMethod: method,
         currency: cart.currency,
         method: chosen,
+        saveMethod: saveMethod && chosen.canSave,
         expectedTotal: options?.amount?.amount,
         ...urls,
       }))
-      const result = await runPayment(created, { api, input: driver?.needsInput ? demoInput : undefined })
+      const result = await runPayment(created, { api, input })
 
       if (result.kind === 'redirect') {
         // Hand the browser to the gateway's own page. Nothing after this runs.
@@ -274,11 +280,12 @@ export default function Checkout() {
     }
   }
 
-  const payTotal = options?.amount || cart.total
+  const chosenMethod = payments && stage === 'payment' ? methods.find((m) => m.key === selected) : null
+  const payTotal = payableTotal(options?.amount || cart.total, chosenMethod)
   const buttonLabel = busy
     ? payments && stage === 'payment' ? 'Processing payment…' : 'Just a moment…'
     : payments
-      ? stage === 'payment' ? `Pay · ${formatMoney(payTotal)}` : 'Continue to payment'
+      ? stage === 'payment' ? `${chosenMethod?.flow === 'offline' ? 'Place order' : 'Pay'} · ${formatMoney(payTotal)}` : 'Continue to payment'
       : config.checkout?.mode === 'redirect'
         ? `Continue to payment · ${formatMoney(cart.total)}`
         : `Place order · ${formatMoney(cart.total)}`
@@ -289,6 +296,12 @@ export default function Checkout() {
       <div className="wrap grid items-start gap-12 py-10 pb-20 lg:grid-cols-[1fr_22rem]">
       <form onSubmit={submit} className="max-w-xl">
         <h1 className="text-display-lg">Checkout</h1>
+
+        {payments && !isMock && (
+          <Suspense fallback={null}>
+            <ExpressCheckout className="mt-6" />
+          </Suspense>
+        )}
 
         {config.checkout?.mode === 'demo' && (
           <p className="mt-5 flex items-start gap-2.5 rounded-xs border border-line bg-surface p-3.5 text-[13px] leading-relaxed text-muted">
@@ -365,6 +378,9 @@ export default function Checkout() {
             disabled={busy}
             demoInput={demoInput}
             onDemoInput={setDemoInput}
+            saveMethod={saveMethod}
+            onSaveMethod={setSaveMethod}
+            onDriverReady={(handle) => { mounted.current = handle }}
           />
         )}
 
@@ -441,9 +457,12 @@ export default function Checkout() {
             )}
             <div className="flex justify-between"><dt className="text-muted">Shipping</dt><dd className="tabular-nums">{cart.shipping.amount === 0 ? 'Free' : formatMoney(cart.shipping)}</dd></div>
             <div className="flex justify-between"><dt className="text-muted">Tax</dt><dd className="tabular-nums">{formatMoney(cart.tax)}</dd></div>
+            {chosenMethod?.fee?.amount > 0 && (
+              <div className="flex justify-between"><dt className="text-muted">Cash on delivery fee</dt><dd className="tabular-nums">{formatMoney(chosenMethod.fee)}</dd></div>
+            )}
           </dl>
           <p className="mt-4 flex justify-between border-t border-line pt-4 text-lg">
-            <span>Total</span><span className="tabular-nums">{formatMoney(cart.total)}</span>
+            <span>Total</span><span className="tabular-nums">{formatMoney(payableTotal(cart.total, chosenMethod))}</span>
           </p>
         </div>
       </aside>

@@ -4,6 +4,7 @@ import { useToast } from './ToastContext.jsx'
 import { onExternalWrite, STORAGE_KEYS } from '../lib/crossTab.js'
 import { addToCart as trackAdd, removeFromCart as trackRemove } from '../lib/analytics.js'
 import { cartProblem } from '../lib/cart-lines.js'
+import { isMock } from '../lib/config.js'
 
 /**
  * Cart state.
@@ -55,6 +56,8 @@ export function CartProvider({ children }) {
         return next
       } catch (err) {
         push(cartProblem(err), { tone: 'error' })
+        // A gateway page is open for this bag: fetch it again so the bag shows the way out.
+        if (!isMock && err?.code === 'payment_in_progress') api.getCart().then(setCart).catch(() => {})
         throw err
       } finally {
         setBusy(false)
@@ -102,6 +105,7 @@ export function CartProvider({ children }) {
       },
       applyDiscount: (code) => run(() => api.applyDiscount(code), { successMessage: 'Code applied' }),
       clear: () => run(() => api.clearCart()),
+      cancelPayment: () => run(() => api.cancelCartPayment(), { successMessage: 'Payment cancelled. You can change your bag now.' }),
       refresh: () => api.getCart().then(setCart),
     }),
     [cart, loading, busy, open, run],

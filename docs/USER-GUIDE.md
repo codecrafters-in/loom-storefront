@@ -483,8 +483,11 @@ server the same button sends.
 
 ## Refund an order
 
-**Admin → Orders → open the order → Payment → Refund.** Against Odoo, refunds are
-issued in Odoo — the Payment card links to the order there.
+**Admin → Orders → open the order → Payment → Refund.** Against Odoo the money
+goes back through the payment provider when it can refund, or with a credit note
+for a full refund of an invoiced order; otherwise the dialog says to do it in
+Odoo. Only staff with Invoicing rights see the button, and items coming back are
+received as a return in Odoo.
 
 It defaults to whatever is still outstanding. Enter less for a partial refund —
 the order stays open and the amounts add up, so a second refund is not issued

@@ -18,13 +18,13 @@ import { createHash } from 'node:crypto'
  * directive that refused it.
  */
 export const THIRD_PARTY = {
-  // Razorpay Checkout, Cloudflare Turnstile, Google reCAPTCHA (and its gstatic half). The captcha hosts are
+  // Razorpay Checkout, Stripe.js (its card form and 3-D Secure frames), Cloudflare Turnstile, Google reCAPTCHA (and its gstatic half). The captcha hosts are
   // narrowed to their captcha paths: www.google.com and www.gstatic.com serve other scripts too, some of them
   // known ways around a policy.
-  script: ['https://checkout.razorpay.com', 'https://challenges.cloudflare.com/turnstile/', 'https://www.google.com/recaptcha/', 'https://www.gstatic.com/recaptcha/'],
-  connect: ['https://api.razorpay.com', 'https://lumberjack.razorpay.com'],
+  script: ['https://checkout.razorpay.com', 'https://js.stripe.com', 'https://challenges.cloudflare.com/turnstile/', 'https://www.google.com/recaptcha/', 'https://www.gstatic.com/recaptcha/'],
+  connect: ['https://api.razorpay.com', 'https://lumberjack.razorpay.com', 'https://api.stripe.com'],
   // Product films play from the privacy-enhanced hosts only, and only after a press of play (Media.jsx).
-  frame: ['https://api.razorpay.com', 'https://checkout.razorpay.com', 'https://challenges.cloudflare.com', 'https://www.google.com/recaptcha/', 'https://www.youtube-nocookie.com', 'https://player.vimeo.com'],
+  frame: ['https://api.razorpay.com', 'https://checkout.razorpay.com', 'https://js.stripe.com', 'https://hooks.stripe.com', 'https://challenges.cloudflare.com', 'https://www.google.com/recaptcha/', 'https://www.youtube-nocookie.com', 'https://player.vimeo.com'],
   style: ['https://fonts.googleapis.com'],
   font: ['https://fonts.gstatic.com'],
 }
