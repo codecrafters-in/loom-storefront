@@ -1,3 +1,5 @@
+import { isMock } from '../../lib/config.js'
+
 /**
  * The mark.
  *
@@ -76,6 +78,17 @@ export default function Logo({ config, className = '', size, variant = 'tile' })
     )
   }
 
+  // A live store's name, never the demo's mark.
+  if (!isMock) {
+    const text = logo.wordmark || config?.store?.name
+    if (!text) return null
+    return (
+      <span className={`font-display font-medium tracking-[-0.02em] ${className}`} style={{ fontSize: height * 0.86, lineHeight: 1 }}>
+        {text}
+      </span>
+    )
+  }
+
   return (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <LoomMark size={height} variant={variant} />
@@ -83,7 +96,7 @@ export default function Logo({ config, className = '', size, variant = 'tile' })
         className="font-display font-medium tracking-[-0.02em]"
         style={{ fontSize: height * 0.86, lineHeight: 1 }}
       >
-        {logo.wordmark || config?.store?.name || 'LOOM'}
+        {logo.wordmark || config?.store?.name}
       </span>
     </span>
   )

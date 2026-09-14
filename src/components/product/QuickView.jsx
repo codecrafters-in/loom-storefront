@@ -9,6 +9,7 @@ import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
 import { ExtraOptions, OptionPicker } from './VariantPicker.jsx'
 import { CompareToggle } from './CompareTray.jsx'
+import useFocusTrap from '../../hooks/useFocusTrap.js'
 
 const OptionalOffer = lazy(() => import('./OptionalOffer.jsx'))
 
@@ -26,6 +27,7 @@ const OptionalOffer = lazy(() => import('./OptionalOffer.jsx'))
  */
 export default function QuickView({ slug, onClose }) {
   const { data: product, error, loading, reload } = useAsync(() => api.getProduct(slug), [slug])
+  const trapRef = useFocusTrap(true)
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
@@ -39,6 +41,8 @@ export default function QuickView({ slug, onClose }) {
 
   return (
     <div
+      ref={trapRef}
+      tabIndex={-1}
       className="fixed inset-0 z-50 grid place-items-center p-4"
       role="dialog"
       aria-modal="true"

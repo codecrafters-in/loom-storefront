@@ -4,6 +4,7 @@ import { Button, Icon } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
 import { formatMoney } from '../../lib/money.js'
+import useFocusTrap from '../../hooks/useFocusTrap.js'
 
 /**
  * "Anything to go with it?" — the store's optional products, offered as the
@@ -23,6 +24,7 @@ import { formatMoney } from '../../lib/money.js'
  */
 export default function OptionalOffer({ product, busy, onConfirm, onClose }) {
   const [picked, setPicked] = useState([])
+  const trapRef = useFocusTrap(true)
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
@@ -35,7 +37,7 @@ export default function OptionalOffer({ product, busy, onConfirm, onClose }) {
   const tick = (variantId, on) => setPicked((list) => (on ? [...list, variantId] : list.filter((id) => id !== variantId)))
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="optional-offer-title">
+    <div ref={trapRef} tabIndex={-1} className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="optional-offer-title">
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
       <div className="relative w-full max-w-md rounded-xs border border-line bg-page p-6 shadow-panel">
         <div className="flex items-start justify-between gap-4">

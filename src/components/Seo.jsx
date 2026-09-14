@@ -50,12 +50,14 @@ export default function Seo({ title, description, image, type = 'website', produ
  * ignored by every scraper that reads it.
  */
 export function buildHead({ title, description, image, type = 'website', product, noindex = false, pathname, config, origin }) {
-  const storeName = config?.store?.name || 'LOOM'
+  const storeName = config?.store?.name || ''
   const base = origin || (typeof window !== 'undefined' ? window.location.origin : '')
-  const full = title ? `${title} — ${storeName}` : `${storeName} — ${config?.store?.tagline || ''}`.trim()
+  const full = title
+    ? [title, storeName].filter(Boolean).join(' — ')
+    : [storeName, config?.store?.tagline].filter(Boolean).join(' — ')
   const desc = description || config?.store?.description || ''
   const url = `${base}${pathname}`
-  const img = absolute(image || '/og.jpg', base)
+  const img = absolute(image || config?.theme?.ogImageUrl || '/og.jpg', base)
 
   return [
     { kind: 'title', text: full },

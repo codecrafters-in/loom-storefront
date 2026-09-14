@@ -4,6 +4,20 @@ Newest first. Each entry links to the page with the detail.
 
 ## What's new — 2026-09-14
 
+### Your store's content, not the demo's
+
+- **No demo on a live store.** Pages, footer copy, promises, logo mark, page title, icons and link card no longer come
+  from the demo; a live build that still contains demo copy fails (`scripts/brand-leak.mjs`). The documentation
+  pages, the "live api" tag and the source link are demo-only. [API.md](API.md#pages-contact-consent-access-and-blog)
+- **Store unavailable, maintenance and password screens** instead of a silent fallback to the demo catalogue.
+- **Pages from the backend** (`GET /pages/:slug`) with text, tables, images, FAQ accordions, contact details and a
+  contact form; they are prerendered.
+- **Theme from the backend:** colours, fonts and corner radius applied at runtime and in prerendered pages.
+- **Cookie consent banner** with preferences, Consent Mode v2 and opt-in analytics; **Cookie settings** in the footer.
+- **Blog** pages (`/blog`, `/blog/:slug`), **rotating announcements**, store contact details in the footer.
+- **Accessibility:** dialogs and the bag and menu drawers keep keyboard focus inside while open and give it back
+  when closed, and closed drawers are out of the Tab order; `e2e/tests/a11y.spec.js` runs axe on the main pages.
+
 ### Any product, not just apparel
 
 - **One picker for every product.** Options render as the store set them up in

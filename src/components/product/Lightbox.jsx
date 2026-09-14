@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
+import useFocusTrap from '../../hooks/useFocusTrap.js'
 
 /**
  * The photograph, full screen, with zoom.
@@ -33,6 +34,7 @@ export default function Lightbox({ images = [], index = 0, onIndex, onClose }) {
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const frameRef = useRef(null)
   const drag = useRef(null)
+  const trapRef = useFocusTrap(true)
 
   const image = images[index]
   const isVideo = image?.type === 'video'
@@ -124,6 +126,8 @@ export default function Lightbox({ images = [], index = 0, onIndex, onClose }) {
 
   return (
     <div
+      ref={trapRef}
+      tabIndex={-1}
       className="fixed inset-0 z-50 flex flex-col bg-ink/95"
       role="dialog"
       aria-modal="true"

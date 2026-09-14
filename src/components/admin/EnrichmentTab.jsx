@@ -556,7 +556,7 @@ function AssuranceEditor({ rows, icons, templates, onChange, onSave }) {
               <textarea
                 rows={2}
                 className="field"
-                placeholder="Unworn, tags attached. A prepaid label is in every parcel."
+                placeholder="e.g. Unused items can be returned within 30 days of delivery."
                 value={row.note || ''}
                 onChange={(ev) => patch(i, 'note', ev.target.value)}
               />

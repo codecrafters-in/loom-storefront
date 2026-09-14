@@ -11,6 +11,7 @@ import useAsync from '../../hooks/useAsync.js'
 import { nestLines } from '../../lib/cart-lines.js'
 import { stepperProps } from '../../lib/quantity.js'
 import LineDetails from './LineDetails.jsx'
+import useFocusTrap from '../../hooks/useFocusTrap.js'
 
 /** Slides in after every add. Nothing here is decorative — it is the fastest
  *  path from "added" to "checkout", which is the only job of a cart drawer. */
@@ -18,6 +19,7 @@ export default function CartDrawer() {
   const { cart, open, setOpen, update, remove, busy } = useCart()
   const config = useStorefront()
   const rec = config.recommendations?.inCart || {}
+  const trapRef = useFocusTrap(open)
 
   // Keyed on the last line added, so the suggestions follow what the shopper is
   // actually buying. Skipped entirely when the bag is empty or the feature is
@@ -62,6 +64,10 @@ export default function CartDrawer() {
         className={`fixed inset-0 z-40 bg-ink/35 transition-opacity duration-300 ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
       />
       <aside
+        ref={trapRef}
+        tabIndex={-1}
+        // Closed, it is off screen but still in the page: `inert` keeps it out of the Tab order.
+        {...(open ? {} : { inert: '' })}
         role="dialog"
         aria-modal="true"
         aria-label="Your bag"

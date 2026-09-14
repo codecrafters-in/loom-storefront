@@ -24,8 +24,9 @@ export default {
         good: 'rgb(var(--good) / <alpha-value>)',
       },
       fontFamily: {
-        sans: ['"Inter"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        display: ['"Fraunces"', 'ui-serif', 'Georgia', 'serif'],
+        // Set by the store's theme at runtime (src/lib/theme.js); defaults in index.css.
+        sans: ['var(--font-body)'],
+        display: ['var(--font-display)'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
       fontSize: {
@@ -33,7 +34,7 @@ export default {
         'display-lg': ['clamp(2rem, 4vw, 3.25rem)', { lineHeight: '1.02', letterSpacing: '-0.025em' }],
         'display-md': ['clamp(1.5rem, 2.6vw, 2.25rem)', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
       },
-      borderRadius: { xs: '2px' },
+      borderRadius: { xs: 'var(--radius)' },
       boxShadow: {
         card: '0 1px 2px rgb(var(--shadow) / 0.05), 0 12px 28px -18px rgb(var(--shadow) / 0.18)',
         lift: '0 2px 4px rgb(var(--shadow) / 0.06), 0 28px 56px -28px rgb(var(--shadow) / 0.22)',

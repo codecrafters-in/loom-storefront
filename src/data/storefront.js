@@ -29,6 +29,17 @@ export const storefront = {
     // Point `imageUrl` at a file to use artwork instead.
     logo: { wordmark: 'LOOM', mark: 'loom', imageUrl: null, height: 22 },
     email: 'help@loom.example',
+    contact: {
+      email: 'help@loom.example',
+      phone: '+1 555 0100',
+      whatsapp: '',
+      address: ['117 Mercer Street', 'New York, NY 10012'],
+      hours: 'Mon–Fri, 9:00–17:00',
+      social: [{ network: 'instagram', url: 'https://instagram.com/' }],
+      legalName: 'LOOM',
+      vat: '',
+    },
+    credit: '',
   },
 
   /** Money, and the countries you will ship to. */

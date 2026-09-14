@@ -184,7 +184,7 @@ export async function beginSignIn({ from, baseUrl = config.api.baseUrl } = {}) {
   }
   const store = storeCode(baseUrl)
   if (!store) {
-    throw new ApiError('VITE_API_BASE_URL does not look like a LOOM store API (…/loom/api/v1/<store>), so there is no Odoo to sign in with.', {
+    throw new ApiError('VITE_API_BASE_URL does not look like a store API (…/loom/api/v1/<store>), so there is no Odoo to sign in with.', {
       code: 'not_odoo',
     })
   }

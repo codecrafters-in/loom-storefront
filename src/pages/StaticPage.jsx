@@ -1,111 +1,135 @@
-import { useParams, Navigate } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { Navigate, useParams } from 'react-router-dom'
+import api, { peek } from '../lib/api/index.js'
+import useAsync from '../hooks/useAsync.js'
 import Promises from '../components/layout/Promises.jsx'
-import { Breadcrumbs } from '../components/ui/index.jsx'
+import { Breadcrumbs, ErrorState, Skeleton } from '../components/ui/index.jsx'
 import Seo from '../components/Seo.jsx'
+import ContactDetails from '../components/content/ContactDetails.jsx'
+import { useStorefront } from '../store/StorefrontContext.jsx'
+
+const ContactForm = lazy(() => import('../components/content/ContactForm.jsx'))
 
 /**
- * The pages a storefront needs before it can take a real order. Content is a
- * plain block array so a merchant can move it into a CMS without touching the
- * renderer.
+ * An information page written in the backend (`GET /pages/:slug`): shipping,
+ * returns, terms, privacy, FAQ, contact. Blocks are text, tables, images,
+ * questions and answers, the store's contact details and a contact form.
  */
-const PAGES = {
-  'size-guide': {
-    title: 'Size guide',
-    intro: 'Measurements are of the garment laid flat, not of the body. If you are between sizes, our cuts run generous — take the smaller one.',
-    blocks: [
-      { h: 'Tops and knitwear', table: [
-        ['Size', 'Chest (cm)', 'Length (cm)', 'Sleeve (cm)'],
-        ['XS', '96', '68', '61'], ['S', '102', '70', '62'], ['M', '108', '72', '64'],
-        ['L', '114', '74', '65'], ['XL', '120', '76', '66'],
-      ] },
-      { h: 'Trousers', table: [
-        ['Size', 'Waist (cm)', 'Hip (cm)', 'Inseam (cm)'],
-        ['XS', '74', '96', '76'], ['S', '79', '101', '76'], ['M', '84', '106', '78'],
-        ['L', '89', '111', '78'], ['XL', '94', '116', '80'],
-      ] },
-      { h: 'How we measure', p: 'Chest is measured across the garment one inch below the armhole and doubled. Length runs from the highest point of the shoulder to the hem. Every piece is measured in the size we photograph, which is a medium.' },
-    ],
-  },
-  shipping: {
-    title: 'Shipping & returns',
-    intro: 'Free standard shipping over $150. Everything is tracked, and a prepaid return label is in every parcel.',
-    blocks: [
-      { h: 'Shipping', table: [
-        ['Method', 'Time', 'Cost'],
-        ['Standard', '2–4 working days', '$12, free over $150'],
-        ['Express', 'Next working day', '$24'],
-        ['International', '5–10 working days', 'Calculated at checkout'],
-      ] },
-      { h: 'Returns', p: 'Thirty days from delivery, unworn and with tags attached. Use the prepaid label in your parcel or start a return from your account. Refunds land within five working days of the parcel reaching us.' },
-      { h: 'Repairs', p: 'We will repair anything we made, for as long as we are around. Send it to us and we will quote before doing any work — most seam and button repairs are free.' },
-    ],
-  },
-  care: {
-    title: 'Fabric & care',
-    intro: 'Most clothes are washed too often and too hot. Airing a wool knit overnight does more than a wash cycle ever will.',
-    blocks: [
-      { h: 'Wool and cashmere', p: 'Hand wash cool with a wool shampoo, or use a machine wool cycle at 30°C in a mesh bag. Never tumble dry. Dry flat and reshape while damp. De-pill with a cashmere comb rather than a razor, which cuts fibres and makes it worse.' },
-      { h: 'Linen', p: 'Machine wash cool and line dry. Linen creases — that is the fibre behaving correctly, not a fault. If you want it flat, iron while it is still slightly damp.' },
-      { h: 'Cotton', p: 'Cool wash with like colours, tumble low or line dry. Garment-dyed pieces will lose a little colour in the first two washes; wash them separately to start.' },
-      { h: 'Waxed cotton', p: 'Never machine wash and never dry clean — both strip the wax. Wipe with a damp cloth. Rewax once a year with heavy use.' },
-      { h: 'Leather', p: 'Wipe with a dry cloth and condition twice a year. Keep it away from radiators and direct sun, which dry the hide out and crack it.' },
-    ],
-  },
-  contact: {
-    title: 'Contact',
-    intro: 'A real person answers, usually within one working day.',
-    blocks: [
-      { h: 'Customer care', p: 'help@loom.example — orders, returns, sizing and repairs.' },
-      { h: 'Press and wholesale', p: 'hello@loom.example' },
-      { h: 'About this store', p: 'LOOM is a demo storefront built by CodeCrafters as an open-source theme. Nothing here ships and no payment is taken. The source, including the API contract for wiring it to a real backend, is on GitHub.' },
-    ],
-  },
+const paragraphs = (text) => (text || '').split(/\n{2,}/).map((t) => t.trim()).filter(Boolean)
+
+/** Consecutive question-and-answer blocks read as one list. */
+function grouped(blocks = []) {
+  const out = []
+  for (const block of blocks) {
+    const last = out[out.length - 1]
+    if (block.type === 'faq' && last?.type === 'faq-group') last.items.push(block)
+    else if (block.type === 'faq') out.push({ type: 'faq-group', items: [block] })
+    else out.push(block)
+  }
+  return out
+}
+
+function Text({ block }) {
+  return (
+    <>
+      {paragraphs(block.p).map((text) => (
+        <p key={text} className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-muted">{text}</p>
+      ))}
+      {block.html && <div className="rich mt-4 text-[15px] leading-relaxed text-muted" dangerouslySetInnerHTML={{ __html: block.html }} />}
+    </>
+  )
+}
+
+function Table({ rows }) {
+  if (!rows?.length) return null
+  return (
+    <div className="mt-5 overflow-x-auto">
+      <table className="w-full border-collapse text-[14px]">
+        <thead>
+          <tr className="border-b border-line text-left">
+            {rows[0].map((h, i) => <th key={i} className="py-2.5 pr-4 font-medium">{h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.slice(1).map((row, r) => (
+            <tr key={r} className="border-b border-line">
+              {row.map((cell, i) => (
+                <td key={i} className={`py-2.5 pr-4 tabular-nums ${i === 0 ? 'text-ink' : 'text-muted'}`}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function Block({ block, config }) {
+  if (block.type === 'faq-group') {
+    return (
+      <section className="divide-y divide-line border-y border-line">
+        {block.items.map((item, i) => (
+          <details key={i} className="py-4">
+            <summary className="cursor-pointer text-[16px] font-medium">{item.h}</summary>
+            <Text block={item} />
+          </details>
+        ))}
+      </section>
+    )
+  }
+  return (
+    <section>
+      {block.h && <h2 className="text-display-md">{block.h}</h2>}
+      {block.type === 'image' && block.image?.url && (
+        <figure className="mt-5">
+          <img src={block.image.url} alt={block.image.alt || ''} loading="lazy" className="w-full rounded-xs" />
+        </figure>
+      )}
+      {block.type !== 'contact-form' && <Text block={block} />}
+      {block.table && <Table rows={block.table} />}
+      {block.type === 'contact' && <ContactDetails contact={config.store?.contact} />}
+      {block.type === 'contact-form' && config.features?.contactForm !== false && (
+        <Suspense fallback={<Skeleton className="mt-5 h-72 w-full" />}>
+          <ContactForm />
+        </Suspense>
+      )}
+    </section>
+  )
 }
 
 export default function StaticPage() {
   const { slug } = useParams()
-  const page = PAGES[slug]
-  if (!page) return <Navigate to="/404" replace />
+  const config = useStorefront()
+  // Seeded by the prerenderer, so the page is in the HTML rather than a skeleton.
+  const { data: page, error, loading, reload } = useAsync(() => api.getPage(slug), [slug], { initial: peek.getPage(slug) })
+
+  if (error?.status === 404) return <Navigate to="/404" replace />
+  if (error) {
+    return (
+      <div className="wrap max-w-3xl py-20">
+        <ErrorState error={error} onRetry={reload} />
+      </div>
+    )
+  }
+  if (loading || !page) {
+    return (
+      <div className="wrap max-w-3xl py-10 pb-20">
+        <Skeleton className="h-10 w-2/3" />
+        <Skeleton className="mt-6 h-5 w-full" />
+        <Skeleton className="mt-12 h-48 w-full" />
+      </div>
+    )
+  }
 
   return (
     <>
-      {/* These four are in the sitemap. Without this they shared the site
-          default, which is the thing per-route titles exist to prevent. */}
-      <Seo title={page.title} description={page.intro} path={`/pages/${slug}`} />
+      <Seo title={page.seo?.title || page.title} description={page.seo?.description || page.intro} path={`/pages/${slug}`} />
       <div className="wrap max-w-3xl py-10 pb-20">
         <Breadcrumbs trail={[{ label: 'Home', to: '/' }, { label: page.title }]} />
         <h1 className="mt-6 text-display-lg">{page.title}</h1>
-        <p className="mt-5 text-[17px] leading-relaxed text-muted">{page.intro}</p>
-
+        {page.intro && <p className="mt-5 text-[17px] leading-relaxed text-muted">{page.intro}</p>}
         <div className="mt-12 space-y-12">
-          {page.blocks.map((b) => (
-            <section key={b.h}>
-              <h2 className="text-display-md">{b.h}</h2>
-              {b.p && <p className="mt-4 text-[15px] leading-relaxed text-muted">{b.p}</p>}
-              {b.table && (
-                <div className="mt-5 overflow-x-auto">
-                  <table className="w-full border-collapse text-[14px]">
-                    <thead>
-                      <tr className="border-b border-line text-left">
-                        {b.table[0].map((h) => (
-                          <th key={h} className="py-2.5 pr-4 font-medium">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {b.table.slice(1).map((row) => (
-                        <tr key={row[0]} className="border-b border-line">
-                          {row.map((cell, i) => (
-                            <td key={i} className={`py-2.5 pr-4 tabular-nums ${i === 0 ? 'text-ink' : 'text-muted'}`}>{cell}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-          ))}
+          {grouped(page.blocks).map((block, i) => <Block key={i} block={block} config={config} />)}
         </div>
       </div>
       <Promises />

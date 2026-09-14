@@ -9,6 +9,7 @@ import Logo from '../ui/Logo.jsx'
 import useAsync from '../../hooks/useAsync.js'
 import api from '../../lib/api/index.js'
 import { docsLinkVisible } from '../../lib/docs-link.js'
+import useFocusTrap from '../../hooks/useFocusTrap.js'
 
 // Submenu entries are categories ({ slug, name }) or links the merchant added
 // by hand ({ label, to }).
@@ -31,6 +32,17 @@ export default function Header() {
   const { data: fetched } = useAsync(() => api.listCategories(), [], { skip: !!booted })
   const cats = booted ? { items: booted } : fetched
   const [openMenu, setOpenMenu] = useState(null)
+  const menuRef = useFocusTrap(menuOpen)
+  const messages = config.navigation?.announcement?.messages || []
+  const [tick, setTick] = useState(0)
+
+  // One announcement at a time, each for a few seconds. Still when motion is reduced or there is only one.
+  useEffect(() => {
+    if (messages.length < 2) return undefined
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined
+    const timer = setInterval(() => setTick((n) => n + 1), 5000)
+    return () => clearInterval(timer)
+  }, [messages.length])
 
   const features = config.features || {}
   // A nav entry with `categorySlug` pulls that category's children in as a
@@ -81,17 +93,11 @@ export default function Header() {
 
   return (
     <>
-      {/* The demo needs to say it is a demo. On a real store this strip is where
-          shipping or promo messaging goes. */}
-      {config.navigation?.announcement?.messages?.length > 0 && (
+      {/* Shipping, promotions or opening hours, written in the backend (with start and end dates). */}
+      {messages.length > 0 && (
         <div className="bg-ink text-page">
-          <div className="wrap flex h-9 items-center justify-center gap-2 text-center font-mono text-[10px] uppercase tracking-[0.16em]">
-            {config.navigation.announcement.messages.map((m, i) => (
-              <span key={m} className={i > 0 ? 'hidden sm:flex sm:items-center sm:gap-2' : ''}>
-                {i > 0 && <span className="text-page/40">·</span>}
-                {m}
-              </span>
-            ))}
+          <div className="wrap flex h-9 items-center justify-center text-center font-mono text-[10px] uppercase tracking-[0.16em]">
+            <span key={tick % messages.length} className="animate-fade-up">{messages[tick % messages.length]}</span>
           </div>
         </div>
       )}
@@ -241,6 +247,9 @@ export default function Header() {
       />
       <nav
         aria-label="Mobile"
+        ref={menuRef}
+        tabIndex={-1}
+        {...(menuOpen ? {} : { inert: '' })}
         className={`fixed left-0 top-0 z-50 h-[100dvh] w-[min(84vw,20rem)] bg-page shadow-panel transition-transform lg:hidden ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-4">

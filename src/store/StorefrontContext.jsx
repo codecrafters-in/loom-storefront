@@ -1,8 +1,10 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import api, { peek } from '../lib/api/index.js'
 import { configureAnalytics } from '../lib/analytics.js'
-import { config } from '../lib/config.js'
-import { storefront as defaults } from '../data/storefront.js'
+import { config, isMock } from '../lib/config.js'
+import { ACCESS_EVENT, accessToken } from '../lib/access.js'
+import { storefront as demo } from '../data/storefront.js'
+import { defaults as neutral } from '../data/defaults.js'
 
 /**
  * The theme configuration, resolved once at boot.
@@ -10,12 +12,14 @@ import { storefront as defaults } from '../data/storefront.js'
  * Three layers, highest priority first:
  *   1. GET /storefront   — the merchant's live settings
  *   2. VITE_* env vars   — deploy-time overrides
- *   3. src/data/storefront.js — the bundled defaults
+ *   3. the bundled defaults — the demo's content in mock mode, neutral values
+ *      (src/data/defaults.js) for a live store
  *
- * The config fetch is allowed to fail. A store whose settings endpoint is down
- * should still sell things, so a failure falls through to the defaults and
- * records the error rather than blocking the first paint.
+ * A live store never falls back to the demo. When its settings cannot be read
+ * the shopper gets a "Store unavailable" screen with a retry; a store in
+ * maintenance or behind a password gets that screen instead of the shop.
  */
+const defaults = isMock ? demo : neutral
 const StorefrontContext = createContext(null)
 
 /** Deep merge, arrays replaced wholesale. An admin panel that sends four home
@@ -51,6 +55,9 @@ export function StorefrontProvider({ children }) {
   const [boot, setBoot] = useState(seeded || null)
   const [ready, setReady] = useState(Boolean(seeded))
   const [error, setError] = useState(null)
+  const [attempt, setAttempt] = useState(0)
+  const [locked, setLocked] = useState(false)
+  const [hasAccess, setHasAccess] = useState(false)
 
   /**
    * One request for the first screen.
@@ -70,18 +77,21 @@ export function StorefrontProvider({ children }) {
         if (!alive) return
         setBoot(data)
         setRemote(data.storefront || null)
+        setError(null)
       })
       .catch(() =>
         api
           .getStorefront()
-          .then((cfg) => alive && setRemote(cfg))
+          .then((cfg) => {
+            if (!alive) return
+            setRemote(cfg)
+            setError(null)
+          })
           .catch((err) => {
             if (!alive) return
             setError(err)
-            // Loud in development, silent in production — a missing settings
-            // endpoint should not be a blank page for a shopper.
             if (import.meta.env.DEV) {
-              console.warn('[storefront] falling back to bundled defaults:', err.message)
+              console.warn('[storefront] settings could not be loaded:', err.message)
             }
           }),
       )
@@ -89,15 +99,42 @@ export function StorefrontProvider({ children }) {
     return () => {
       alive = false
     }
+  }, [attempt])
+
+  // The API refused a call because the store is closed: show the password or maintenance screen.
+  useEffect(() => {
+    const onLocked = () => setLocked(true)
+    window.addEventListener(ACCESS_EVENT, onLocked)
+    return () => window.removeEventListener(ACCESS_EVENT, onLocked)
+  }, [])
+  // Read after mounting, so the server render and the first client render agree.
+  useEffect(() => {
+    setHasAccess(Boolean(accessToken()))
+  }, [locked, remote])
+
+  const reload = useCallback(() => {
+    setReady(false)
+    setAttempt((n) => n + 1)
   }, [])
 
   const cfg = useMemo(() => merge(merge(defaults, fromEnv()), remote), [remote])
 
+  // Loaded only for a store with a theme; the prerendered page already carries its colours.
+  useEffect(() => {
+    if (cfg.theme) import('../lib/theme.js').then((m) => m.applyTheme(cfg.theme))
+  }, [cfg.theme])
+
   // Settings decide whether anything is sent at all, so this runs before the
   // first event rather than on the first render that happens to need one.
   useEffect(() => {
-    configureAnalytics(cfg.analytics || {})
+    configureAnalytics({
+      ...(cfg.analytics || {}),
+      consentRequired: Boolean(cfg.consent?.enabled && cfg.consent.mode !== 'opt-out'),
+    })
   }, [cfg])
+
+  const mode = cfg.access?.mode || 'open'
+  const closed = mode !== 'open' && (locked || !hasAccess)
 
   const value = useMemo(() => {
     return {
@@ -105,13 +142,18 @@ export function StorefrontProvider({ children }) {
       ready,
       error,
       usingDefaults: !remote,
+      reload,
+      // A live store whose settings could not be read: never shown as the demo.
+      unavailable: !isMock && ready && !remote,
+      closed,
+      unlock: () => window.location.reload(),
       // Prefetched by the bootstrap call. Components read these first and only
       // fall back to their own request when the bootstrap did not include them.
       categories: boot?.categories || null,
       collections: boot?.collections || null,
       rails: boot?.rails || null,
     }
-  }, [cfg, remote, boot, ready, error])
+  }, [cfg, remote, boot, ready, error, reload, closed])
 
   return <StorefrontContext.Provider value={value}>{children}</StorefrontContext.Provider>
 }

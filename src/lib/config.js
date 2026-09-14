@@ -29,14 +29,15 @@ export const config = {
   },
 
   store: {
-    name: env.VITE_STORE_NAME || 'LOOM',
+    name: env.VITE_STORE_NAME || '',
     currency: env.VITE_CURRENCY || 'USD',
     locale: env.VITE_LOCALE || 'en-US',
     /** In major units, the way a merchandiser would write it. */
     freeShippingOver: num(env.VITE_FREE_SHIPPING_OVER, 150),
   },
 
-  repoUrl: env.VITE_REPO_URL || 'https://github.com/codecrafters-in/loom-storefront',
+  // The theme's source, linked from the demo's footer only (see Footer.jsx).
+  repoUrl: env.VITE_REPO_URL || '',
 
   /**
    * Demo admin credential. Mock mode only.

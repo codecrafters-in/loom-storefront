@@ -23,7 +23,7 @@ import { config } from './config.js'
  *    for, and a shop that ignores it is telling on itself.
  */
 
-let settings = { enabled: false, respectDoNotTrack: true, debug: false }
+let settings = { enabled: false, respectDoNotTrack: true, debug: false, consentRequired: false }
 let consented = null
 
 /** Called once from the storefront provider, when settings arrive. */
@@ -46,6 +46,8 @@ function allowed() {
   if (typeof window === 'undefined') return false
   if (!settings.enabled) return false
   if (consented === false) return false
+  // A store that asks for opt-in consent sends nothing until the visitor agrees.
+  if (settings.consentRequired && consented !== true) return false
   if (settings.respectDoNotTrack !== false && doNotTrack()) return false
   return true
 }

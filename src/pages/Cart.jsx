@@ -6,6 +6,7 @@ import { Button, Empty, Icon, QuantityStepper, Skeleton } from '../components/ui
 import Promises from '../components/layout/Promises.jsx'
 import { formatMoney } from '../lib/money.js'
 import { useStorefront } from '../store/StorefrontContext.jsx'
+import { isMock } from '../lib/config.js'
 import Media from '../components/ui/Media.jsx'
 import { SIZES } from '../lib/images.js'
 import { nestLines } from '../lib/cart-lines.js'
@@ -133,7 +134,7 @@ export default function Cart() {
                 <Icon name="check" size={13} /> {cart.discountCode.code} — {cart.discountCode.label}
               </p>
             )}
-            <p className="mt-2 text-[11px] text-faint">Demo codes: LOOM10, WELCOME15, FREESHIP</p>
+            {isMock && <p className="mt-2 text-[11px] text-faint">Demo codes: LOOM10, WELCOME15, FREESHIP</p>}
             </>
             )}
 

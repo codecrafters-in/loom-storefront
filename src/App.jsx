@@ -18,6 +18,7 @@ import Product from './pages/Product.jsx'
 import StaticPage from './pages/StaticPage.jsx'
 import Docs from './pages/Docs.jsx'
 import { Skeleton } from './components/ui/index.jsx'
+import { isMock } from './lib/config.js'
 
 // Split the routes a browsing visitor never reaches. Checkout and account are
 // the biggest of these and the least visited, which is exactly the trade
@@ -33,6 +34,8 @@ const Login = lazy(() => import('./pages/Login.jsx'))
 const Search = lazy(() => import('./pages/Search.jsx'))
 const Compare = lazy(() => import('./pages/Compare.jsx'))
 const Brands = lazy(() => import('./pages/Brands.jsx'))
+const Blog = lazy(() => import('./pages/Blog.jsx'))
+const BlogPost = lazy(() => import('./pages/BlogPost.jsx'))
 const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 
 // The admin panel is a separate chunk. A shopper never downloads it.
@@ -99,10 +102,12 @@ export default function App() {
                   <Route path="login" element={<Login />} />
                   <Route path="account/*" element={<Account />} />
                   <Route path="pages/:slug" element={<StaticPage />} />
-                  {/* Public and prerendered. The API reference behind a login
-                      is a reference nobody reads before deciding. */}
-                  <Route path="docs" element={<Docs />} />
-                  <Route path="docs/:page" element={<Docs />} />
+                  <Route path="blog" element={<Blog />} />
+                  <Route path="blog/:slug" element={<BlogPost />} />
+                  {/* The theme's documentation, on the demo only: a live store's
+                      customers are not offered an API reference. */}
+                  {isMock && <Route path="docs" element={<Docs />} />}
+                  {isMock && <Route path="docs/:page" element={<Docs />} />}
                   <Route path="404" element={<NotFound />} />
                   <Route path="*" element={<Navigate to="/404" replace />} />
                 </Route>

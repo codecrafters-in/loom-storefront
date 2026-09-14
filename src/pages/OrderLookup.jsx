@@ -52,8 +52,7 @@ export default function OrderLookup() {
         <p className="eyebrow">Order lookup</p>
         <h1 className="mt-3 text-display-lg">Find your order</h1>
         <p className="mt-4 text-[15px] leading-relaxed text-muted">
-          The order number is in your confirmation email — it looks like{' '}
-          <span className="font-mono text-ink">LM-10428</span>.
+          Your order number is in your order confirmation email.
         </p>
 
         <form onSubmit={submit} className="mt-8 space-y-5">
@@ -64,7 +63,6 @@ export default function OrderLookup() {
             <input
               id="order-number"
               className="field font-mono"
-              placeholder="LM-10428"
               autoComplete="off"
               value={form.number}
               onChange={set('number')}

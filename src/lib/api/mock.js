@@ -613,6 +613,55 @@ export async function getBootstrap() {
 
 /* brands and combinations */
 
+/* pages, contact, consent, access, blog */
+
+export async function listPages() {
+  await latency()
+  const { pages } = await import('../../data/pages.js')
+  const items = Object.entries(pages).map(([slug, p]) => ({ slug, title: p.title }))
+  return { items, total: items.length }
+}
+
+export async function getPage(slug) {
+  await latency()
+  const { pages } = await import('../../data/pages.js')
+  const page = pages[slug]
+  if (!page) throw new ApiError(`No page with slug "${slug}".`, { status: 404, code: 'not_found' })
+  return { slug, ...page, seo: { title: page.title, description: page.intro } }
+}
+
+export async function sendContact(message = {}) {
+  await latency()
+  if (!message.name || !message.email || !message.message) {
+    throw new ApiError('Please enter your name, a valid email address and a message.', { status: 422, code: 'missing_fields' })
+  }
+  return { ok: true, id: `msg_${Date.now()}` }
+}
+
+export async function recordConsent() {
+  await latency()
+  return { ok: true }
+}
+
+export async function requestAccess() {
+  await latency()
+  return { token: 'demo', header: 'X-Loom-Access', expiresAt: new Date(Date.now() + 12 * 3600 * 1000).toISOString() }
+}
+
+export async function adminAccess() {
+  return requestAccess()
+}
+
+export async function listBlogPosts({ page = 1, perPage = 12 } = {}) {
+  await latency()
+  return { items: [], total: 0, page, perPage, blogs: [], tags: [] }
+}
+
+export async function getBlogPost(slug) {
+  await latency()
+  throw new ApiError(`No post with slug "${slug}".`, { status: 404, code: 'not_found' })
+}
+
 /** The demo's downloads are static files the browser follows as plain links. */
 export async function downloadFile() {
   return null

@@ -13,6 +13,7 @@
 import { config } from '../config.js'
 import { adminFetch } from '../admin-session.js'
 import { ApiError, ContractError, assertCart, assertList, assertMoney, assertProduct } from './contracts.js'
+import { ACCESS_HEADER, accessRequired, accessToken } from '../access.js'
 
 const SESSION_KEY = 'loom.session'
 
@@ -61,6 +62,8 @@ const isAdminPath = (path) => path === '/admin' || path.startsWith('/admin/')
 async function send(method, path, { query, body, auth }) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), config.api.timeout)
+  // A store in maintenance or behind a password answers only calls that carry its access token.
+  const access = accessToken()
   try {
     return await fetch(url(path, query), {
       method,
@@ -71,6 +74,7 @@ async function send(method, path, { query, body, auth }) {
         accept: 'application/json',
         ...(body ? { 'content-type': 'application/json' } : {}),
         ...(auth ? { authorization: `Bearer ${auth}` } : {}),
+        ...(access ? { [ACCESS_HEADER]: access } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
     })
@@ -114,6 +118,7 @@ async function request(method, path, { query, body } = {}) {
   }
 
   if (!res.ok) {
+    if (payload?.code === 'store_locked' || payload?.code === 'store_maintenance') accessRequired(payload.code)
     throw new ApiError(payload?.message || payload?.error || `${method} ${path} failed with ${res.status}.`, {
       status: res.status,
       code: payload?.code || `http_${res.status}`,
@@ -172,6 +177,35 @@ export async function getCombination(slug, choiceIds = []) {
 }
 
 export const listBrands = () => get('/brands').then((r) => assertList(r, 'GET /brands'))
+
+/* ── pages, contact, consent, access, blog ─────────────────────────────── */
+
+export const listPages = () => get('/pages').then((r) => assertList(r, 'GET /pages'))
+
+export async function getPage(slug) {
+  const page = await get(`/pages/${encodeURIComponent(slug)}`)
+  if (!page || typeof page.title !== 'string' || !Array.isArray(page.blocks)) {
+    throw new ContractError(`GET /pages/${slug}`, '{ slug, title, intro, blocks[] }', page)
+  }
+  return page
+}
+
+/** `{ name, email, phone, order, subject, message, captchaToken }` → `{ ok }`. */
+export const sendContact = (message) => post('/contact', message)
+
+/** `{ anonymousId, choices: { analytics, marketing }, policyVersion }`, kept by the backend as proof of consent. */
+export const recordConsent = (consent) => post('/consents', consent)
+
+/** A password-protected store's password → `{ token, header, expiresAt }`. */
+export const requestAccess = (password) => post('/access', { password })
+
+/** The same token for a signed-in admin, while the store is closed to shoppers. */
+export const adminAccess = () => post('/admin/access', {})
+
+export const listBlogPosts = ({ page, perPage, tag, blog } = {}) =>
+  get('/blog', { page, per_page: perPage, tag, blog }).then((r) => assertList(r, 'GET /blog'))
+
+export const getBlogPost = (slug) => get(`/blog/${encodeURIComponent(slug)}`)
 
 /**
  * A file bought with an order, as a Blob, or null when `href` is not an API route

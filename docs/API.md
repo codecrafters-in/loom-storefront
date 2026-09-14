@@ -92,6 +92,10 @@ capability), a customer token, or an admin token — never interchangeable.
 | `GET` | `/categories`, `/collections` | none | public | [Catalogue](#catalogue) |
 | `POST` | `/products/:slug/combination` | none | no-store (the theme caches it with the product) | [Combinations](#post-productsslugcombination) |
 | `GET` | `/brands`, `/brands/:slug` | none | public | [Brands](#brands) |
+| `GET` | `/pages`, `/pages/:slug` | none | public | [Pages, contact, consent, access and blog](#pages-contact-consent-access-and-blog) |
+| `POST` | `/contact`, `/consents` | none / customer | never | [Pages, contact, consent, access and blog](#pages-contact-consent-access-and-blog) |
+| `POST` | `/access`, `/admin/access` | none / admin | never | [Pages, contact, consent, access and blog](#pages-contact-consent-access-and-blog) |
+| `GET` | `/blog`, `/blog/:slug` | none | public | [Pages, contact, consent, access and blog](#pages-contact-consent-access-and-blog) |
 | `GET` | `/attributes` | none | public | [Attributes](#attributes) |
 | `GET` | `/size-charts` | none | public | [ADMIN.md](ADMIN.md) |
 | `GET` | `/countries/:code` | none | public | [Orders and account](#orders-and-account) |
@@ -1193,6 +1197,31 @@ owner, or to the holder of the order link, and answers `404` before payment.
 payment in their own vocabulary.
 
 ---
+
+## Pages, contact, consent, access and blog
+
+Everything a shopper reads on a live store comes from the backend. The theme carries no pages, promises or brand
+of its own; the demo's live in `src/data/storefront.js` and `src/data/pages.js` and only the demo adapter reads them.
+`npm run build` fails a live-store build that still contains demo copy (`scripts/brand-leak.mjs`).
+
+- `GET /pages/:slug` → `{ slug, title, intro, seo, blocks }`. Blocks: `{ type: 'text' | 'table' | 'image' | 'faq' |
+  'contact' | 'contact-form', h, p, html, table, image }`. `/pages/:slug` renders them; consecutive `faq` blocks become
+  an accordion, `contact` shows `store.contact`, `contact-form` loads the contact form.
+- `POST /contact` `{ name, email, message, phone, subject, order, captchaToken }` → `{ ok }` (`contact` captcha action).
+- `POST /consents` `{ anonymousId, choices: { analytics, marketing }, policyVersion }` → `{ ok }`. With
+  `storefront.consent.enabled`, the banner (`src/components/consent/ConsentBanner.jsx`) asks once per policy
+  version; in opt-in mode `track()` sends nothing until the visitor agrees, and Google Consent Mode v2 defaults
+  and updates are pushed to `dataLayer`.
+- `storefront.access: { mode, message }`. When `mode` is not `open`, the shop is replaced by the maintenance or
+  password screen. `POST /access { password }` (or `POST /admin/access` for a signed-in admin) →
+  `{ token, header, expiresAt }`; the token is sent as `X-Loom-Access` on every call. A `401 store_locked` or
+  `503 store_maintenance` answer drops the token and shows the screen again.
+- `storefront.theme: { colors, fonts, radius, faviconUrl, ogImageUrl, logoDarkUrl }` is applied as the CSS custom
+  properties in `src/index.css` (`src/lib/theme.js`), in the prerendered HTML too. `storefront.store.contact` fills
+  the footer and the contact block; `storefront.store.credit` is an optional credit line.
+- `GET /blog` `{ page, per_page, tag }` → `{ items, total, page, perPage, tags }`; `GET /blog/:slug` → a post with
+  `contentHtml`. Shown at `/blog` and `/blog/:slug` when `features.blog` is on.
+- A settings call that fails on a live store shows "Store unavailable" with a retry, never the demo.
 
 ## Wishlist
 

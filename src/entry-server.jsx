@@ -8,6 +8,8 @@ import { listingQuery } from './pages/Shop.jsx'
 import { loadDoc } from './pages/Docs.jsx'
 import { docPages, docPath } from './data/docs.js'
 import { flattenCategories } from './lib/categories.js'
+import { isMock } from './lib/config.js'
+import { fontsHref, themeCss } from './lib/theme.js'
 
 /**
  * One route, rendered to HTML at build time.
@@ -43,11 +45,12 @@ export async function prime(reads = []) {
  * match, and a silently empty grid on every category page.
  */
 export async function routes() {
-  const [products, categories, collections, brands] = await Promise.all([
+  const [products, categories, collections, brands, pages] = await Promise.all([
     api.listProducts({ perPage: 500 }),
     api.listCategories(),
     api.listCollections(),
     api.listBrands(),
+    api.listPages(),
   ])
   // Any depth: a third-level category is a page like any other.
   const flatCategories = flattenCategories(categories.items)
@@ -75,13 +78,14 @@ export async function routes() {
         ['getReviews', [p.slug]],
       ],
     })),
-    ...['size-guide', 'shipping', 'care', 'contact'].map((slug) => ({ url: `/pages/${slug}`, reads: [] })),
+    // The store's own pages, from the backend.
+    ...pages.items.map((p) => ({ url: `/pages/${p.slug}`, reads: [['getPage', [p.slug]]] })),
     /**
      * The documentation reads from disk rather than from the API, so it seeds
      * itself: the markdown travels with the page it produced, and the first
      * client render finds the same text the server did.
      */
-    ...(await Promise.all(
+    ...(!isMock ? [] : await Promise.all(
       docPages.map(async (d) => ({
         url: docPath(d.slug),
         reads: [],
@@ -104,7 +108,13 @@ export function render(url, { docs } = {}) {
         <App />
       </StaticRouter>,
     )
-    return { html, head: renderHead(stopCollecting()) }
+    const head = renderHead(stopCollecting())
+    // The store's colours and fonts in the page itself, so the first paint is already in them.
+    const theme = peek.getBootstrap()?.storefront?.theme
+    const css = themeCss(theme)
+    const fonts = fontsHref(theme)
+    const style = (css ? `<style id="loom-theme">${css}</style>` : '') + (fonts ? `<link rel="stylesheet" href="${fonts}" data-loom-fonts="1" />` : '')
+    return { html, head: style + head }
   } catch (err) {
     stopCollecting()
     throw err

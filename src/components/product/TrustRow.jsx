@@ -3,6 +3,7 @@ import useAsync from '../../hooks/useAsync.js'
 import { Icon } from '../ui/index.jsx'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { formatMoney } from '../../lib/money.js'
+import { isMock } from '../../lib/config.js'
 
 /**
  * The reassurance block, immediately under the buy button.
@@ -22,7 +23,7 @@ export default function TrustRow({ flat = false }) {
   const { data: eta } = useAsync(() => api.getDeliveryEstimate({ method: 'standard' }), [])
 
   const free = config.commerce?.freeShippingOver
-  const days = config.commerce?.returnsWindowDays ?? 30
+  const days = config.commerce?.returnsWindowDays ?? 0
 
   const rows = [
     eta && {
@@ -37,14 +38,14 @@ export default function TrustRow({ flat = false }) {
     free && {
       icon: 'package',
       strong: `Free shipping over ${formatMoney({ amount: free, currency: config.pricing?.currency || 'USD' })}`,
-      rest: 'tracked, and insured until it reaches you',
+      rest: isMock ? 'tracked, and insured until it reaches you' : '',
     },
-    {
+    days > 0 && {
       icon: 'refresh',
-      strong: `Free ${days}-day returns`,
-      rest: 'prepaid label in every parcel — try it on at home',
+      strong: isMock ? `Free ${days}-day returns` : `${days}-day returns`,
+      rest: isMock ? 'prepaid label in every parcel — try it on at home' : '',
     },
-    trust.repairs !== false && {
+    trust.repairs === true && {
       icon: 'shield',
       strong: 'Repaired, not replaced',
       rest: 'we mend anything we made, for as long as we exist',
@@ -59,8 +60,8 @@ export default function TrustRow({ flat = false }) {
             <Icon name={r.icon} size={16} className="mt-px shrink-0 text-accent" />
             {/* min-w-0 so a long line wraps instead of widening the column. */}
             <span className="min-w-0">
-              <span className="text-ink">{r.strong}</span>{' '}
-              <span className="text-muted">— {r.rest}</span>
+              <span className="text-ink">{r.strong}</span>
+              {r.rest && <span className="text-muted"> — {r.rest}</span>}
             </span>
           </li>
         ))}

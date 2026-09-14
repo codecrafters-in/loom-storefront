@@ -9,6 +9,7 @@ import Logo from '../ui/Logo.jsx'
 import { config as envConfig } from '../../lib/config.js'
 import { docsLinkVisible } from '../../lib/docs-link.js'
 import { useCaptcha } from '../Captcha.jsx'
+import ContactDetails from '../content/ContactDetails.jsx'
 
 export default function Footer() {
   const [email, setEmail] = useState('')
@@ -50,11 +51,12 @@ export default function Footer() {
       <div className="wrap grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
         <div>
           <Link to="/"><Logo config={config} size={26} /></Link>
-          <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-muted">{config.store?.tagline}</p>
+          {config.store?.tagline && <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-muted">{config.store.tagline}</p>}
+          <ContactDetails contact={config.store?.contact} compact className="mt-5" />
 
           {config.features?.newsletter !== false && (
           <form onSubmit={submit} className="mt-8 max-w-sm">
-            <label htmlFor="newsletter" className="eyebrow">Letters, occasionally</label>
+            <label htmlFor="newsletter" className="eyebrow">Newsletter</label>
             <div className="mt-3 flex gap-2">
               <input
                 id="newsletter"
@@ -94,19 +96,35 @@ export default function Footer() {
       <div className="border-t border-line">
         <div className="wrap flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[12px] text-faint">
-            © {new Date().getFullYear()} {config.store?.name}. A storefront theme by{' '}
-            <a href="https://codecrafters.in" className="link-underline text-muted" target="_blank" rel="noreferrer">
-              CodeCrafters
-            </a>
-            . MIT licensed.
+            © {new Date().getFullYear()} {config.store?.contact?.legalName || config.store?.name}
+            {config.store?.contact?.vat ? ` · ${config.store.contact.vat}` : ''}
+            {isMock ? (
+              <>
+                . A storefront theme by{' '}
+                <a href="https://codecrafters.in" className="link-underline text-muted" target="_blank" rel="noreferrer">
+                  CodeCrafters
+                </a>
+                . MIT licensed.
+              </>
+            ) : (
+              config.store?.credit ? ` · ${config.store.credit}` : ''
+            )}
           </p>
           <div className="flex items-center gap-4">
-            <span
-              className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint"
-              title={isMock ? 'Running on the bundled catalogue' : 'Running against a live API'}
-            >
-              {isMock ? 'demo data' : 'live api'}
-            </span>
+            {config.consent?.enabled && (
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('loom:consent-open'))}
+                className="text-[13px] text-muted transition-colors hover:text-ink"
+              >
+                Cookie settings
+              </button>
+            )}
+            {isMock && (
+              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint" title="Running on the bundled catalogue">
+                demo data
+              </span>
+            )}
             {/* Only rendered for a signed-in admin — a shopper never sees that
                 a back office exists. */}
             {isAdmin && (
@@ -127,15 +145,17 @@ export default function Footer() {
                 Docs &amp; API
               </Link>
             )}
-            <a
-              href={envConfig.repoUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 text-[13px] text-muted transition-colors hover:text-ink"
-            >
-              <Icon name="github" size={16} />
-              Source
-            </a>
+            {isMock && (
+              <a
+                href={envConfig.repoUrl || 'https://github.com/codecrafters-in/loom-storefront'}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 text-[13px] text-muted transition-colors hover:text-ink"
+              >
+                <Icon name="github" size={16} />
+                Source
+              </a>
+            )}
           </div>
         </div>
       </div>
