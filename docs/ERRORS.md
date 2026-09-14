@@ -38,6 +38,10 @@ the person buying, not for your logs. `code` is what you branch on.
 | `missing_credentials` | 422 | Inline |
 | `invalid_email` | 422 | Inline on the newsletter field |
 | `invalid_address` | 422 | The fields named in `detail.fields` are marked on the checkout and account address forms, with the message |
+| `captcha_failed` | 422 | Inline on the form that sent it — sign-in, registration, order lookup, newsletter — and the captcha is reset for another try |
+| `invalid_grant` | 400 or 401 | Admin sign-in: shown on the admin login page. From a refresh, the panel signs out |
+| `invalid_request` | 400 | Admin sign-in: shown on the admin login page |
+| `odoo_sign_in_required` | 403 | `POST /admin/auth/login` was sent a password. The panel never does this; a script should send an API key |
 
 ### Payments
 
@@ -95,6 +99,11 @@ These mean the integration is wrong, not the request.
 | `payment_unsupported` | A `direct` method with no storefront driver | Add a driver in `src/lib/payments/drivers/`, or offer the method as `redirect` |
 | `payment_no_redirect` | `flow: "redirect"` with no `redirect.url` | Return `{ "redirect": { "url": "https://…" } }` |
 | `payment_misconfigured` | The gateway values a driver needs are missing, such as Razorpay's key or order id | Fill `client` on the create response |
+| `captcha_unavailable` | The captcha provider's script did not load | A content blocker, or a Content-Security-Policy without the provider's domain — see [CONFIGURATION.md](CONFIGURATION.md#content-security-policy) |
+| `captcha_pending` | Submitted before Turnstile finished its check | Nothing to fix — the shopper tries again a moment later |
+| `insecure_context` | Sign in with Odoo on a page that is neither https nor localhost | The browser only offers the crypto PKCE needs on secure pages. Open the store over https |
+| `not_odoo` | `VITE_API_BASE_URL` has no `/loom/api/v1/<store>` segment | Point it at the store API, so the sign-in knows which Odoo and which store |
+| `invalid_state` | The admin callback's `state` did not match the one this tab saved | Nothing to fix — start the sign-in again, in one tab |
 
 ---
 

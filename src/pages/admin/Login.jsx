@@ -1,38 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Button, Icon } from '../../components/ui/index.jsx'
 import { LoomMark } from '../../components/ui/Logo.jsx'
 import { useAdminAuth } from '../../store/AdminAuthContext.jsx'
 
-/** Errors after which the server wants the authenticator code as well. */
-const NEEDS_CODE = new Set(['totp_required', 'invalid_totp'])
-
 export default function AdminLogin() {
-  const { signIn, signedIn, demo } = useAdminAuth()
-  const [form, setForm] = useState({ username: '', password: '', totp: '' })
-  const [askCode, setAskCode] = useState(false)
-  const [error, setError] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const navigate = useNavigate()
+  const { signedIn, demo } = useAdminAuth()
   const { state } = useLocation()
 
   if (signedIn) return <Navigate to={state?.from || '/admin'} replace />
-
-  const submit = async (e) => {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    try {
-      await signIn(form)
-      navigate(state?.from || '/admin', { replace: true })
-    } catch (err) {
-      if (NEEDS_CODE.has(err.code)) setAskCode(true)
-      setError(err.message)
-      setBusy(false)
-    }
-  }
-
-  const field = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
   return (
     <div className="grid min-h-[100dvh] place-items-center bg-sunken/40 px-5">
@@ -40,34 +16,7 @@ export default function AdminLogin() {
         <div className="rounded-xs border border-line bg-surface p-8">
           <LoomMark size={30} />
           <h1 className="mt-5 font-display text-2xl">Admin</h1>
-          <p className="mt-2 text-[13px] text-muted">
-            {demo ? 'Sign in to manage the catalogue.' : 'Sign in with your Odoo account to manage the catalogue.'}
-          </p>
-
-          <form onSubmit={submit} className="mt-7 space-y-4">
-            <div>
-              <label htmlFor="u" className="mb-1.5 block text-[13px] font-medium">{demo ? 'Username' : 'Odoo login'}</label>
-              <input id="u" required autoFocus autoComplete="username" className="field"
-                value={form.username} onChange={field('username')} />
-            </div>
-            <div>
-              <label htmlFor="p" className="mb-1.5 block text-[13px] font-medium">Password</label>
-              <input id="p" type="password" required autoComplete="current-password" className="field"
-                value={form.password} onChange={field('password')} />
-            </div>
-            {askCode && (
-              <div>
-                <label htmlFor="t" className="mb-1.5 block text-[13px] font-medium">Authenticator code</label>
-                <input id="t" required autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6}
-                  pattern="[0-9]{6}" className="field tracking-[0.3em]"
-                  value={form.totp} onChange={field('totp')} />
-              </div>
-            )}
-            {error && <p className="text-[13px] text-sale">{error}</p>}
-            <Button as="button" type="submit" full size="lg" disabled={busy}>
-              {busy ? 'Signing in…' : 'Sign in'}
-            </Button>
-          </form>
+          {demo ? <DemoSignIn from={state?.from} /> : <OdooSignIn from={state?.from} notice={state?.error} />}
         </div>
 
         {demo && (
@@ -87,5 +36,96 @@ export default function AdminLogin() {
         )}
       </div>
     </div>
+  )
+}
+
+/** The demo's own credential, checked in the browser. Mock mode only. */
+function DemoSignIn({ from }) {
+  const { signIn } = useAdminAuth()
+  const [form, setForm] = useState({ username: '', password: '' })
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const navigate = useNavigate()
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      await signIn(form)
+      navigate(from || '/admin', { replace: true })
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+    }
+  }
+
+  const field = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+
+  return (
+    <>
+      <p className="mt-2 text-[13px] text-muted">Sign in to manage the catalogue.</p>
+      <form onSubmit={submit} className="mt-7 space-y-4">
+        <div>
+          <label htmlFor="u" className="mb-1.5 block text-[13px] font-medium">Username</label>
+          <input id="u" required autoFocus autoComplete="username" className="field"
+            value={form.username} onChange={field('username')} />
+        </div>
+        <div>
+          <label htmlFor="p" className="mb-1.5 block text-[13px] font-medium">Password</label>
+          <input id="p" type="password" required autoComplete="current-password" className="field"
+            value={form.password} onChange={field('password')} />
+        </div>
+        {error && <p className="text-[13px] text-sale">{error}</p>}
+        <Button as="button" type="submit" full size="lg" disabled={busy}>
+          {busy ? 'Signing in…' : 'Sign in'}
+        </Button>
+      </form>
+    </>
+  )
+}
+
+/**
+ * One button, no password field.
+ *
+ * A password typed on the shop's domain is a password every script on the shop
+ * can read — an analytics tag, a compromised dependency, a browser extension.
+ * Odoo's own page is where the password, two-factor and lockouts already live.
+ */
+function OdooSignIn({ from, notice }) {
+  const { signIn } = useAdminAuth()
+  const [error, setError] = useState(notice || null)
+  const [busy, setBusy] = useState(false)
+
+  // Back from Odoo's page without signing in restores this page from the
+  // back-forward cache, button still saying "Opening Odoo…". Wake it up.
+  useEffect(() => {
+    const onShow = (e) => e.persisted && setBusy(false)
+    window.addEventListener('pageshow', onShow)
+    return () => window.removeEventListener('pageshow', onShow)
+  }, [])
+
+  const start = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await signIn({ from })
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <p className="mt-2 text-[13px] leading-relaxed text-muted">
+        You will sign in on your Odoo site&rsquo;s own page — with two-factor authentication if you
+        have it switched on — and come straight back here.
+      </p>
+      {error && <p role="alert" className="mt-5 text-[13px] text-sale">{error}</p>}
+      <Button as="button" type="button" full size="lg" className="mt-7" disabled={busy} onClick={start}>
+        {busy ? 'Opening Odoo…' : 'Sign in with Odoo'}
+      </Button>
+    </>
   )
 }

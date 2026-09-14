@@ -47,6 +47,7 @@ const AdminProductEditor = lazy(() => import('./pages/admin/ProductEditor.jsx'))
 const AdminSizeCharts = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.SizeCharts })))
 const AdminDiscounts = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Discounts })))
 const AdminLogin = lazy(() => import('./pages/admin/Login.jsx'))
+const AdminCallback = lazy(() => import('./pages/admin/Callback.jsx'))
 
 /** Keyed on the path, because a boundary that never resets breaks every page
  *  after the first one. */
@@ -102,6 +103,8 @@ export default function App() {
                 </Route>
 
                 <Route path="/admin/login" element={<AdminLogin />} />
+                {/* Where Odoo returns after sign-in. Outside the guard: nobody is signed in yet. */}
+                <Route path="/admin/callback" element={<AdminCallback />} />
                 <Route
                   path="/admin"
                   element={

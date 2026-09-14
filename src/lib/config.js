@@ -19,7 +19,6 @@ export const config = {
 
   api: {
     baseUrl: (env.VITE_API_BASE_URL || '').replace(/\/+$/, ''),
-    token: env.VITE_API_TOKEN || '',
     timeout: num(env.VITE_API_TIMEOUT, 12000),
     /**
      * 'off' skips the response cache and the browser's HTTP cache, so an edit

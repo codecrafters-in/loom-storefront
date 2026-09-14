@@ -107,6 +107,32 @@ error.
 
 [CHECKOUT.md](CHECKOUT.md) covers testing the older `redirect` contract.
 
+## End to end, against a real Odoo
+
+`e2e/` runs the storefront in Chromium against a real Odoo 19 with the
+`loom_storefront` addon: one Playwright spec per business scenario in the audit
+checklist, from S-1 (a guest pays by card) to S-16 (the merchant uninstalls).
+Each test checks where the outcome lands — the page, the store API, and the
+order, delivery, invoice and email in Odoo. It has its own `package.json`, so
+none of it is in the theme's install.
+
+```
+npm run e2e        # from the repo root, once Odoo is seeded and running
+```
+
+Creating the database, seeding it and starting Odoo on port 8074 are in
+[e2e/README.md](../e2e/README.md). It is not part of `npm test` or of CI on
+push, because it needs a database and an Odoo server;
+`.github/workflows/e2e.yml` runs it nightly and on demand.
+
+A scenario blocked by a known gap is still written as the real test, marked
+`test.fail()` with a `gap` annotation that names the gap. The run reports it as
+**unexpectedly passed** the day a fix lands. Remove the `.fail`, and it becomes a
+regular test. Of the checks by hand above, it covers the demo card outcomes,
+cash on delivery, a failed payment retried and a bag that changes before
+payment. Razorpay, hosted payment pages and the `/admin` fulfilment screens are
+still checked by hand.
+
 ## Two rules that make it worth having
 
 **Never copy a list the code already owns.** `adapters.test.mjs` parses
@@ -155,7 +181,8 @@ that means jsdom and a testing library, which is a real cost against three
 runtime dependencies — worth paying when the first layout regression ships, and
 not before.
 
-**No integration test against a real backend.** `http.js` is checked for shape,
-never for behaviour. The reference payments server *is* run for real, but
+**No integration test against a real backend in `npm test`.** Here `http.js` is
+checked for shape, never for behaviour; the behaviour against Odoo is what the
+end-to-end suite above is for. The reference payments server *is* run for real, but
 against forged signatures rather than Razorpay's — the crypto is verified, the
 provider round trip is not.

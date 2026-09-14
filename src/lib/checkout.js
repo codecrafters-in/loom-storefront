@@ -112,13 +112,13 @@ async function postAbsolute(url, body) {
     /* no session — a guest checkout is normal */
   }
 
+  // Header auth only, no cookies — the same rule as the API adapter.
   const res = await fetch(target, {
     method: 'POST',
-    credentials: 'include',
     headers: {
       'content-type': 'application/json',
       accept: 'application/json',
-      ...(env.api.token ? { authorization: `Bearer ${env.api.token}` } : session ? { authorization: `Bearer ${session}` } : {}),
+      ...(session ? { authorization: `Bearer ${session}` } : {}),
     },
     body: JSON.stringify(body),
   })

@@ -628,7 +628,13 @@ system, expose these under `/admin`, authenticated, and **never reachable with a
 storefront token**:
 
 ```
-POST   /admin/auth/login  { username, password }         → { token }
+GET    {origin}/loom/admin/authorize?store=&redirect_uri=&state=&code_challenge=&code_challenge_method=S256
+                                                         → your own login page, then 302 to redirect_uri?code=&state=
+POST   /admin/auth/token  { grant_type: "authorization_code", code, code_verifier, redirect_uri }
+                          { grant_type: "refresh_token", refresh_token }   → { token, expiresAt, refreshToken, refreshExpiresAt, user }
+                                                         (refresh tokens rotate; a reused one revokes the session)
+POST   /admin/auth/logout { refresh_token }               (Authorization: Bearer)
+POST   /admin/auth/login  { login, apiKey }               → { token }   (scripts only; passwords refused)
 GET    /admin/products?q=&page=&per_page=                → { items, total, page, perPage }
 GET    /admin/products/:id                               → Product (raw, sizeChartId unresolved)
 POST   /admin/products                                   → Product

@@ -134,7 +134,6 @@ cp .env.example .env.local
 | --- | --- | --- |
 | `VITE_DATA_SOURCE` | `mock` | `mock` or `api` |
 | `VITE_API_BASE_URL` | — | Required when `api`. No trailing slash |
-| `VITE_API_TOKEN` | — | Sent as `Authorization: Bearer`. Publishable keys only |
 | `VITE_API_TIMEOUT` | `12000` | Request timeout in ms |
 | `VITE_API_CACHE` | `on` | `off` shows backend edits on the next load. For development. Browser only — the build always caches |
 | `VITE_STORE_NAME` | `LOOM` | Wordmark and page titles |

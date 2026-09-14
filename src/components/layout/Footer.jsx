@@ -8,6 +8,7 @@ import { useAdminAuth } from '../../store/AdminAuthContext.jsx'
 import Logo from '../ui/Logo.jsx'
 import { config as envConfig } from '../../lib/config.js'
 import { docsLinkVisible } from '../../lib/docs-link.js'
+import { useCaptcha } from '../Captcha.jsx'
 
 export default function Footer() {
   const [email, setEmail] = useState('')
@@ -15,17 +16,23 @@ export default function Footer() {
   const { push } = useToast()
   const config = useStorefront()
   const { signedIn: isAdmin } = useAdminAuth()
+  // Deferred to the first focus: this footer is on every page, and a captcha
+  // script on every page is a cost every shopper pays for one small form.
+  const captcha = useCaptcha('newsletter', { defer: true })
 
   const submit = async (e) => {
     e.preventDefault()
     setBusy(true)
     try {
-      await api.subscribe(email)
+      const captchaToken = await captcha.getToken()
+      await api.subscribe(email, { captchaToken })
       setEmail('')
       push('Thanks — check your inbox to confirm.')
     } catch (err) {
       push(err.message || 'Could not subscribe.', { tone: 'error' })
     } finally {
+      // Single-use, and the form stays on screen for another address.
+      captcha.reset()
       setBusy(false)
     }
   }
@@ -55,6 +62,7 @@ export default function Footer() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onFocus={captcha.activate}
                 placeholder="you@example.com"
                 className="field"
               />
@@ -62,6 +70,7 @@ export default function Footer() {
                 {busy ? '…' : 'Join'}
               </Button>
             </div>
+            {captcha.widget && <div className="mt-3">{captcha.widget}</div>}
           </form>
           )}
         </div>

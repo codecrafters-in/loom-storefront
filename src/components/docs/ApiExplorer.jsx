@@ -145,7 +145,7 @@ function curl(endpoint, args) {
     .map((f) => `${f.name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}=${encodeURIComponent(args[f.name])}`)
     .join('&')
 
-  return `curl ${base}${path}${query ? `?${query}` : ''}${config.api.token ? ` \\\n  -H "Authorization: Bearer $TOKEN"` : ''}`
+  return `curl ${base}${path}${query ? `?${query}` : ''}`
 }
 
 export default function ApiExplorer() {

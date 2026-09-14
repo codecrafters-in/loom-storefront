@@ -1,5 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { config, isMock } from '../lib/config.js'
+import {
+  ADMIN_SESSION_KEY,
+  ADMIN_SIGNED_OUT_EVENT,
+  beginSignIn,
+  completeSignIn as finishSignIn,
+  readSession,
+  revokeAdminSession,
+  sessionAlive,
+} from '../lib/admin-session.js'
 
 /**
  * Admin session, kept deliberately separate from the customer session.
@@ -9,14 +18,16 @@ import { config, isMock } from '../lib/config.js'
  * two is how a storefront XSS becomes a catalogue takeover.
  *
  * In mock mode this checks a demo credential in the browser, which is fine for
- * a demo and is not security. Everything under /admin is client-side, so the
- * guard below hides the UI and nothing more: **the only real protection is your
- * server refusing unauthenticated /admin/* requests.** That is stated here
- * rather than buried in a doc because it is the thing people get wrong.
+ * a demo and is not security. Against a real store the password is never typed
+ * here at all: signing in goes to Odoo's own login page and comes back through
+ * /admin/callback (lib/admin-session.js has the why).
+ *
+ * Everything under /admin is client-side, so the guard below hides the UI and
+ * nothing more: **the only real protection is your server refusing
+ * unauthenticated /admin/* requests.** That is stated here rather than buried in
+ * a doc because it is the thing people get wrong.
  */
-export const ADMIN_SESSION_KEY = 'loom.admin_session'
-/** Fired by the API client when the server rejects the admin token. */
-export const ADMIN_SIGNED_OUT_EVENT = 'loom:admin-signed-out'
+export { ADMIN_SESSION_KEY, ADMIN_SIGNED_OUT_EVENT }
 const KEY = ADMIN_SESSION_KEY
 const AdminAuthContext = createContext(null)
 const TWELVE_HOURS = 12 * 60 * 60 * 1000
@@ -39,13 +50,16 @@ export function AdminAuthProvider({ children }) {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(KEY) || 'null')
-      // A stored session that has aged out is the same as no session.
-      if (stored?.expiresAt && Date.now() < stored.expiresAt) setSession(stored)
-      else localStorage.removeItem(KEY)
-    } catch {
-      /* private mode — sign-in simply will not persist */
+    const stored = readSession()
+    // A stored session that has aged out — no live access token and no refresh
+    // token to get one — is the same as no session.
+    if (sessionAlive(stored)) setSession(stored)
+    else {
+      try {
+        localStorage.removeItem(KEY)
+      } catch {
+        /* private mode — sign-in simply will not persist */
+      }
     }
     setReady(true)
   }, [])
@@ -57,7 +71,23 @@ export function AdminAuthProvider({ children }) {
     return () => window.removeEventListener(ADMIN_SIGNED_OUT_EVENT, onSignedOut)
   }, [])
 
-  const signIn = useCallback(async ({ username, password, totp }) => {
+  // Tokens rotate, and any tab may be the one that rotated them — so storage is
+  // the truth, and a sign-out in one tab is a sign-out in all of them.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key !== null && e.key !== KEY) return
+      const next = readSession()
+      setSession(sessionAlive(next) ? next : null)
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  /**
+   * Mock mode: `{ username, password }`, checked here. Api mode: `{ from }`,
+   * and the browser leaves for Odoo — the promise only settles if it cannot.
+   */
+  const signIn = useCallback(async ({ username, password, from } = {}) => {
     if (isMock) {
       // Constant-ish comparison is pointless here — the credential is public and
       // in the bundle. The demo is a door, not a lock.
@@ -76,53 +106,36 @@ export function AdminAuthProvider({ children }) {
       return next
     }
 
-    // api mode: your server decides. Nothing here is trusted.
-    const res = await fetch(`${config.api.baseUrl}/admin/auth/login`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ username, password, ...(totp ? { totp } : {}) }),
-    })
-    const body = await res.json().catch(() => null)
-    if (!res.ok) {
-      const err = new Error(body?.message || 'Sign-in failed.')
-      err.code = body?.code || `http_${res.status}`
-      throw err
-    }
-    const serverExpiry = Date.parse(body?.expiresAt || '')
-    const next = {
-      username: body?.user?.name || username,
-      token: body.token,
-      expiresAt: Number.isFinite(serverExpiry) ? serverExpiry : Date.now() + TWELVE_HOURS,
-    }
-    persist(next)
-    setSession(next)
-    return next
+    await beginSignIn({ from })
+    return null
+  }, [])
+
+  /** The callback page's half. Resolves `{ ok, from, message }`; never throws. */
+  const completeSignIn = useCallback(async (search) => {
+    const result = await finishSignIn(search)
+    if (result.ok) setSession(result.session)
+    return result
   }, [])
 
   const signOut = useCallback(() => {
-    const token = session?.token
-    if (!isMock && token) {
-      // Revoke on the server too, so a copied token stops working. Best effort: the local
-      // session ends either way.
-      fetch(`${config.api.baseUrl}/admin/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json', accept: 'application/json', authorization: `Bearer ${token}` },
-        body: '{}',
-      }).catch(() => {})
-    }
-    try {
-      localStorage.removeItem(KEY)
-    } catch {
-      /* already gone */
+    if (isMock) {
+      try {
+        localStorage.removeItem(KEY)
+      } catch {
+        /* already gone */
+      }
+    } else {
+      // Revoke on the server too, so a copied token stops working. It reads the
+      // tokens from storage rather than from state, because a refresh may have
+      // rotated them since this tab last rendered.
+      revokeAdminSession()
     }
     setSession(null)
-  }, [session])
+  }, [])
 
   const value = useMemo(
-    () => ({ session, ready, signedIn: !!session, signIn, signOut, demo: isMock ? DEMO : null }),
-    [session, ready, signIn, signOut],
+    () => ({ session, ready, signedIn: !!session, signIn, completeSignIn, signOut, demo: isMock ? DEMO : null }),
+    [session, ready, signIn, completeSignIn, signOut],
   )
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>

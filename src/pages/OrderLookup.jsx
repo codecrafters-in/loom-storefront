@@ -4,6 +4,8 @@ import api from '../lib/api/index.js'
 import Seo from '../components/Seo.jsx'
 import { Button, ErrorState } from '../components/ui/index.jsx'
 import { useAuth } from '../store/AuthContext.jsx'
+import { useCaptcha } from '../components/Captcha.jsx'
+import { withCaptcha } from '../lib/captcha.js'
 
 /**
  * Find an order without an account.
@@ -22,6 +24,9 @@ export default function OrderLookup() {
   const [form, setForm] = useState({ number: '', email: '' })
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  // An email-and-number form is what a bot uses to test leaked addresses
+  // against sequential order numbers, so a store may put a captcha on it.
+  const captcha = useCaptcha('lookup')
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
@@ -30,9 +35,10 @@ export default function OrderLookup() {
     setBusy(true)
     setError(null)
     try {
-      const order = await api.lookupOrder(form)
+      const order = await api.lookupOrder(withCaptcha(form, await captcha.getToken()))
       navigate(`/order/${order.id}`, { state: { order } })
     } catch (err) {
+      captcha.reset()
       setError(err)
     } finally {
       setBusy(false)
@@ -85,6 +91,8 @@ export default function OrderLookup() {
               let anyone read anyone&rsquo;s order.
             </p>
           </div>
+
+          {captcha.widget}
 
           {error && (
             <div className="rounded-xs border border-line p-4">

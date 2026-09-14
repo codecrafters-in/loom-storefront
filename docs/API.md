@@ -37,15 +37,17 @@ real invoice. Zero-decimal currencies (JPY, KRW, VND, CLP, ISK) use whole units;
 
 `message` is shown to the shopper, so write it for them. `code` is for you.
 
-**Auth** is `Authorization: Bearer <token>`. The token comes from
-`POST /auth/login` and is kept in `localStorage` under `loom.session`. Set
-`VITE_API_TOKEN` instead if your catalogue needs a publishable key on every
-request — but never put a secret key there, because Vite compiles `VITE_*`
-variables into the JavaScript bundle.
+**Auth** is `Authorization: Bearer <token>` and nothing else — no cookies. The
+customer token comes from `POST /auth/login` and is kept in `localStorage` under
+`loom.session`; the admin token comes from Sign in with Odoo and is kept under
+`loom.admin_session` ([ADMIN.md](ADMIN.md#authentication)). There is no
+build-time token: a public catalogue needs none, and anything in a `VITE_*`
+variable is compiled into the JavaScript bundle for anyone to read.
 
 **CORS.** The storefront is a static site on its own origin. Your API must send
 `Access-Control-Allow-Origin` for it and allow `Authorization`, or every request
-fails with an opaque network error.
+fails with an opaque network error. The storefront never sends cookies, so do not
+send `Access-Control-Allow-Credentials`.
 
 **Pagination.** List endpoints take `page` (1-based) and `per_page`, and return:
 
@@ -99,16 +101,18 @@ capability), a customer token, or an admin token — never interchangeable.
 | `POST` | `/payments/:id/actions/:action` | payment id | no-store | [On-site payments](#on-site-payments) |
 | `GET` | `/payments/:id` | payment id | no-store | [On-site payments](#on-site-payments) |
 | `POST` | `/payments/verify` | none — the signature is the proof | no-store | [Payments, refunds and secrets](#payments-refunds-and-secrets) |
-| `POST` | `/auth/login`, `/auth/register` | none | no-store | [Orders and account](#orders-and-account) |
+| `POST` | `/auth/login`, `/auth/register` | none; captcha when enabled | no-store | [Orders and account](#orders-and-account) |
 | `POST` | `/auth/logout` | customer | no-store | [Orders and account](#orders-and-account) |
 | `GET` `PATCH` | `/me` | customer | no-store | [Orders and account](#orders-and-account) |
 | `POST` `PATCH` `DELETE` | `/me/addresses…` | customer | no-store | [Orders and account](#orders-and-account) |
 | `GET` | `/orders` | customer | no-store | [Order visibility](#order-visibility) |
 | `GET` | `/orders/:id` | customer, or the browser that placed it | no-store | [Order visibility](#order-visibility) |
-| `POST` | `/orders/lookup` | order number and email, rate-limited | no-store | [Order visibility](#order-visibility) |
+| `POST` | `/orders/lookup` | order number and email, rate-limited; captcha when enabled | no-store | [Order visibility](#order-visibility) |
 | `GET` `POST` `DELETE` | `/me/wishlist…` | customer | no-store | [Wishlist](#wishlist) |
-| `POST` | `/newsletter` | none | no-store | [Newsletter](#newsletter) |
-| `POST` | `/admin/auth/login` | none, rate-limited | no-store | [ADMIN.md](ADMIN.md) |
+| `POST` | `/newsletter` | none; captcha when enabled | no-store | [Newsletter](#newsletter) |
+| `POST` | `/admin/auth/token` | authorization code and PKCE verifier, or refresh token | no-store | [ADMIN.md](ADMIN.md#authentication) |
+| `POST` | `/admin/auth/logout` | admin | no-store | [ADMIN.md](ADMIN.md#authentication) |
+| `POST` | `/admin/auth/login` | Odoo API key, for scripts; rate-limited | no-store | [ADMIN.md](ADMIN.md#scripts-and-api-keys) |
 | `GET` `POST` `PATCH` `DELETE` | `/admin/products…`, `/admin/variants/:id/inventory` | admin | no-store | [Write API](#write-api-admin) |
 | `GET` `POST` `DELETE` | `/admin/categories…` | admin | no-store | [Write API](#write-api-admin) |
 | `POST` | `/admin/size-charts` | admin | no-store | [ADMIN.md](ADMIN.md) |
@@ -188,11 +192,46 @@ returns is optional too; omitted keys keep their defaults.
   "home": [{ "type": "hero", "title": "…" }],
   "recommendations": { "strategy": "automatic", "limit": 4 },
   "checkout": { "mode": "redirect", "createUrl": "…" },
-  "promises": []
+  "promises": [],
+  "security": { "captcha": null }
 }
 ```
 
 Cache it hard — it changes when a merchant saves settings, not per request.
+
+### Captcha
+
+When a store switches captcha on, the settings document says so:
+
+```json
+{
+  "security": {
+    "captcha": { "provider": "turnstile", "siteKey": "0x4AAAAAAA…", "actions": ["login", "register", "lookup", "newsletter"] }
+  }
+}
+```
+
+`captcha` is `null`, or absent, when it is off — and then nothing loads: no
+widget, no script, no request to a captcha provider. The demo never loads one.
+With it on, the storefront adds `captchaToken` to the JSON body of each listed
+form:
+
+| Action | Request |
+| --- | --- |
+| `login` | `POST /auth/login` |
+| `register` | `POST /auth/register` |
+| `lookup` | `POST /orders/lookup` |
+| `newsletter` | `POST /newsletter` |
+
+`provider` is `turnstile` — a Cloudflare widget the form shows by its submit
+button — or `recaptcha`, Google reCAPTCHA v3, which is invisible and asked for a
+token with the action name at submit time. With no `actions` list every form
+sends a token. Tokens are single-use, so the form gets a new one after every
+attempt.
+
+Verify the token on the server and answer a missing or failed one with
+`422 { "code": "captcha_failed", "message": "…" }`. The message is shown on the
+form, and the captcha is reset for another try.
 
 ---
 
@@ -436,6 +475,8 @@ refund shape.
 ```json
 { "number": "LM-10428", "email": "guest@example.com" }   →  the Order
 ```
+
+Plus `captchaToken` when [captcha](#captcha) is on for `lookup`.
 
 Both fields, and **that is the whole security model**. Order numbers are
 sequential in most shops — including this one — so the number alone is
@@ -943,6 +984,9 @@ See [CHECKOUT.md](CHECKOUT.md) for the flows and how to add a gateway driver.
 Address endpoints return the **whole customer**, not the address, so the account
 page never has to merge state by hand.
 
+`POST /auth/login` and `POST /auth/register` also carry `captchaToken` when
+[captcha](#captcha) is on for them.
+
 **Addresses are validated on the server**, at checkout and in the address book
 alike. A refused address answers `422 invalid_address` with the fields to fix and
 a message that names them:
@@ -1007,7 +1051,8 @@ these can be slow without the grid feeling slow.
 
 ## Newsletter
 
-`POST /newsletter` with `{ email }` → `{ ok: true }`. Return
+`POST /newsletter` with `{ email }` → `{ ok: true }`, plus `captchaToken` in the
+body when [captcha](#captcha) is on for `newsletter`. Return
 `422 invalid_email` for a malformed address.
 
 ---

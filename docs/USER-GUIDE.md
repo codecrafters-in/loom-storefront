@@ -2,7 +2,8 @@
 
 For whoever runs the shop. Ten tasks, one screen each.
 
-> Everything here is at **`/admin`**. Sign in with `admin` / `admin` on the demo.
+> Everything here is at **`/admin`**. Sign in with `admin` / `admin` on the demo;
+> on a live store, **Sign in with Odoo** takes you to your Odoo login and back.
 > Changes are live immediately — there is no publish button.
 
 Once you are signed in, an **Admin** link appears in the shop's footer so you can

@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run clean && node scripts/check-docs.mjs && node scripts/contrast.mjs && node scripts/responsive.mjs && node --test \"test/**/*.test.mjs\" && node scripts/brand.mjs && vite build && node scripts/budget.mjs && node scripts/prerender.mjs && node scripts/sitemap.mjs && node scripts/robots.mjs",
+    "build": "npm run clean && node scripts/check-docs.mjs && node scripts/contrast.mjs && node scripts/responsive.mjs && node --test \"test/**/*.test.mjs\" && node scripts/brand.mjs && vite build && node scripts/budget.mjs && node scripts/prerender.mjs && node scripts/sitemap.mjs && node scripts/robots.mjs && node scripts/csp.mjs",
     "preview": "vite preview",
     "lint": "eslint src scripts test",
     "images": "node scripts/images.mjs",
@@ -22,8 +22,10 @@
     "responsive": "node scripts/responsive.mjs",
     "responsive:force": "node scripts/responsive.mjs --force",
     "robots": "node scripts/robots.mjs",
+    "csp": "node scripts/csp.mjs",
     "check:contrast": "node scripts/contrast.mjs",
-    "check:budget": "node scripts/budget.mjs"
+    "check:budget": "node scripts/budget.mjs",
+    "e2e": "npm --prefix e2e test --"
   },
   "dependencies": {
     "react": "^18.3.1",

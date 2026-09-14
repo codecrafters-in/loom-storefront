@@ -11,12 +11,19 @@
  * endpoint and the field.
  */
 import { config } from '../config.js'
+import { adminFetch } from '../admin-session.js'
 import { ApiError, ContractError, assertCart, assertList, assertProduct } from './contracts.js'
 
 const SESSION_KEY = 'loom.session'
 
-function token() {
-  if (config.api.token) return config.api.token
+/**
+ * The signed-in customer's token, and nothing else.
+ *
+ * There used to be a build-time token that overrode this. It was sent in place
+ * of the customer's own, so with it set every sign-in "worked" and then every
+ * account call answered as somebody else — or as nobody.
+ */
+function customerToken() {
   try {
     return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null')?.token || ''
   } catch {
@@ -34,48 +41,23 @@ function url(path, query) {
   return u.toString()
 }
 
-const ADMIN_SESSION_KEY = 'loom.admin_session'
-
-/**
- * The admin token, for /admin calls only.
- *
- * Never the customer token: a shopper's session must not reach the write API,
- * and an admin session must not be sent to the shop's customer endpoints.
- */
-function adminToken() {
-  try {
-    const session = JSON.parse(localStorage.getItem(ADMIN_SESSION_KEY) || 'null')
-    return session?.expiresAt && Date.now() < session.expiresAt ? session.token || '' : ''
-  } catch {
-    return ''
-  }
-}
-
-/** The server rejected the admin token: end the session so the panel asks to sign in again. */
-function adminSignedOut() {
-  try {
-    localStorage.removeItem(ADMIN_SESSION_KEY)
-  } catch {
-    /* already gone */
-  }
-  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-    window.dispatchEvent(new Event('loom:admin-signed-out'))
-  }
-}
-
 const isAdminPath = (path) => path === '/admin' || path.startsWith('/admin/')
 
-async function request(method, path, { query, body } = {}) {
+/**
+ * One request, returning the Response.
+ *
+ * No `credentials: 'include'`. Authentication is the Authorization header and
+ * nothing else, so there is no cookie for the API to read — and a server that
+ * answered credentialed requests would have to name this origin exactly and
+ * could never fall back to `*`.
+ */
+async function send(method, path, { query, body, auth }) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), config.api.timeout)
-  const auth = isAdminPath(path) ? adminToken() : token()
-
-  let res
   try {
-    res = await fetch(url(path, query), {
+    return await fetch(url(path, query), {
       method,
       signal: controller.signal,
-      credentials: 'include',
       // The server's Cache-Control is honoured unless the cache is switched off.
       cache: config.api.cache ? 'default' : 'no-store',
       headers: {
@@ -86,7 +68,6 @@ async function request(method, path, { query, body } = {}) {
       body: body ? JSON.stringify(body) : undefined,
     })
   } catch (err) {
-    clearTimeout(timer)
     if (err.name === 'AbortError') {
       throw new ApiError(`${method} ${path} timed out after ${config.api.timeout}ms.`, { code: 'timeout' })
     }
@@ -95,10 +76,20 @@ async function request(method, path, { query, body } = {}) {
       `Could not reach ${config.api.baseUrl}. Check VITE_API_BASE_URL and that the server sends CORS headers for this origin.`,
       { code: 'network_error', detail: err.message },
     )
+  } finally {
+    clearTimeout(timer)
   }
-  clearTimeout(timer)
+}
 
-  if (res.status === 401 && isAdminPath(path)) adminSignedOut()
+async function request(method, path, { query, body } = {}) {
+  // The admin token for /admin calls, the customer token for everything else —
+  // never the other way round. A shopper's session must not reach the write
+  // API, and an admin session must not be sent to the shop's customer
+  // endpoints. The admin one renews itself; see lib/admin-session.js.
+  const res = isAdminPath(path)
+    ? await adminFetch((auth) => send(method, path, { query, body, auth }))
+    : await send(method, path, { query, body, auth: customerToken() })
+
   if (res.status === 204) return null
 
   let payload = null
@@ -409,12 +400,12 @@ function forgetSession() {
 }
 
 export async function getMe() {
-  if (!token()) throw unauthenticated()
+  if (!customerToken()) throw unauthenticated()
   try {
     return await get('/me')
   } catch (err) {
     // An expired or revoked token: drop it, so the next load does not ask again.
-    if (err.status === 401 && !config.api.token) forgetSession()
+    if (err.status === 401) forgetSession()
     throw err
   }
 }
@@ -428,7 +419,7 @@ export const deleteAddress = (addressId) => del(`/me/addresses/${addressId}`)
 /* ── wishlist ──────────────────────────────────────────────────────────── */
 
 export const getWishlist = () =>
-  token()
+  customerToken()
     ? get('/me/wishlist').then((r) => assertList(r, 'GET /me/wishlist'))
     : Promise.reject(unauthenticated())
 export const addToWishlist = (slug) => post('/me/wishlist', { product_slug: slug })
@@ -436,7 +427,13 @@ export const removeFromWishlist = (slug) => del(`/me/wishlist/${encodeURICompone
 
 /* ── misc ──────────────────────────────────────────────────────────────── */
 
-export const subscribe = (email) => post('/newsletter', { email })
+/**
+ * `captchaToken` only when the store asks for a captcha (`security.captcha` in
+ * the settings document). Login, register and order lookup take it the same
+ * way, inside the body the page passes in.
+ */
+export const subscribe = (email, { captchaToken } = {}) =>
+  post('/newsletter', captchaToken ? { email, captchaToken } : { email })
 
 /** Optional. If the endpoint 404s the caller falls back to the shipping copy. */
 export const getDeliveryEstimate = ({ method = 'standard', country = 'US' } = {}) =>
@@ -557,18 +554,18 @@ export const adminGetProduct = (id) => get(`/admin/products/${encodeURIComponent
 export async function uploadMedia(file) {
   const body = new FormData()
   body.append('file', file)
-  // The admin session, never the customer's or the publishable key: uploading is a write.
-  const session = adminToken()
-  const res = await fetch(`${config.api.baseUrl}/admin/media`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      accept: 'application/json',
-      ...(session ? { authorization: `Bearer ${session}` } : {}),
-    },
-    body,
-  })
-  if (res.status === 401) adminSignedOut()
+  // The admin session, never the customer's: uploading is a write. Renewed and
+  // retried like every other /admin call — a FormData body can be sent twice.
+  const res = await adminFetch((auth) =>
+    fetch(url('/admin/media'), {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        ...(auth ? { authorization: `Bearer ${auth}` } : {}),
+      },
+      body,
+    }),
+  )
   const json = await res.json().catch(() => null)
   if (!res.ok) {
     throw new ApiError(json?.message || `Upload failed with ${res.status}.`, {

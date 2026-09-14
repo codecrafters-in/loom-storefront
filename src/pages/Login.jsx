@@ -4,6 +4,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../store/AuthContext.jsx'
 import { Button, Icon } from '../components/ui/index.jsx'
 import { isMock } from '../lib/api/index.js'
+import { useCaptcha } from '../components/Captcha.jsx'
+import { withCaptcha } from '../lib/captcha.js'
 
 export default function Login() {
   const [mode, setMode] = useState('login')
@@ -13,6 +15,8 @@ export default function Login() {
   const { login, register } = useAuth()
   const navigate = useNavigate()
   const { state } = useLocation()
+  // The modes are named like the captcha actions, so the check follows the form.
+  const captcha = useCaptcha(mode)
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
@@ -21,10 +25,13 @@ export default function Login() {
     setBusy(true)
     setError(null)
     try {
-      if (mode === 'login') await login({ email: form.email, password: form.password })
-      else await register(form)
+      const captchaToken = await captcha.getToken()
+      if (mode === 'login') await login(withCaptcha({ email: form.email, password: form.password }, captchaToken))
+      else await register(withCaptcha(form, captchaToken))
       navigate(state?.from || '/account', { replace: true })
     } catch (err) {
+      // The token was spent on the attempt, right or wrong.
+      captcha.reset()
       setError(err)
       setBusy(false)
     }
@@ -78,6 +85,7 @@ export default function Login() {
             />
           </div>
 
+          {captcha.widget}
           {error && <p className="text-[13px] text-sale">{error.message}</p>}
 
           <Button as="button" type="submit" size="lg" full disabled={busy}>

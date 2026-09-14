@@ -2,6 +2,44 @@
 
 Newest first. Each entry links to the page with the detail.
 
+## What's new — 2026-09-14
+
+### Security
+
+- **Admins sign in with Odoo, not on the shop.** In api mode the admin login page
+  is one **Sign in with Odoo** button: the password and two-factor code are typed
+  on Odoo's own page, and the browser comes back to the new `/admin/callback`
+  route with a one-time code, traded with a PKCE verifier at
+  `POST /admin/auth/token`. The password form is gone, and
+  `POST /admin/auth/login` now refuses passwords (`403 odoo_sign_in_required`);
+  scripts use an Odoo API key. The demo keeps its `admin` / `admin` form.
+  [ADMIN.md](ADMIN.md#authentication)
+- **Admin sessions renew themselves.** The access token lasts about an hour and
+  is refreshed before it runs out, or once after a 401. Refresh tokens rotate;
+  tabs take turns so none is ever spent twice, which the server would treat as
+  theft. Sign-out revokes the refresh token too.
+  [ADMIN.md](ADMIN.md#authentication)
+- **Captcha, when the store switches it on.** `security.captcha` in the settings
+  document turns on Cloudflare Turnstile or Google reCAPTCHA v3 for sign-in,
+  registration, order lookup and the newsletter, which then send `captchaToken`.
+  Off, nothing loads. [API.md](API.md#captcha)
+- **A Content-Security-Policy on every built page.** `npm run build` now ends
+  with `scripts/csp.mjs`: scripts only from the site, its own hashed inline
+  scripts, the known payment providers and only the captcha paths of Cloudflare
+  and Google (their other scripts are known ways around a policy); API calls
+  only to the configured backend. [CONFIGURATION.md](CONFIGURATION.md#content-security-policy)
+- **The shop can no longer be framed.** `frame-ancestors 'none'` and
+  `X-Frame-Options: DENY` in `vercel.json` and `public/_headers`.
+
+### Removed
+
+- **`VITE_API_TOKEN`.** It was sent in place of the signed-in customer's token,
+  which silently broke sign-in. Delete it from `.env.local` and your host.
+  [CONFIGURATION.md](CONFIGURATION.md#environment-variables)
+- **Cookies on API requests.** No request sets `credentials: 'include'` any more;
+  auth is the `Authorization` header alone, and the backend no longer sends
+  `Access-Control-Allow-Credentials`. [API.md](API.md)
+
 ## What's new — 2026-09-12
 
 ### Fixes

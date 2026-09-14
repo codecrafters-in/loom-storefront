@@ -1,0 +1,179 @@
+name: E2E (real Odoo)
+
+# The storefront in Chromium against a real Odoo 19 running the loom_storefront
+# addon, one test per business scenario (e2e/README.md). It needs a database, an
+# Odoo server and two dev servers, so it runs nightly and on demand rather than
+# on every push — CI stays fast, and this still catches a broken journey within
+# a day.
+
+on:
+  workflow_dispatch:
+    inputs:
+      addon_repository:
+        description: 'owner/name of the loom_storefront addon repository (default: the LOOM_ADDON_REPOSITORY variable)'
+        required: false
+        default: ''
+      addon_ref:
+        description: 'Branch, tag or SHA of the addon (default: its default branch)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '17 3 * * *'
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ODOO_DB: loom_e2e_20260913
+  LOOM_E2E_API: http://localhost:8074/loom/api/v1/e2e
+  # The addon has no public remote yet. Set the repository variable (and a
+  # LOOM_ADDON_TOKEN secret if it is private) once it does.
+  ADDON_REPOSITORY: ${{ inputs.addon_repository || vars.LOOM_ADDON_REPOSITORY }}
+  ADDON_REF: ${{ inputs.addon_ref || vars.LOOM_ADDON_REF }}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: odoo
+          POSTGRES_PASSWORD: odoo
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Addon repository is configured
+        if: env.ADDON_REPOSITORY == ''
+        run: |
+          echo "::error::Set the LOOM_ADDON_REPOSITORY repository variable to owner/name of the loom_storefront addon, or pass addon_repository when running this workflow."
+          exit 1
+
+      - name: Check out the storefront
+        uses: actions/checkout@v4
+        with:
+          path: storefront
+
+      - name: Check out Odoo 19.0
+        uses: actions/checkout@v4
+        with:
+          repository: odoo/odoo
+          ref: '19.0'
+          path: odoo
+          fetch-depth: 1
+
+      - name: Check out the addon
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ADDON_REPOSITORY }}
+          ref: ${{ env.ADDON_REF }}
+          token: ${{ secrets.LOOM_ADDON_TOKEN || github.token }}
+          path: addon-src
+
+      # Today the module is the repository root; the App Store layout puts it in
+      # a loom_storefront/ folder. Accept both.
+      - name: Addons path
+        run: |
+          mkdir -p addons
+          if [ -f addon-src/__manifest__.py ]; then
+            ln -s "$PWD/addon-src" addons/loom_storefront
+          elif [ -f addon-src/loom_storefront/__manifest__.py ]; then
+            ln -s "$PWD/addon-src/loom_storefront" addons/loom_storefront
+          else
+            echo "::error::No loom_storefront module in $ADDON_REPOSITORY"
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: odoo/requirements.txt
+
+      # wkhtmltopdf so order and invoice emails render their PDF, as in production.
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libldap2-dev libsasl2-dev libpq-dev wkhtmltopdf
+
+      - name: Python packages
+        run: pip install -r odoo/requirements.txt
+
+      - name: Odoo configuration
+        run: |
+          cat > odoo.conf <<EOF
+          [options]
+          addons_path = $PWD/odoo/addons,$PWD/addons
+          db_host = localhost
+          db_port = 5432
+          db_user = odoo
+          db_password = odoo
+          admin_passwd = admin
+          EOF
+
+      - name: Create the database
+        run: python odoo/odoo-bin -c odoo.conf -d "$ODOO_DB" -i loom_storefront,payment_demo,payment_custom --stop-after-init --log-level=warn
+
+      - name: Seed the stores
+        run: python odoo/odoo-bin shell -c odoo.conf -d "$ODOO_DB" --no-http --log-level=warn < addons/loom_storefront/tools/e2e_seed.py
+
+      - name: Start Odoo on port 8074
+        run: |
+          nohup python odoo/odoo-bin -c odoo.conf -d "$ODOO_DB" --db-filter="^${ODOO_DB}\$" \
+            --http-port 8074 --logfile "$RUNNER_TEMP/odoo.log" > /dev/null 2>&1 &
+          for attempt in $(seq 1 90); do
+            if curl -fsS -o /dev/null -H 'Origin: http://localhost:5174' "$LOOM_E2E_API/storefront"; then exit 0; fi
+            sleep 2
+          done
+          tail -n 200 "$RUNNER_TEMP/odoo.log"
+          exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            storefront/package-lock.json
+            storefront/e2e/package-lock.json
+
+      - name: Storefront dependencies
+        working-directory: storefront
+        run: npm ci
+
+      - name: E2E dependencies
+        working-directory: storefront/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run the scenarios
+        working-directory: storefront
+        run: npm run e2e
+
+      - name: Odoo log
+        if: always()
+        run: tail -n 300 "$RUNNER_TEMP/odoo.log" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            storefront/e2e/playwright-report
+            storefront/e2e/test-results
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Stop Odoo
+        if: always()
+        run: pkill -f "odoo-bin -c odoo.conf" || true

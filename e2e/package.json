@@ -1,0 +1,18 @@
+{
+  "name": "loom-storefront-e2e",
+  "private": true,
+  "description": "End-to-end business-scenario tests: the storefront in a real browser against a real Odoo 19 with loom_storefront. Kept out of the theme's own package.json so its install stays small.",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report",
+    "install:browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

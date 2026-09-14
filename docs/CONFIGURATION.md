@@ -50,7 +50,6 @@ cp .env.example .env.local
 | --- | --- | --- |
 | `VITE_DATA_SOURCE` | `mock` | `mock` or `api` |
 | `VITE_API_BASE_URL` | — | Required when `api`. No trailing slash |
-| `VITE_API_TOKEN` | — | `Authorization: Bearer`. Publishable keys only |
 | `VITE_API_TIMEOUT` | `12000` | Milliseconds before a request aborts |
 | `VITE_API_CACHE` | `on` | `off` stops the **browser** reusing API responses, so a backend edit shows on the next load. For development. Server rendering and the prerender always cache — a render cannot await, it reads what was fetched first — so the build is the same either way |
 | `VITE_STORE_NAME` | `LOOM` | |
@@ -62,10 +61,16 @@ cp .env.example .env.local
 | `VITE_ADMIN_USER` | `admin` | Demo back-office username. **Mock mode only** |
 | `VITE_ADMIN_PASSWORD` | `admin` | Demo back-office password. **Mock mode only** |
 
-In `api` mode the admin credential is checked by your server at
-`POST /admin/auth/login` and those two variables are ignored. They are compiled
-into the bundle like every `VITE_` variable, so they gate a browser-local demo
-and nothing more — see [ADMIN.md](ADMIN.md#authentication).
+In `api` mode those two variables are ignored: the admin login page has a single
+**Sign in with Odoo** button, and the password is typed on Odoo's own page. They
+are compiled into the bundle like every `VITE_` variable, so they gate a
+browser-local demo and nothing more — see [ADMIN.md](ADMIN.md#authentication).
+
+**`VITE_API_TOKEN` is gone.** It was sent in place of the signed-in customer's
+own token, so with it set a sign-in appeared to work and every account call then
+answered for somebody else, or for nobody. Delete it from `.env.local` and from
+your host's settings. A public catalogue needs no token, and customer and admin
+sessions carry their own.
 
 > **Vite inlines every `VITE_*` variable into the JavaScript bundle.** Anything
 > here is readable by anyone who opens devtools. Publishable keys are fine;
@@ -73,6 +78,47 @@ and nothing more — see [ADMIN.md](ADMIN.md#authentication).
 
 Setting `VITE_DATA_SOURCE=api` without `VITE_API_BASE_URL` throws at boot with
 a readable message rather than firing requests at `undefined`.
+
+---
+
+## Content-Security-Policy
+
+`npm run build` ends with `scripts/csp.mjs`, which writes a
+`<meta http-equiv="Content-Security-Policy">` into every HTML file in `dist/`.
+It is a meta tag rather than a header because the policy depends on the build —
+the API origin, and the hash of each page's inline scripts, which are the data
+the prerenderer seeds — while `vercel.json` and `public/_headers` are static
+files. The one directive a meta tag cannot carry, `frame-ancestors 'none'`, is a
+real header in both, next to `X-Frame-Options: DENY`: nobody may frame the shop.
+
+| Directive | Allows |
+| --- | --- |
+| `default-src` | `'self'` |
+| `script-src` | `'self'`, the SHA-256 of each inline script on that page, Razorpay Checkout, Cloudflare Turnstile, Google reCAPTCHA. No `'unsafe-inline'`, no `'unsafe-eval'` |
+| `connect-src` | `'self'`, the API origin, Razorpay |
+| `img-src`, `media-src` | `'self'`, `data:`, `blob:`, any `https:` origin, and the API origin — so an Odoo on plain `http://localhost:8069` still shows its images |
+| `style-src` | `'self'`, inline styles, Google Fonts |
+| `font-src` | `'self'`, `data:`, Google Fonts |
+| `frame-src` | Razorpay, Turnstile, reCAPTCHA |
+| `form-action` | `'self'` and the API origin |
+| `base-uri`, `object-src` | `'self'`, `'none'` |
+
+The API origin is read from `VITE_DATA_SOURCE` and `VITE_API_BASE_URL` the way
+Vite reads them — the environment first, then the `.env` files — so it is always
+the backend the bundle calls. The dev server sends no policy; check a change with
+`npm run build` and `npx vite preview`.
+
+**Adding a domain.** A script, an iframe or an API call to a new third party — an
+analytics tag, a chat widget, another payment gateway — is refused until it is
+listed. Add it to `THIRD_PARTY` in `scripts/lib/csp.mjs` and rebuild. The browser
+console names the directive that refused it ("Refused to load the script … because
+it violates the following Content Security Policy directive: script-src …"), and
+that is the list to add it to. Never add `'unsafe-inline'` or `'unsafe-eval'` to
+`script-src` to make something work: that switches the policy off for exactly the
+attack it is there to stop.
+
+If your host or CDN sends its own `Content-Security-Policy` header, the browser
+enforces both, so a page is allowed only what both allow.
 
 ---
 
@@ -516,6 +562,24 @@ Icon names come from the built-in set in `src/components/ui/Icon.jsx`:
 `bag` `user` `search` `star` `filter` `trash`.
 
 An empty array removes the strip everywhere it appears.
+
+### `security`
+
+```json
+{
+  "security": {
+    "captcha": { "provider": "turnstile", "siteKey": "0x4AAAAAAA…", "actions": ["login", "register", "lookup", "newsletter"] }
+  }
+}
+```
+
+Filled in by the backend rather than edited here: the Odoo module sets it when a
+store switches captcha on. `captcha` is `null` when it is off, and then no
+captcha script is ever requested. `provider` is `turnstile` (Cloudflare) or
+`recaptcha` (Google reCAPTCHA v3, invisible). `actions` lists the forms that send
+a token; with no list, all four do. The site key is public by design — the secret
+stays on the server. The demo never loads a captcha. Wire format in
+[API.md](API.md#captcha).
 
 ---
 

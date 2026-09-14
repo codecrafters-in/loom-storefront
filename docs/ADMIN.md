@@ -341,17 +341,97 @@ make each chunk idempotent so a partial failure can be retried safely.
 
 ## Authentication
 
+**The demo** checks `VITE_ADMIN_USER` / `VITE_ADMIN_PASSWORD` — `admin` / `admin`
+by default — entirely in the browser. Those are compiled into the bundle like
+every `VITE_` variable, so they are public by construction. That is a demo
+affordance, not a design; the customer sign-in at `POST /auth/login` is a
+separate thing with a separate session.
+
+**A live store signs in with Odoo.** The admin login page has one button and no
+password field. A password typed on the shop's domain can be read by every script
+the shop loads — an analytics tag, a compromised dependency, a browser extension —
+while Odoo's own login page is where the password, two-factor authentication and
+lockouts already live.
+
+1. **Sign in with Odoo** makes a PKCE pair (RFC 7636, `S256`) and a random
+   `state`, keeps them in `sessionStorage` under `loom.admin_pkce` — this tab
+   only — and sends the browser to
+
+   ```
+   {odoo origin}/loom/admin/authorize?store={store code}
+     &redirect_uri={shop origin}/admin/callback
+     &state=…&code_challenge=…&code_challenge_method=S256
+   ```
+
+   Both come from `VITE_API_BASE_URL`: `http://localhost:8069/loom/api/v1/loom`
+   is origin `http://localhost:8069` and store `loom`.
+2. Odoo shows its login page (and two-factor, if the user has it), asks the user
+   to confirm, and redirects to `/admin/callback?code=…&state=…`.
+3. The callback refuses a `state` this tab did not issue, without calling the
+   API — otherwise a forged link could sign the browser in as whoever made it.
+   Then it trades the code:
+
+   ```
+   POST /admin/auth/token
+   { "grant_type": "authorization_code", "code": "…", "code_verifier": "…", "redirect_uri": "…/admin/callback" }
+   → { "token", "expiresAt", "refreshToken", "refreshExpiresAt", "user": { "id", "name", "login", "email" } }
+   ```
+
+   and replaces itself in the history, so Back never lands on a spent code.
+
+The session is kept in `localStorage` under `loom.admin_session` as
+`{ username, token, expiresAt, refreshToken, refreshExpiresAt }`, times in
+milliseconds. The access token lives about an hour; the refresh token about a
+week.
+
+**Renewal.** Before an `/admin/*` request whose access token has less than 30
+seconds left — or once, after a 401 — the client sends
+
 ```
-POST /admin/auth/login   { username, password } → { token }
+POST /admin/auth/token   { "grant_type": "refresh_token", "refresh_token": "…" }
 ```
 
-The demo checks `VITE_ADMIN_USER` / `VITE_ADMIN_PASSWORD` — `admin` / `admin` by
-default — entirely in the browser. Those are compiled into the bundle like every
-`VITE_` variable, so they are public by construction. That is a demo affordance,
-not a design; the customer sign-in at `POST /auth/login` is a separate thing with
-a separate session.
+which answers in the same shape with a **new** refresh token, and the request is
+retried once. Refresh tokens rotate, and the server revokes the whole session
+when an old one is presented again, so the client never spends one twice:
+requests in one tab share a single refresh, and tabs take turns through a Web
+Lock and read the rotated token from storage. A 400 or 401 from the refresh signs
+the panel out; a network error keeps the session.
 
-For a real deployment:
+**Signing out** sends `POST /admin/auth/logout` with the access token as
+`Authorization: Bearer` and `{ "refresh_token": "…" }` in the body — the refresh
+token is the long-lived half — and forgets the session whether or not the request
+arrives.
+
+| Status | Code | Meaning |
+| --- | --- | --- |
+| 400 | `invalid_request` | A field is missing or malformed |
+| 400 or 401 | `invalid_grant` | The code or refresh token is expired, already used, or does not match its verifier or redirect URI |
+| 403 | `odoo_sign_in_required` | `POST /admin/auth/login` was sent a password. People use Sign in with Odoo; scripts use an API key |
+
+The authorize URL is derived from the base URL as above. A backend other than
+the Odoo module implements the same three endpoints, or changes
+`src/lib/admin-session.js` to point at its own login page.
+
+### Scripts and API keys
+
+A script has no browser to send to Odoo. It signs in with an Odoo API key
+(*Preferences → Account Security → New API Key* in Odoo) and then sends the token
+exactly as the panel does:
+
+```bash
+curl -X POST "$API/admin/auth/login" -H 'content-type: application/json' \
+  -d '{"login": "admin", "apiKey": "…"}'
+# → { "token": "…", "expiresAt": "…" }
+curl "$API/admin/orders" -H "Authorization: Bearer $TOKEN"
+```
+
+A key acts as its user, with that user's rights, so treat it as a password: give
+each script its own Odoo user with only the rights it needs, keep the key in the
+script's secret store and never in a `VITE_` variable, and revoke it in Odoo when
+the script retires.
+
+For any deployment:
 
 1. **Separate the admin session from the storefront session.** A customer token
    must not carry admin scope. Different audience claim, ideally a different
