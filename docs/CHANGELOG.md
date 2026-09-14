@@ -4,6 +4,63 @@ Newest first. Each entry links to the page with the detail.
 
 ## What's new — 2026-09-14
 
+### Any product, not just apparel
+
+- **One picker for every product.** Options render as the store set them up in
+  Odoo (swatches, image tiles, pills, radios or a select), whatever they are
+  called. Choices are available, sold out (struck through), never made in that
+  combination (dashed) or not yet made on a dynamic option, and the button says
+  what is missing ("Select storage"). Products with no options are buyable.
+  The gallery follows whichever option has `imagesFollow`; the size chart and
+  the fit block appear only where an option has `role: 'size'`.
+  [API.md](API.md#any-product)
+- **Dynamic options and extras.** Combinations missing from `variants[]` and
+  no-variant extras (an engraving, a gift box) are priced by the new
+  `POST /products/:slug/combination`. Extras render as radios or checkboxes, a
+  custom choice opens a text field (200 characters), and the bag takes
+  `{ product_slug, choice_ids, extra_choice_ids, custom_values, quantity }`.
+  A backend without choice ids still gets `{ variant_id, quantity }`.
+  [API.md](API.md#cart)
+- **Quantity rules and stock wording.** The product and bag steppers follow
+  `quantity.{min, max, step, unit, decimals}` (coffee by the quarter kilo), and
+  stock follows `stock.display`: the number, "Only N left" under the threshold,
+  or never a number. [API.md](API.md#any-product)
+- **Sets, optional products and accessories.** A combo product gets a set
+  configurator (one item per group, extra price shown, total). Optional
+  products are offered in a dialog as the product is added and ride on the same
+  request, linked to its line; the bag shows them indented under it. Accessories
+  are a "Frequently bought together" rail on the product page and in the bag
+  drawer; alternatives feed "You might also like". Bag lines show extras, typed
+  text and a set's contents everywhere a line is shown. [API.md](API.md#cart)
+- **Filters for any catalogue.** The filter panel renders every attribute,
+  specification facet and brand the backend sends (`attr=`, `spec=`, `brand=`,
+  kept in the URL), and the price filter has a lowest and a highest end in the
+  store's currency. [API.md](API.md#get-products)
+- **Brands, specifications, films.** Brand name or logo on cards and product
+  pages, a `/brands/:slug` page, and the brand in Product JSON-LD. Specifications
+  and tab names come from the store (`enrichment.specList`, `enrichment.labels`).
+  YouTube and Vimeo films are a poster until pressed, then play from the
+  privacy-enhanced hosts, which the Content-Security-Policy now allows as frames.
+  [API.md](API.md#any-product) · [CONFIGURATION.md](CONFIGURATION.md#content-security-policy)
+- **Categories at any depth.** Category pages and breadcrumbs use names from
+  `breadcrumbs` and category `path`, to any depth; a third-level page no longer
+  calls itself "All products". [API.md](API.md#get-categories)
+- **Compare and quick view.** Compare up to four products at `/compare?slugs=`,
+  with a specification table, and look at a product from the grid without
+  leaving it. Both load only when used.
+- **Downloads.** A paid order with a digital product lists its files on the
+  order page. [API.md](API.md#orders-and-account)
+- **The demo sells more than clothes.** A phone (Storage × Color, a combination
+  never made, a film, an optional case), a notebook with no options, a pen with
+  an engraving, coffee by weight with a dynamic grind, a desk set and a
+  downloadable handbook, under a three-level Goods category.
+- **Neutral wording.** "Pieces" is "products" or "items", and the search hint,
+  the tag filter and the option names no longer assume clothing.
+- **A smaller first download.** The build now knows which data layer it talks
+  to and leaves the other adapter out, so a live store no longer downloads the
+  demo backend and the demo no longer downloads the HTTP client.
+  [PERFORMANCE.md](PERFORMANCE.md)
+
 ### Security
 
 - **Admins sign in with Odoo, not on the shop.** In api mode the admin login page

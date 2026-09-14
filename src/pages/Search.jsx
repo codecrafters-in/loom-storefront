@@ -64,7 +64,7 @@ export default function Search() {
           <Empty
             icon="search"
             title={`Nothing for “${q}”`}
-            body="Try a fabric, a category, or something broader — “linen”, “wool”, “shirt”."
+            body="Try a category, a brand, or something broader."
             action={<Button to="/shop" size="lg">Browse everything</Button>}
           />
         ) : (

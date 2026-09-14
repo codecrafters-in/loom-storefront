@@ -16,11 +16,19 @@ import { cached, dedupe, dropPersisted, invalidate, keyOf, peek as peekKey, TTL 
 
 assertConfig()
 
-const adapter = isMock ? mock : http
+/**
+ * `__LOOM_API__` is written in by vite.config.js, which is what lets the build
+ * leave the unused adapter out. Outside a Vite build (the tests, a script) it
+ * does not exist, and the runtime setting decides as it always did.
+ */
+// eslint-disable-next-line no-undef
+const apiMode = typeof __LOOM_API__ === 'boolean' ? __LOOM_API__ : !isMock
+const adapter = apiMode ? http : mock
 
 const SURFACE = [
   'getStorefront', 'getBootstrap',
   'listProducts', 'getProduct', 'getRelated', 'listCategories', 'listCollections', 'getReviews',
+  'getCombination', 'listBrands', 'getBrand',
   'getCart', 'addToCart', 'updateCartLine', 'removeCartLine', 'applyDiscount', 'clearCart',
   'checkout', 'listOrders', 'getOrder', 'lookupOrder',
   'getPaymentOptions', 'createPayment', 'paymentAction', 'getPayment',
@@ -61,6 +69,11 @@ const CACHEABLE = {
   listCollections: TTL.catalog,
   getProduct: TTL.product,
   getRelated: TTL.product,
+  // A read sent as a POST: the same choices always price the same, so it caches
+  // like the product it belongs to and is purged with it.
+  getCombination: TTL.product,
+  listBrands: TTL.catalog,
+  getBrand: TTL.catalog,
   getReviews: TTL.reviews,
   getDeliveryEstimate: TTL.catalog,
   listSizeCharts: TTL.catalog,
@@ -77,19 +90,19 @@ const CACHEABLE = {
  * change every price the moment someone signs in or out, so the copies cached
  * for the previous visitor have to go rather than wait out their window.
  */
-const PRICED = ['listProducts', 'getProduct', 'getRelated', 'getBootstrap']
+const PRICED = ['listProducts', 'getProduct', 'getRelated', 'getCombination', 'getBootstrap']
 
 const PURGES = {
   login: PRICED, register: PRICED, logout: PRICED,
   addToCart: [], updateCartLine: [], removeCartLine: [], applyDiscount: [], clearCart: [],
-  checkout: ['listProducts', 'getProduct', 'getBootstrap'],
+  checkout: ['listProducts', 'getProduct', 'getCombination', 'getBootstrap'],
   // Options apply the address and delivery to the cart, so they are a write — never joined or cached.
   getPaymentOptions: [],
   // A payment that lands places the order and sells the stock, exactly like checkout.
-  createPayment: ['listProducts', 'getProduct', 'getBootstrap'],
-  paymentAction: ['listProducts', 'getProduct', 'getBootstrap'],
+  createPayment: ['listProducts', 'getProduct', 'getCombination', 'getBootstrap'],
+  paymentAction: ['listProducts', 'getProduct', 'getCombination', 'getBootstrap'],
   // A save can teach the library a new attribute, so the vocabulary is stale too.
-  adminSaveProduct: ['listProducts', 'getProduct', 'getRelated', 'getBootstrap', 'adminListProducts', 'adminGetProduct', 'listAttributes', 'listLibrary'],
+  adminSaveProduct: ['listProducts', 'getProduct', 'getRelated', 'getCombination', 'listBrands', 'getBootstrap', 'adminListProducts', 'adminGetProduct', 'listAttributes', 'listLibrary'],
   saveLibraryItem: ['listAttributes', 'listLibrary'],
   deleteLibraryItem: ['listAttributes', 'listLibrary'],
   adminSaveSizeChart: ['listSizeCharts', 'getProduct', 'adminGetProduct'],

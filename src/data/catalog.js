@@ -14,6 +14,9 @@
 import { toMinor, isRealDiscount } from '../lib/money.js'
 import { productFacts } from './fit.js'
 import { productEnrichment, manufacturerInfo } from './enrichment.js'
+import { anyCategories, anyProducts, brands } from './catalog-any.js'
+
+export { brands }
 
 /**
  * Categories are a flat list with a `parent` pointer rather than nested arrays.
@@ -26,7 +29,7 @@ import { productEnrichment, manufacturerInfo } from './enrichment.js'
  * /shop/shirts includes everything under it without products having to list
  * both.
  */
-export const categories = [
+const APPAREL_CATEGORIES = [
   { slug: 'shirts', name: 'Shirts', parent: null, blurb: 'Poplin, oxford, and one very good linen.', imageQuery: 'white linen shirt on hanger minimal' },
   { slug: 'shirts-oxford', name: 'Oxford & poplin', parent: 'shirts', blurb: 'Collars that hold.', imageQuery: 'oxford shirt collar detail studio' },
   { slug: 'shirts-linen', name: 'Linen', parent: 'shirts', blurb: 'For the warm half of the year.', imageQuery: 'linen shirt hanging natural light' },
@@ -53,6 +56,21 @@ export const categories = [
   { slug: 'accessories-bags', name: 'Bags', parent: 'accessories', blurb: 'Canvas that outlives the trip.', imageQuery: 'canvas duffle bag leather trim' },
   { slug: 'accessories-cold', name: 'Scarves & hats', parent: 'accessories', blurb: 'Wool, for the months that need it.', imageQuery: 'wool scarf and beanie folded neutral' },
 ]
+
+export const categories = [...APPAREL_CATEGORIES, ...anyCategories]
+
+/**
+ * What goes with what, for the rails that are not computed.
+ *
+ * `accessories` feeds "Frequently bought together" and `alternatives` feeds
+ * "You might also like" — Odoo's accessory and alternative products. Only a few
+ * are set, on purpose: every other product falls back to the computed related
+ * rail, which is what a store that never fills these in would see.
+ */
+const RELATIONS = {
+  'oxford-shirt-ecru': { accessories: ['leather-belt', 'merino-crew-knit'], alternatives: ['poplin-shirt-white', 'linen-camp-shirt', 'brushed-flannel-shirt'] },
+  'wool-overcoat': { accessories: ['lambswool-scarf', 'merino-beanie'] },
+}
 
 const APPAREL = ['XS', 'S', 'M', 'L', 'XL']
 const ONE = ['One Size']
@@ -590,8 +608,11 @@ function complianceFor(facts) {
 }
 
 function enrichmentFor(raw, facts) {
+  // The detail tabs are named for clothes here; a product that is not clothes
+  // sends its own names, and the theme's defaults are neutral.
+  const labels = { fabric: 'Fabric & care', details: 'Construction' }
   const authored = productEnrichment[raw.slug]
-  if (authored) return { ...authored, manufacturer: complianceFor(facts) }
+  if (authored) return { labels, ...authored, manufacturer: complianceFor(facts) }
 
   const fabric = facts.fabric || {}
   const highlights = [
@@ -660,6 +681,7 @@ function enrichmentFor(raw, facts) {
   ].filter(Boolean)
 
   return {
+    labels,
     highlights,
     features,
     assurances,
@@ -773,6 +795,8 @@ function build(raw) {
     // Highlights, feature cards and the specifications table. See
     // src/data/enrichment.js for why they are three blocks and not one.
     enrichment: enrichmentFor(raw, facts),
+    ...(RELATIONS[raw.slug]?.accessories ? { accessorySlugs: RELATIONS[raw.slug].accessories } : {}),
+    ...(RELATIONS[raw.slug]?.alternatives ? { alternativeSlugs: RELATIONS[raw.slug].alternatives } : {}),
 
     // Honest scarcity and demand, derived rather than invented. A fabricated
     // "17 people are viewing" is the fastest way to lose a considered buyer.
@@ -788,7 +812,7 @@ function build(raw) {
   }
 }
 
-export const products = RAW.map(build)
+export const products = [...RAW.map(build), ...anyProducts]
 
 export const collections = [
   {

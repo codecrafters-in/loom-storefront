@@ -17,13 +17,13 @@
  */
 import * as db from '../db.js'
 import { railKey } from './railKey.js'
-import * as mediaStore from '../media.js'
 import { attributes, attributeGroups, assuranceTemplates, featureIcons } from '../../data/attributes.js'
-import { COUNTRY_DETAILS } from '../../data/regions.js'
-import { ORDER_ACTIONS, adminOrderView, filterOrders, orderCounts, trackingProblem } from '../admin-orders.js'
+// regions.js and admin-orders.js are imported where they are used, not here: see getCountry and orderKit.
 import { config } from '../config.js'
 import { ApiError } from './contracts.js'
 import { invalidateAndNotify } from './cache.js'
+import { comboState, keyOf, modelOf, optionsOf, variantFor } from '../variants.js'
+import { ruleOf } from '../quantity.js'
 
 /**
  * The catalogue is read from the demo database, not from a static import.
@@ -32,16 +32,18 @@ import { invalidateAndNotify } from './cache.js'
  * the point where this module picks up the current data — every endpoint awaits
  * it already, so there is no separate "load" step to forget.
  */
-let products = []
+export let products = []
 let categories = []
 let collections = []
 let sizeCharts = []
-let storefront = {}
+let brands = []
+export let storefront = {}
 
-function adopt() {
+export function adopt() {
   products = db.getProducts()
   categories = db.getCategories()
   collections = db.getCollections()
+  brands = db.getBrands()
   sizeCharts = db.getSizeCharts()
   storefront = db.getSettings()
 }
@@ -50,14 +52,23 @@ function adopt() {
  * from another tab has not been purged at all, and cannot be — nothing here
  * knows what it touched.
  */
-db.subscribe((_next, origin) => {
-  adopt()
-  if (origin === 'remote') invalidateAndNotify()
-})
+let watching = false
+/**
+ * Subscribed on the first call, not when the module loads: an import with no
+ * side effects is one a live-store build can leave out entirely.
+ */
+function watch() {
+  if (watching) return
+  watching = true
+  db.subscribe((_next, origin) => {
+    adopt()
+    if (origin === 'remote') invalidateAndNotify()
+  })
+}
 
-const CURRENCY = config.store.currency
-const nowIso = () => new Date().toISOString()
-const KEY = {
+export const CURRENCY = config.store.currency
+export const nowIso = () => new Date().toISOString()
+export const KEY = {
   discounts: 'loom.discounts',
   cart: 'loom.cart',
   orders: 'loom.orders',
@@ -77,15 +88,16 @@ const KEY = {
   payments: 'loom.payments',
 }
 
-async function latency() {
+export async function latency() {
   await db.ready()
+  watch()
   adopt()
   if (config.mockLatency > 0) {
     await new Promise((r) => setTimeout(r, config.mockLatency + Math.random() * config.mockLatency))
   }
 }
 
-function read(key, fallback) {
+export function read(key, fallback) {
   try {
     const raw = localStorage.getItem(key)
     return raw ? JSON.parse(raw) : fallback
@@ -93,7 +105,7 @@ function read(key, fallback) {
     return fallback // private mode, quota, or a stale shape from an older build
   }
 }
-function write(key, value) {
+export function write(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value))
   } catch {
@@ -101,14 +113,127 @@ function write(key, value) {
   }
 }
 
-const money = (amount) => ({ amount, currency: CURRENCY })
-const id = (p) => `${p}_${Math.random().toString(36).slice(2, 10)}`
+export const money = (amount) => ({ amount, currency: CURRENCY })
+export const id = (p) => `${p}_${Math.random().toString(36).slice(2, 10)}`
 
-/** Strip the fields that only exist to drive the image script. */
-const publicProduct = (p) => {
-  const { _imageQuery, _altQuery, _colorQuery, sizeChartId, ...rest } = p
+const isLive = (p) => Boolean(p) && p.published !== false
+const inStock = (p) => (p.variants || []).some((v) => v.available)
+
+/** The store's stock setting under the product's own, as `{ display, lowThreshold }`. */
+function stockOf(p) {
+  const { display, lowThreshold } = { display: 'low', lowThreshold: 3, ...(storefront.commerce?.stock || {}), ...(p?.stock || {}) }
+  return { display, lowThreshold }
+}
+
+/** `[{ slug, name }]`, root first. Stops at a loop in the parents rather than hanging on one. */
+function categoryPath(slug) {
+  const path = []
+  const seen = new Set()
+  let c = categories.find((x) => x.slug === slug)
+  while (c && !seen.has(c.slug)) {
+    seen.add(c.slug)
+    path.unshift({ slug: c.slug, name: c.name })
+    c = c.parent ? categories.find((x) => x.slug === c.parent) : null
+  }
+  return path
+}
+
+/** The trail to the product's deepest category — where a shopper would say it lives. */
+const breadcrumbsOf = (slugs = []) =>
+  slugs.map(categoryPath).reduce((best, path) => (path.length > best.length ? path : best), [])
+
+/**
+ * `ProductSummary`: enough for a rail, a chip or a dialog, and no variants.
+ * `variantId` only when there is exactly one to add; otherwise the shopper has
+ * choices to make on the product's page.
+ */
+const summaryOf = (p) => ({
+  slug: p.slug,
+  title: p.title,
+  price: p.price,
+  compareAtPrice: p.compareAtPrice ?? null,
+  image: p.images?.[0] || null,
+  available: inStock(p),
+  type: p.type || 'goods',
+  variantId: p.variants?.length === 1 ? p.variants[0].id : null,
+})
+const summaries = (slugs) => (slugs || []).map((s) => products.find((x) => x.slug === s)).filter(isLive).map(summaryOf)
+
+/** A combo item with its title, photograph and stock read live, so a set never offers a pen that sold out. */
+function liveComboItem(item) {
+  const p = products.find((x) => x.slug === item.productSlug)
+  const v = p?.variants.find((x) => x.id === item.variantId)
+  return {
+    id: item.id,
+    variantId: item.variantId,
+    productSlug: item.productSlug,
+    title: p?.title || item.title || '',
+    image: (p?.images || []).find((i) => i.id === v?.imageId) || p?.images?.[0] || null,
+    options: v?.options || {},
+    extraPrice: item.extraPrice || money(0),
+    available: Boolean(isLive(p) && v?.available),
+  }
+}
+
+/**
+ * A stored product as the API serves it.
+ *
+ * Strips what only the image script and this adapter read, resolves the size
+ * chart, and brings a product authored the old way — options by name, no ids —
+ * up to the current contract, so a shirt and a phone arrive in the same shape.
+ * `detail` adds what only the product page reads: breadcrumbs, extra options,
+ * the combo and the related lists.
+ */
+function publicProduct(p, { detail = false } = {}) {
+  const {
+    _imageQuery, _altQuery, _colorQuery, sizeChartId, optionalProductSlugs, accessorySlugs, alternativeSlugs,
+    download: _download, extraOptions, combo, ...rest
+  } = p
   // A product either references a shared chart by id or carries its own. The
   // reference is resolved here so the storefront always sees one shape.
+  const chart = sizeChartId ? sizeCharts.find((c) => c.id === sizeChartId) : rest.sizeChart
+  const options = optionsOf(rest)
+  const stock = stockOf(rest)
+  const rule = ruleOf(rest.quantity)
+  const shaped = {
+    ...rest,
+    type: rest.type || 'goods',
+    brand: rest.brand || null,
+    options,
+    // A store that does not publish stock levels must not publish them in the payload either.
+    variants: (rest.variants || []).map((v) => ({
+      ...v,
+      optionIds: keyOf(v, options),
+      inventory: stock.display === 'hidden' ? null : v.inventory,
+    })),
+    stock,
+    quantity: { ...rule, unit: rule.unit || 'Units' },
+    sizeChartId: sizeChartId ?? rest.sizeChart?.id ?? null,
+    sizeChart: chart || null,
+    enrichment: rest.enrichment?.specList
+      ? { ...rest.enrichment, specList: rest.enrichment.specList.map(({ facet: _facet, ...s }) => s) }
+      : rest.enrichment,
+  }
+  if (!detail) return shaped
+  return {
+    ...shaped,
+    breadcrumbs: breadcrumbsOf(rest.categories),
+    extraOptions: extraOptions || [],
+    ...(combo ? { combo: combo.map((g) => ({ ...g, items: g.items.map(liveComboItem) })) } : {}),
+    optionalProducts: summaries(optionalProductSlugs),
+    accessories: summaries(accessorySlugs),
+    alternatives: summaries(alternativeSlugs),
+  }
+}
+
+/**
+ * The admin's view: the record as stored, with the chart resolved and nothing
+ * derived. The editor writes back what it reads, and a derived `choices` list
+ * saved into a Colour/Size product would go stale the first time a colour was
+ * added.
+ */
+export function storedProduct(p) {
+  const { _imageQuery, _altQuery, _colorQuery, sizeChartId, ...rest } = p
   const chart = sizeChartId ? sizeCharts.find((c) => c.id === sizeChartId) : rest.sizeChart
   return { ...rest, sizeChartId: sizeChartId ?? rest.sizeChart?.id ?? null, sizeChart: chart || null }
 }
@@ -134,6 +259,29 @@ const SORTS = {
   rating: (a, b) => average(b) - average(a),
 }
 
+/** `['Color:Ecru', 'Color:Navy', 'Size:M']` → `Map { Color → [Ecru, Navy], Size → [M] }`. A value may hold a colon; a key may not. */
+function pairsOf(list) {
+  const map = new Map()
+  for (const pair of [].concat(list || [])) {
+    const text = String(pair)
+    const at = text.indexOf(':')
+    if (at < 1) continue
+    map.set(text.slice(0, at), [...(map.get(text.slice(0, at)) || []), text.slice(at + 1)])
+  }
+  return map
+}
+
+/** Whether a product is sold in any of these values of one option. Either within a group, all groups together. */
+function hasValue(p, optionId, names) {
+  const options = optionsOf(p)
+  const option = options.find((o) => o.id === optionId)
+  const ids = new Set((option?.choices || []).filter((c) => names.includes(c.name)).map((c) => c.id))
+  if (!ids.size) return false
+  // A dynamic option's values are made when bought, so offering the value is enough.
+  if (option.mode === 'dynamic') return true
+  return (p.variants || []).some((v) => ids.has(keyOf(v, options)[optionId]))
+}
+
 export async function listProducts(query = {}) {
   await latency()
   return listProductsSync(query)
@@ -153,6 +301,10 @@ function listProductsSync(query = {}) {
     page = 1,
     perPage = 12,
     inStock = false,
+    attr = [],
+    spec = [],
+    brand = [],
+    inBrand,
   } = query
 
   // Drafts are invisible to shoppers. `includeDrafts` is only ever passed by
@@ -170,6 +322,8 @@ function listProductsSync(query = {}) {
     const c = collections.find((x) => x.slug === collection)
     items = c ? items.filter((p) => c.productSlugs.includes(p.slug)) : []
   }
+  // A brand page's scope, like a category (`brand` is the filter a shopper sets).
+  if (inBrand) items = items.filter((p) => p.brand?.slug === inBrand)
   if (q) {
     const needle = q.toLowerCase()
     items = items.filter((p) =>
@@ -185,21 +339,29 @@ function listProductsSync(query = {}) {
   if (Number.isFinite(minPrice)) items = items.filter((p) => amount(p) >= minPrice)
   if (Number.isFinite(maxPrice)) items = items.filter((p) => amount(p) <= maxPrice)
   if (inStock) items = items.filter((p) => (p.variants || []).some((v) => v.available))
+  for (const [optionId, names] of pairsOf(attr)) items = items.filter((p) => hasValue(p, optionId, names))
+  for (const [key, values] of pairsOf(spec)) {
+    items = items.filter((p) => (p.enrichment?.specList || []).some((s) => s.key === key && values.includes(String(s.value))))
+  }
+  const brandSlugs = [].concat(brand || []).filter(Boolean)
+  if (brandSlugs.length) items = items.filter((p) => brandSlugs.includes(p.brand?.slug))
+  if (storefront.commerce?.stock?.hideSoldOut) items = items.filter(inStock)
 
   items.sort(SORTS[sort] || SORTS.featured)
 
   const total = items.length
   const start = (page - 1) * perPage
 
-  const facetScope = category
+  const facetScope = (category
     ? products.filter((p) => {
         const scope = new Set(descendants(category))
         return p.categories.some((c) => scope.has(c))
       })
     : products
+  ).filter((p) => !inBrand || p.brand?.slug === inBrand)
 
   return {
-    items: items.slice(start, start + perPage).map(publicProduct),
+    items: items.slice(start, start + perPage).map((p) => publicProduct(p)),
     total,
     page,
     perPage,
@@ -228,6 +390,52 @@ function buildFacets(scope) {
     colors: [...colors].map(([name, hex]) => ({ name, hex })),
     tags: [...tags].sort(),
     priceRange: { min: Number.isFinite(min) ? min : 0, max },
+    ...anyFacets(scope, order),
+  }
+}
+
+/**
+ * The generic facets: every option, every specification marked as a facet,
+ * every brand.
+ *
+ * Counted in products rather than variants. "Navy (12)" meaning twelve
+ * navy-and-a-size pairs is a number nobody can use.
+ */
+function anyFacets(scope, sizeOrder) {
+  const attributes = new Map()
+  const specs = new Map()
+  const brandCounts = new Map()
+  for (const p of scope) {
+    if (!isLive(p)) continue
+    for (const o of optionsOf(p)) {
+      const entry = attributes.get(o.id) || { id: o.id, name: o.name, displayType: o.displayType, role: o.role, values: new Map() }
+      for (const c of o.choices) {
+        const value = entry.values.get(c.name) || { name: c.name, color: c.color || null, count: 0 }
+        value.count += 1
+        entry.values.set(c.name, value)
+      }
+      attributes.set(o.id, entry)
+    }
+    for (const s of p.enrichment?.specList || []) {
+      if (!s.facet) continue
+      const entry = specs.get(s.key) || { key: s.key, label: s.label, group: s.groupLabel || s.group || null, unit: s.unit ?? null, values: new Map() }
+      entry.values.set(String(s.value), (entry.values.get(String(s.value)) || 0) + 1)
+      specs.set(s.key, entry)
+    }
+    if (p.brand?.slug) {
+      const b = brandCounts.get(p.brand.slug) || { slug: p.brand.slug, name: p.brand.name, count: 0 }
+      b.count += 1
+      brandCounts.set(p.brand.slug, b)
+    }
+  }
+  const rank = (name) => (sizeOrder.includes(name) ? sizeOrder.indexOf(name) : sizeOrder.length)
+  return {
+    attributes: [...attributes.values()].map((a) => ({
+      ...a,
+      values: [...a.values.values()].sort((x, y) => (a.role === 'size' ? rank(x.name) - rank(y.name) : 0)),
+    })),
+    specs: [...specs.values()].map((s) => ({ ...s, values: [...s.values].map(([value, count]) => ({ value, count })) })),
+    brands: [...brandCounts.values()].sort((a, b) => a.name.localeCompare(b.name)),
   }
 }
 
@@ -237,7 +445,7 @@ export async function getProduct(slug) {
   if (!p || p.published === false) {
     throw new ApiError(`No product with slug "${slug}".`, { status: 404, code: 'not_found' })
   }
-  return publicProduct(p)
+  return publicProduct(p, { detail: true })
 }
 
 /**
@@ -307,7 +515,7 @@ export async function getRelated(slug, { limit = 4, strategy = 'automatic' } = {
     )
   }
 
-  return { items: ranked.slice(0, limit).map(publicProduct), total: ranked.length, strategy }
+  return { items: ranked.slice(0, limit).map((x) => publicProduct(x)), total: ranked.length, strategy }
 }
 
 /**
@@ -320,23 +528,28 @@ export async function listCategories(opts) {
   return listCategoriesSync(opts)
 }
 
-function listCategoriesSync({ tree = true } = {}) {
+export function listCategoriesSync({ tree = true } = {}) {
   const decorate = (c) => ({
     slug: c.slug,
     name: c.name,
     parent: c.parent ?? null,
     blurb: c.blurb,
-    image: { url: `/images/categories/${c.slug}.jpg`, alt: c.name },
+    image: c.image || { url: `/images/categories/${c.slug}.jpg`, alt: c.name },
     count: countIn(c.slug),
+    path: categoryPath(c.slug),
   })
 
   if (!tree) return { items: categories.map(decorate), total: categories.length }
 
-  const roots = categories.filter((c) => !c.parent)
-  const items = roots.map((r) => ({
-    ...decorate(r),
-    children: categories.filter((c) => c.parent === r.slug).map(decorate),
-  }))
+  // Any depth. Only two levels were built here once, so a third-level category
+  // was missing from the tree and its page could not find its own name.
+  const node = (c, seen) => ({
+    ...decorate(c),
+    children: categories
+      .filter((k) => k.parent === c.slug && !seen.has(k.slug))
+      .map((k) => node(k, new Set([...seen, k.slug]))),
+  })
+  const items = categories.filter((c) => !c.parent).map((r) => node(r, new Set([r.slug])))
   return { items, total: items.length }
 }
 
@@ -398,6 +611,53 @@ export async function getBootstrap() {
 
 
 
+/* brands and combinations */
+
+export async function listBrands() {
+  await latency()
+  const items = brands.map((b) => ({
+    slug: b.slug,
+    name: b.name,
+    logo: b.logo || null,
+    description: b.description || '',
+    count: products.filter((p) => isLive(p) && p.brand?.slug === b.slug).length,
+  }))
+  return { items, total: items.length }
+}
+
+export async function getBrand(slug) {
+  await latency()
+  const b = brands.find((x) => x.slug === slug)
+  if (!b) throw new ApiError(`No brand with slug "${slug}".`, { status: 404, code: 'not_found' })
+  return {
+    slug: b.slug,
+    name: b.name,
+    logo: b.logo || null,
+    description: b.description || '',
+    seo: b.seo || { title: b.name, description: b.description || '' },
+  }
+}
+
+/**
+ * The price and stock of a set of choices that `variants[]` cannot answer: a
+ * dynamic option nobody has bought yet, or an engraving on top.
+ */
+export async function getCombination(slug, choiceIds = []) {
+  await latency()
+  const p = products.find((x) => x.slug === slug)
+  if (!isLive(p)) throw new ApiError(`No product with slug "${slug}".`, { status: 404, code: 'not_found' })
+  const quote = priceChoices(p, choiceIds, [], { incomplete: 'invalid_combination' })
+  const compareAt = quote.variant.compareAtPrice
+  return {
+    exists: !quote.variant.dynamic,
+    variantId: quote.variant.dynamic ? null : quote.variant.id,
+    available: quote.variant.available,
+    price: money(quote.unit),
+    compareAtPrice: compareAt ? money(compareAt.amount + quote.extraAmount) : null,
+    imageId: quote.variant.imageId ?? null,
+  }
+}
+
 export async function listCollections() {
   await latency()
   return collectionsPublic()
@@ -429,26 +689,36 @@ const BODIES = [
 ]
 const HEIGHTS = ['5\'4"', '5\'7"', '5\'9"', '5\'11"', '6\'0"', '6\'2"']
 const FIT_WORDS = ['small', 'true', 'large']
+const PLAIN_BODIES = [
+  'Exactly as described, and better made than the photographs suggest.',
+  'Second one I have bought. The first is still going.',
+  'Arrived two days early and very well packed.',
+  'Worth the money, which is not something I say often.',
+  'Took one star off because delivery took a week longer than quoted.',
+]
 
 export async function getReviews(slug, { page = 1, perPage = 5 } = {}) {
   await latency()
   const p = products.find((x) => x.slug === slug)
   if (!p) throw new ApiError('Unknown product.', { status: 404, code: 'not_found' })
   const n = Math.min(p.rating.count, 12)
-  const sizes = p.options.find((o) => o.name === 'Size')?.values || ['M']
+  // Size, height and fit only where there is a size to have bought. A review
+  // of a phone that "runs small" is noise.
+  const sizes = optionsOf(p).find((o) => o.role === 'size')?.values || null
+  const bodies = sizes ? BODIES : PLAIN_BODIES
   const items = Array.from({ length: n }, (_, i) => ({
     id: `rev_${slug}_${i}`,
     author: NAMES[(i * 3) % NAMES.length],
     rating: i % 7 === 0 ? 4 : i % 11 === 0 ? 3 : 5,
     title: '',
-    body: BODIES[(i * 5) % BODIES.length],
+    body: bodies[(i * 5) % bodies.length],
     createdAt: new Date(2026, 7, 28 - i * 3).toISOString(),
     verified: i % 4 !== 0,
     // The fields that make a review useful on an apparel page rather than
     // decorative: what they bought, how tall they are, how it fitted.
-    size: sizes[i % sizes.length],
-    height: p.fit?.model ? HEIGHTS[i % HEIGHTS.length] : null,
-    fit: FIT_WORDS[i % 9 === 0 ? 0 : i % 7 === 0 ? 2 : 1],
+    size: sizes ? sizes[i % sizes.length] : undefined,
+    height: sizes && p.fit?.model ? HEIGHTS[i % HEIGHTS.length] : null,
+    fit: sizes ? FIT_WORDS[i % 9 === 0 ? 0 : i % 7 === 0 ? 2 : 1] : undefined,
     photos: i % 5 === 0 ? [p.images[1]] : [],
   }))
   const start = (page - 1) * perPage
@@ -478,21 +748,23 @@ const SEED_DISCOUNTS = [
   { code: 'FREESHIP', label: 'Free shipping', kind: 'shipping', value: 0, active: true },
 ]
 
-const discounts = () => read(KEY.discounts, SEED_DISCOUNTS)
+export const discounts = () => read(KEY.discounts, SEED_DISCOUNTS)
 const discountByCode = (code) =>
   discounts().find((d) => d.code === String(code || '').toUpperCase() && d.active !== false)
 
 const shippingFlat = () => storefront.commerce?.shippingMethods?.[0]?.price ?? 1200
 
-const emptyCart = () => ({
+export const emptyCart = () => ({
   id: id('cart'),
   lines: [],
   discountCode: null,
   currency: CURRENCY,
 })
 
-function priceCart(cart) {
-  const subtotalAmount = cart.lines.reduce((a, l) => a + l.unitPrice.amount * l.quantity, 0)
+export function priceCart(cart) {
+  // Rounded per line: a quarter kilo of coffee at an odd price is a fraction of
+  // a cent, and money only ever crosses the boundary in whole minor units.
+  const subtotalAmount = cart.lines.reduce((a, l) => a + Math.round(l.unitPrice.amount * l.quantity), 0)
   const rule = cart.discountCode ? discountByCode(cart.discountCode.code) : null
 
   const discountAmount =
@@ -515,7 +787,7 @@ function priceCart(cart) {
 
   return {
     ...cart,
-    lines: cart.lines.map((l) => ({ ...l, lineTotal: money(l.unitPrice.amount * l.quantity) })),
+    lines: cart.lines.map((l) => ({ ...l, lineTotal: money(Math.round(l.unitPrice.amount * l.quantity)) })),
     subtotal: money(subtotalAmount),
     discount: money(discountAmount),
     shipping: money(shippingAmount),
@@ -526,49 +798,253 @@ function priceCart(cart) {
   }
 }
 
-function loadCart() {
+export function loadCart() {
   const stored = read(KEY.cart, null)
   return stored && Array.isArray(stored.lines) ? stored : emptyCart()
 }
-function saveCart(cart) {
+/** A line as the API returns it, without this adapter's bookkeeping. */
+const publicLine = ({ _components, _untracked, ...line }) => line
+const publicCart = (cart) => ({ ...cart, lines: cart.lines.map(publicLine) })
+
+export function saveCart(cart) {
   const { lines, id: cartId, discountCode, currency } = cart
   write(KEY.cart, { id: cartId, lines, discountCode, currency })
-  return priceCart(cart)
+  return publicCart(priceCart(cart))
 }
 
 export async function getCart() {
   await latency()
-  return priceCart(loadCart())
+  return publicCart(priceCart(loadCart()))
 }
 
-export async function addToCart({ variantId, quantity = 1 }) {
-  await latency()
-  const cart = loadCart()
-  const product = products.find((p) => p.variants.some((v) => v.id === variantId))
-  const variant = product?.variants.find((v) => v.id === variantId)
-  if (!variant) throw new ApiError('That variant does not exist.', { status: 404, code: 'variant_not_found' })
-  if (!variant.available) throw new ApiError('That size is out of stock.', { status: 409, code: 'out_of_stock' })
+const refuse = (message, code = 'invalid_combination', detail) => new ApiError(message, { status: 422, code, detail })
 
-  const existing = cart.lines.find((l) => l.variantId === variantId)
-  const wanted = (existing?.quantity || 0) + quantity
-  if (wanted > variant.inventory) {
-    throw new ApiError(`Only ${variant.inventory} left in that size.`, { status: 409, code: 'insufficient_inventory' })
+/**
+ * Choice ids to a variant, the extras on top, and a unit price.
+ *
+ * Shared by the combination quote and the bag, so the price a shopper is shown
+ * before adding is, by construction, the price the line is added at.
+ */
+function priceChoices(p, choiceIds = [], extraChoiceIds = [], { incomplete = 'choose_options' } = {}) {
+  const shaped = publicProduct(p, { detail: true })
+  const model = modelOf(shaped)
+  const selection = {}
+  const extras = []
+  for (const choiceId of [...(choiceIds || []), ...(extraChoiceIds || [])].map(String)) {
+    const option = model.options.find((o) => o.choices.some((c) => c.id === choiceId))
+    if (option) {
+      if (selection[option.id] && selection[option.id] !== choiceId) throw refuse(`Choose one ${option.name.toLowerCase()}.`)
+      selection[option.id] = choiceId
+      continue
+    }
+    const extra = model.extras.find((o) => o.choices.some((c) => c.id === choiceId))
+    if (!extra) throw refuse('That choice is not offered on this product.')
+    if (!extra.multiple && extras.some((x) => x.option.id === extra.id)) throw refuse(`Choose one ${extra.name.toLowerCase()}.`)
+    extras.push({ option: extra, choice: extra.choices.find((c) => c.id === choiceId) })
+  }
+  const missing = [
+    ...model.options.filter((o) => selection[o.id] == null),
+    ...model.extras.filter((o) => o.required && !extras.some((x) => x.option.id === o.id)),
+  ].map((o) => o.name)
+  if (missing.length) {
+    throw incomplete === 'choose_options'
+      ? refuse(`Choose ${missing.join(' and ')} first.`, 'choose_options', { missing })
+      : refuse(`Choose ${missing.join(' and ')} first.`)
   }
 
-  if (existing) existing.quantity = wanted
-  else
-    cart.lines.push({
-      id: id('line'),
-      variantId,
-      productSlug: product.slug,
-      title: product.title,
-      options: variant.options,
-      image: product.images[0],
-      quantity,
-      unitPrice: variant.price,
-      lineTotal: money(variant.price.amount * quantity),
-    })
+  let variant = variantFor(model, selection)
+  if (variant) {
+    // The stored variant, with its real stock, not the served one.
+    variant = p.variants.find((v) => v.id === variant.id)
+  } else if (model.dynamic) {
+    // Made when bought: the base price plus what the chosen values add, which
+    // is how Odoo prices a variant it has not created yet.
+    const chosen = model.options.map((o) => o.choices.find((c) => c.id === selection[o.id]))
+    variant = {
+      id: `${p.slug}~${chosen.map((c) => c.id).join('+')}`,
+      options: Object.fromEntries(model.options.map((o, i) => [o.name, chosen[i].name])),
+      price: money(p.price.amount + chosen.reduce((sum, c) => sum + (c.priceExtra?.amount || 0), 0)),
+      compareAtPrice: null,
+      inventory: null,
+      available: true,
+      imageId: null,
+      dynamic: true,
+    }
+  } else {
+    throw refuse('That combination is not made. Try another choice.')
+  }
+  const extraAmount = extras.reduce((sum, x) => sum + (x.choice.priceExtra?.amount || 0), 0)
+  return { shaped, model, variant, extras, extraAmount, unit: variant.price.amount + extraAmount }
+}
 
+/** A sentence about stock that does not say how much there is when the store does not. */
+const shortage = (p, left) =>
+  stockOf(p).display === 'hidden' || typeof left !== 'number' ? 'There is not enough of that in stock.' : `Only ${left} left.`
+
+const EPSILON = 1e-6
+
+/** `422 quantity_rule` for a quantity the product is not sold in. */
+function checkQuantity(p, quantity) {
+  const rule = ruleOf(p?.quantity)
+  const steps = (quantity - rule.min) / rule.step
+  const wrong =
+    !Number.isFinite(quantity) ||
+    quantity < rule.min - EPSILON ||
+    (rule.max != null && quantity > rule.max + EPSILON) ||
+    (!rule.decimals && !Number.isInteger(quantity)) ||
+    Math.abs(steps - Math.round(steps)) > EPSILON
+  if (wrong) {
+    throw new ApiError('That quantity is not available.', {
+      status: 422,
+      code: 'quantity_rule',
+      detail: { min: rule.min, max: rule.max, step: rule.step },
+    })
+  }
+}
+
+/**
+ * A bag line from a request, refusing anything a real backend would.
+ *
+ * Nothing is written here. `addToCart` builds the main line and every optional
+ * product before placing any of them, so an accessory that has sold out
+ * refuses the whole add rather than leaving the phone in the bag without the
+ * case it was chosen with.
+ */
+function buildLine(body = {}) {
+  const quantity = Number(body.quantity ?? 1)
+  let p
+  let variant
+  let quote = null
+  if (body.variantId) {
+    p = products.find((x) => x.variants.some((v) => v.id === body.variantId))
+    variant = p?.variants.find((v) => v.id === body.variantId)
+    if (!variant || !isLive(p)) throw new ApiError('That variant does not exist.', { status: 404, code: 'variant_not_found' })
+  } else {
+    p = products.find((x) => x.slug === body.productSlug)
+    if (!isLive(p)) throw new ApiError('That product does not exist.', { status: 404, code: 'not_found' })
+    quote = priceChoices(p, body.choiceIds, body.extraChoiceIds)
+    variant = quote.variant
+  }
+  checkQuantity(p, quantity)
+  if (!variant.available) throw new ApiError('That choice is out of stock.', { status: 409, code: 'out_of_stock' })
+
+  const shaped = quote?.shaped || publicProduct(p, { detail: true })
+  const model = quote?.model || modelOf(shaped)
+  const sent = new Set([...(body.choiceIds || []), ...(body.extraChoiceIds || [])].map(String))
+  const everyChoice = [...model.options, ...model.extras].flatMap((o) => o.choices)
+  const customValues = (body.customValues || [])
+    .map(({ choiceId, text }) => {
+      const c = everyChoice.find((x) => x.id === String(choiceId))
+      if (!c?.custom || !sent.has(c.id)) throw refuse('That text belongs to a choice that was not made.')
+      const value = String(text ?? '').trim()
+      if (value.length > 200) throw refuse('Keep the text to 200 characters.')
+      return { name: c.name, text: value }
+    })
+    .filter((c) => c.text)
+
+  let unit = quote ? quote.unit : variant.price.amount
+  const components = []
+  const comboItems = []
+  if (shaped.type === 'combo') {
+    const groups = shaped.combo || []
+    const picks = {}
+    for (const chosen of body.comboItems || []) {
+      const group = groups.find((g) => g.items.some((i) => i.id === String(chosen.comboItemId)))
+      if (group) picks[group.id] = String(chosen.comboItemId)
+    }
+    const state = comboState(groups, picks)
+    if (!state.complete) {
+      const names = state.missing.map((g) => g.name)
+      throw new ApiError(`Choose one for ${names.join(' and ')}.`, { status: 422, code: 'combo_incomplete', detail: { groups: names } })
+    }
+    for (const g of groups) {
+      const item = g.items.find((i) => i.id === picks[g.id])
+      if (!item.available) throw new ApiError(`${item.title} is sold out.`, { status: 409, code: 'out_of_stock' })
+      components.push(item.variantId)
+      comboItems.push({ title: item.title, options: item.options, quantity })
+    }
+    unit += state.extra
+  }
+
+  const tracked = !variant.dynamic
+  if (tracked && quantity > variant.inventory) {
+    throw new ApiError(shortage(p, variant.inventory), { status: 409, code: 'insufficient_inventory' })
+  }
+  const extraOptions = {}
+  for (const { option, choice } of quote?.extras || []) {
+    extraOptions[option.name] = extraOptions[option.name] ? `${extraOptions[option.name]}, ${choice.name}` : choice.name
+  }
+  const rule = ruleOf(p.quantity)
+  return {
+    variantId: variant.id,
+    productSlug: p.slug,
+    title: p.title,
+    options: variant.options,
+    extraOptions,
+    customValues,
+    comboItems,
+    image: p.images.find((i) => i.id === variant.imageId) || p.images[0],
+    quantity,
+    unitPrice: money(unit),
+    lineTotal: money(Math.round(unit * quantity)),
+    linkedTo: null,
+    quantityRule: { ...rule, unit: rule.unit || 'Units' },
+    // This adapter's own bookkeeping, stripped from every response: what a set
+    // takes out of stock, and whether the variant is counted at all.
+    _components: components,
+    _untracked: !tracked,
+  }
+}
+
+/** Put a built line in the bag, or grow the identical line already there. */
+function placeLine(cart, line) {
+  const identity = (l) =>
+    JSON.stringify([l.variantId, l.linkedTo || null, l.extraOptions || {}, l.customValues || [], (l.comboItems || []).map((i) => [i.title, i.options])])
+  const existing = cart.lines.find((l) => identity(l) === identity(line))
+  if (!existing) {
+    const placed = { id: id('line'), ...line }
+    cart.lines.push(placed)
+    return placed
+  }
+  const wanted = Math.round((existing.quantity + line.quantity) * 1000) / 1000
+  const p = products.find((x) => x.slug === existing.productSlug)
+  checkQuantity(p, wanted)
+  const variant = p?.variants.find((v) => v.id === existing.variantId)
+  if (!existing._untracked && variant && wanted > variant.inventory) {
+    throw new ApiError(shortage(p, variant.inventory), { status: 409, code: 'insufficient_inventory' })
+  }
+  existing.quantity = wanted
+  if (existing.comboItems?.length) existing.comboItems = existing.comboItems.map((i) => ({ ...i, quantity: wanted }))
+  return existing
+}
+
+/** Removing a line removes what was added with it: a case without its phone was never the order. */
+function removeLines(cart, lineId) {
+  const gone = new Set([lineId])
+  for (let grew = true; grew; ) {
+    grew = false
+    for (const l of cart.lines) {
+      if (l.linkedTo && gone.has(l.linkedTo) && !gone.has(l.id)) {
+        gone.add(l.id)
+        grew = true
+      }
+    }
+  }
+  cart.lines = cart.lines.filter((l) => !gone.has(l.id))
+  return saveCart(cart)
+}
+
+/**
+ * `{ variantId }` as before, or `{ productSlug, choiceIds }` with extras, typed
+ * text, a combo's items and optional products — the bodies in docs/API.md.
+ */
+export async function addToCart(body = {}) {
+  await latency()
+  const cart = loadCart()
+  const main = buildLine(body)
+  const optional = (body.optionalProducts || []).map((o) => buildLine({ variantId: o.variantId, quantity: o.quantity ?? 1 }))
+  const placed = placeLine(cart, main)
+  for (const line of optional) placeLine(cart, { ...line, linkedTo: placed.id })
   return saveCart(cart)
 }
 
@@ -577,22 +1053,22 @@ export async function updateCartLine(lineId, quantity) {
   const cart = loadCart()
   const line = cart.lines.find((l) => l.id === lineId)
   if (!line) throw new ApiError('That line is no longer in your bag.', { status: 404, code: 'line_not_found' })
-  if (quantity <= 0) cart.lines = cart.lines.filter((l) => l.id !== lineId)
-  else {
-    const variant = products.flatMap((p) => p.variants).find((v) => v.id === line.variantId)
-    if (variant && quantity > variant.inventory) {
-      throw new ApiError(`Only ${variant.inventory} left in that size.`, { status: 409, code: 'insufficient_inventory' })
-    }
-    line.quantity = quantity
+  if (quantity <= 0) return removeLines(cart, lineId)
+  const p = products.find((x) => x.slug === line.productSlug)
+  if (p) checkQuantity(p, quantity)
+  const variant = products.flatMap((x) => x.variants).find((v) => v.id === line.variantId)
+  if (!line._untracked && variant && quantity > variant.inventory) {
+    throw new ApiError(shortage(p, variant.inventory), { status: 409, code: 'insufficient_inventory' })
   }
+  line.quantity = quantity
+  // A set's contents follow its quantity.
+  if (line.comboItems?.length) line.comboItems = line.comboItems.map((i) => ({ ...i, quantity }))
   return saveCart(cart)
 }
 
 export async function removeCartLine(lineId) {
   await latency()
-  const cart = loadCart()
-  cart.lines = cart.lines.filter((l) => l.id !== lineId)
-  return saveCart(cart)
+  return removeLines(loadCart(), lineId)
 }
 
 export async function applyDiscount(code) {
@@ -636,9 +1112,13 @@ export async function clearCart() {
  */
 function checkStock(cart) {
   const short = []
+  const every = products.flatMap((p) => p.variants)
   for (const line of cart.lines) {
-    const variant = products.flatMap((p) => p.variants).find((v) => v.id === line.variantId)
-    if (!variant || variant.inventory < line.quantity) {
+    // A set is in stock only while everything in it is.
+    const setShort = (line._components || []).some((vid) => (every.find((v) => v.id === vid)?.inventory ?? 0) < line.quantity)
+    if (line._untracked && !setShort) continue
+    const variant = every.find((v) => v.id === line.variantId)
+    if (setShort || !variant || variant.inventory < line.quantity) {
       short.push({
         variantId: line.variantId,
         title: line.title,
@@ -658,7 +1138,7 @@ function checkStock(cart) {
   }
 }
 
-function placeOrderFromCart(cart, { email, shippingAddress, shippingMethod = 'standard', payment }) {
+export function placeOrderFromCart(cart, { email, shippingAddress, shippingMethod = 'standard', payment }) {
   if (!cart.lines.length) throw new ApiError('Your bag is empty.', { status: 422, code: 'empty_cart' })
   if (!email) throw new ApiError('An email address is required.', { status: 422, code: 'email_required' })
   checkStock(cart)
@@ -669,7 +1149,7 @@ function placeOrderFromCart(cart, { email, shippingAddress, shippingMethod = 'st
     number: `LM-${10000 + orders.length + 428}`,
     status: 'placed',
     placedAt: new Date().toISOString(),
-    lines: cart.lines,
+    lines: cart.lines.map(publicLine),
     subtotal: cart.subtotal,
     discount: cart.discount,
     shipping: cart.shipping,
@@ -702,7 +1182,10 @@ function placeOrderFromCart(cart, { email, shippingAddress, shippingMethod = 'st
 
   // Decrement what was sold. A checkout that leaves inventory alone lets the
   // same last unit be bought indefinitely, which hides every stock bug there is.
-  for (const line of cart.lines) db.adjustInventory(line.variantId, -line.quantity)
+  for (const line of cart.lines) {
+    if (!line._untracked) db.adjustInventory(line.variantId, -line.quantity)
+    for (const vid of line._components || []) db.adjustInventory(vid, -line.quantity)
+  }
   adopt()
 
   write(KEY.orders, [order, ...orders])
@@ -717,7 +1200,7 @@ export async function checkout({ email, shippingAddress, shippingMethod = 'stand
   // to reopen its own confirmation page, and the bag it just bought is emptied.
   write(KEY.placed, [order.id, ...read(KEY.placed, [])].slice(0, 50))
   saveCart(emptyCart())
-  return order
+  return withDownloads(order)
 }
 
 /* ── on-site payments (checkout.mode "payments") ───────────────────────── */
@@ -882,349 +1365,6 @@ export async function getPayment(paymentId) {
 }
 
 /**
- * Place an order on behalf of a payment that has already been taken.
- *
- * This is how `examples/server/server.mjs` turns a captured Razorpay payment
- * into an order, and it existed as an undocumented dependency for a while: the
- * reference server called `POST /admin/orders` and nothing in the contract said
- * the route was meant to be there, so a backend built from the docs would 502
- * the first time somebody paid.
- *
- * **Idempotent on `idempotencyKey`.** Providers retry their webhooks, and a
- * retry must not place a second order for the same money. A replay returns the
- * original order with `created: false`, which is the flag the reference server
- * uses to decide whether to send a confirmation email — without it, every retry
- * emails the customer again.
- */
-export async function adminPlaceOrder({ cartId, email, payment, idempotencyKey } = {}) {
-  await latency()
-
-  if (idempotencyKey) {
-    const seen = read(KEY.idempotency, {})[idempotencyKey]
-    const existing = seen && read(KEY.orders, []).find((o) => o.id === seen)
-    if (existing) return { ...existing, created: false }
-  }
-
-  const cart = loadCart()
-  if (!cartId || cart.id !== cartId) {
-    throw new ApiError(`No cart with id "${cartId}".`, { status: 404, code: 'cart_not_found' })
-  }
-
-  const order = placeOrderFromCart(priceCart(cart), {
-    email,
-    shippingAddress: cart.shippingAddress,
-    shippingMethod: cart.shippingMethod,
-    payment,
-  })
-
-  if (idempotencyKey) {
-    write(KEY.idempotency, { ...read(KEY.idempotency, {}), [idempotencyKey]: order.id })
-  }
-  // The lines were sold, so the bag is spent. `KEY.placed` is deliberately not
-  // written: an order placed by a server on a webhook's behalf is not this
-  // browser's order, and granting it the guest-confirmation capability would
-  // hand the shop's own tab access to somebody else's purchase.
-  saveCart(emptyCart())
-  return { ...order, created: true }
-}
-
-const ORDER_STATUSES = ['placed', 'paid', 'fulfilled', 'delivered', 'cancelled', 'refunded']
-
-/** The back-office view of an order: the stored Order plus what it needs next. */
-const adminView = (order) => adminOrderView(order, { shippingMethods: storefront.commerce?.shippingMethods || [] })
-
-const ACTION_DONE = {
-  ship: 'marked as shipped',
-  update_tracking: 'given tracking',
-  deliver: 'marked as delivered',
-  record_payment: 'marked as paid',
-  cancel: 'cancelled',
-}
-
-// The old `{ status }` body. These three statuses are actions now; the rest are set as before.
-const LEGACY_STATUS_ACTIONS = { fulfilled: 'ship', delivered: 'deliver', cancelled: 'cancel' }
-
-export async function adminListOrders({ q, status, payment, delivery, page = 1, perPage = 25 } = {}) {
-  await latency()
-  const views = read(KEY.orders, [])
-    .map(adminView)
-    .sort((a, b) => (a.placedAt < b.placedAt ? 1 : -1))
-  const size = Math.min(Math.max(Number(perPage) || 25, 1), 100)
-  const current = Math.max(Number(page) || 1, 1)
-  const matching = filterOrders(views, { q, status, payment, delivery })
-  return {
-    items: matching.slice((current - 1) * size, current * size),
-    total: matching.length,
-    page: current,
-    perPage: size,
-    // Over every order, whatever the filter — they label the tabs.
-    counts: orderCounts(views),
-  }
-}
-
-/* ── refunds ───────────────────────────────────────────────────────────── */
-
-/**
- * Refund some or all of an order.
- *
- * Modelled as a list rather than a flag, because a partial refund is the common
- * case — one item back from a three-item order — and a boolean cannot express
- * "refunded £40 of £120, twice, for two different reasons". The list is also
- * the only shape that reconciles against a payment provider's own records,
- * which is what anyone doing the books will actually need.
- *
- * Real money moves on the server. This records the intent and the result; the
- * reference server calls Razorpay and posts the outcome back.
- */
-export async function adminRefundOrder(orderId, { amount, reason = '', restock } = {}) {
-  await latency()
-  const orders = read(KEY.orders, [])
-  const i = orders.findIndex((o) => o.id === orderId || o.number === orderId)
-  if (i < 0) throw new ApiError('Order not found.', { status: 404, code: 'not_found' })
-
-  const order = orders[i]
-  const paid = order.total?.amount ?? 0
-  const already = order.refundedTotal?.amount ?? 0
-  const remaining = paid - already
-
-  if (remaining <= 0) {
-    throw new ApiError('This order is already fully refunded.', { status: 409, code: 'already_refunded' })
-  }
-
-  // Default to the rest of it, which is what "Refund" means when nobody typed
-  // a number. An explicit amount is still checked — a refund larger than the
-  // payment is a chargeback waiting to happen, and providers reject it anyway.
-  const value = amount === undefined || amount === null ? remaining : Math.round(Number(amount))
-  if (!Number.isFinite(value) || value <= 0) {
-    throw new ApiError('A refund needs a positive amount.', { status: 422, code: 'invalid_amount' })
-  }
-  if (value > remaining) {
-    throw new ApiError(
-      `That is more than the ${formatMinor(remaining)} still refundable on this order.`,
-      { status: 422, code: 'amount_too_large', detail: { remaining } },
-    )
-  }
-
-  const putBack = restock ?? storefront.checkout?.restockOnRefund !== false
-  const full = value === remaining
-
-  // Only a full refund restocks automatically. Guessing which line a partial
-  // refund refers to would put the wrong variant back, and a phantom unit in
-  // stock is worse than a missing one — it sells.
-  if (putBack && full) {
-    for (const line of order.lines) db.adjustInventory(line.variantId, line.quantity)
-    adopt()
-  }
-
-  const refund = {
-    id: id('refund'),
-    amount: money(value),
-    reason: reason.trim(),
-    createdAt: nowIso(),
-    reference: null,
-    restocked: Boolean(putBack && full),
-  }
-
-  const refundedTotal = already + value
-  orders[i] = {
-    ...order,
-    refunds: [...(order.refunds || []), refund],
-    refundedTotal: money(refundedTotal),
-    status: refundedTotal >= paid ? 'refunded' : order.status,
-    payment: {
-      ...(order.payment || {}),
-      status: refundedTotal >= paid ? 'refunded' : 'partially_refunded',
-    },
-    updatedAt: nowIso(),
-  }
-  write(KEY.orders, orders)
-  return orders[i]
-}
-
-const formatMinor = (amount) => `${(amount / 100).toFixed(2)} ${CURRENCY}`
-
-/* ── notifications ─────────────────────────────────────────────────────── */
-
-/**
- * What the store would send, and when.
- *
- * The browser cannot send email — SMTP needs a socket and an app password needs
- * somewhere to hide — so mock mode reports the message it *would* have sent
- * rather than pretending. That is more useful than a fake success: a merchant
- * checking their setup wants to see the recipient, the subject and which event
- * fired, and to be told plainly that nothing left the building.
- */
-export async function adminSendTestNotification({ event = 'orderPlaced', to } = {}) {
-  await latency()
-  const settings = storefront.notifications || {}
-  const recipient = to || settings.from
-
-  if (settings.enabled === false) {
-    throw new ApiError('Notifications are switched off in settings.', { status: 409, code: 'notifications_disabled' })
-  }
-  if (!recipient) {
-    throw new ApiError('Set a from-address before sending a test.', { status: 422, code: 'missing_from' })
-  }
-  if (settings.transport === 'smtp' && !settings.smtp?.host) {
-    throw new ApiError('Set an SMTP host before sending a test.', { status: 422, code: 'missing_smtp_host' })
-  }
-
-  return {
-    delivered: false,
-    reason: 'no_server',
-    message:
-      'The demo backend runs in your browser and cannot open an SMTP connection. Point VITE_DATA_SOURCE at a server — examples/server implements this — and the same call sends for real.',
-    preview: {
-      event,
-      to: recipient,
-      from: settings.from,
-      replyTo: settings.replyTo || null,
-      transport: settings.transport,
-      subject: NOTIFICATION_SUBJECTS[event] || 'Notification',
-      via: settings.transport === 'smtp' ? `${settings.smtp?.host}:${settings.smtp?.port}` : settings.endpoint,
-    },
-  }
-}
-
-const NOTIFICATION_SUBJECTS = {
-  orderPlaced: 'Your order is confirmed',
-  paymentCaptured: 'Payment received',
-  shipped: 'Your order is on its way',
-  refunded: 'Your refund is on its way',
-  cancelled: 'Your order was cancelled',
-}
-
-/* ── credentials ───────────────────────────────────────────────────────── */
-
-/**
- * Secrets go in, nothing comes out.
- *
- * A Razorpay `key_secret` or a Gmail app password in the storefront settings
- * would be served to every visitor by `GET /storefront`, which is not a
- * hardening question — it is the whole secret, published. So they take a
- * separate write-only path, and the read returns whether each one is set and
- * when, never the value.
- *
- * In this demo there is no server to hold one, so nothing is stored at all: the
- * marker is written and the value is dropped on the floor. That is deliberate.
- * A demo that accepts a live key is a demo that will eventually be handed one.
- */
-const CREDENTIALS = ['razorpayKeySecret', 'razorpayWebhookSecret', 'smtpPassword', 'stripeSecretKey']
-
-export async function adminGetCredentials() {
-  await latency()
-  const stored = read(KEY.credentials, {})
-  return {
-    items: CREDENTIALS.map((key) => ({
-      key,
-      set: Boolean(stored[key]?.set),
-      updatedAt: stored[key]?.updatedAt || null,
-    })),
-    // The storefront is a browser app. Saying so here is what stops somebody
-    // pasting a live secret into a preview and assuming it went somewhere.
-    storesSecrets: false,
-  }
-}
-
-export async function adminSaveCredentials(patch = {}) {
-  await latency()
-  const unknown = Object.keys(patch).filter((k) => !CREDENTIALS.includes(k))
-  if (unknown.length) {
-    throw new ApiError(`Unknown credential: ${unknown.join(', ')}.`, { status: 422, code: 'unknown_credential' })
-  }
-
-  const stored = read(KEY.credentials, {})
-  for (const [key, value] of Object.entries(patch)) {
-    if (!String(value || '').trim()) delete stored[key]
-    else stored[key] = { set: true, updatedAt: nowIso() } // the value is not kept
-  }
-  write(KEY.credentials, stored)
-  return adminGetCredentials()
-}
-
-/**
- * Move an order along: ship it, track it, deliver it, take the cash, or cancel.
- *
- * One action per call, and only the ones the order's `actions` list allows —
- * the same rule a real backend applies, so the demo cannot teach a flow the
- * live store would refuse.
- */
-export async function adminUpdateOrder(orderId, patch = {}) {
-  await latency()
-  const orders = read(KEY.orders, [])
-  const i = orders.findIndex((o) => o.id === orderId || o.number === orderId)
-  if (i < 0) throw new ApiError('Order not found.', { status: 404, code: 'not_found' })
-  const order = orders[i]
-
-  let action = patch.action
-  if (!action && patch.status) {
-    action = LEGACY_STATUS_ACTIONS[patch.status]
-    if (!action) {
-      if (!ORDER_STATUSES.includes(patch.status)) {
-        throw new ApiError(`"${patch.status}" is not a valid status.`, { status: 422, code: 'invalid_status' })
-      }
-      orders[i] = { ...order, status: patch.status, updatedAt: nowIso() }
-      write(KEY.orders, orders)
-      return adminView(orders[i])
-    }
-  }
-  if (!ORDER_ACTIONS.includes(action)) {
-    throw new ApiError(`"${action}" is not something an order can do.`, { status: 422, code: 'invalid_action' })
-  }
-  if (!adminView(order).actions.includes(action)) {
-    throw new ApiError(`${order.number} can't be ${ACTION_DONE[action]} right now.`, { status: 409, code: 'action_not_allowed' })
-  }
-  const tracking = patch.tracking || {}
-  const problem = trackingProblem(tracking)
-  if (problem) throw new ApiError(problem, { status: 422, code: 'invalid_tracking' })
-
-  const now = nowIso()
-  const next = { ...order, updatedAt: now }
-  const applyTracking = () => {
-    const current = typeof order.tracking === 'string' ? { code: order.tracking } : order.tracking || {}
-    const merged = { carrier: current.carrier || '', code: current.code || '', url: current.url || '' }
-    // A field left out is kept, so adding the link later does not wipe the number.
-    for (const key of ['carrier', 'code', 'url']) {
-      if (tracking[key] !== undefined) merged[key] = String(tracking[key] || '').trim()
-    }
-    next.tracking = merged.carrier || merged.code || merged.url ? merged : null
-  }
-
-  switch (action) {
-    case 'ship':
-      next.shippedAt = now
-      next.status = 'fulfilled'
-      applyTracking()
-      break
-    case 'update_tracking':
-      applyTracking()
-      break
-    case 'deliver':
-      next.shippedAt = order.shippedAt || now
-      next.deliveredAt = now
-      next.status = 'delivered'
-      break
-    case 'record_payment':
-      next.payment = { ...order.payment, status: 'captured', capturedAt: now }
-      if (order.status === 'placed') next.status = 'paid'
-      break
-    case 'cancel':
-      // Cancelling puts the stock back. An order that vanishes without returning
-      // its units is how a catalogue slowly loses inventory nobody can account for.
-      for (const line of order.lines) db.adjustInventory(line.variantId, line.quantity)
-      adopt()
-      next.status = 'cancelled'
-      next.cancelledAt = now
-      if (order.payment?.status === 'pending') next.payment = { ...order.payment, status: 'cancelled' }
-      break
-  }
-
-  orders[i] = next
-  write(KEY.orders, orders)
-  return adminView(next)
-}
-
-/**
  * Order history belongs to whoever is signed in — and to nobody otherwise.
  *
  * This used to hand back every order in the browser regardless of session, so
@@ -1265,7 +1405,19 @@ export async function getOrder(orderId) {
     : read(KEY.placed, []).includes(order.id)
   if (!allowed) throw new ApiError('Order not found.', { status: 404, code: 'not_found' })
 
-  return order
+  return withDownloads(order)
+}
+
+/**
+ * The files a paid order unlocks. A real backend streams each one from
+ * `GET /orders/:id/downloads/:documentId` to the order's owner; the demo's file
+ * is static, so its link is the file itself.
+ */
+function withDownloads(order) {
+  if (order?.payment?.status !== 'captured' || order.status === 'cancelled') return order
+  const files = order.lines.map((l) => products.find((p) => p.slug === l.productSlug)?.download).filter(Boolean)
+  if (!files.length) return order
+  return { ...order, downloads: files.map((f, i) => ({ id: `${order.id}-${i + 1}`, name: f.name, url: f.url })) }
 }
 
 /**
@@ -1312,30 +1464,8 @@ export async function lookupOrder({ number, email } = {}) {
   // Remembering it means the confirmation page works from here on, which is
   // what somebody looking their order up actually wanted.
   write(KEY.placed, [...new Set([order.id, ...read(KEY.placed, [])])].slice(0, 50))
-  return order
+  return withDownloads(order)
 }
-
-/**
- * One order, for an admin token.
- *
- * Deliberately not owner-scoped, unlike `getOrder` above — that one gates on
- * the customer session or on the browser that placed the order, which is
- * exactly right for a shopper and useless for a back office. The refund route
- * in `examples/server/server.mjs` reads `payment.reference` through here to
- * call the provider, so this must also never redact it.
- *
- * In this demo there is no server to check a token against, so it simply
- * returns the record — the same position `adminListProducts` takes. The
- * enforcement is the backend's, and the docs say so.
- */
-export async function adminGetOrder(idOrNumber) {
-  await latency()
-  const order = read(KEY.orders, []).find((o) => o.id === idOrNumber || o.number === idOrNumber)
-  if (!order) throw new ApiError('Order not found.', { status: 404, code: 'not_found' })
-  return adminView(order)
-}
-
-/* ── account ───────────────────────────────────────────────────────────── */
 
 const DEMO_CUSTOMER = {
   id: 'cus_demo',
@@ -1460,6 +1590,8 @@ export async function updateMe(patch) {
 
 export async function getCountry(code) {
   await latency()
+  // Loaded when asked: every state of every country is a lot to send to a shopper who never reaches checkout.
+  const { COUNTRY_DETAILS } = await import('../../data/regions.js')
   const details = COUNTRY_DETAILS[String(code || '').toUpperCase()]
   if (!details) throw new ApiError('We could not find that country.', { status: 404, code: 'not_found' })
   return details
@@ -1495,7 +1627,7 @@ export async function getWishlist() {
   await latency()
   const slugs = read(KEY.wishlist, [])
   return {
-    items: products.filter((p) => slugs.includes(p.slug)).map(publicProduct),
+    items: products.filter((p) => slugs.includes(p.slug)).map((p) => publicProduct(p)),
     total: slugs.length,
   }
 }
@@ -1549,137 +1681,6 @@ export async function getDeliveryEstimate({ method = 'standard', country = 'US' 
 
 /* ── admin (write API) ─────────────────────────────────────────────────── */
 
-export async function adminListProducts({ q = '', page = 1, perPage = 25 } = {}) {
-  await latency()
-  const needle = q.trim().toLowerCase()
-  // Admin sees drafts. `listProducts` never does.
-  const all = needle
-    ? products.filter((p) => `${p.title} ${p.slug} ${p.tags.join(' ')}`.toLowerCase().includes(needle))
-    : products
-  const start = (page - 1) * perPage
-  return { items: all.slice(start, start + perPage).map(publicProduct), total: all.length, page, perPage }
-}
-
-const BUILT_IN_KEYS = new Set(attributes.map((a) => a.key))
-
-export async function adminSaveProduct(patch) {
-  await latency()
-  const saved = db.upsertProduct(patch)
-  // Anything described here that the built-in vocabulary does not know is
-  // offered on the next product. Reuse should not require deciding to save.
-  db.learnFrom(saved, BUILT_IN_KEYS)
-  return publicProduct(saved)
-}
-
-export async function adminDeleteProduct(idOrSlug) {
-  await latency()
-  return db.deleteProduct(idOrSlug)
-}
-
-export async function adminSetInventory(variantId, quantity) {
-  await latency()
-  const v = db.setInventory(variantId, quantity)
-  if (!v) throw new ApiError('Unknown variant.', { status: 404, code: 'variant_not_found' })
-  return v
-}
-
-export async function adminAdjustInventory(variantId, delta) {
-  await latency()
-  const v = db.adjustInventory(variantId, delta)
-  if (!v) throw new ApiError('Unknown variant.', { status: 404, code: 'variant_not_found' })
-  return v
-}
-
-export async function adminSaveCategory(patch) {
-  await latency()
-  return db.upsertCategory(patch)
-}
-
-export async function adminDeleteCategory(slug) {
-  await latency()
-  return db.deleteCategory(slug)
-}
-
-/** The admin tree. The local catalogue already lists every category, empty ones included. */
-export async function adminListCategories() {
-  await latency()
-  return listCategoriesSync({ tree: true })
-}
-
-export async function adminUpdateSettings(patch) {
-  await latency()
-  return db.updateSettings(patch)
-}
-
-export async function adminImport(payload) {
-  await latency()
-  return db.importCatalog(payload)
-}
-
-export async function adminExport() {
-  await latency()
-  return db.exportCatalog()
-}
-
-export async function adminListDiscounts() {
-  await latency()
-  const items = discounts()
-  return { items, total: items.length }
-}
-
-export async function adminSaveDiscount(discount) {
-  await latency()
-  const code = String(discount.code || '').trim().toUpperCase()
-  if (!code) throw new ApiError('A code is required.', { status: 422, code: 'code_required' })
-  const list = discounts().slice()
-  const i = list.findIndex((d) => d.code === code)
-  const next = { ...discount, code }
-  if (i >= 0) list[i] = { ...list[i], ...next }
-  else list.push(next)
-  write(KEY.discounts, list)
-  return next
-}
-
-export async function adminDeleteDiscount(code) {
-  await latency()
-  write(KEY.discounts, discounts().filter((d) => d.code !== code))
-  return { ok: true }
-}
-
-/* ── media ─────────────────────────────────────────────────────────────── */
-
-/**
- * Uploads go to a browser-local binary store, and the product keeps a
- * `media:<id>` reference. In api mode this posts to your endpoint instead and
- * the product keeps whatever URL comes back — see docs/ADMIN.md.
- */
-export async function uploadMedia(file) {
-  const record = await mediaStore.upload(file)
-  return record
-}
-
-export async function listMedia() {
-  const items = await mediaStore.list()
-  return {
-    items: items.map((m) => ({
-      id: m.id,
-      url: `media:${m.id}`,
-      type: m.type,
-      name: m.name,
-      width: m.width,
-      height: m.height,
-      duration: m.duration ?? null,
-      bytes: m.bytes,
-      createdAt: m.createdAt,
-    })),
-    total: items.length,
-  }
-}
-
-export async function deleteMedia(id) {
-  return mediaStore.remove(id)
-}
-
 /**
  * The suggested attribute vocabulary.
  *
@@ -1714,54 +1715,9 @@ export async function listAttributes() {
 
 /* ── reuse library ─────────────────────────────────────────────────────── */
 
-export async function listLibrary() {
-  await latency()
-  return db.getLibrary()
-}
-
-export async function saveLibraryItem({ kind, item }) {
-  await latency()
-  try {
-    return db.saveLibraryItem(kind, item)
-  } catch (err) {
-    throw new ApiError(err.message, { status: 422, code: 'invalid_kind' })
-  }
-}
-
-export async function deleteLibraryItem({ kind, id }) {
-  await latency()
-  try {
-    return db.deleteLibraryItem(kind, id)
-  } catch (err) {
-    throw new ApiError(err.message, { status: 422, code: 'invalid_kind' })
-  }
-}
-
 export async function listSizeCharts() {
   await latency()
   return { items: sizeCharts, total: sizeCharts.length }
-}
-
-export async function adminSaveSizeChart(chart) {
-  await latency()
-  return db.upsertSizeChart(chart)
-}
-
-export async function adminGetProduct(idOrSlug) {
-  await latency()
-  const p = products.find((x) => x.id === idOrSlug || x.slug === idOrSlug)
-  if (!p) throw new ApiError('Product not found.', { status: 404, code: 'not_found' })
-  // Admin sees the raw record, including the chart reference rather than the
-  // resolved copy — you edit the link, not the snapshot.
-  const { _imageQuery, _altQuery, ...rest } = p
-  return rest
-}
-
-export async function adminReset() {
-  await latency()
-  await db.resetToSeed()
-  adopt()
-  return { ok: true }
 }
 
 export async function subscribe(email) {
@@ -1771,3 +1727,47 @@ export async function subscribe(email) {
   }
   return { ok: true }
 }
+
+
+/* ── the back office, loaded when first used ───────────────────────────── */
+
+/**
+ * Every admin endpoint lives in mock-admin.js and arrives with its first call.
+ *
+ * A shopper browsing the demo never opens the admin panel, and these are the
+ * largest part of this file — orders, refunds, notifications, the catalogue
+ * editor's writes. Loading them with the shop spent the first download on code
+ * almost nobody runs. They share this module's state through the exports above.
+ */
+const later = (name) => async (...args) => (await import('./mock-admin.js'))[name](...args)
+export const adminPlaceOrder = later('adminPlaceOrder')
+export const adminListOrders = later('adminListOrders')
+export const adminRefundOrder = later('adminRefundOrder')
+export const adminSendTestNotification = later('adminSendTestNotification')
+export const adminGetCredentials = later('adminGetCredentials')
+export const adminSaveCredentials = later('adminSaveCredentials')
+export const adminUpdateOrder = later('adminUpdateOrder')
+export const adminGetOrder = later('adminGetOrder')
+export const adminListProducts = later('adminListProducts')
+export const adminSaveProduct = later('adminSaveProduct')
+export const adminDeleteProduct = later('adminDeleteProduct')
+export const adminSetInventory = later('adminSetInventory')
+export const adminAdjustInventory = later('adminAdjustInventory')
+export const adminSaveCategory = later('adminSaveCategory')
+export const adminDeleteCategory = later('adminDeleteCategory')
+export const adminListCategories = later('adminListCategories')
+export const adminUpdateSettings = later('adminUpdateSettings')
+export const adminImport = later('adminImport')
+export const adminExport = later('adminExport')
+export const adminListDiscounts = later('adminListDiscounts')
+export const adminSaveDiscount = later('adminSaveDiscount')
+export const adminDeleteDiscount = later('adminDeleteDiscount')
+export const uploadMedia = later('uploadMedia')
+export const listMedia = later('listMedia')
+export const deleteMedia = later('deleteMedia')
+export const listLibrary = later('listLibrary')
+export const saveLibraryItem = later('saveLibraryItem')
+export const deleteLibraryItem = later('deleteLibraryItem')
+export const adminSaveSizeChart = later('adminSaveSizeChart')
+export const adminGetProduct = later('adminGetProduct')
+export const adminReset = later('adminReset')

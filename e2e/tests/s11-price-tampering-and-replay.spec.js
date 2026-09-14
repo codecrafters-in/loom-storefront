@@ -13,7 +13,8 @@ const isCartPayments = (url) => /\/carts\/[^/]+\/payments$/.test(new URL(url).pa
 test('S-11 tampered price, quantity and expected total are ignored or refused; replayed payment requests do nothing', { tag: '@S-11' }, async ({ page, shop, store, odoo }) => {
   const email = uniqueEmail('s11-tamper')
 
-  // 1. The add-to-bag request is rewritten with a price and a negative quantity.
+  // 1. The add-to-bag request is rewritten with a price and a negative quantity: refused (the quantity
+  //    rules answer 422), so nothing is added. Retried untouched, the server's price is charged.
   await page.route('**/carts/*/lines', async (route) => {
     const request = route.request()
     if (request.method() !== 'POST') return route.continue()
@@ -23,8 +24,11 @@ test('S-11 tampered price, quantity and expected total are ignored or refused; r
   await shop.openProduct('e2e-merino-crew')
   await shop.choose('Colour', 'Blue')
   await shop.choose('Size', 'S')
-  await shop.addToBag()
+  const tampered = page.waitForResponse((r) => /\/carts\/[^/]+\/lines$/.test(new URL(r.url()).pathname) && r.request().method() === 'POST')
+  await shop.addToBagButton().click()
+  expect((await tampered).status()).toBe(422)
   await page.unroute('**/carts/*/lines')
+  await shop.addToBag()
 
   const cartId = await page.evaluate(() => localStorage.getItem('loom.cart_id'))
   const cart = await store.ok('GET', `/carts/${cartId}`)

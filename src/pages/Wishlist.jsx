@@ -17,7 +17,7 @@ export default function Wishlist() {
       <div className="wrap py-10">
         <h1 className="text-display-lg">Saved</h1>
         <p className="mt-3 text-[15px] text-muted">
-          {loading ? 'Loading…' : `${data?.total ?? 0} ${data?.total === 1 ? 'piece' : 'pieces'} you came back to.`}
+          {loading ? 'Loading…' : `${data?.total ?? 0} ${data?.total === 1 ? 'item' : 'items'} you came back to.`}
         </p>
       </div>
 

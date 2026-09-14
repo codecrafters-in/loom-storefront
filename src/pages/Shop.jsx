@@ -6,7 +6,8 @@ import ProductGrid from '../components/product/ProductGrid.jsx'
 import FilterPanel from '../components/shop/FilterPanel.jsx'
 import Promises from '../components/layout/Promises.jsx'
 import Seo from '../components/Seo.jsx'
-import { useBootstrap } from '../store/StorefrontContext.jsx'
+import { useBootstrap, useStorefront } from '../store/StorefrontContext.jsx'
+import { categoryTrail, flattenCategories } from '../lib/categories.js'
 import { Breadcrumbs, Button, Empty, ErrorState, Icon, Pagination } from '../components/ui/index.jsx'
 
 const SORTS = [
@@ -20,18 +21,23 @@ const SORTS = [
 const PER_PAGE = 12
 
 /**
- * The query this page makes with no filters applied.
+ * The query this page makes, with no filters applied unless `extra` says so.
  *
- * Exported so the prerenderer can seed the exact same cache key. Writing it out
- * a second time in the build script is how a `maxPrice: null` crept in against
- * this page's `undefined` — different key, no match, and every category page
- * silently prerendered an empty grid while looking fine locally.
+ * Exported so the prerenderer can seed the exact same cache key — and used by
+ * the page itself, so there is one spelling of it. Writing it out a second time
+ * in the build script is how a `maxPrice: null` crept in against this page's
+ * `undefined` — different key, no match, and every category page silently
+ * prerendered an empty grid while looking fine locally.
  */
 export const listingQuery = (extra = {}) => ({
   sizes: [],
   colors: [],
   tags: [],
+  attr: [],
+  spec: [],
+  brand: [],
   inStock: false,
+  minPrice: undefined,
   maxPrice: undefined,
   sort: 'featured',
   page: 1,
@@ -39,23 +45,34 @@ export const listingQuery = (extra = {}) => ({
   ...extra,
 })
 
+const csv = (params, key) => params.get(key)?.split(',').filter(Boolean) || []
+const price = (params, key) => (params.get(key) ? Number(params.get(key)) : undefined)
+
 /**
  * Filter state lives in the URL, not in React.
  *
  * That is what makes a filtered grid shareable, bookmarkable and survivable
  * across a back button — all three of which shoppers expect and none of which
  * you get from useState.
+ *
+ * `attr` and `spec` repeat (`?attr=Color:Navy&attr=Size:M`) rather than join
+ * with commas: their values are names a merchant typed, and a comma in one
+ * would split it in two.
  */
 function useFilters() {
   const [params, setParams] = useSearchParams()
 
   const value = useMemo(
     () => ({
-      sizes: params.get('sizes')?.split(',').filter(Boolean) || [],
-      colors: params.get('colors')?.split(',').filter(Boolean) || [],
-      tags: params.get('tags')?.split(',').filter(Boolean) || [],
+      sizes: csv(params, 'sizes'),
+      colors: csv(params, 'colors'),
+      tags: csv(params, 'tags'),
+      attr: params.getAll('attr').filter(Boolean),
+      spec: params.getAll('spec').filter(Boolean),
+      brand: csv(params, 'brand'),
       inStock: params.get('in_stock') === '1',
-      maxPrice: params.get('max_price') ? Number(params.get('max_price')) : undefined,
+      minPrice: price(params, 'min_price'),
+      maxPrice: price(params, 'max_price'),
       sort: params.get('sort') || 'featured',
       page: Number(params.get('page') || 1),
     }),
@@ -65,11 +82,11 @@ function useFilters() {
   const set = useCallback(
     (next) => {
       const p = new URLSearchParams()
-      if (next.sizes?.length) p.set('sizes', next.sizes.join(','))
-      if (next.colors?.length) p.set('colors', next.colors.join(','))
-      if (next.tags?.length) p.set('tags', next.tags.join(','))
+      for (const key of ['sizes', 'colors', 'tags', 'brand']) if (next[key]?.length) p.set(key, next[key].join(','))
+      for (const key of ['attr', 'spec']) (next[key] || []).forEach((item) => p.append(key, item))
       if (next.inStock) p.set('in_stock', '1')
-      if (next.maxPrice) p.set('max_price', String(next.maxPrice))
+      if (next.minPrice != null) p.set('min_price', String(next.minPrice))
+      if (next.maxPrice != null) p.set('max_price', String(next.maxPrice))
       if (next.sort && next.sort !== 'featured') p.set('sort', next.sort)
       if (next.page && next.page > 1) p.set('page', String(next.page))
       setParams(p, { replace: true })
@@ -84,52 +101,46 @@ export default function Shop({ mode = 'category' }) {
   const { slug } = useParams()
   const [filters, setFilters] = useFilters()
   const [drawer, setDrawer] = useState(false)
+  const config = useStorefront()
 
   const category = mode === 'category' ? slug : undefined
   const collection = mode === 'collection' ? slug : undefined
+  const brand = mode === 'brand' ? slug : undefined
 
   // Category metadata comes from the API, not from a bundled catalogue —
   // importing the demo data here shipped it to every visitor in api mode too.
+  // Flattened to any depth: a third-level category is a page like any other.
   const { categories: booted } = useBootstrap()
   const catTree = useAsync(() => api.listCategories(), [], { skip: !!booted })
-  const flatCats = useMemo(() => {
-    const tree = booted || catTree.data?.items || []
-    return tree.flatMap((c) => [c, ...(c.children || [])])
-  }, [booted, catTree.data])
+  const flatCats = useMemo(() => flattenCategories(booted || catTree.data?.items || []), [booted, catTree.data])
   const meta = flatCats.find((c) => c.slug === category)
+  const trail = category ? categoryTrail(category, flatCats) : []
+
+  // On a brand's page the brand is the scope, not a filter the shopper set.
+  const query = listingQuery({
+    category,
+    collection,
+    sizes: filters.sizes,
+    colors: filters.colors,
+    tags: filters.tags,
+    attr: filters.attr,
+    spec: filters.spec,
+    brand: filters.brand,
+    inBrand: brand,
+    inStock: filters.inStock,
+    minPrice: filters.minPrice,
+    maxPrice: filters.maxPrice,
+    sort: filters.sort,
+    page: filters.page,
+  })
 
   const { data, error, loading, reload } = useAsync(
-    () =>
-      api.listProducts({
-        category,
-        collection,
-        sizes: filters.sizes,
-        colors: filters.colors,
-        tags: filters.tags,
-        inStock: filters.inStock,
-        maxPrice: filters.maxPrice,
-        sort: filters.sort,
-        page: filters.page,
-        perPage: PER_PAGE,
-      }),
-    [category, collection, JSON.stringify(filters)],
+    () => api.listProducts(query),
+    [category, collection, brand, JSON.stringify(filters)],
     // Seeded by the prerenderer for the default, unfiltered view — the one a
     // crawler and a first-time visitor both land on. Any filter is a cache miss
     // and fetches as before.
-    {
-      initial: peek.listProducts({
-        category,
-        collection,
-        sizes: filters.sizes,
-        colors: filters.colors,
-        tags: filters.tags,
-        inStock: filters.inStock,
-        maxPrice: filters.maxPrice,
-        sort: filters.sort,
-        page: filters.page,
-        perPage: PER_PAGE,
-      }),
-    },
+    { initial: peek.listProducts(query) },
   )
 
   const collectionMeta = useAsync(() => api.listCollections(), [], {
@@ -139,6 +150,8 @@ export default function Shop({ mode = 'category' }) {
     initial: peek.listCollections(),
   })
   const col = collectionMeta.data?.items.find((c) => c.slug === collection)
+  const brandMeta = useAsync(() => api.getBrand(brand), [brand], { skip: !brand })
+  const maker = brandMeta.data
 
   useEffect(() => {
     document.body.style.overflow = drawer ? 'hidden' : ''
@@ -147,38 +160,53 @@ export default function Shop({ mode = 'category' }) {
     }
   }, [drawer])
 
-  const title = col?.title || meta?.name || 'All products'
-  const blurb = col?.blurb || meta?.blurb || 'Everything we make, in one place.'
+  const title = brand ? maker?.name || '' : col?.title || meta?.name || 'All products'
+  const blurb = brand ? maker?.description || '' : col?.blurb || meta?.blurb || 'Everything we make, in one place.'
   const clear = () => setFilters({ sort: filters.sort, page: 1 })
+  const count = data?.total ?? 0
+
+  const panel = (
+    <FilterPanel
+      facets={data?.facets}
+      value={filters}
+      onChange={setFilters}
+      onClear={clear}
+      currency={config.pricing?.currency}
+      hideBrands={Boolean(brand)}
+    />
+  )
 
   return (
     <>
-      <Seo title={title} description={blurb} />
+      <Seo title={maker?.seo?.title || title} description={maker?.seo?.description || blurb} />
       <div className="wrap pt-8">
         <Breadcrumbs
           trail={[
             { label: 'Home', to: '/' },
             { label: mode === 'collection' ? 'Collections' : 'Shop', to: '/shop' },
-            ...(slug ? [{ label: title }] : []),
+            // Every ancestor by name, linked; the page itself last, unlinked.
+            ...trail.slice(0, -1).map((c) => ({ label: c.name, to: `/shop/${c.slug}` })),
+            ...(slug ? [{ label: title || slug }] : []),
           ]}
         />
         <header className="mt-6 max-w-2xl">
+          {maker?.logo?.url && <img src={maker.logo.url} alt="" className="mb-5 h-10 w-auto" />}
           <h1 className="text-display-lg">{title}</h1>
-          <p className="mt-4 text-[15px] leading-relaxed text-muted">{blurb}</p>
+          {blurb && <p className="mt-4 text-[15px] leading-relaxed text-muted">{blurb}</p>}
         </header>
       </div>
 
       <div className="wrap mt-10 grid gap-10 pb-20 lg:grid-cols-[15rem_1fr]">
         <aside className="hidden lg:block">
-          <div className="sticky top-24">
-            <FilterPanel facets={data?.facets} value={filters} onChange={setFilters} onClear={clear} />
-          </div>
+          {/* Scrolls on its own once the store has more facets than a screen
+              holds, so the last group is never out of reach. */}
+          <div className="no-scrollbar sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto pb-6">{panel}</div>
         </aside>
 
         <div>
           <div className="mb-6 flex items-center justify-between gap-4 border-b border-line pb-4">
             <p className="text-[13px] text-faint tabular-nums">
-              {loading ? 'Loading…' : `${data?.total ?? 0} ${data?.total === 1 ? 'piece' : 'pieces'}`}
+              {loading ? 'Loading…' : `${count} ${count === 1 ? 'product' : 'products'}`}
             </p>
             <div className="flex items-center gap-2">
               <Button variant="quiet" size="sm" icon="filter" className="lg:hidden" onClick={() => setDrawer(true)}>
@@ -247,9 +275,9 @@ export default function Shop({ mode = 'category' }) {
             <Icon name="close" size={20} />
           </button>
         </div>
-        <FilterPanel facets={data?.facets} value={filters} onChange={setFilters} onClear={clear} />
+        {panel}
         <Button full size="lg" className="mt-8" onClick={() => setDrawer(false)}>
-          Show {data?.total ?? 0} results
+          Show {count} results
         </Button>
       </div>
 

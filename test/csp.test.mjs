@@ -59,6 +59,14 @@ test('the API origin is allowed where the storefront needs it, and only in api m
   assert.ok(!demo.includes('localhost:8069'))
 })
 
+test('product films may be framed, from their privacy-enhanced hosts and no others', () => {
+  const frames = directive(policyOf(applyCsp(sample)), 'frame-src')
+  for (const host of ['https://www.youtube-nocookie.com', 'https://player.vimeo.com']) {
+    assert.ok(frames.includes(host), `frame-src is missing ${host}`)
+  }
+  assert.ok(!/https:\/\/www\.youtube\.com(\s|$)/.test(frames), 'the tracking host stays out')
+})
+
 test('the API origin comes from the variables the bundle was built with', () => {
   assert.equal(apiOriginFrom({ VITE_DATA_SOURCE: 'api', VITE_API_BASE_URL: 'http://localhost:8069/loom/api/v1/loom' }), 'http://localhost:8069')
   assert.equal(apiOriginFrom({ VITE_DATA_SOURCE: 'mock', VITE_API_BASE_URL: 'http://localhost:8069/loom/api/v1/loom' }), '')

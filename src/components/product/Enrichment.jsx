@@ -33,7 +33,7 @@ export function ProductHighlights({ enrichment, limit = 6 }) {
       <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4">
         {rows.map((row) => (
           <div key={row.key}>
-            <dt className="text-[12px] leading-snug text-faint">{label(row.key)}</dt>
+            <dt className="text-[12px] leading-snug text-faint">{row.label || label(row.key)}</dt>
             <dd className="mt-0.5 text-[14px] leading-snug text-ink">{row.value}</dd>
           </div>
         ))}
@@ -76,20 +76,20 @@ export function ImageSpecs({ enrichment, limit = 4 }) {
   const specs = enrichment?.specs || {}
   const seen = new Set((enrichment?.highlights || []).map((h) => h.key))
 
-  // Vocabulary order, not object order — a store that happens to write `care`
+  // The store's own labelled list when it sends one, in its order. Otherwise
+  // vocabulary order, not object order — a store that happens to write `care`
   // before `sleeve` should not get a different strip from one that does not.
   // Long values are dropped rather than truncated: they wrap the strip up the
   // image and it stops being a whisper.
-  const all = attributes
-    .filter((a) => specs[a.key])
-    // The unit joins the value here, not the label. The specifications table
-    // can afford "Weight (gsm)" in one column and "260" in the other; a single
-    // line cannot, and "Weight 260" on its own says nothing.
-    .map((a) => ({
-      key: a.key,
-      label: a.label,
-      value: a.unit ? `${specs[a.key]} ${a.unit}` : String(specs[a.key]),
-    }))
+  //
+  // The unit joins the value here, not the label. The specifications table can
+  // afford "Weight (gsm)" in one column and "260" in the other; a single line
+  // cannot, and "Weight 260" on its own says nothing.
+  const all = (enrichment?.specList?.length
+    ? enrichment.specList.map((s) => ({ key: s.key, label: s.label || s.key, value: s.unit ? `${s.value} ${s.unit}` : String(s.value) }))
+    : attributes
+      .filter((a) => specs[a.key])
+      .map((a) => ({ key: a.key, label: a.label, value: a.unit ? `${specs[a.key]} ${a.unit}` : String(specs[a.key]) })))
     .filter((r) => r.value.length <= STRIP_MAX)
 
   /**
@@ -398,21 +398,42 @@ function CarouselArrow({ side, hidden, onClick }) {
  * Built on scroll-snap rather than transforms, so a touch swipe is the native
  * behaviour and the arrows are only there for pointers and keyboards.
  */
-export function SpecCarousel({ specs }) {
+export function SpecCarousel({ specs, specList }) {
   const trackRef = useRef(null)
   const [page, setPage] = useState(0)
 
   const groups = useMemo(() => {
+    /**
+     * `specList` carries the store's own labels, units and groups, and wins.
+     * The bundled vocabulary is apparel's: read against a phone it prints
+     * "battery_capacity" as a label, which is the store's key rather than
+     * anything a shopper should see. It stays only for a backend that sends
+     * the bare `specs` map.
+     */
+    if (specList?.length) {
+      const byGroup = new Map()
+      for (const s of specList) {
+        const id = s.group || 'general'
+        const group = byGroup.get(id) || { id, label: s.groupLabel || s.group || 'General', rows: [] }
+        group.rows.push({ key: s.key, label: s.label || s.key, value: s.unit ? `${s.value} ${s.unit}` : String(s.value) })
+        byGroup.set(id, group)
+      }
+      return [...byGroup.values()]
+    }
     const rows = specs || {}
     return attributeGroups
       .map((g) => ({
         ...g,
         rows: Object.entries(rows)
           .filter(([key]) => (attributeByKey[key]?.group || 'general') === g.id)
-          .map(([key, value]) => ({ key, value })),
+          .map(([key, value]) => ({
+            key,
+            label: attributeByKey[key]?.unit ? `${label(key)} (${attributeByKey[key].unit})` : label(key),
+            value,
+          })),
       }))
       .filter((g) => g.rows.length)
-  }, [specs])
+  }, [specs, specList])
 
   if (!groups.length) return null
 
@@ -470,10 +491,7 @@ export function SpecCarousel({ specs }) {
             <dl>
               {g.rows.map((row) => (
                 <div key={row.key} className="flex gap-4 border-b border-line py-2.5 last:border-b-0">
-                  <dt className="w-[9rem] shrink-0 text-[12px] leading-snug text-faint">
-                    {label(row.key)}
-                    {attributeByKey[row.key]?.unit && ` (${attributeByKey[row.key].unit})`}
-                  </dt>
+                  <dt className="w-[9rem] shrink-0 text-[12px] leading-snug text-faint">{row.label}</dt>
                   <dd className="min-w-0 break-words text-[13px] leading-snug text-ink">{row.value}</dd>
                 </div>
               ))}

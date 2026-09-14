@@ -53,7 +53,15 @@ export const config = {
   mockLatency: num(env.VITE_MOCK_LATENCY, 220),
 }
 
-export const isMock = config.dataSource === 'mock'
+/**
+ * A constant in a Vite build, where vite.config.js writes `__LOOM_API__` in.
+ * Every `isMock ? … : …` in the theme then folds away at build time, so the
+ * demo's branches do not ship to a live store and the live store's do not ship
+ * to the demo. Anywhere else — tests, scripts — it is read from the environment
+ * as before.
+ */
+// eslint-disable-next-line no-undef
+export const isMock = typeof __LOOM_API__ === 'boolean' ? !__LOOM_API__ : config.dataSource === 'mock'
 
 /**
  * Fail loudly at boot rather than mysteriously on the first fetch. A missing

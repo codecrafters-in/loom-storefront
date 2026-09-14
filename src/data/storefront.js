@@ -64,6 +64,13 @@ export const storefront = {
       ['US', 'United States'], ['GB', 'United Kingdom'], ['IN', 'India'], ['CA', 'Canada'],
       ['AU', 'Australia'], ['DE', 'Germany'], ['FR', 'France'], ['AE', 'United Arab Emirates'],
     ],
+    /**
+     * How much the shop says about stock. `exact` shows the number, `low` only
+     * "Only N left" under the threshold, `hidden` only in stock or sold out. A
+     * product's own `stock` wins; this is for products that do not send one.
+     * `hideSoldOut` leaves sold-out products out of listings.
+     */
+    stock: { display: 'low', lowThreshold: 3, hideSoldOut: false },
   },
 
   /** Turn a whole surface off. Routes stay reachable but nothing links to them. */

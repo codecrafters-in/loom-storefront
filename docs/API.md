@@ -90,6 +90,8 @@ capability), a customer token, or an admin token — never interchangeable.
 | `GET` | `/products`, `/products/:slug` | none | public | [Catalogue](#catalogue) |
 | `GET` | `/products/:slug/related`, `/products/:slug/reviews` | none | public | [Catalogue](#catalogue) |
 | `GET` | `/categories`, `/collections` | none | public | [Catalogue](#catalogue) |
+| `POST` | `/products/:slug/combination` | none | no-store (the theme caches it with the product) | [Combinations](#post-productsslugcombination) |
+| `GET` | `/brands`, `/brands/:slug` | none | public | [Brands](#brands) |
 | `GET` | `/attributes` | none | public | [Attributes](#attributes) |
 | `GET` | `/size-charts` | none | public | [ADMIN.md](ADMIN.md) |
 | `GET` | `/countries/:code` | none | public | [Orders and account](#orders-and-account) |
@@ -186,7 +188,8 @@ returns is optional too; omitted keys keep their defaults.
   "version": 1,
   "store": { "name": "LOOM", "tagline": "…", "logo": { "wordmark": "LOOM" } },
   "pricing": { "currency": "USD", "locale": "en-US", "currencies": [] },
-  "commerce": { "freeShippingOver": 15000, "shippingMethods": [], "countries": [] },
+  "commerce": { "freeShippingOver": 15000, "shippingMethods": [], "countries": [],
+    "stock": { "display": "low", "lowThreshold": 3, "hideSoldOut": false } },
   "features": { "wishlist": true, "reviews": true },
   "navigation": { "primary": [], "footer": [], "announcement": { "messages": [] } },
   "home": [{ "type": "hero", "title": "…" }],
@@ -247,6 +250,10 @@ form, and the captcha is reset for another try.
 | `sizes` | csv | `S,M,L` |
 | `colors` | csv | Colour names as they appear in `options` |
 | `tags` | csv | |
+| `attr` | repeat | `<optionId>:<value name>`, e.g. `attr=12:Navy&attr=13:M`. Either value within one option, every option given |
+| `spec` | repeat | `<key>:<value>`, for specifications marked as a facet |
+| `brand` | csv | Brand slugs |
+| `in_brand` | string | A brand page's scope, like `category`: facets describe only that brand's products (the storefront's `/brands/:slug` sends it) |
 | `min_price`, `max_price` | int | Minor units |
 | `in_stock` | `1` | Only products with a buyable variant |
 | `sort` | enum | `featured` `newest` `price-asc` `price-desc` `rating` |
@@ -262,10 +269,25 @@ form, and the captcha is reset for another try.
     "sizes": ["XS", "S", "M", "L", "XL"],
     "colors": [{ "name": "Ecru", "hex": "#EDE6D8" }],
     "tags": ["cotton", "linen"],
-    "priceRange": { "min": 4800, "max": 68500 }
+    "priceRange": { "min": 4800, "max": 68500 },
+    "attributes": [
+      { "id": "12", "name": "Color", "displayType": "color", "role": "color",
+        "values": [{ "name": "Navy", "color": "#22304A", "count": 4 }] }
+    ],
+    "specs": [
+      { "key": "screen_size", "label": "Screen size", "group": "Display", "unit": "in",
+        "values": [{ "value": "6.1", "count": 1 }] }
+    ],
+    "brands": [{ "slug": "nova", "name": "Nova", "count": 1 }]
   }
 }
 ```
+
+`attr` and `spec` repeat rather than join with commas, because their values are
+names a merchant typed and a comma in one would split it. The theme renders
+`attributes`, `specs` and `brands` when they are present, and falls back to
+`sizes` and `colors` for a backend that sends only those. With the store's
+`commerce.stock.hideSoldOut` on, sold-out products are left out of listings.
 
 > **Facets must be computed over the whole category, not over the filtered
 > result set.** If you narrow them to what is currently showing, selecting one
@@ -421,6 +443,98 @@ it above the fold pushes the buy button off the screen.
 
 Every block is optional and renders nothing when absent, so a thin product is a
 shorter page rather than a set of empty headings.
+
+`specList` replaces the vocabulary lookup when present:
+`[{ key, label, group, groupLabel, value, unit }]`, labelled and grouped by the
+store. The Specifications tab, the strip over the first photograph and the
+compare table all read it; the bundled vocabulary is used only for a backend
+that sends the bare `specs` map. `labels` names the tabs
+(`{ fabric, specs, features, details, manufacturer }`, any of them); without it
+the tabs are "Materials & care", "Specifications", "Features", "Details" and
+"Manufacturer info".
+
+### Any product
+
+Everything below is additive. A backend that sends only `options[].name`,
+`options[].values` and `variants[].options` keeps working: the theme derives
+option ids from the names and adds to the bag with `variant_id`.
+
+| Field | Where | Notes |
+| --- | --- | --- |
+| `type` | list, detail | `goods` · `service` · `digital` · `combo` |
+| `options[].id` | list, detail | String. Filters use it (`attr=<id>:<value>`) |
+| `options[].displayType` | list, detail | `radio` · `pills` · `select` · `color` · `image`. How the picker draws the option |
+| `options[].role` | list, detail | `color` · `size` · `null`. Size shows the size chart link and the fit block; colour gives the card its swatches |
+| `options[].imagesFollow` | list, detail | The gallery shows images whose `color` is the chosen value of this option, plus untagged ones |
+| `options[].mode` | list, detail | `variant`, or `dynamic`: a combination may be missing from `variants[]` and is priced by `POST /products/:slug/combination` |
+| `options[].choices[]` | list, detail | `{ id, name, color, image, priceExtra, custom }`. `custom: true` asks the shopper for text |
+| `extraOptions[]` | detail | No-variant attributes: `{ id, name, displayType, multiple, required, choices }`. Checkboxes when `multiple`; a "None" row when not `required` |
+| `variants[].optionIds` | list, detail | `{ optionId: choiceId }`. Its presence is what tells the theme to add by choices |
+| `variants[].inventory` | list, detail | A number, or `null` when the store does not show stock |
+| `stock` | list, detail | `{ display, lowThreshold }`. `exact` says "12 in stock"; `low` says "Only 3 left" under the threshold; `hidden` never shows a number |
+| `quantity` | list, detail | `{ min, max, step, unit, decimals }`. The product and bag steppers offer only these quantities; a unit other than a count is shown |
+| `brand` | list, detail | `{ slug, name, logo }` or `null`. Shown on the card and the product page, linked to `/brands/:slug`, and used as the JSON-LD brand |
+| `breadcrumbs` | detail | `[{ slug, name }]`, root to leaf. Without it the theme walks the category tree |
+| `images[]` video | detail | `{ type: "video", provider, embedUrl, url, alt }`. `youtube` and `vimeo` show `url` as a poster and load `embedUrl` only when pressed; `file` plays `url` in a video element |
+| `combo` | detail, combo only | `[{ id, name, items: [{ id, variantId, productSlug, title, image, options, extraPrice, available }] }]`. One item per group |
+| `optionalProducts` | detail | `ProductSummary[]`, offered in a dialog when the product is added |
+| `accessories` | detail | `ProductSummary[]`, the "Frequently bought together" rail on the page and in the bag drawer |
+| `alternatives` | detail | `ProductSummary[]`, used for "You might also like" instead of `GET /products/:slug/related` |
+
+`ProductSummary` is `{ slug, title, price, compareAtPrice, image, available, type, variantId }`.
+`variantId` is set when the row points at one variant; the optional-products
+dialog can add those directly, and links to the product page for the rest.
+
+```json
+{
+  "type": "goods",
+  "brand": { "slug": "nova", "name": "Nova", "logo": null },
+  "options": [
+    { "id": "storage", "name": "Storage", "displayType": "pills", "role": null,
+      "imagesFollow": false, "mode": "variant", "values": ["128 GB", "256 GB"],
+      "choices": [
+        { "id": "storage-128", "name": "128 GB", "color": null, "image": null, "priceExtra": null, "custom": false },
+        { "id": "storage-256", "name": "256 GB", "color": null, "image": null,
+          "priceExtra": { "amount": 10000, "currency": "USD" }, "custom": false }
+      ] }
+  ],
+  "variants": [
+    { "id": "var_1", "options": { "Storage": "256 GB" }, "optionIds": { "storage": "storage-256" },
+      "price": { "amount": 79900, "currency": "USD" }, "inventory": 6, "available": true }
+  ],
+  "stock": { "display": "low", "lowThreshold": 5 },
+  "quantity": { "min": 1, "max": 2, "step": 1, "unit": "Units", "decimals": false }
+}
+```
+
+The picker logic is in `src/lib/variants.js` and the quantity and stock rules in
+`src/lib/quantity.js`, both with unit tests. A choice is judged against the
+options before it, so the first option is always fully open.
+
+### `POST /products/:slug/combination`
+
+Prices what `variants[]` cannot: a dynamic combination nobody has bought, or
+extras on top of a variant. The theme calls it 250 ms after the choices settle.
+
+```json
+{ "choiceIds": ["grind-espresso"] }
+```
+
+```json
+{ "exists": false, "variantId": null, "available": true,
+  "price": { "amount": 3200, "currency": "USD" }, "compareAtPrice": null, "imageId": null }
+```
+
+`404 not_found` for an unknown product; `422 invalid_combination` for an
+excluded or incomplete combination, which the buy button shows as "Not
+available".
+
+### Brands
+
+- `GET /brands` → `{ items: [{ slug, name, logo, description, count }], total }`
+- `GET /brands/:slug` → `{ slug, name, logo, description, seo: { title, description } }`
+
+The `/brands/:slug` page reads the brand and lists `GET /products?brand=<slug>`.
 
 ---
 
@@ -750,6 +864,10 @@ Three rules the theme depends on:
   leaf category, so this resolution has to happen server-side.
 - **Store flat, serve nested.** Keep `parent` on the row; build the tree on read.
   Nesting in storage makes every reparent a structural migration.
+
+Trees have any depth, and every category carries `path: [{ slug, name }]`, root
+to itself. Category pages title themselves and build their breadcrumbs from it
+(or from the parents, when it is missing).
 ### `GET /collections` → `{ items: [{ slug, title, blurb, image, count }], total }`
 
 ---
@@ -765,7 +883,7 @@ client that recalculates them will eventually disagree with the invoice.
 | --- | --- | --- |
 | `POST` | `/carts` | `{}` or `{ "fresh": true }` — returns `Cart` (see *Who owns a bag* below) |
 | `GET` | `/carts/:id` | 404 if expired; the theme silently creates a new one |
-| `POST` | `/carts/:id/lines` | `{ variant_id, quantity }` |
+| `POST` | `/carts/:id/lines` | `{ variant_id, quantity }`, or `{ product_slug, choice_ids, quantity }` with the extras below |
 | `PATCH` | `/carts/:id/lines/:lineId` | `{ quantity }` |
 | `DELETE` | `/carts/:id/lines/:lineId` | |
 | `DELETE` | `/carts/:id/lines` | Empties the cart |
@@ -804,6 +922,41 @@ zero when it does not apply.
 
 Expected errors: `409 insufficient_inventory`, `409 out_of_stock`,
 `422 invalid_discount`.
+
+### Adding any product
+
+The theme sends `{ variant_id, quantity }` to a backend whose variants carry no
+`optionIds`. Otherwise it sends the product and its choices, with whichever of
+these apply:
+
+```json
+{
+  "product_slug": "brass-pen",
+  "choice_ids": ["finish-raw"],
+  "extra_choice_ids": ["engraving-initials", "add-gift-box"],
+  "custom_values": [{ "choice_id": "engraving-initials", "text": "J.S." }],
+  "combo_items": [{ "combo_item_id": "combo-pen-raw" }],
+  "optional_products": [{ "variant_id": "var_leather_phone_case", "quantity": 1 }],
+  "quantity": 1
+}
+```
+
+Lines gain `extraOptions: { name: value }`, `customValues: [{ name, text }]`,
+`comboItems: [{ title, options, quantity }]`, `linkedTo` (the line an optional
+product was added with, or `null`) and `quantityRule`. A combo's items are not
+lines of their own. Removing a line removes the lines linked to it.
+`PATCH /carts/:id/lines/:lineId` applies the same quantity rule, and changes a
+combo's items with it.
+
+| Error | When | The theme |
+| --- | --- | --- |
+| `422 choose_options` | An option is missing; `detail.missing` names them | Toast: "Choose Storage first." |
+| `422 invalid_combination` | Excluded, not made, or text over 200 characters | Toast |
+| `422 quantity_rule` | Outside `detail.min`, `detail.max` or `detail.step` | Toast; the steppers never offer such a quantity |
+| `422 combo_incomplete` | A group has no item; `detail.groups` names them | Toast: "Choose one for Pen." |
+
+A message in the response body is shown as it is; the sentences above are for a
+response that carries only the code.
 
 ### Who owns a bag
 
@@ -1028,6 +1181,11 @@ its code the next time the form opens. The demo adapter answers from
 ```
 
 `status` — `placed` `paid` `fulfilled` `delivered` `cancelled`.
+
+A paid order with digital products adds `downloads: [{ id, name, url }]`, listed
+on the order page. `url` is `GET /orders/:orderId/downloads/:documentId`; a bare
+path is resolved against the API base URL. It streams the file to the order's
+owner, or to the holder of the order link, and answers `404` before payment.
 
 `payment` is `null` until the order has a payment. Its `status` is `pending`,
 `authorized`, `captured`, `cancelled` or `failed`. **`captured` is what

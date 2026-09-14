@@ -7,6 +7,7 @@ import { startCollecting, stopCollecting, renderHead } from './lib/head.js'
 import { listingQuery } from './pages/Shop.jsx'
 import { loadDoc } from './pages/Docs.jsx'
 import { docPages, docPath } from './data/docs.js'
+import { flattenCategories } from './lib/categories.js'
 
 /**
  * One route, rendered to HTML at build time.
@@ -47,7 +48,8 @@ export async function routes() {
     api.listCategories(),
     api.listCollections(),
   ])
-  const flatCategories = categories.items.flatMap((c) => [c, ...(c.children || [])])
+  // Any depth: a third-level category is a page like any other.
+  const flatCategories = flattenCategories(categories.items)
   const listing = (extra) => [['listProducts', [listingQuery(extra)]]]
 
   return [

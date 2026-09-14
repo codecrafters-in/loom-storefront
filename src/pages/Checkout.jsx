@@ -17,6 +17,8 @@ import { useCart } from '../store/CartContext.jsx'
 import { useAuth } from '../store/AuthContext.jsx'
 import { Button, Empty, Icon } from '../components/ui/index.jsx'
 import { formatMoney } from '../lib/money.js'
+import { nestLines } from '../lib/cart-lines.js'
+import LineDetails from '../components/cart/LineDetails.jsx'
 
 /** Form fields a backend error can point at, by the name it uses. */
 const FIELD_IDS = ['email', 'name', 'line1', 'line2', 'city', 'region', 'postalCode', 'country', 'phone']
@@ -414,8 +416,8 @@ export default function Checkout() {
         <div className="rounded-xs border border-line bg-surface p-6">
           <h2 className="font-display text-lg">Order</h2>
           <ul className="mt-5 space-y-4">
-            {cart.lines.map((l) => (
-              <li key={l.id} className="flex gap-3.5">
+            {nestLines(cart.lines).map(({ line: l, depth }) => (
+              <li key={l.id} className={`flex gap-3.5 ${depth ? 'pl-6' : ''}`}>
                 <div className="relative w-14 shrink-0">
                   <div className="shot rounded-xs">
                     <Media sizes={SIZES.thumb} src={l.image?.url} type={l.image?.type} alt="" loading="lazy" className="h-full w-full object-cover" />
@@ -426,9 +428,7 @@ export default function Checkout() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-medium leading-snug">{l.title}</p>
-                  <p className="mt-0.5 text-[12px] text-faint">
-                    {Object.values(l.options).join(' · ')}
-                  </p>
+                  <LineDetails line={l} />
                 </div>
                 <span className="text-[13px] tabular-nums">{formatMoney(l.lineTotal)}</span>
               </li>

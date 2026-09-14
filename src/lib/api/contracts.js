@@ -34,6 +34,7 @@
  * @property {number} inventory
  * @property {boolean} available
  * @property {string|null} imageId    Which image to show when this variant is picked.
+ * @property {Record<string,string>} [optionIds]  { optionId: choiceId }. Phase 2; older backends omit it.
  *
  * @typedef  {object} Product
  * @property {string} id
@@ -46,7 +47,21 @@
  * @property {Money}  price            The lowest variant price, for listings.
  * @property {Money|null} compareAtPrice
  * @property {Image[]} images
- * @property {{name:string, values:string[]}[]} options
+ * @property {{name:string, values:string[], id?:string, displayType?:string, role?:'color'|'size'|null,
+ *   imagesFollow?:boolean, mode?:'variant'|'dynamic', choices?:object[]}[]} options
+ * @property {'goods'|'service'|'digital'|'combo'} [type]
+ * @property {object[]} [extraOptions]   No-variant attributes: engraving, gift box.
+ * @property {{display:'exact'|'low'|'hidden', lowThreshold:number}} [stock]
+ * @property {{min:number, max:number|null, step:number, unit:string, decimals:boolean}} [quantity]
+ * @property {{slug:string, name:string, logo:Image|null}|null} [brand]
+ * @property {{slug:string, name:string}[]} [breadcrumbs]
+ * @property {object[]} [combo]          Groups, one item chosen from each.
+ * @property {object[]} [optionalProducts]  ProductSummary[]
+ * @property {object[]} [accessories]    ProductSummary[]
+ * @property {object[]} [alternatives]   ProductSummary[]
+ *
+ * Every Phase 2 field is optional here on purpose: a backend that predates it
+ * still validates, and the theme falls back to what it did before.
  * @property {Variant[]} variants
  * @property {string[]} categories     Category slugs.
  * @property {string[]} tags
@@ -217,7 +232,11 @@ export function assertProduct(p, where = 'product') {
   }
   assertMoney(p.price, `${where}.price`)
   if (!Array.isArray(p.images) || !p.images.length) throw new ContractError(`${where}.images`, 'at least one Image', p.images)
-  if (!Array.isArray(p.variants) || !p.variants.length) throw new ContractError(`${where}.variants`, 'at least one Variant', p.variants)
+  // No variants is valid only while every combination is made when bought and nobody has bought one yet.
+  const madeWhenBought = (p.options || []).some((o) => o.mode === 'dynamic')
+  if (!Array.isArray(p.variants) || (!p.variants.length && !madeWhenBought)) {
+    throw new ContractError(`${where}.variants`, 'at least one Variant', p.variants)
+  }
   return p
 }
 

@@ -1,24 +1,25 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
 import { loadApp } from './helpers/browser.mjs'
+import { modelOf, priceFor } from '../src/lib/variants.js'
 
 const { api } = await loadApp()
 
 /**
- * The price the buy box shows, lifted out of ProductView rather than copied.
+ * The price the buy box shows: `priceFor` from lib/variants.js, the function
+ * the product page calls, rather than a copy of it.
  *
  * A copy of this calculation would keep passing after the real one broke, which
  * is exactly the failure it exists to catch — the bug was that the page read
  * `variant`, which needs a colour *and* a size, so choosing a colour changed
  * nothing and the price then jumped when a size was picked.
  */
-const src = fs.readFileSync(new URL('../src/components/product/ProductView.jsx', import.meta.url), 'utf8')
-const body = src.slice(src.indexOf('const shown = useMemo(() => {'))
-const inner = body.slice(body.indexOf('{') + 1, body.indexOf('  }, [product, variant, activeColor])'))
-const shownFrom = new Function('product', 'variant', 'activeColor', inner)
-const shown = (p, color, size) =>
-  shownFrom(p, p.variants.find((v) => v.options.Color === color && v.options.Size === size), color)
+const shown = (p, color, size) => {
+  const selection = {}
+  if (color) selection.Color = `Color:${color}`
+  if (size) selection.Size = `Size:${size}`
+  return priceFor(modelOf(p), selection, p)
+}
 const label = (s) => (s.to ? `${s.price.amount}-${s.to.amount}` : String(s.price.amount))
 
 const slug = 'oxford-shirt-ecru'

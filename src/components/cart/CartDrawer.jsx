@@ -8,6 +8,9 @@ import { formatMoney } from '../../lib/money.js'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import api from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
+import { nestLines } from '../../lib/cart-lines.js'
+import { stepperProps } from '../../lib/quantity.js'
+import LineDetails from './LineDetails.jsx'
 
 /** Slides in after every add. Nothing here is decorative — it is the fastest
  *  path from "added" to "checkout", which is the only job of a cart drawer. */
@@ -20,8 +23,19 @@ export default function CartDrawer() {
   // actually buying. Skipped entirely when the bag is empty or the feature is
   // off, so an empty drawer costs no request.
   const anchor = cart?.lines?.at(-1)?.productSlug
+  //
+  // The anchor's accessories come first when the store chose some: "frequently
+  // bought together" is the merchant's answer and a better one than a computed
+  // guess. The product read is cached, and usually already is from the page the
+  // shopper added it on.
   const suggestions = useAsync(
-    () => api.getRelated(anchor, { limit: rec.limit || 3, strategy: rec.strategy || 'same-category' }),
+    async () => {
+      const limit = rec.limit || 3
+      const product = await api.getProduct(anchor).catch(() => null)
+      const accessories = product?.accessories || []
+      if (accessories.length) return { items: accessories.slice(0, limit), accessories: true }
+      return api.getRelated(anchor, { limit, strategy: rec.strategy || 'same-category' })
+    },
     [anchor, rec.limit, rec.strategy],
     { skip: !open || !anchor || rec.enabled === false },
   )
@@ -86,8 +100,8 @@ export default function CartDrawer() {
             )}
 
             <ul className="flex-1 divide-y divide-line overflow-y-auto px-5">
-              {lines.map((line) => (
-                <li key={line.id} className="flex gap-3.5 py-4">
+              {nestLines(lines).map(({ line, depth }) => (
+                <li key={line.id} className={`flex gap-3.5 py-4 ${depth ? 'pl-6' : ''}`}>
                   <Link to={`/product/${line.productSlug}`} onClick={() => setOpen(false)} className="w-16 shrink-0">
                     <div className="shot rounded-xs">
                       <Media sizes={SIZES.thumb} src={line.image?.url} type={line.image?.type} alt={line.image?.alt || line.title} loading="lazy" className="h-full w-full object-cover" />
@@ -107,11 +121,9 @@ export default function CartDrawer() {
                         <Icon name="trash" size={15} />
                       </button>
                     </div>
-                    <p className="mt-1 text-[12px] text-faint">
-                      {Object.entries(line.options).map(([k, v]) => `${k}: ${v}`).join('  ·  ')}
-                    </p>
+                    <LineDetails line={line} />
                     <div className="mt-2.5 flex items-center justify-between">
-                      <QuantityStepper size="sm" value={line.quantity} onChange={(q) => update(line.id, q)} disabled={busy} />
+                      <QuantityStepper size="sm" value={line.quantity} onChange={(q) => update(line.id, q)} disabled={busy} {...stepperProps(line.quantityRule)} />
                       <span className="text-sm tabular-nums">{formatMoney(line.lineTotal)}</span>
                     </div>
                   </div>
@@ -121,7 +133,7 @@ export default function CartDrawer() {
 
             {rec.enabled !== false && suggestions.data?.items?.length > 0 && (
               <div className="border-t border-line px-5 py-3">
-                <p className="eyebrow">{rec.title || 'Goes with this'}</p>
+                <p className="eyebrow">{suggestions.data.accessories ? 'Frequently bought together' : rec.title || 'Goes with this'}</p>
                 {/*
                   Chips, not cards. Three 4:5 cards with a name and a price
                   under each is 210px — a third of a phone screen given to
@@ -142,9 +154,9 @@ export default function CartDrawer() {
                         <span className="w-10 shrink-0">
                           <span className="shot block overflow-hidden rounded-xs bg-sunken">
                             <Media
-                              src={p.images[0]?.url}
-                              type={p.images[0]?.type}
-                              alt={p.images[0]?.alt || p.title}
+                              src={(p.images?.[0] || p.image)?.url}
+                              type={p.images?.[0]?.type}
+                              alt={(p.images?.[0] || p.image)?.alt || p.title}
                               loading="lazy"
                               className="h-full w-full object-cover"
                             />

@@ -8,6 +8,9 @@ import { formatMoney } from '../lib/money.js'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import Media from '../components/ui/Media.jsx'
 import { SIZES } from '../lib/images.js'
+import { nestLines } from '../lib/cart-lines.js'
+import { stepperProps } from '../lib/quantity.js'
+import LineDetails from '../components/cart/LineDetails.jsx'
 
 export default function Cart() {
   const { cart, loading, busy, update, remove, applyDiscount } = useCart()
@@ -54,8 +57,9 @@ export default function Cart() {
 
       <div className="wrap grid items-start gap-12 pb-20 lg:grid-cols-[1fr_22rem]">
         <ul className="divide-y divide-line border-y border-line">
-          {cart.lines.map((line) => (
-            <li key={line.id} className="flex gap-5 py-6">
+          {/* An optional product sits under, and indented from, the line it was added with. */}
+          {nestLines(cart.lines).map(({ line, depth }) => (
+            <li key={line.id} className={`flex gap-5 py-6 ${depth ? 'pl-8 sm:pl-14' : ''}`}>
               <Link to={`/product/${line.productSlug}`} className="w-24 shrink-0 sm:w-28">
                 <div className="shot rounded-xs">
                   <Media sizes={SIZES.thumb} src={line.image?.url} type={line.image?.type} alt={line.image?.alt || line.title} loading="lazy" className="h-full w-full object-cover" />
@@ -67,14 +71,12 @@ export default function Cart() {
                     <Link to={`/product/${line.productSlug}`} className="text-[15px] font-medium">
                       {line.title}
                     </Link>
-                    <p className="mt-1 text-[13px] text-faint">
-                      {Object.entries(line.options).map(([k, v]) => `${k}: ${v}`).join('  ·  ')}
-                    </p>
+                    <LineDetails line={line} className="text-[13px] text-faint" />
                   </div>
                   <span className="shrink-0 text-[15px] tabular-nums">{formatMoney(line.lineTotal)}</span>
                 </div>
                 <div className="mt-auto flex items-center justify-between pt-4">
-                  <QuantityStepper value={line.quantity} onChange={(q) => update(line.id, q)} disabled={busy} />
+                  <QuantityStepper value={line.quantity} onChange={(q) => update(line.id, q)} disabled={busy} {...stepperProps(line.quantityRule)} />
                   <button
                     type="button"
                     onClick={() => remove(line.id)}

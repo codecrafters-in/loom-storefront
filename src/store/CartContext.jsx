@@ -3,6 +3,7 @@ import api from '../lib/api/index.js'
 import { useToast } from './ToastContext.jsx'
 import { onExternalWrite, STORAGE_KEYS } from '../lib/crossTab.js'
 import { addToCart as trackAdd, removeFromCart as trackRemove } from '../lib/analytics.js'
+import { cartProblem } from '../lib/cart-lines.js'
 
 /**
  * Cart state.
@@ -53,7 +54,7 @@ export function CartProvider({ children }) {
         if (openDrawer) setOpen(true)
         return next
       } catch (err) {
-        push(err.message || 'Something went wrong.', { tone: 'error' })
+        push(cartProblem(err), { tone: 'error' })
         throw err
       } finally {
         setBusy(false)
@@ -69,15 +70,25 @@ export function CartProvider({ children }) {
       busy,
       open,
       setOpen,
-      count: cart?.lines.reduce((a, l) => a + l.quantity, 0) || 0,
-      add: async (variantId, quantity = 1, label = 'Added to your bag') => {
-        const next = await run(() => api.addToCart({ variantId, quantity }), {
+      // Three quarters of a kilo is one thing in the bag, not 0.75 of one.
+      count: cart?.lines.reduce((a, l) => a + (Number.isInteger(l.quantity) ? l.quantity : 1), 0) || 0,
+      /**
+       * A variant id, as before, or a request from `useProductChoice` — the
+       * product and its choices, extras, typed text, a combo's items and the
+       * optional products added with it.
+       */
+      add: async (item, quantity = 1, label = 'Added to your bag') => {
+        const request = typeof item === 'string' ? { variantId: item, quantity } : { ...item, quantity: item.quantity ?? quantity }
+        const next = await run(() => api.addToCart(request), {
           successMessage: label,
           openDrawer: true,
         })
         // Reported from the resulting cart, which is the only thing that knows
         // what was actually added — the variant, the price and the quantity.
-        trackAdd(next?.lines?.find((l) => l.variantId === variantId), quantity)
+        const line = [...(next?.lines || [])].reverse().find((l) =>
+          request.variantId ? l.variantId === request.variantId : l.productSlug === request.productSlug && !l.linkedTo,
+        )
+        trackAdd(line, request.quantity)
         return next
       },
       update: (lineId, quantity) => run(() => api.updateCartLine(lineId, quantity)),

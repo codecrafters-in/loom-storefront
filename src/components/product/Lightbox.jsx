@@ -167,6 +167,8 @@ export default function Lightbox({ images = [], index = 0, onIndex, onClose }) {
           <Media
             src={image.url}
             type={image.type}
+            provider={image.provider}
+            embedUrl={image.embedUrl}
             alt={image.alt || ''}
             controls={isVideo}
             className="h-full w-full object-contain"
@@ -196,7 +198,7 @@ export default function Lightbox({ images = [], index = 0, onIndex, onClose }) {
               }`}
             >
               <span className="shot block bg-ink/40">
-                <Media src={img.url} type={img.type} alt="" className="h-full w-full object-cover" />
+                <Media src={img.url} type={img.type} provider={img.provider} alt="" className="h-full w-full object-cover" />
               </span>
             </button>
           ))}

@@ -12,7 +12,7 @@
  */
 import { config } from '../config.js'
 import { adminFetch } from '../admin-session.js'
-import { ApiError, ContractError, assertCart, assertList, assertProduct } from './contracts.js'
+import { ApiError, ContractError, assertCart, assertList, assertMoney, assertProduct } from './contracts.js'
 
 const SESSION_KEY = 'loom.session'
 
@@ -31,11 +31,18 @@ function customerToken() {
   }
 }
 
+/**
+ * Filters whose values are names a merchant typed. A comma in one ("Red, dark")
+ * would split it in two, so these repeat the parameter instead of joining it.
+ */
+const REPEATED = new Set(['attr', 'spec'])
+
 function url(path, query) {
   const u = new URL(config.api.baseUrl + path, window.location.origin)
   for (const [k, v] of Object.entries(query || {})) {
     if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) continue
-    if (Array.isArray(v)) u.searchParams.set(k, v.join(','))
+    if (Array.isArray(v) && REPEATED.has(k)) v.forEach((item) => u.searchParams.append(k, String(item)))
+    else if (Array.isArray(v)) u.searchParams.set(k, v.join(','))
     else u.searchParams.set(k, String(v))
   }
   return u.toString()
@@ -132,6 +139,10 @@ export async function listProducts(query = {}) {
     sizes: query.sizes,
     colors: query.colors,
     tags: query.tags,
+    attr: query.attr,
+    spec: query.spec,
+    brand: query.brand,
+    in_brand: query.inBrand,
     min_price: query.minPrice,
     max_price: query.maxPrice,
     in_stock: query.inStock || undefined,
@@ -147,6 +158,21 @@ export async function listProducts(query = {}) {
 export async function getProduct(slug) {
   return assertProduct(await get(`/products/${encodeURIComponent(slug)}`), `GET /products/${slug}`)
 }
+
+/**
+ * Price and stock for choices `variants[]` cannot answer: a dynamic option's
+ * combination nobody has bought yet, or no-variant extras on top.
+ */
+export async function getCombination(slug, choiceIds = []) {
+  const where = `POST /products/${slug}/combination`
+  const res = await post(`/products/${encodeURIComponent(slug)}/combination`, { choiceIds })
+  if (!res || typeof res.available !== 'boolean') throw new ContractError(where, '{ exists, variantId, available, price }', res)
+  assertMoney(res.price, `${where} price`)
+  return res
+}
+
+export const listBrands = () => get('/brands').then((r) => assertList(r, 'GET /brands'))
+export const getBrand = (slug) => get(`/brands/${encodeURIComponent(slug)}`)
 
 export async function getRelated(slug, { limit = 4, strategy = 'automatic' } = {}) {
   const res = await get(`/products/${encodeURIComponent(slug)}/related`, { limit, strategy })
@@ -247,12 +273,34 @@ export async function getCart() {
   return ensureCart()
 }
 
-export async function addToCart({ variantId, quantity = 1 }) {
+const customBody = (values) => values.map((c) => ({ choice_id: c.choiceId, text: c.text }))
+
+/**
+ * `variant_id` when that is all there is, which every backend understands.
+ * Otherwise the product and its choices: a dynamic combination has no variant id
+ * yet, and extras, typed text, a combo's items and optional products all ride
+ * on the same request so the server prices them together.
+ */
+export async function addToCart({
+  variantId, productSlug, choiceIds, extraChoiceIds, customValues, comboItems, optionalProducts, quantity = 1,
+}) {
   const cart = await ensureCart()
-  return assertCart(
-    await post(`/carts/${cart.id}/lines`, { variant_id: variantId, quantity }),
-    'POST /carts/:id/lines',
-  )
+  const body = variantId
+    ? { variant_id: variantId, quantity }
+    : { product_slug: productSlug, choice_ids: choiceIds || [], quantity }
+  if (extraChoiceIds?.length) body.extra_choice_ids = extraChoiceIds
+  if (customValues?.length) body.custom_values = customBody(customValues)
+  if (comboItems?.length) {
+    body.combo_items = comboItems.map((item) => ({
+      combo_item_id: item.comboItemId,
+      ...(item.extraChoiceIds?.length ? { extra_choice_ids: item.extraChoiceIds } : {}),
+      ...(item.customValues?.length ? { custom_values: customBody(item.customValues) } : {}),
+    }))
+  }
+  if (optionalProducts?.length) {
+    body.optional_products = optionalProducts.map((o) => ({ variant_id: o.variantId, quantity: o.quantity ?? 1 }))
+  }
+  return assertCart(await post(`/carts/${cart.id}/lines`, body), 'POST /carts/:id/lines')
 }
 
 export async function updateCartLine(lineId, quantity) {

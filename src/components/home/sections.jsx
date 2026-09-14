@@ -96,7 +96,7 @@ function CategoryStrip({ section }) {
                 <img src={c.image.url} alt={c.image.alt} loading="lazy" decoding="async" className="transition-transform duration-700 group-hover:scale-[1.04]" />
               </div>
               <p className="mt-3 text-sm font-medium">{c.name}</p>
-              <p className="text-[12px] text-faint">{c.count} pieces</p>
+              <p className="text-[12px] text-faint">{c.count} {c.count === 1 ? 'product' : 'products'}</p>
             </Link>
           </li>
         ))}
@@ -180,7 +180,7 @@ function CollectionGrid({ section }) {
                 <div className="absolute inset-0 bg-gradient-to-t from-ink/60 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-5">
                   <h3 className="font-display text-xl text-page">{c.title}</h3>
-                  <p className="mt-1 text-[13px] text-page/80">{c.count} pieces</p>
+                  <p className="mt-1 text-[13px] text-page/80">{c.count} {c.count === 1 ? 'product' : 'products'}</p>
                 </div>
               </div>
               <p className="mt-3 text-[14px] leading-relaxed text-muted">{c.blurb}</p>

@@ -107,7 +107,9 @@ function productSchema(p, url, config) {
     description: p.description,
     sku: p.variants?.[0]?.sku,
     image: (p.images || []).map((i) => absolute(i.url)),
-    brand: { '@type': 'Brand', name: config.store?.name },
+    // The maker when the product names one — a phone is not made by the shop
+    // that sells it — and the store for its own goods.
+    brand: { '@type': 'Brand', name: p.brand?.name || config.store?.name },
     offers:
       low === high
         ? {

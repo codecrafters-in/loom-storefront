@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import * as media from '../../lib/media.js'
 import { responsive } from '../../lib/images.js'
+
+const VideoEmbed = lazy(() => import('./VideoEmbed.jsx'))
 
 /**
  * Renders whatever a product stored: a CDN URL, a bundled path, or an uploaded
@@ -20,6 +22,8 @@ export default function Media({
   src,
   alt = '',
   type,
+  provider,
+  embedUrl,
   className = '',
   poster,
   controls = false,
@@ -46,7 +50,17 @@ export default function Media({
     }
   }, [src])
 
-  const kind = type || (resolved?.startsWith('data:video') ? 'video' : 'image')
+  /**
+   * A hosted film (YouTube, Vimeo) is its poster and a play button until
+   * somebody presses it. The player is a third-party frame that sets cookies
+   * and pulls megabytes of script; loading it for every visitor to show a still
+   * would make everybody pay for the few who watch. Without `embedUrl` — a
+   * thumbnail — it is only the poster. `provider: 'file'` is ours, and plays in
+   * a plain `<video>` below.
+   */
+  const hosted = type === 'video' && provider && provider !== 'file'
+  if (hosted && embedUrl) return <Embed poster={resolved} embedUrl={embedUrl} alt={alt} className={className} />
+  const kind = hosted ? 'image' : type || (resolved?.startsWith('data:video') ? 'video' : 'image')
 
   if (!resolved) {
     // The well is already the right shape and colour, so a missing source is a
@@ -82,5 +96,31 @@ export default function Media({
       <source type={alternates.type} srcSet={alternates.srcSet} sizes={sizes} />
       <img src={resolved} alt={alt} sizes={sizes} className={className} {...rest} />
     </picture>
+  )
+}
+
+function Embed({ poster, embedUrl, alt, className }) {
+  const [playing, setPlaying] = useState(false)
+  if (playing) {
+    return (
+      <Suspense fallback={<span className="block h-full w-full bg-sunken" />}>
+        <VideoEmbed src={embedUrl} title={alt} />
+      </Suspense>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setPlaying(true)}
+      aria-label={alt ? `Play video: ${alt}` : 'Play video'}
+      className="group relative block h-full w-full"
+    >
+      {poster ? <img src={poster} alt="" className={className} /> : <span className="block h-full w-full bg-sunken" />}
+      <span aria-hidden="true" className="absolute inset-0 grid place-items-center">
+        <span className="grid h-16 w-16 place-items-center rounded-full bg-page/90 text-ink shadow-panel transition-transform group-hover:scale-105">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+        </span>
+      </span>
+    </button>
   )
 }

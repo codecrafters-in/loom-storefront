@@ -26,7 +26,8 @@ test('highlights stay inside the cap and the vocabulary', async () => {
     const { enrichment: e } = await api.getProduct(card.slug)
     assert.ok(e.highlights.length <= 6, `${card.slug} has ${e.highlights.length} highlights`)
     for (const h of e.highlights) {
-      assert.ok(attributeByKey[h.key], `${card.slug}: "${h.key}" is off-vocabulary`)
+      // A store's own attribute brings its own label; anything else must be in the vocabulary.
+      assert.ok(h.label || attributeByKey[h.key], `${card.slug}: "${h.key}" is off-vocabulary and has no label`)
       assert.ok(String(h.value).trim(), `${card.slug}: "${h.key}" has no value`)
     }
   }
@@ -112,9 +113,13 @@ test('the image strip picks facts a shopper cannot already see', async () => {
   for (const card of all) {
     const { enrichment: e } = await api.getProduct(card.slug)
     const seen = new Set((e.highlights || []).map((h) => h.key))
-    const rows = attributes
-      .filter((a) => e.specs?.[a.key])
-      .map((a) => ({ key: a.key, value: a.unit ? `${e.specs[a.key]} ${a.unit}` : String(e.specs[a.key]) }))
+    // The same two sources ImageSpecs reads: the store's labelled list when it
+    // sends one, the bundled vocabulary when it does not.
+    const rows = (e.specList?.length
+      ? e.specList.map((s) => ({ key: s.key, value: s.unit ? `${s.value} ${s.unit}` : String(s.value) }))
+      : attributes
+        .filter((a) => e.specs?.[a.key])
+        .map((a) => ({ key: a.key, value: a.unit ? `${e.specs[a.key]} ${a.unit}` : String(e.specs[a.key]) })))
       .filter((r) => r.value.length <= STRIP_MAX)
     const fresh = rows.filter((r) => !seen.has(r.key))
     const shown = (fresh.length >= 3 ? fresh : rows).slice(0, 4)

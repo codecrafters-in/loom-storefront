@@ -3,17 +3,14 @@
  * specifications and Storage × Colour variants, and a shopper can buy it.
  *
  * Checklist: B2 B9 R3. Gap report §6: ❌ — can't add to bag (#1); apparel spec
- * labels (#2).
+ * labels (#2). Both fixed in Phase 2: a picker for any option, and specification
+ * labels sent by Odoo.
  */
-import { test, expect, gaps } from '../support/fixtures.js'
+import { test, expect } from '../support/fixtures.js'
 
-test.fail(
+test(
   'S-7 electronics product: own specifications, Storage × Colour variant bought at its own price',
-  gaps(
-    '@S-7',
-    '#1 add-to-bag only works for products with options named exactly Color and Size',
-    '#2 specification labels come from the bundled apparel vocabulary; other keys show raw',
-  ),
+  { tag: '@S-7' },
   async ({ page, shop }) => {
     await shop.openProduct('e2e-nova-phone')
 

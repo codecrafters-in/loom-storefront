@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import api, { peek } from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
@@ -7,7 +7,8 @@ import Promises from '../components/layout/Promises.jsx'
 import { Breadcrumbs, Button, Empty, ErrorState, Icon, Rating, Skeleton } from '../components/ui/index.jsx'
 import Seo from '../components/Seo.jsx'
 import ProductView from '../components/product/ProductView.jsx'
-import { useStorefront } from '../store/StorefrontContext.jsx'
+import { useBootstrap, useStorefront } from '../store/StorefrontContext.jsx'
+import { productTrail } from '../lib/categories.js'
 import { viewItem } from '../lib/analytics.js'
 import { remember } from '../lib/recentlyViewed.js'
 import { useAuth } from '../store/AuthContext.jsx'
@@ -32,6 +33,10 @@ export default function Product() {
   const reviews = useAsync(() => api.getReviews(slug), [slug], {
     skip: config.features?.reviews === false,
   })
+  // Category names, not slugs, to any depth: the product's own breadcrumbs, or
+  // the deepest of its categories found in the tree the bootstrap already sent.
+  const { categories: tree } = useBootstrap()
+  const trail = useMemo(() => (product ? productTrail(product, tree) : []), [product, tree])
 
   // Keyed on the slug, so navigating between products reports each one — and
   // not on every render, which would report the same view a dozen times.
@@ -51,7 +56,7 @@ export default function Product() {
         {error.status === 404 ? (
           <Empty
             icon="search"
-            title="We could not find that piece"
+            title="We could not find that product"
             body="It may have sold out and been retired."
             action={<Button to="/shop">Browse everything</Button>}
           />
@@ -76,9 +81,7 @@ export default function Product() {
           trail={[
             { label: 'Home', to: '/' },
             { label: 'Shop', to: '/shop' },
-            ...(product.categories?.[0]
-              ? [{ label: product.categories[0], to: `/shop/${product.categories[0]}` }]
-              : []),
+            ...trail.map((c) => ({ label: c.name, to: `/shop/${c.slug}` })),
             { label: product.title },
           ]}
         />
@@ -87,7 +90,21 @@ export default function Product() {
       {/* Enrichment used to be a full-width section here. It now sits in the
           buy column inside ProductView — everything that decides a purchase
           belongs beside the button, not below it. */}
-      <ProductView product={product} />
+      {/* Keyed on the product, so moving from one product to another starts the
+          picker afresh rather than carrying one product's choices into the next. */}
+      <ProductView key={product.slug} product={product} />
+
+      {/* The store's own "goes with it", when it has chosen some. Without them
+          this rail is not shown and the related rail below is what the page
+          offers, as it always did. */}
+      {product.accessories?.length > 0 && (
+        <section className="wrap wrap-tight pb-16">
+          <h2 className="text-display-md">Frequently bought together</h2>
+          <div className="mt-8">
+            <ProductGrid products={product.accessories} />
+          </div>
+        </section>
+      )}
 
       {/* reviews */}
       {config.features?.reviews !== false && (
@@ -170,11 +187,12 @@ export default function Product() {
       )}
 
       {/* related */}
-      {related.data?.items?.length > 0 && (
+      {/* The store's alternatives when it named them, computed recommendations when it did not. */}
+      {(product.alternatives?.length > 0 || related.data?.items?.length > 0) && (
         <section className="wrap wrap-tight py-16">
           <h2 className="text-display-md">{recs.title || 'You might also like'}</h2>
           <div className="mt-8">
-            <ProductGrid products={related.data.items} />
+            <ProductGrid products={product.alternatives?.length ? product.alternatives : related.data.items} />
           </div>
         </section>
       )}

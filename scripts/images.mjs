@@ -212,7 +212,9 @@ function chain(query, extra = []) {
 }
 
 const jobs = []
-for (const p of products) {
+// Products and categories without a query bring their own artwork (the
+// non-apparel demo products are drawn, not photographed), so there is nothing to fetch.
+for (const p of products.filter((x) => x._imageQuery)) {
   const garment = garmentOf(p._imageQuery) || garmentOf(p._colorQuery) || 'clothing'
   const garmentQuery = p._colorQuery || p._imageQuery
 
@@ -268,7 +270,7 @@ for (const p of products) {
   }
 }
 
-for (const c of categories) {
+for (const c of categories.filter((x) => x.imageQuery)) {
   jobs.push({
     key: `categories/${c.slug}`,
     queries: chain(c.imageQuery),

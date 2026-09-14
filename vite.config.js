@@ -1,8 +1,21 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig(({ isSsrBuild }) => ({
+export default defineConfig(({ isSsrBuild, mode }) => ({
   plugins: [react()],
+  /**
+   * Which data layer this build talks to, as a constant the bundler can read.
+   *
+   * `src/lib/api/index.js` imports both adapters and picks one. Picked at run
+   * time, both ship: every visitor to a live store downloaded the whole demo
+   * backend, and every demo visitor the HTTP client. With the answer known at
+   * build time Rollup drops the other one — the largest single saving in the
+   * first download. `loadEnv` sees the same variables the bundle does,
+   * `.env.local` and the shell alike.
+   */
+  define: {
+    __LOOM_API__: JSON.stringify((loadEnv(mode, process.cwd(), 'VITE_').VITE_DATA_SOURCE || 'mock').toLowerCase() === 'api'),
+  },
   build: {
     // The manifest names the entry chunk and everything it pulls in, which is
     // what scripts/budget.mjs measures. Matching `dist/assets/index-*.js` by

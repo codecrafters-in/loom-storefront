@@ -152,16 +152,26 @@ export function Badge({ kind, children, className = '' }) {
 
 /* ── quantity ──────────────────────────────────────────────────────────── */
 
-export function QuantityStepper({ value, onChange, min = 1, max = 99, disabled = false, size = 'md' }) {
+/**
+ * `step` and `unit` for things not sold one at a time — coffee by the quarter
+ * kilo. Pass the props from `stepperProps()` in lib/quantity.js, which reads the
+ * product's rule, so the stepper never offers a quantity the server refuses.
+ */
+export function QuantityStepper({ value, onChange, min = 1, max = 99, step = 1, unit = '', disabled = false, size = 'md' }) {
   const h = size === 'sm' ? 'h-8' : 'h-10'
   const btn = 'grid w-8 place-items-center text-muted transition-colors hover:text-ink disabled:opacity-30 disabled:hover:text-muted'
+  // Rounded to three places, or a quarter-kilo step drifts into 0.7500000001.
+  const move = (dir) => onChange(Math.min(max, Math.max(min, Math.round((value + dir * step) * 1000) / 1000)))
   return (
     <div className={`inline-flex ${h} items-center rounded-xs border border-line bg-surface`}>
-      <button type="button" className={btn} onClick={() => onChange(value - 1)} disabled={disabled || value <= min} aria-label="Decrease quantity">
+      <button type="button" className={btn} onClick={() => move(-1)} disabled={disabled || value <= min} aria-label="Decrease quantity">
         <Icon name="minus" size={14} />
       </button>
-      <span className="w-8 text-center text-sm tabular-nums" aria-live="polite">{value}</span>
-      <button type="button" className={btn} onClick={() => onChange(value + 1)} disabled={disabled || value >= max} aria-label="Increase quantity">
+      <span className="min-w-8 px-0.5 text-center text-sm tabular-nums" aria-live="polite">
+        {value}
+        {unit && <span className="ml-0.5 text-[11px] text-faint">{unit}</span>}
+      </span>
+      <button type="button" className={btn} onClick={() => move(1)} disabled={disabled || value + step > max + 1e-9} aria-label="Increase quantity">
         <Icon name="plus" size={14} />
       </button>
     </div>
@@ -211,7 +221,7 @@ export function Breadcrumbs({ trail }) {
   return (
     <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-[12px] text-faint">
       {trail.map((step, i) => (
-        <span key={step.label} className="flex items-center gap-1.5">
+        <span key={`${i}-${step.label}`} className="flex items-center gap-1.5">
           {i > 0 && <Icon name="chevron-right" size={12} className="text-line" />}
           {step.to && i < trail.length - 1 ? (
             <Link to={step.to} className="transition-colors hover:text-ink">{step.label}</Link>

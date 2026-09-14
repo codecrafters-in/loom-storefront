@@ -19,7 +19,7 @@
 import { isRealDiscount } from './money.js'
 
 const KEY = 'loom.db'
-const VERSION = 11
+const VERSION = 12
 
 const listeners = new Set()
 let cache = null
@@ -30,7 +30,7 @@ function nowIso() {
 
 /** Seeded once, then owned by the user. Bumping VERSION reseeds. */
 async function seed() {
-  const [{ products, categories, collections }, { storefront }, { sizeCharts }] = await Promise.all([
+  const [{ products, categories, collections, brands }, { storefront }, { sizeCharts }] = await Promise.all([
     import('../data/catalog.js'),
     import('../data/storefront.js'),
     import('../data/fit.js'),
@@ -41,6 +41,7 @@ async function seed() {
     products: products.map((p) => ({ ...p, updatedAt: nowIso() })),
     categories: categories.map((c) => ({ ...c })),
     collections: collections.map((c) => ({ ...c })),
+    brands: brands.map((b) => ({ ...b })),
     // Shared and referenced by id, so editing "tops" fixes it on all nine
     // products that use it instead of nine separate tables drifting apart.
     sizeCharts: Object.entries(sizeCharts).map(([id, chart]) => ({ id, ...chart })),
@@ -204,6 +205,7 @@ async function backfill(stored) {
     products,
     categories: mergeById(fresh.categories, stored.categories, 'slug'),
     collections: mergeById(fresh.collections, stored.collections, 'slug'),
+    brands: mergeById(fresh.brands, stored.brands, 'slug'),
     sizeCharts: mergeById(fresh.sizeCharts, stored.sizeCharts, 'id'),
     settings: deepMerge(fresh.settings, stored.settings || {}),
     library: { ...fresh.library, ...(stored.library || {}) },
@@ -255,6 +257,7 @@ if (typeof window !== 'undefined') {
 export const getProducts = () => cache?.products || []
 export const getCategories = () => cache?.categories || []
 export const getCollections = () => cache?.collections || []
+export const getBrands = () => cache?.brands || []
 export const getSettings = () => cache?.settings || {}
 export const getSizeCharts = () => cache?.sizeCharts || []
 

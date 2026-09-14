@@ -38,6 +38,10 @@ the person buying, not for your logs. `code` is what you branch on.
 | `missing_credentials` | 422 | Inline |
 | `invalid_email` | 422 | Inline on the newsletter field |
 | `invalid_address` | 422 | The fields named in `detail.fields` are marked on the checkout and account address forms, with the message |
+| `choose_options` | 422 | Adding to the bag with an option not chosen. Toast: "Choose Storage first.", from `detail.missing` when the body has no message |
+| `invalid_combination` | 422 | A combination that is excluded or not made, or text over 200 characters. The buy button reads "Not available"; the add is refused with a toast |
+| `quantity_rule` | 422 | A quantity outside the product's `quantity` rule. Toast built from `detail.min`, `detail.max`, `detail.step`; the steppers only offer allowed quantities |
+| `combo_incomplete` | 422 | A set added without one item from every group. Toast names `detail.groups` |
 | `captcha_failed` | 422 | Inline on the form that sent it — sign-in, registration, order lookup, newsletter — and the captcha is reset for another try |
 | `invalid_grant` | 400 or 401 | Admin sign-in: shown on the admin login page. From a refresh, the panel signs out |
 | `invalid_request` | 400 | Admin sign-in: shown on the admin login page |

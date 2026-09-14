@@ -6,6 +6,16 @@ import Promises from '../components/layout/Promises.jsx'
 import Media from '../components/ui/Media.jsx'
 import { SIZES } from '../lib/images.js'
 import { formatMoney } from '../lib/money.js'
+import { config } from '../lib/config.js'
+import { nestLines } from '../lib/cart-lines.js'
+import LineDetails from '../components/cart/LineDetails.jsx'
+
+/**
+ * A download link as the backend gave it. `GET /orders/:id/downloads/:doc` is a
+ * route on the API, so a bare one is resolved against the API's base URL; an
+ * absolute link, or a file the demo serves itself, is used as it is.
+ */
+const downloadUrl = (url = '') => (/^\/orders\//.test(url) ? `${config.api.baseUrl}${url}` : url)
 
 export default function OrderConfirmation() {
   const { id } = useParams()
@@ -62,18 +72,33 @@ export default function OrderConfirmation() {
           </div>
         )}
 
+        {/* Only a paid order carries these; before payment the backend answers 404 for the files anyway. */}
+        {order.downloads?.length > 0 && (
+          <div className="mt-8 rounded-xs border border-line bg-surface p-5">
+            <p className="eyebrow">Downloads</p>
+            <ul className="mt-3 space-y-2">
+              {order.downloads.map((d) => (
+                <li key={d.id}>
+                  <a href={downloadUrl(d.url)} download className="inline-flex items-center gap-2 text-[14px] text-accent link-underline">
+                    <Icon name="package" size={15} />
+                    {d.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="mt-10 rounded-xs border border-line bg-surface">
           <ul className="divide-y divide-line px-6">
-            {order.lines.map((l) => (
-              <li key={l.id} className="flex gap-4 py-5">
+            {nestLines(order.lines).map(({ line: l, depth }) => (
+              <li key={l.id} className={`flex gap-4 py-5 ${depth ? 'pl-6' : ''}`}>
                 <div className="w-16 shrink-0">
                   <div className="shot rounded-xs"><Media sizes={SIZES.thumb} src={l.image?.url} type={l.image?.type} alt="" loading="lazy" className="h-full w-full object-cover" /></div>
                 </div>
                 <div className="min-w-0 flex-1">
                   <Link to={`/product/${l.productSlug}`} className="text-[14px] font-medium">{l.title}</Link>
-                  <p className="mt-1 text-[12px] text-faint">
-                    {Object.values(l.options).join(' · ')} · Qty {l.quantity}
-                  </p>
+                  <LineDetails line={l} quantity />
                 </div>
                 <span className="text-[14px] tabular-nums">{formatMoney(l.lineTotal)}</span>
               </li>
