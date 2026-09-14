@@ -5,6 +5,7 @@ import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
 import { formatMoney } from '../../lib/money.js'
 import useFocusTrap from '../../hooks/useFocusTrap.js'
+import { t, plural } from '../../i18n/index.js'
 
 /**
  * "Anything to go with it?" — the store's optional products, offered as the
@@ -38,14 +39,14 @@ export default function OptionalOffer({ product, busy, onConfirm, onClose }) {
 
   return (
     <div ref={trapRef} tabIndex={-1} className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="optional-offer-title">
-      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
+      <button type="button" aria-label={t('Close')} onClick={onClose} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
       <div className="relative w-full max-w-md rounded-xs border border-line bg-page p-6 shadow-panel">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id="optional-offer-title" className="font-display text-xl">Anything to go with it?</h2>
-            <p className="mt-1 text-[13px] text-muted">Added to your bag together with {product.title}.</p>
+            <h2 id="optional-offer-title" className="font-display text-xl">{t('Anything to go with it?')}</h2>
+            <p className="mt-1 text-[13px] text-muted">{t('Added to your bag together with {title}.', { title: product.title })}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-muted hover:text-ink">
+          <button type="button" onClick={onClose} aria-label={t('Close')} className="text-muted hover:text-ink">
             <Icon name="close" size={18} />
           </button>
         </div>
@@ -73,7 +74,7 @@ export default function OptionalOffer({ product, busy, onConfirm, onClose }) {
                   <>
                     <span className="block">{p.title}</span>
                     <Link to={`/product/${p.slug}`} onClick={onClose} className="link-underline text-[12px] text-accent">
-                      Choose options
+                      {t('Choose options')}
                     </Link>
                   </>
                 )}
@@ -85,10 +86,10 @@ export default function OptionalOffer({ product, busy, onConfirm, onClose }) {
 
         <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
           <Button full disabled={busy} onClick={() => onConfirm(chosen)}>
-            {chosen.length ? `Add ${chosen.length + 1} items` : 'Add to bag'}
+            {chosen.length ? plural(chosen.length + 1, 'Add {count} item', 'Add {count} items') : t('Add to bag')}
           </Button>
           <Button full variant="quiet" disabled={busy} onClick={() => onConfirm([])}>
-            No thanks
+            {t('No thanks')}
           </Button>
         </div>
       </div>

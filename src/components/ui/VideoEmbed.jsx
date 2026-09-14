@@ -9,20 +9,22 @@
  * Its own chunk: most product pages have no film, and the few that do have
  * shoppers who never press play.
  */
+import { t } from '../../i18n/index.js'
+
 const ALLOWED = /^https:\/\/(www\.youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/)/
 
 export default function VideoEmbed({ src, title, className = '' }) {
   if (!ALLOWED.test(src || '')) {
     return (
       <span className="grid h-full w-full place-items-center bg-sunken p-6 text-center text-[13px] text-muted">
-        This video cannot be played here.
+        {t('This video cannot be played here.')}
       </span>
     )
   }
   return (
     <iframe
       src={`${src}${src.includes('?') ? '&' : '?'}autoplay=1`}
-      title={title || 'Video'}
+      title={title || t('Video')}
       allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
       allowFullScreen
       referrerPolicy="strict-origin-when-cross-origin"

@@ -10,6 +10,7 @@ import { SIZES } from '../../lib/images.js'
 import { ExtraOptions, OptionPicker } from './VariantPicker.jsx'
 import { CompareToggle } from './CompareTray.jsx'
 import useFocusTrap from '../../hooks/useFocusTrap.js'
+import { t } from '../../i18n/index.js'
 
 const OptionalOffer = lazy(() => import('./OptionalOffer.jsx'))
 
@@ -46,15 +47,15 @@ export default function QuickView({ slug, onClose }) {
       className="fixed inset-0 z-50 grid place-items-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-label={product ? `Quick view: ${product.title}` : 'Quick view'}
+      aria-label={product ? t('Quick view: {title}', { title: product.title }) : t('Quick view')}
     >
-      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
-      <div className="relative max-h-[90dvh] w-full max-w-3xl overflow-y-auto rounded-xs border border-line bg-page text-left shadow-panel">
+      <button type="button" aria-label={t('Close')} onClick={onClose} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
+      <div className="relative max-h-[90dvh] w-full max-w-3xl overflow-y-auto rounded-xs border border-line bg-page text-start shadow-panel">
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close quick view"
-          className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-page/85 text-muted transition-colors hover:text-ink"
+          aria-label={t('Close quick view')}
+          className="absolute end-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-page/85 text-muted transition-colors hover:text-ink"
         >
           <Icon name="close" size={18} />
         </button>
@@ -83,7 +84,7 @@ function Body({ product, onClose }) {
   const [offer, setOffer] = useState(null)
 
   const submit = (request) =>
-    add(request, request.quantity ?? choice.qty, `${product.title} added to your bag`)
+    add(request, request.quantity ?? choice.qty, t('{title} added to your bag', { title: product.title }))
       .then(onClose)
       .catch(() => {
         /* the bag has already said why */
@@ -102,12 +103,12 @@ function Body({ product, onClose }) {
       </div>
       <div className="min-w-0">
         {product.brand && <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{product.brand.name}</p>}
-        <h2 className="mt-1 pr-8 text-display-md">{product.title}</h2>
+        <h2 className="mt-1 pe-8 text-display-md">{product.title}</h2>
         {product.subtitle && <p className="mt-1.5 text-[14px] text-muted">{product.subtitle}</p>}
         <Price price={choice.shown.price} to={choice.shown.to} compareAt={choice.shown.compareAt} className="mt-4" />
 
         {product.type === 'combo' ? (
-          <p className="mt-6 text-[14px] leading-relaxed text-muted">Choose what goes in the set on its page.</p>
+          <p className="mt-6 text-[14px] leading-relaxed text-muted">{t('Choose what goes in the set on its page.')}</p>
         ) : (
           <>
             <OptionPicker choice={choice} />
@@ -115,7 +116,7 @@ function Body({ product, onClose }) {
             <div className="mt-6 flex items-center gap-3">
               <QuantityStepper value={choice.qty} onChange={choice.setQty} {...choice.stepper} />
               <Button className="flex-1" disabled={!choice.ready || busy} onClick={buy}>
-                {choice.blocker || (busy ? 'Adding…' : 'Add to bag')}
+                {choice.blocker || (busy ? t('Adding…') : t('Add to bag'))}
               </Button>
             </div>
           </>
@@ -123,7 +124,7 @@ function Body({ product, onClose }) {
 
         <div className="mt-5 flex items-center justify-between gap-4">
           <Link to={`/product/${product.slug}`} onClick={onClose} className="link-underline text-[13px] text-accent">
-            View full details
+            {t('View full details')}
           </Link>
           <CompareToggle slug={product.slug} />
         </div>

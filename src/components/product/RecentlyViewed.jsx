@@ -4,6 +4,7 @@ import { recent, onRecentChange } from '../../lib/recentlyViewed.js'
 import { useAuth } from '../../store/AuthContext.jsx'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import ProductGrid from './ProductGrid.jsx'
+import { t } from '../../i18n/index.js'
 
 /**
  * The rail of what this person was just looking at.
@@ -19,7 +20,7 @@ import ProductGrid from './ProductGrid.jsx'
  * broken carousel, and telling somebody what they just clicked is not a
  * recommendation.
  */
-export default function RecentlyViewed({ exclude, title = 'Recently viewed', limit = 6 }) {
+export default function RecentlyViewed({ exclude, title = t('Recently viewed'), limit = 6 }) {
   const { customer } = useAuth()
   const config = useStorefront()
   const enabled = config.features?.recentlyViewed !== false

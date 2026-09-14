@@ -7,9 +7,10 @@ import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { formatMoney } from '../../lib/money.js'
 import { Button, Icon } from '../ui/index.jsx'
 import PaymentStep from './PaymentStep.jsx'
+import { mark, t, addressPrefix } from '../../i18n/index.js'
 
 const STILL_WAITING =
-  'We have not heard back from the payment provider yet. If the payment went through, we will email you. There is no need to pay again.'
+  mark('We have not heard back from the payment provider yet. If the payment went through, we will email you. There is no need to pay again.')
 
 /**
  * "Pay now" on an order that is placed but not paid: a quotation the shop sent,
@@ -72,7 +73,7 @@ export default function PayNow({ order, autoOpen = false, notice: firstNotice = 
       const created = await api.createOrderPayment(order.id, {
         ...(chosen.saved ? { tokenId: chosen.id } : { providerId: chosen.providerId, methodId: chosen.methodId }),
         saveMethod: saveMethod && chosen.canSave,
-        ...returnUrls(config.checkout, window.location.origin),
+        ...returnUrls(config.checkout, window.location.origin + addressPrefix()),
       })
       const result = await runPayment(created, { api, input })
       if (result.kind === 'redirect') {
@@ -80,7 +81,7 @@ export default function PayNow({ order, autoOpen = false, notice: firstNotice = 
         return
       }
       if (result.kind === 'order') await onPaid?.()
-      else if (result.kind === 'timeout') setNotice(STILL_WAITING)
+      else if (result.kind === 'timeout') setNotice(t(STILL_WAITING))
       else setError(new ApiError(result.message, { code: `payment_${result.payment.status}` }))
     } catch (err) {
       if (err.code === 'payment_cancelled') setNotice(err.message)
@@ -95,10 +96,10 @@ export default function PayNow({ order, autoOpen = false, notice: firstNotice = 
     <section aria-labelledby="pay-now" className="mt-8 rounded-xs border border-ink bg-surface p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 id="pay-now" className="eyebrow">Amount due</h2>
+          <h2 id="pay-now" className="eyebrow">{t('Amount due')}</h2>
           <p className="mt-2 text-[22px] tabular-nums">{formatMoney(order.amountDue)}</p>
         </div>
-        {!open && <Button onClick={() => setOpen(true)} iconRight="arrow-right">Pay now</Button>}
+        {!open && <Button onClick={() => setOpen(true)} iconRight="arrow-right">{t('Pay now')}</Button>}
       </div>
 
       {notice && (
@@ -127,7 +128,7 @@ export default function PayNow({ order, autoOpen = false, notice: firstNotice = 
             <p role="alert" className="mt-5 rounded-xs border border-sale/25 bg-page p-3.5 text-[13px] text-sale">{error.message}</p>
           )}
           <Button as="button" type="submit" full size="lg" className="mt-6" disabled={busy || loading || !selected}>
-            {busy ? 'Processing payment…' : `Pay · ${formatMoney(order.amountDue)}`}
+            {busy ? t('Processing payment…') : t('Pay · {amount}', { amount: formatMoney(order.amountDue) })}
           </Button>
         </form>
       )}

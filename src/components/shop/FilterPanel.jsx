@@ -1,5 +1,6 @@
 import { Icon } from '../ui/index.jsx'
-import { formatMoney, minorUnits } from '../../lib/money.js'
+import { formatMoney, minorUnits, money } from '../../lib/money.js'
+import { t } from '../../i18n/index.js'
 
 /**
  * Facets come from the API, never from the rendered page. Deriving them from
@@ -15,7 +16,7 @@ import { formatMoney, minorUnits } from '../../lib/money.js'
  * Within a group the choices widen (either colour); across groups they narrow
  * (this colour, in this size). That is what the API does with repeated `attr`.
  */
-export default function FilterPanel({ facets, value, onChange, onClear, currency = 'USD', hideBrands = false }) {
+export default function FilterPanel({ facets, value, onChange, onClear, currency, hideBrands = false }) {
   if (!facets) return null
   const { sizes = [], colors = [], tags = [], priceRange, attributes, specs = [], brands = [] } = facets
   const generic = Array.isArray(attributes)
@@ -34,10 +35,10 @@ export default function FilterPanel({ facets, value, onChange, onClear, currency
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className="eyebrow">Filter</h2>
+        <h2 className="eyebrow">{t('Filter')}</h2>
         {active > 0 && (
           <button type="button" onClick={onClear} className="text-[12px] text-muted link-underline">
-            Clear all ({active})
+            {t('Clear all ({count})', { count: active })}
           </button>
         )}
       </div>
@@ -57,12 +58,12 @@ export default function FilterPanel({ facets, value, onChange, onClear, currency
       ) : (
         <>
           {sizes.length > 0 && (
-            <Group title="Size">
+            <Group title={t('Size')}>
               <Chips items={sizes.map((name) => ({ name }))} isOn={(s) => value.sizes?.includes(s)} onToggle={(s) => toggle('sizes', s)} />
             </Group>
           )}
           {colors.length > 0 && (
-            <Group title="Colour">
+            <Group title={t('Colour')}>
               <Swatches items={colors} isOn={(c) => value.colors?.includes(c)} onToggle={(c) => toggle('colors', c)} />
             </Group>
           )}
@@ -81,7 +82,7 @@ export default function FilterPanel({ facets, value, onChange, onClear, currency
         ))}
 
       {!hideBrands && brands.length > 0 && (
-        <Group title="Brand">
+        <Group title={t('Brand')}>
           <ul className="space-y-2.5">
             {brands.map((b) => (
               <li key={b.slug}>
@@ -102,12 +103,12 @@ export default function FilterPanel({ facets, value, onChange, onClear, currency
       )}
 
       {tags.length > 0 && (
-        <Group title={facets.tagsLabel || 'Tags'}>
+        <Group title={facets.tagsLabel || t('Tags')}>
           <Chips small items={tags.map((name) => ({ name }))} isOn={(t) => value.tags?.includes(t)} onToggle={(t) => toggle('tags', t)} />
         </Group>
       )}
 
-      <Group title="Availability">
+      <Group title={t('Availability')}>
         <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-muted">
           <input
             type="checkbox"
@@ -115,12 +116,12 @@ export default function FilterPanel({ facets, value, onChange, onClear, currency
             onChange={(e) => onChange({ ...value, inStock: e.target.checked, page: 1 })}
             className="h-4 w-4 accent-[rgb(var(--accent))]"
           />
-          In stock only
+          {t('In stock only')}
         </label>
       </Group>
 
       {priceRange && priceRange.max > priceRange.min && (
-        <Group title="Price">
+        <Group title={t('Price')}>
           <PriceRange range={priceRange} currency={currency} value={value} onChange={onChange} />
         </Group>
       )}
@@ -153,7 +154,7 @@ function Chips({ items, isOn, onToggle, small = false }) {
             } ${on ? 'border-ink bg-ink text-page' : 'border-line text-ink hover:border-ink'}`}
           >
             {label || name}
-            {count != null && <span className={`ml-1.5 text-[11px] tabular-nums ${on ? 'text-page/70' : 'text-faint'}`}>{count}</span>}
+            {count != null && <span className={`ms-1.5 text-[11px] tabular-nums ${on ? 'text-page/70' : 'text-faint'}`}>{count}</span>}
           </button>
         )
       })}
@@ -172,7 +173,7 @@ function Swatches({ items, isOn, onToggle }) {
               type="button"
               onClick={() => onToggle(c.name)}
               aria-pressed={on}
-              className="flex w-full items-center gap-2.5 text-left text-[13px]"
+              className="flex w-full items-center gap-2.5 text-start text-[13px]"
             >
               <span
                 className={`grid h-4 w-4 shrink-0 place-items-center rounded-full ring-1 ring-inset ${on ? 'ring-2 ring-ink' : 'ring-ink/15'}`}
@@ -198,7 +199,9 @@ function Swatches({ items, isOn, onToggle }) {
  * whole major unit, or a hundredth of the spread when that is larger, so a
  * catalogue running from a pen to a phone is not a thousand steps wide.
  */
-function PriceRange({ range, currency, value, onChange }) {
+function PriceRange({ range, currency: given, value, onChange }) {
+  // The store's currency, never an assumed dollar: a dinar store's filter reads in KWD, with its three decimals.
+  const currency = given || money(0).currency
   const unit = 10 ** minorUnits(currency)
   const step = Math.max(unit, Math.round((range.max - range.min) / 100 / unit) * unit)
   const low = value.minPrice ?? range.min
@@ -210,7 +213,7 @@ function PriceRange({ range, currency, value, onChange }) {
         {formatMoney({ amount: low, currency })} — {formatMoney({ amount: high, currency })}
       </p>
       <label className="mt-3 block text-[12px] text-faint">
-        Lowest
+        {t('Lowest')}
         <input
           type="range"
           min={range.min}
@@ -222,11 +225,11 @@ function PriceRange({ range, currency, value, onChange }) {
             set({ minPrice: n <= range.min ? undefined : n })
           }}
           className="mt-1 w-full accent-[rgb(var(--accent))]"
-          aria-label="Lowest price"
+          aria-label={t('Minimum price')}
         />
       </label>
       <label className="mt-2 block text-[12px] text-faint">
-        Highest
+        {t('Highest')}
         <input
           type="range"
           min={range.min}
@@ -238,7 +241,7 @@ function PriceRange({ range, currency, value, onChange }) {
             set({ maxPrice: n >= range.max ? undefined : n })
           }}
           className="mt-1 w-full accent-[rgb(var(--accent))]"
-          aria-label="Highest price"
+          aria-label={t('Maximum price')}
         />
       </label>
     </>

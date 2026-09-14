@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import api from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
+import { t } from '../../i18n/index.js'
 
 const NO_STATES = []
 
@@ -15,7 +16,7 @@ const NO_STATES = []
  * `onChange` receives the native change event, so it drops into the same
  * `set('region')` handler a plain input uses.
  */
-export default function RegionField({ id, country, value, onChange, invalid = false, label = 'State / region' }) {
+export default function RegionField({ id, country, value, onChange, invalid = false, label = t('State / region') }) {
   const code = String(country || '').toUpperCase()
   const { data } = useAsync(
     () => (code ? api.getCountry(code).catch(() => null) : Promise.resolve(null)),
@@ -36,7 +37,7 @@ export default function RegionField({ id, country, value, onChange, invalid = fa
   }, [states, value, onChange])
 
   const className = `field ${invalid ? 'border-sale' : ''}`
-  const optional = states.length && !required ? ' (optional)' : ''
+  const optional = states.length && !required ? ` ${t('(optional)')}` : ''
 
   return (
     <div>
@@ -51,7 +52,7 @@ export default function RegionField({ id, country, value, onChange, invalid = fa
           aria-invalid={invalid || undefined}
           autoComplete="address-level1"
         >
-          <option value="" disabled={required}>{required ? 'Select a state' : 'None'}</option>
+          <option value="" disabled={required}>{required ? t('Select a state') : t('None')}</option>
           {states.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}
         </select>
       ) : (

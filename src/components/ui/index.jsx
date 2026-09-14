@@ -2,6 +2,7 @@ import { forwardRef } from 'react'
 import { Link } from 'react-router-dom'
 import Icon from './Icon.jsx'
 import { formatMoney, discountPercent, MIN_DISCOUNT } from '../../lib/money.js'
+import { t, mark } from '../../i18n/index.js'
 
 export { default as Icon } from './Icon.jsx'
 
@@ -115,7 +116,7 @@ export function Rating({ value = 0, count, size = 13, showCount = true, classNam
           />
         ))}
       </span>
-      <span className="sr-only">{value} out of 5</span>
+      <span className="sr-only">{t('{value} out of 5', { value })}</span>
       {showCount && count !== undefined && (
         <span className="text-[12px] text-faint tabular-nums">({count})</span>
       )}
@@ -133,11 +134,11 @@ const BADGE_TONE = {
   'sold-out': 'bg-sunken text-faint',
 }
 const BADGE_LABEL = {
-  new: 'New',
-  sale: 'Sale',
-  bestseller: 'Bestseller',
-  'low-stock': 'Low stock',
-  'sold-out': 'Sold out',
+  new: mark('New'),
+  sale: mark('Sale'),
+  bestseller: mark('Bestseller'),
+  'low-stock': mark('Low stock'),
+  'sold-out': mark('Sold out'),
 }
 
 export function Badge({ kind, children, className = '' }) {
@@ -145,7 +146,7 @@ export function Badge({ kind, children, className = '' }) {
     <span
       className={`inline-flex items-center rounded-xs px-2 py-1 font-mono text-[9px] uppercase tracking-[0.14em] ${BADGE_TONE[kind] || 'bg-sunken text-muted'} ${className}`}
     >
-      {children || BADGE_LABEL[kind] || kind}
+      {children || (BADGE_LABEL[kind] && t(BADGE_LABEL[kind])) || kind}
     </span>
   )
 }
@@ -164,14 +165,14 @@ export function QuantityStepper({ value, onChange, min = 1, max = 99, step = 1, 
   const move = (dir) => onChange(Math.min(max, Math.max(min, Math.round((value + dir * step) * 1000) / 1000)))
   return (
     <div className={`inline-flex ${h} items-center rounded-xs border border-line bg-surface`}>
-      <button type="button" className={btn} onClick={() => move(-1)} disabled={disabled || value <= min} aria-label="Decrease quantity">
+      <button type="button" className={btn} onClick={() => move(-1)} disabled={disabled || value <= min} aria-label={t('Decrease quantity')}>
         <Icon name="minus" size={14} />
       </button>
       <span className="min-w-8 px-0.5 text-center text-sm tabular-nums" aria-live="polite">
         {value}
-        {unit && <span className="ml-0.5 text-[11px] text-faint">{unit}</span>}
+        {unit && <span className="ms-0.5 text-[11px] text-faint">{unit}</span>}
       </span>
-      <button type="button" className={btn} onClick={() => move(1)} disabled={disabled || value + step > max + 1e-9} aria-label="Increase quantity">
+      <button type="button" className={btn} onClick={() => move(1)} disabled={disabled || value + step > max + 1e-9} aria-label={t('Increase quantity')}>
         <Icon name="plus" size={14} />
       </button>
     </div>
@@ -197,14 +198,14 @@ export function ErrorState({ error, onRetry }) {
   return (
     <div className="mx-auto max-w-lg rounded-xs border border-sale/25 bg-surface p-6 text-center">
       <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-sale">
-        {error?.code || 'error'}
+        {error?.code || t('error')}
       </p>
       <p className="mt-3 text-[15px] leading-relaxed text-ink">
-        {error?.message || 'Something went wrong.'}
+        {error?.message || t('Something went wrong.')}
       </p>
       {onRetry && (
         <Button variant="quiet" size="sm" className="mt-5" onClick={onRetry}>
-          Try again
+          {t('Try again')}
         </Button>
       )}
     </div>
@@ -219,10 +220,10 @@ export function Skeleton({ className = '' }) {
 
 export function Breadcrumbs({ trail }) {
   return (
-    <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-[12px] text-faint">
+    <nav aria-label={t('Breadcrumb')} className="flex flex-wrap items-center gap-1.5 text-[12px] text-faint">
       {trail.map((step, i) => (
         <span key={`${i}-${step.label}`} className="flex items-center gap-1.5">
-          {i > 0 && <Icon name="chevron-right" size={12} className="text-line" />}
+          {i > 0 && <Icon name="chevron-right" size={12} className="text-line rtl:-scale-x-100" />}
           {step.to && i < trail.length - 1 ? (
             <Link to={step.to} className="transition-colors hover:text-ink">{step.label}</Link>
           ) : (
@@ -243,15 +244,15 @@ export function Pagination({ page, perPage, total, onPage }) {
     (n) => n === 1 || n === pages || Math.abs(n - page) <= 1,
   )
   return (
-    <nav className="flex items-center justify-center gap-1.5" aria-label="Pagination">
+    <nav className="flex items-center justify-center gap-1.5" aria-label={t('Pagination')}>
       <button
         type="button"
         onClick={() => onPage(page - 1)}
         disabled={page <= 1}
         className="grid h-9 w-9 place-items-center rounded-xs border border-line text-muted transition-colors hover:border-ink hover:text-ink disabled:opacity-30"
-        aria-label="Previous page"
+        aria-label={t('Previous page')}
       >
-        <Icon name="chevron-left" size={15} />
+        <Icon name="chevron-left" size={15} className="rtl:-scale-x-100" />
       </button>
       {nums.map((n, i) => (
         <span key={n} className="flex items-center gap-1.5">
@@ -273,9 +274,9 @@ export function Pagination({ page, perPage, total, onPage }) {
         onClick={() => onPage(page + 1)}
         disabled={page >= pages}
         className="grid h-9 w-9 place-items-center rounded-xs border border-line text-muted transition-colors hover:border-ink hover:text-ink disabled:opacity-30"
-        aria-label="Next page"
+        aria-label={t('Next page')}
       >
-        <Icon name="chevron-right" size={15} />
+        <Icon name="chevron-right" size={15} className="rtl:-scale-x-100" />
       </button>
     </nav>
   )

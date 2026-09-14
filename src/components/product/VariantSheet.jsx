@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Button, Icon, Price } from '../ui/index.jsx'
+import { t } from '../../i18n/index.js'
 import { OptionPicker } from './VariantPicker.jsx'
 import useFocusTrap from '../../hooks/useFocusTrap.js'
 
@@ -27,8 +28,8 @@ export default function VariantSheet({ product, choice, busy, aside, onClose, on
   }, [onClose])
 
   return (
-    <div ref={trapRef} tabIndex={-1} className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label={`Choose options for ${product.title}`}>
-      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
+    <div ref={trapRef} tabIndex={-1} className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label={t('Choose options for {title}', { title: product.title })}>
+      <button type="button" aria-label={t('Close')} onClick={onClose} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
 
       <div className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-lg border-t border-line bg-page">
         {/* A grab handle is the only affordance that says "this came from the
@@ -43,7 +44,7 @@ export default function VariantSheet({ product, choice, busy, aside, onClose, on
               <p className="truncate text-[14px] font-medium">{product.title}</p>
               <Price price={choice.shown.price} to={choice.shown.to} compareAt={choice.shown.compareAt} size="sm" className="mt-1 flex-wrap" />
             </div>
-            <Button variant="quiet" size="sm" square aria-label="Close" onClick={onClose}>
+            <Button variant="quiet" size="sm" square aria-label={t('Close')} onClick={onClose}>
               <Icon name="close" size={16} />
             </Button>
           </div>
@@ -51,7 +52,7 @@ export default function VariantSheet({ product, choice, busy, aside, onClose, on
           <OptionPicker choice={choice} aside={aside} />
 
           <Button size="lg" full className="mt-6" disabled={!choice.ready || busy} onClick={onAdd}>
-            {choice.blocker || (busy ? 'Adding…' : 'Add to bag')}
+            {choice.blocker || (busy ? t('Adding…') : t('Add to bag'))}
           </Button>
         </div>
       </div>

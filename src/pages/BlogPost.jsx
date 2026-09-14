@@ -3,6 +3,7 @@ import api from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import Seo from '../components/Seo.jsx'
 import { Breadcrumbs, ErrorState, Skeleton } from '../components/ui/index.jsx'
+import { t } from '../i18n/index.js'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 
 /** One blog post (`GET /blog/:slug`). The content is HTML the backend has already sanitised. */
@@ -30,14 +31,14 @@ export default function BlogPost() {
     <>
       <Seo title={post.seo?.title || post.title} description={post.seo?.description || post.teaser} image={post.image?.url} type="article" />
       <article className="wrap max-w-3xl py-10 pb-20">
-        <Breadcrumbs trail={[{ label: 'Blog', to: '/blog' }, { label: post.title }]} />
+        <Breadcrumbs trail={[{ label: t('Blog'), to: '/blog' }, { label: post.title }]} />
         <h1 className="mt-6 text-display-lg">{post.title}</h1>
         {post.subtitle && <p className="mt-4 text-[18px] leading-relaxed text-muted">{post.subtitle}</p>}
         <p className="mt-4 text-[13px] text-faint">{[post.author, published].filter(Boolean).join(' · ')}</p>
         {post.image && <img src={post.image.url} alt="" className="mt-8 w-full rounded-xs" />}
         <div className="rich mt-10 text-[16px] leading-relaxed text-ink" dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
         {post.tags?.length > 0 && (
-          <p className="mt-10 text-[13px] text-muted">Topics: {post.tags.join(', ')}</p>
+          <p className="mt-10 text-[13px] text-muted">{t('Topics: {tags}', { tags: post.tags.join(', ') })}</p>
         )}
       </article>
     </>

@@ -11,6 +11,8 @@ import { useStorefront } from '../store/StorefrontContext.jsx'
 import Media from '../components/ui/Media.jsx'
 import PaymentStep from '../components/checkout/PaymentStep.jsx'
 import RegionField from '../components/address/RegionField.jsx'
+import useAddressLayout from '../components/address/useAddressLayout.js'
+import { postcodeLabel } from '../lib/addressLayout.js'
 import { prefillCheckout } from '../lib/prefill.js'
 import { SIZES } from '../lib/images.js'
 import { useCart } from '../store/CartContext.jsx'
@@ -20,6 +22,7 @@ import { formatMoney } from '../lib/money.js'
 import { nestLines } from '../lib/cart-lines.js'
 import LineDetails from '../components/cart/LineDetails.jsx'
 import { isMock } from '../lib/config.js'
+import { t, addressPrefix } from '../i18n/index.js'
 
 const ExpressCheckout = lazy(() => import('../components/checkout/ExpressCheckout.jsx'))
 
@@ -42,7 +45,7 @@ export default function Checkout() {
   const { cart, refresh } = useCart()
   const { customer } = useAuth()
   const config = useStorefront()
-  const COUNTRIES = config.commerce?.countries || [['US', 'United States']]
+  const COUNTRIES = config.commerce?.countries || [['US', t('United States')]]
   const SHIPPING = config.commerce?.shippingMethods || []
   // A guest starts in the store's own country rather than whichever sorts first.
   const localeCountry = (config.pricing?.locale || '').split('-')[1]
@@ -85,6 +88,10 @@ export default function Checkout() {
   const [form, setForm] = useState(() => prefillCheckout({
     email: '', name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country: fallbackCountry, phone: '',
   }, customer))
+
+  // Each address in its country's own order and words (Kuwait: no postcode required; India: PIN code).
+  const shippingLayout = useAddressLayout(form.country)
+  const billingLayout = useAddressLayout(billing.country)
 
   // Payments mode only.
   const [stage, setStage] = useState('details')
@@ -263,9 +270,9 @@ export default function Checkout() {
     return (
       <Empty
         icon="bag"
-        title="Nothing to check out"
-        body="Your bag is empty."
-        action={<Button to="/shop" size="lg">Shop everything</Button>}
+        title={t('Nothing to check out')}
+        body={t('Your bag is empty.')}
+        action={<Button to="/shop" size="lg">{t('Shop everything')}</Button>}
       />
     )
   }
@@ -290,7 +297,7 @@ export default function Checkout() {
   const pay = async () => {
     const chosen = methods.find((m) => m.key === selected)
     if (!chosen) {
-      fail(new ApiError('Choose how you would like to pay.', { code: 'payment_method_required' }))
+      fail(new ApiError(t('Choose how you would like to pay.'), { code: 'payment_method_required' }))
       return
     }
     const driver = chosen.saved ? null : driverFor(chosen.provider)
@@ -305,7 +312,7 @@ export default function Checkout() {
     }
     try {
       const { email, ...address } = form
-      const urls = returnUrls(config.checkout, window.location.origin)
+      const urls = returnUrls(config.checkout, window.location.origin + addressPrefix())
       const created = await api.createPayment(cart.id, paymentBody({
         email,
         shippingAddress: address,
@@ -383,19 +390,19 @@ export default function Checkout() {
   const chosenMethod = payments && stage === 'payment' ? methods.find((m) => m.key === selected) : null
   const payTotal = payableTotal(options?.amount || cart.total, chosenMethod)
   const buttonLabel = busy
-    ? payments && stage === 'payment' ? 'Processing payment…' : 'Just a moment…'
+    ? payments && stage === 'payment' ? t('Processing payment…') : t('Just a moment…')
     : payments
-      ? stage === 'payment' ? `${chosenMethod?.flow === 'offline' ? 'Place order' : 'Pay'} · ${formatMoney(payTotal)}` : 'Continue to payment'
+      ? stage === 'payment' ? (chosenMethod?.flow === 'offline' ? t('Place order · {amount}', { amount: formatMoney(payTotal) }) : t('Pay · {amount}', { amount: formatMoney(payTotal) })) : t('Continue to payment')
       : config.checkout?.mode === 'redirect'
-        ? `Continue to payment · ${formatMoney(cart.total)}`
-        : `Place order · ${formatMoney(cart.total)}`
+        ? t('Continue to payment · {amount}', { amount: formatMoney(cart.total) })
+        : t('Place order · {amount}', { amount: formatMoney(cart.total) })
 
   return (
     <>
-      <Seo title={'Checkout'} noindex />
+      <Seo title={t('Checkout')} noindex />
       <div className="wrap grid items-start gap-12 py-10 pb-20 lg:grid-cols-[1fr_22rem]">
       <form onSubmit={submit} className="max-w-xl">
-        <h1 className="text-display-lg">Checkout</h1>
+        <h1 className="text-display-lg">{t('Checkout')}</h1>
 
         {/* A wallet sheet has no terms box and skips the minimum order: those orders use the form. */}
         {payments && !isMock && !config.checkout?.termsRequired && !short && (
@@ -408,43 +415,46 @@ export default function Checkout() {
           <p className="mt-5 flex items-start gap-2.5 rounded-xs border border-line bg-surface p-3.5 text-[13px] leading-relaxed text-muted">
             <Icon name="info" size={16} className="mt-px shrink-0 text-accent" />
             <span>
-              This is a demo. No payment is taken and no card details are collected — a real build
-              hands off to a payment provider at this point, so card data never touches the storefront.
+              {t('This is a demo. No payment is taken and no card details are collected — a real build hands off to a payment provider at this point, so card data never touches the storefront.')}
             </span>
           </p>
         )}
 
-        <Section title="Contact">
+        <Section title={t('Contact')}>
           {!customer && config.features?.accounts !== false && (
             <p className="text-[13px] text-muted">
-              Have an account?{' '}
-              <Link to="/login" state={{ from: '/checkout' }} className="text-ink link-underline">Sign in</Link>
-              {' '}for your saved addresses — your bag comes with you.
+              {t('Have an account?')}{' '}
+              <Link to="/login" state={{ from: '/checkout' }} className="text-ink link-underline">{t('Sign in')}</Link>
+              {' '}{t('for your saved addresses — your bag comes with you.')}
             </p>
           )}
-          <Field label="Email" id="email" type="email" required value={form.email} onChange={set('email')} autoComplete="email" />
+          <Field label={t('Email')} id="email" type="email" required value={form.email} onChange={set('email')} autoComplete="email" />
         </Section>
 
-        <Section title="Shipping address">
-          <Field label="Full name" id="name" required value={form.name} onChange={set('name')} autoComplete="name" />
-          <Field label="Address" id="line1" required value={form.line1} onChange={set('line1')} autoComplete="address-line1" />
-          <Field label="Apartment, suite (optional)" id="line2" value={form.line2} onChange={set('line2')} autoComplete="address-line2" />
+        <Section title={t('Shipping address')}>
+          <Field label={t('Full name')} id="name" required value={form.name} onChange={set('name')} autoComplete="name" />
+          <Field label={t('Address')} id="line1" required value={form.line1} onChange={set('line1')} autoComplete="address-line1" />
+          <Field label={t('Apartment, suite (optional)')} id="line2" value={form.line2} onChange={set('line2')} autoComplete="address-line2" />
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="City" id="city" required value={form.city} onChange={set('city')} autoComplete="address-level2" />
-            <RegionField id="region" country={form.country} value={form.region} onChange={setRegion} />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Postcode" id="postalCode" required value={form.postalCode} onChange={set('postalCode')} autoComplete="postal-code" />
-            <div>
-              <label htmlFor="country" className="mb-1.5 block text-[13px] font-medium">Country</label>
-              <select id="country" value={form.country} onChange={set('country')} className="field" autoComplete="country">
-                {COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
-              </select>
-            </div>
+            {shippingLayout.short.map((field) => {
+              if (field === 'city') return <Field key={field} label={t('City')} id="city" required value={form.city} onChange={set('city')} autoComplete="address-level2" />
+              if (field === 'region') return <RegionField key={field} id="region" label={t(shippingLayout.labels.region)} country={form.country} value={form.region} onChange={setRegion} />
+              if (field === 'postalCode') {
+                return <Field key={field} label={postcodeLabel(shippingLayout)} id="postalCode" required={shippingLayout.postcodeRequired} value={form.postalCode} onChange={set('postalCode')} autoComplete="postal-code" />
+              }
+              return (
+                <div key={field}>
+                  <label htmlFor="country" className="mb-1.5 block text-[13px] font-medium">{t('Country')}</label>
+                  <select id="country" value={form.country} onChange={set('country')} className="field" autoComplete="country">
+                    {COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                  </select>
+                </div>
+              )
+            })}
           </div>
           {config.checkout?.collectPhone !== false && (
             <Field
-              label={config.checkout?.phoneRequired === false ? 'Phone (optional, for delivery updates)' : 'Phone (for delivery updates)'}
+              label={config.checkout?.phoneRequired === false ? t('Phone (optional, for delivery updates)') : t('Phone (for delivery updates)')}
               id="phone"
               type="tel"
               required={config.checkout?.phoneRequired === true}
@@ -455,7 +465,7 @@ export default function Checkout() {
           )}
         </Section>
 
-        <Section title="Billing">
+        <Section title={t('Billing')}>
           <label className="flex items-center gap-2.5 text-[13px] text-muted">
             <input
               type="checkbox"
@@ -463,24 +473,28 @@ export default function Checkout() {
               onChange={(e) => setBillingSame(e.target.checked)}
               className="h-4 w-4 accent-[rgb(var(--accent))]"
             />
-            Billing address is the same as the delivery address
+            {t('Billing address is the same as the delivery address')}
           </label>
           {!billingSame && (
             <>
-              <Field label="Name on the invoice" id="billing-name" required value={billing.name} onChange={setBillingField('name')} autoComplete="billing name" />
-              <Field label="Address" id="billing-line1" required value={billing.line1} onChange={setBillingField('line1')} autoComplete="billing address-line1" />
+              <Field label={t('Name on the invoice')} id="billing-name" required value={billing.name} onChange={setBillingField('name')} autoComplete="billing name" />
+              <Field label={t('Address')} id="billing-line1" required value={billing.line1} onChange={setBillingField('line1')} autoComplete="billing address-line1" />
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="City" id="billing-city" required value={billing.city} onChange={setBillingField('city')} autoComplete="billing address-level2" />
-                <RegionField id="billing-region" country={billing.country} value={billing.region} onChange={setBillingRegion} />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Postcode" id="billing-postalCode" value={billing.postalCode} onChange={setBillingField('postalCode')} autoComplete="billing postal-code" />
-                <div>
-                  <label htmlFor="billing-country" className="mb-1.5 block text-[13px] font-medium">Country</label>
-                  <select id="billing-country" value={billing.country} onChange={setBillingField('country')} className="field" autoComplete="billing country">
-                    {COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
-                  </select>
-                </div>
+                {billingLayout.short.map((field) => {
+                  if (field === 'city') return <Field key={field} label={t('City')} id="billing-city" required value={billing.city} onChange={setBillingField('city')} autoComplete="billing address-level2" />
+                  if (field === 'region') return <RegionField key={field} id="billing-region" label={t(billingLayout.labels.region)} country={billing.country} value={billing.region} onChange={setBillingRegion} />
+                  if (field === 'postalCode') {
+                    return <Field key={field} label={postcodeLabel(billingLayout)} id="billing-postalCode" required={billingLayout.postcodeRequired} value={billing.postalCode} onChange={setBillingField('postalCode')} autoComplete="billing postal-code" />
+                  }
+                  return (
+                    <div key={field}>
+                      <label htmlFor="billing-country" className="mb-1.5 block text-[13px] font-medium">{t('Country')}</label>
+                      <select id="billing-country" value={billing.country} onChange={setBillingField('country')} className="field" autoComplete="billing country">
+                        {COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                      </select>
+                    </div>
+                  )
+                })}
               </div>
             </>
           )}
@@ -494,12 +508,12 @@ export default function Checkout() {
               }}
               className="h-4 w-4 accent-[rgb(var(--accent))]"
             />
-            I’m buying for a business
+            {t('I’m buying for a business')}
           </label>
           {business.on && (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                label="Company name"
+                label={t('Company name')}
                 id="company"
                 value={business.company}
                 onChange={(e) => {
@@ -509,7 +523,7 @@ export default function Checkout() {
                 autoComplete="organization"
               />
               <Field
-                label="Tax ID (VAT, GSTIN…)"
+                label={t('Tax ID (VAT, GSTIN…)')}
                 id="vat"
                 value={business.vat}
                 onChange={(e) => {
@@ -521,10 +535,10 @@ export default function Checkout() {
           )}
         </Section>
 
-        <Section title="Delivery">
+        <Section title={t('Delivery')}>
           {shippingOptions?.length === 0 && (
             <p role="status" className="rounded-xs border border-line bg-surface p-3.5 text-[13px] text-muted">
-              We don’t deliver to this address yet. Check the country and postcode.
+              {t('We don’t deliver to this address yet. Check the country and postcode.')}
             </p>
           )}
           <div className="space-y-2.5">
@@ -547,7 +561,7 @@ export default function Checkout() {
                 </span>
                 <span className="text-sm tabular-nums">
                   {(shippingOptions ? s.price === 0 : cart.shipping.amount === 0 && s.id === 'standard')
-                    ? 'Free'
+                    ? t('Free')
                     : formatMoney({ amount: s.price, currency: cart.currency })}
                 </span>
               </label>
@@ -556,10 +570,10 @@ export default function Checkout() {
 
           {chosenShipping?.pickup && !isMock && (
             <fieldset className="space-y-2.5">
-              <legend className="mb-2 text-[13px] font-medium">Collect from</legend>
-              {shops === null && <p className="text-[13px] text-faint">Finding shops near you…</p>}
+              <legend className="mb-2 text-[13px] font-medium">{t('Collect from')}</legend>
+              {shops === null && <p className="text-[13px] text-faint">{t('Finding shops near you…')}</p>}
               {shops?.length === 0 && (
-                <p role="status" className="text-[13px] text-muted">No shop can take this order for collection. Choose delivery instead.</p>
+                <p role="status" className="text-[13px] text-muted">{t('No shop can take this order for collection. Choose delivery instead.')}</p>
               )}
               {shops?.map((shop) => (
                 <label
@@ -578,9 +592,9 @@ export default function Checkout() {
                   <span className="flex-1">
                     <span className="block text-sm font-medium">{shop.name}</span>
                     <span className="block text-[13px] text-faint">{[shop.street, shop.city, shop.postalCode].filter(Boolean).join(', ')}</span>
-                    {!shop.inStock && <span className="block text-[13px] text-sale">Not everything in your bag is in stock here</span>}
+                    {!shop.inStock && <span className="block text-[13px] text-sale">{t('Not everything in your bag is in stock here')}</span>}
                   </span>
-                  {shop.distanceKm != null && <span className="text-[13px] tabular-nums text-faint">{shop.distanceKm} km</span>}
+                  {shop.distanceKm != null && <span className="text-[13px] tabular-nums text-faint">{t('{distance} km', { distance: shop.distanceKm })}</span>}
                 </label>
               ))}
             </fieldset>
@@ -588,9 +602,9 @@ export default function Checkout() {
 
           {chosenShipping?.slots && slots?.required && (
             <fieldset>
-              <legend className="mb-2 text-[13px] font-medium">Delivery slot</legend>
+              <legend className="mb-2 text-[13px] font-medium">{t('Delivery slot')}</legend>
               {slots.slots.length === 0 ? (
-                <p role="status" className="text-[13px] text-muted">No delivery slots are free right now. Choose another delivery option.</p>
+                <p role="status" className="text-[13px] text-muted">{t('No delivery slots are free right now. Choose another delivery option.')}</p>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {slots.slots.map((slot, i) => (
@@ -621,23 +635,23 @@ export default function Checkout() {
         </Section>
 
         {(config.checkout?.orderNote || config.checkout?.giftMessage || config.checkout?.giftWrap) && (
-          <Section title="Notes & gifts">
+          <Section title={t('Notes & gifts')}>
             {config.checkout?.orderNote && (
               <div>
-                <label htmlFor="note" className="mb-1.5 block text-[13px] font-medium">Delivery instructions <span className="font-normal text-faint">(optional)</span></label>
-                <textarea id="note" rows={2} maxLength={1000} className="field" value={extras.note} onChange={setExtra('note')} placeholder="Gate code, a safe place to leave it…" />
+                <label htmlFor="note" className="mb-1.5 block text-[13px] font-medium">{t('Delivery instructions')} <span className="font-normal text-faint">{t('(optional)')}</span></label>
+                <textarea id="note" rows={2} maxLength={1000} className="field" value={extras.note} onChange={setExtra('note')} placeholder={t('Gate code, a safe place to leave it…')} />
               </div>
             )}
             {config.checkout?.giftWrap && (
               <label className="flex items-center gap-2.5 text-[13px] text-muted">
                 <input type="checkbox" checked={extras.giftWrap} onChange={setExtra('giftWrap')} className="h-4 w-4 accent-[rgb(var(--accent))]" />
-                Gift wrap this order
+                {t('Gift wrap this order')}
                 {config.checkout.giftWrap.price > 0 && <span className="tabular-nums">(+{formatMoney({ amount: config.checkout.giftWrap.price, currency: cart.currency })})</span>}
               </label>
             )}
             {config.checkout?.giftMessage && (
               <div>
-                <label htmlFor="giftMessage" className="mb-1.5 block text-[13px] font-medium">Gift message <span className="font-normal text-faint">(optional)</span></label>
+                <label htmlFor="giftMessage" className="mb-1.5 block text-[13px] font-medium">{t('Gift message')} <span className="font-normal text-faint">{t('(optional)')}</span></label>
                 <textarea id="giftMessage" rows={2} maxLength={500} className="field" value={extras.giftMessage} onChange={setExtra('giftMessage')} />
               </div>
             )}
@@ -669,10 +683,9 @@ export default function Checkout() {
 
         {waiting && (
           <div role="status" className="mt-6 rounded-xs border border-line bg-surface p-3.5 text-[13px] leading-relaxed text-muted">
-            We have not heard back from the payment provider yet. If the payment went through, we will email you a
-            confirmation — there is no need to pay again.
+            {t('We have not heard back from the payment provider yet. If the payment went through, we will email you a confirmation — there is no need to pay again.')}
             {waiting.order && (
-              <Link to={`/order/${waiting.order.id}`} className="ml-1 text-ink link-underline">View your order</Link>
+              <Link to={`/order/${waiting.order.id}`} className="ms-1 text-ink link-underline">{t('View your order')}</Link>
             )}
           </div>
         )}
@@ -694,15 +707,15 @@ export default function Checkout() {
               className="mt-0.5 h-4 w-4 accent-[rgb(var(--accent))]"
             />
             <span>
-              I accept the{' '}
-              {config.checkout.termsUrl ? <Link to={config.checkout.termsUrl} className="link-underline text-ink">terms</Link> : 'terms'}.
+              {t('I accept the')}{' '}
+              {config.checkout.termsUrl ? <Link to={config.checkout.termsUrl} className="link-underline text-ink">{t('terms')}</Link> : t('terms')}.
             </span>
           </label>
         )}
 
         {short && (
           <p role="status" className="mt-6 rounded-xs border border-line bg-surface p-3.5 text-[13px] text-muted">
-            Orders start at {formatMoney(cart.minimumOrder.amount)}. Add {formatMoney(cart.minimumOrder.remaining)} more to check out.
+            {t('Orders start at {minimum}. Add {remaining} more to check out.', { minimum: formatMoney(cart.minimumOrder.amount), remaining: formatMoney(cart.minimumOrder.remaining) })}
           </p>
         )}
 
@@ -718,26 +731,26 @@ export default function Checkout() {
         </Button>
         {config.checkout?.termsUrl && !config.checkout?.termsRequired && (
           <p className="mt-4 text-center text-[12px] leading-relaxed text-faint">
-            By placing this order you agree to our{' '}
-            <Link to={config.checkout.termsUrl} className="link-underline text-muted">terms</Link>.
+            {t('By placing this order you agree to our')}{' '}
+            <Link to={config.checkout.termsUrl} className="link-underline text-muted">{t('terms')}</Link>.
           </p>
         )}
         <Link to="/cart" className="mt-4 block text-center text-[13px] text-muted link-underline">
-          Back to bag
+          {t('Back to bag')}
         </Link>
       </form>
 
       <aside className="lg:sticky lg:top-24">
         <div className="rounded-xs border border-line bg-surface p-6">
-          <h2 className="font-display text-lg">Order</h2>
+          <h2 className="font-display text-lg">{t('Order')}</h2>
           <ul className="mt-5 space-y-4">
             {nestLines(cart.lines).map(({ line: l, depth }) => (
-              <li key={l.id} className={`flex gap-3.5 ${depth ? 'pl-6' : ''}`}>
+              <li key={l.id} className={`flex gap-3.5 ${depth ? 'ps-6' : ''}`}>
                 <div className="relative w-14 shrink-0">
                   <div className="shot rounded-xs">
                     <Media sizes={SIZES.thumb} src={l.image?.url} type={l.image?.type} alt="" loading="lazy" className="h-full w-full object-cover" />
                   </div>
-                  <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1 font-mono text-[10px] text-page tabular-nums">
+                  <span className="absolute -end-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1 font-mono text-[10px] text-page tabular-nums">
                     {l.quantity}
                   </span>
                 </div>
@@ -750,7 +763,7 @@ export default function Checkout() {
             ))}
           </ul>
           <dl className="mt-6 space-y-2.5 border-t border-line pt-5 text-sm">
-            <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd className="tabular-nums">{formatMoney(cart.subtotal)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">{t('Subtotal')}</dt><dd className="tabular-nums">{formatMoney(cart.subtotal)}</dd></div>
             {cart.codes || cart.promotions ? (
               [...(cart.codes || []).map((c) => ({ key: `code-${c.code}`, label: c.label || c.code, amount: c.amount })),
                 ...(cart.promotions || []).map((p) => ({ key: `promo-${p.name}`, label: p.name, amount: p.amount }))]
@@ -761,17 +774,17 @@ export default function Checkout() {
             ) : cart.discount.amount > 0 && (
               <div className="flex justify-between text-sale"><dt>{cart.discountCode?.label}</dt><dd className="tabular-nums">−{formatMoney(cart.discount)}</dd></div>
             )}
-            <div className="flex justify-between"><dt className="text-muted">Shipping</dt><dd className="tabular-nums">{cart.shipping.amount === 0 ? 'Free' : formatMoney(cart.shipping)}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted">Tax</dt><dd className="tabular-nums">{formatMoney(cart.tax)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">{t('Shipping')}</dt><dd className="tabular-nums">{cart.shipping.amount === 0 ? t('Free') : formatMoney(cart.shipping)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">{t('Tax')}</dt><dd className="tabular-nums">{formatMoney(cart.tax)}</dd></div>
             {chosenMethod?.fee?.amount > 0 && (
-              <div className="flex justify-between"><dt className="text-muted">Cash on delivery fee</dt><dd className="tabular-nums">{formatMoney(chosenMethod.fee)}</dd></div>
+              <div className="flex justify-between"><dt className="text-muted">{t('Cash on delivery fee')}</dt><dd className="tabular-nums">{formatMoney(chosenMethod.fee)}</dd></div>
             )}
             {cart.giftWrap?.amount > 0 && (
-              <div className="flex justify-between"><dt className="text-muted">Gift wrapping</dt><dd className="tabular-nums">{formatMoney(cart.giftWrap)}</dd></div>
+              <div className="flex justify-between"><dt className="text-muted">{t('Gift wrapping')}</dt><dd className="tabular-nums">{formatMoney(cart.giftWrap)}</dd></div>
             )}
           </dl>
           <p className="mt-4 flex justify-between border-t border-line pt-4 text-lg">
-            <span>Total</span><span className="tabular-nums">{formatMoney(payableTotal(cart.total, chosenMethod))}</span>
+            <span>{t('Total')}</span><span className="tabular-nums">{formatMoney(payableTotal(cart.total, chosenMethod))}</span>
           </p>
         </div>
       </aside>

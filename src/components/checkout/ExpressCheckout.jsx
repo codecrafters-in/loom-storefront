@@ -6,9 +6,10 @@ import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { returnUrls } from '../../lib/payments/index.js'
 import { mountExpressCheckout } from '../../lib/payments/express.js'
 import { purchase } from '../../lib/analytics.js'
+import { mark, t, addressPrefix } from '../../i18n/index.js'
 
 const STILL_WAITING =
-  'We have not heard back from the payment provider yet. If the payment went through, we will email you. There is no need to pay again.'
+  mark('We have not heard back from the payment provider yet. If the payment went through, we will email you. There is no need to pay again.')
 
 /**
  * Apple Pay and Google Pay buttons for the bag. Shows nothing unless the store has a wallet for it (Stripe with
@@ -36,13 +37,13 @@ export default function ExpressCheckout({ className = '' }) {
           express,
           cart,
           api,
-          urls: returnUrls(config.checkout, window.location.origin),
+          urls: returnUrls(config.checkout, window.location.origin + addressPrefix()),
           onAvailable: (ok) => alive && setAvailable(ok),
-          onError: (err) => alive && setMessage(err?.message || 'The payment did not go through.'),
+          onError: (err) => alive && setMessage(err?.message || t('The payment did not go through.')),
           onDone: async (payment) => {
             await refresh().catch(() => {})
             if (!payment?.order) {
-              if (alive) setMessage(STILL_WAITING)
+              if (alive) setMessage(t(STILL_WAITING))
               return
             }
             const order = await api.getOrder(payment.order.id).catch(() => null)
@@ -64,7 +65,7 @@ export default function ExpressCheckout({ className = '' }) {
   return (
     <div className={className}>
       {available && (
-        <p className="mb-2.5 text-center text-[11px] uppercase tracking-[0.12em] text-faint">Express checkout</p>
+        <p className="mb-2.5 text-center text-[11px] uppercase tracking-[0.12em] text-faint">{t('Express checkout')}</p>
       )}
       <div ref={box} />
       {message && <p role="alert" className="mt-2 text-[13px] text-sale">{message}</p>}

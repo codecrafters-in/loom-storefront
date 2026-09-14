@@ -6,6 +6,7 @@ import Promises from '../layout/Promises.jsx'
 import { Button, ErrorState, Icon } from '../ui/index.jsx'
 import { useBootstrap } from '../../store/StorefrontContext.jsx'
 import { railKey } from '../../lib/api/railKey.js'
+import { t } from '../../i18n/index.js'
 
 /**
  * The home page is data.
@@ -67,7 +68,7 @@ function SectionHead({ eyebrow, title, ctaLabel, ctaTo }) {
       </div>
       {ctaTo && (
         <Link to={ctaTo} className="hidden shrink-0 items-center gap-1.5 text-sm text-muted transition-colors hover:text-ink sm:inline-flex">
-          {ctaLabel || 'See all'} <Icon name="arrow-right" size={15} />
+          {ctaLabel || t('See all')} <Icon name="arrow-right" size={15} className="rtl:-scale-x-100" />
         </Link>
       )}
     </div>
@@ -149,7 +150,7 @@ function Editorial({ section }) {
             <img src={section.image.url} alt={section.image.alt || ''} loading="lazy" decoding="async" className="h-full w-full object-cover" />
           </div>
         )}
-        <div className="md:pl-6">
+        <div className="md:ps-6">
           {section.eyebrow && <p className="eyebrow">{section.eyebrow}</p>}
           <h2 className="mt-4 text-display-md">{section.title}</h2>
           {body.map((p) => (

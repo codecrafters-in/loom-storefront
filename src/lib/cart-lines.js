@@ -9,6 +9,8 @@
  * the same.
  */
 
+import { t } from '../i18n/index.js'
+
 /**
  * Lines in display order, each optional product straight after the line it was
  * added with, one level deeper.
@@ -63,7 +65,7 @@ export function lineDetails(line = {}) {
 }
 
 const list = (names) =>
-  names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+  names.length < 2 ? names.join('') : t('{first} and {last}', { first: names.slice(0, -1).join(', '), last: names[names.length - 1] })
 
 /**
  * The sentence to show when the bag refuses a line.
@@ -74,29 +76,29 @@ const list = (names) =>
  * with 422".
  */
 export function cartProblem(err) {
-  if (!err) return 'Something went wrong.'
+  if (!err) return t('Something went wrong.')
   const payload = err.detail && typeof err.detail === 'object' ? err.detail : {}
   if (payload.message) return err.message
   const d = payload.detail && typeof payload.detail === 'object' ? payload.detail : payload
   switch (err.code) {
     case 'choose_options':
-      if (d.missing?.length) return `Choose ${list(d.missing)} first.`
+      if (d.missing?.length) return t('Choose {options} first.', { options: list(d.missing) })
       break
     case 'combo_incomplete':
-      if (d.groups?.length) return `Choose one for ${list(d.groups)}.`
+      if (d.groups?.length) return t('Choose one for {groups}.', { groups: list(d.groups) })
       break
     case 'invalid_combination':
-      return 'That combination is not available. Try another choice.'
+      return t('That combination is not available. Try another choice.')
     case 'quantity_rule': {
       const parts = []
-      if (d.min != null) parts.push(`at least ${d.min}`)
-      if (d.max != null) parts.push(`at most ${d.max}`)
-      if (d.step != null && Number(d.step) !== 1) parts.push(`in steps of ${d.step}`)
-      if (parts.length) return `That quantity is not available: buy ${list(parts)}.`
+      if (d.min != null) parts.push(t('at least {min}', { min: d.min }))
+      if (d.max != null) parts.push(t('at most {max}', { max: d.max }))
+      if (d.step != null && Number(d.step) !== 1) parts.push(t('in steps of {step}', { step: d.step }))
+      if (parts.length) return t('That quantity is not available: buy {rule}.', { rule: list(parts) })
       break
     }
     default:
       break
   }
-  return err.message || 'Something went wrong.'
+  return err.message || t('Something went wrong.')
 }

@@ -14,6 +14,7 @@ import LineDetails from './LineDetails.jsx'
 import PaymentLock from './PaymentLock.jsx'
 import useFocusTrap from '../../hooks/useFocusTrap.js'
 import { isMock } from '../../lib/config.js'
+import { t } from '../../i18n/index.js'
 
 /** Slides in after every add. Nothing here is decorative — it is the fastest
  *  path from "added" to "checkout", which is the only job of a cart drawer. */
@@ -72,8 +73,8 @@ export default function CartDrawer() {
         {...(open ? {} : { inert: '' })}
         role="dialog"
         aria-modal="true"
-        aria-label="Your bag"
-        className={`fixed right-0 top-0 z-50 flex h-[100dvh] w-[min(92vw,26rem)] flex-col bg-page shadow-panel transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        aria-label={t('Your bag')}
+        className={`fixed end-0 top-0 z-50 flex h-[100dvh] w-[min(92vw,26rem)] flex-col bg-page shadow-panel transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full rtl:-translate-x-full'}`}
       >
         {/*
           Everything in this drawer competes with the one thing it is for:
@@ -85,9 +86,9 @@ export default function CartDrawer() {
         */}
         <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h2 className="font-display text-[17px]">
-            Your bag{lines.length > 0 && <span className="ml-2 text-sm text-faint">({lines.length})</span>}
+            {t('Your bag')}{lines.length > 0 && <span className="ms-2 text-sm text-faint">({lines.length})</span>}
           </h2>
-          <button type="button" onClick={() => setOpen(false)} aria-label="Close bag" className="text-muted transition-colors hover:text-ink">
+          <button type="button" onClick={() => setOpen(false)} aria-label={t('Close bag')} className="text-muted transition-colors hover:text-ink">
             <Icon name="close" size={20} />
           </button>
         </header>
@@ -95,15 +96,15 @@ export default function CartDrawer() {
         {lines.length === 0 ? (
           <Empty
             icon="bag"
-            title="Nothing here yet"
-            body="Saved items and anything you add will show up here."
-            action={<Button to="/shop" onClick={() => setOpen(false)}>Start shopping</Button>}
+            title={t('Nothing here yet')}
+            body={t('Saved items and anything you add will show up here.')}
+            action={<Button to="/shop" onClick={() => setOpen(false)}>{t('Start shopping')}</Button>}
           />
         ) : (
           <>
             {remaining > 0 && (
               <p className="border-b border-line bg-accent-soft/60 px-5 py-2.5 text-[12px] text-accent">
-                {formatMoney(cart.freeShippingRemaining)} away from free shipping
+                {t('{amount} away from free shipping', { amount: formatMoney(cart.freeShippingRemaining) })}
               </p>
             )}
 
@@ -111,7 +112,7 @@ export default function CartDrawer() {
             {!isMock && <PaymentLock className="mx-5 mt-3" />}
             <ul className="flex-1 divide-y divide-line overflow-y-auto px-5">
               {nestLines(lines).map(({ line, depth }) => (
-                <li key={line.id} className={`flex gap-3.5 py-4 ${depth ? 'pl-6' : ''}`}>
+                <li key={line.id} className={`flex gap-3.5 py-4 ${depth ? 'ps-6' : ''}`}>
                   <Link to={`/product/${line.productSlug}`} onClick={() => setOpen(false)} className="w-16 shrink-0">
                     <div className="shot rounded-xs">
                       <Media sizes={SIZES.thumb} src={line.image?.url} type={line.image?.type} alt={line.image?.alt || line.title} loading="lazy" className="h-full w-full object-cover" />
@@ -125,7 +126,7 @@ export default function CartDrawer() {
                       <button
                         type="button"
                         onClick={() => remove(line.id)}
-                        aria-label={`Remove ${line.title}`}
+                        aria-label={t('Remove {title}', { title: line.title })}
                         className="shrink-0 text-faint transition-colors hover:text-sale"
                       >
                         <Icon name="trash" size={15} />
@@ -134,7 +135,7 @@ export default function CartDrawer() {
                     <LineDetails line={line} />
                     <div className="mt-2.5 flex items-center justify-between">
                       {!isMock && line.isReward
-                        ? <span className="text-[12px] text-good">Free</span>
+                        ? <span className="text-[12px] text-good">{t('Free')}</span>
                         : <QuantityStepper size="sm" value={line.quantity} onChange={(q) => update(line.id, q)} disabled={busy} {...stepperProps(line.quantityRule)} />}
                       <span className="text-sm tabular-nums">{formatMoney(line.lineTotal)}</span>
                     </div>
@@ -145,7 +146,7 @@ export default function CartDrawer() {
 
             {rec.enabled !== false && suggestions.data?.items?.length > 0 && (
               <div className="border-t border-line px-5 py-3">
-                <p className="eyebrow">{suggestions.data.accessories ? 'Frequently bought together' : rec.title || 'Goes with this'}</p>
+                <p className="eyebrow">{suggestions.data.accessories ? t('Frequently bought together') : rec.title || t('Goes with this')}</p>
                 {/*
                   Chips, not cards. Three 4:5 cards with a name and a price
                   under each is 210px — a third of a phone screen given to
@@ -192,33 +193,33 @@ export default function CartDrawer() {
             <footer className="border-t border-line px-5 py-4">
               <dl className="space-y-1 text-[13px]">
                 <div className="flex justify-between">
-                  <dt className="text-muted">Subtotal</dt>
+                  <dt className="text-muted">{t('Subtotal')}</dt>
                   <dd className="tabular-nums">{formatMoney(cart.subtotal)}</dd>
                 </div>
                 {cart.discount?.amount > 0 && (
                   <div className="flex justify-between text-sale">
-                    <dt>{cart.discountCode?.label || 'Discount'}</dt>
+                    <dt>{cart.discountCode?.label || t('Discount')}</dt>
                     <dd className="tabular-nums">−{formatMoney(cart.discount)}</dd>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <dt className="text-muted">Shipping</dt>
-                  <dd className="tabular-nums">{cart.shipping.amount === 0 ? 'Free' : formatMoney(cart.shipping)}</dd>
+                  <dt className="text-muted">{t('Shipping')}</dt>
+                  <dd className="tabular-nums">{cart.shipping.amount === 0 ? t('Free') : formatMoney(cart.shipping)}</dd>
                 </div>
               </dl>
               <p className="mt-2.5 flex justify-between border-t border-line pt-2.5 text-[15px] font-medium">
-                <span>Total</span>
+                <span>{t('Total')}</span>
                 <span className="tabular-nums">{formatMoney(cart.total)}</span>
               </p>
               <Button to="/checkout" full size="lg" className="mt-3.5" onClick={() => setOpen(false)}>
-                Checkout
+                {t('Checkout')}
               </Button>
               <Link
                 to="/cart"
                 onClick={() => setOpen(false)}
                 className="link-underline mt-2.5 block text-center text-[12px] text-muted"
               >
-                View full bag
+                {t('View full bag')}
               </Link>
             </footer>
           </>

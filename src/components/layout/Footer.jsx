@@ -10,6 +10,7 @@ import { config as envConfig } from '../../lib/config.js'
 import { docsLinkVisible } from '../../lib/docs-link.js'
 import { useCaptcha } from '../Captcha.jsx'
 import ContactDetails from '../content/ContactDetails.jsx'
+import { t } from '../../i18n/index.js'
 
 export default function Footer() {
   const [email, setEmail] = useState('')
@@ -28,9 +29,9 @@ export default function Footer() {
       const captchaToken = await captcha.getToken()
       await api.subscribe(email, { captchaToken })
       setEmail('')
-      push('Thanks — check your inbox to confirm.')
+      push(t('Thanks — check your inbox to confirm.'))
     } catch (err) {
-      push(err.message || 'Could not subscribe.', { tone: 'error' })
+      push(err.message || t('Could not subscribe.'), { tone: 'error' })
     } finally {
       // Single-use, and the form stays on screen for another address.
       captcha.reset()
@@ -56,7 +57,7 @@ export default function Footer() {
 
           {config.features?.newsletter !== false && (
           <form onSubmit={submit} className="mt-8 max-w-sm">
-            <label htmlFor="newsletter" className="eyebrow">Newsletter</label>
+            <label htmlFor="newsletter" className="eyebrow">{t('Newsletter')}</label>
             <div className="mt-3 flex gap-2">
               <input
                 id="newsletter"
@@ -69,7 +70,7 @@ export default function Footer() {
                 className="field"
               />
               <Button type="submit" as="button" disabled={busy} className="shrink-0">
-                {busy ? '…' : 'Join'}
+                {busy ? '…' : t('Join')}
               </Button>
             </div>
             {captcha.widget && <div className="mt-3">{captcha.widget}</div>}
@@ -100,11 +101,11 @@ export default function Footer() {
             {config.store?.contact?.vat ? ` · ${config.store.contact.vat}` : ''}
             {isMock ? (
               <>
-                . A storefront theme by{' '}
+                . {t('A storefront theme by')}{' '}
                 <a href="https://codecrafters.in" className="link-underline text-muted" target="_blank" rel="noreferrer">
                   CodeCrafters
                 </a>
-                . MIT licensed.
+                . {t('MIT licensed.')}
               </>
             ) : (
               config.store?.credit ? ` · ${config.store.credit}` : ''
@@ -117,12 +118,12 @@ export default function Footer() {
                 onClick={() => window.dispatchEvent(new CustomEvent('loom:consent-open'))}
                 className="text-[13px] text-muted transition-colors hover:text-ink"
               >
-                Cookie settings
+                {t('Cookie settings')}
               </button>
             )}
             {isMock && (
-              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint" title="Running on the bundled catalogue">
-                demo data
+              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint" title={t('Running on the bundled catalogue')}>
+                {t('demo data')}
               </span>
             )}
             {/* Only rendered for a signed-in admin — a shopper never sees that
@@ -133,7 +134,7 @@ export default function Footer() {
                 className="inline-flex items-center gap-1.5 rounded-xs border border-accent/40 px-2.5 py-1 text-[12px] text-accent transition-colors hover:bg-accent hover:text-accent-ink"
               >
                 <Icon name="user" size={13} />
-                Admin
+                {t('Admin')}
               </Link>
             )}
             {showDocs && (
@@ -142,7 +143,7 @@ export default function Footer() {
                 className="inline-flex items-center gap-2 text-[13px] text-muted transition-colors hover:text-ink"
               >
                 <Icon name="info" size={16} />
-                Docs &amp; API
+                {t('Docs & API')}
               </Link>
             )}
             {isMock && (
@@ -153,7 +154,7 @@ export default function Footer() {
                 className="inline-flex items-center gap-2 text-[13px] text-muted transition-colors hover:text-ink"
               >
                 <Icon name="github" size={16} />
-                Source
+                {t('Source')}
               </a>
             )}
           </div>

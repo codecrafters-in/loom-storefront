@@ -2,6 +2,21 @@
 
 Newest first. Each entry links to the page with the detail.
 
+## What's new — Phase 6: money, countries and languages (in progress)
+
+- **Every currency's decimals:** prices, the price filter and analytics use the decimals the backend reports, so a
+  dinar store shows 24.560 KWD, not 245.60. No more assumed dollars in the price filter or product structured data.
+  [API.md](API.md#money)
+- **Addresses the way each country writes them:** checkout, billing and the address book follow the country's field
+  order and words (State, Province, County; ZIP code, PIN code), and a country without postcodes does not require
+  one. [API.md](API.md#orders-and-account)
+- **Languages:** the storefront's text in English, French, Spanish, German, Italian, Portuguese, Dutch, Arabic and
+  Hindi; `/fr/...` addresses, the store's default language otherwise, `X-Loom-Lang` on every API call, and `<html lang
+  dir>`. [CONFIGURATION.md](CONFIGURATION.md#i18n)
+- **Right to left:** Arabic lays the whole storefront out right to left (logical spacing, drawers, mirrored arrows).
+- **Currency switcher** in the header when the Odoo website offers more than one currency: the choice is sent as
+  `X-Loom-Pricelist` on every call and the bag is repriced in it. [CONFIGURATION.md](CONFIGURATION.md)
+
 ## What's new — 2026-09-14
 
 ### Bag and checkout

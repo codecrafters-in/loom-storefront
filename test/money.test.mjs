@@ -60,3 +60,16 @@ test('a real discount still reads as one', () => {
   assert.equal(discountPercent(usd(14500), usd(17500)), 17)
   assert.equal(isRealDiscount(usd(14500), usd(17500)), true)
 })
+
+test('dinars have three decimals and the backend can say so for any currency', async () => {
+  const { minorUnits, registerCurrencies } = await import('../src/lib/money.js')
+  assert.equal(minorUnits('KWD'), 3)
+  assert.match(formatMoney({ amount: 24560, currency: 'KWD' }, { locale: 'en-US' }), /24\.560/, 'not 245.60')
+  assert.equal(toMajor({ amount: 1500, currency: 'JPY' }), 1500)
+
+  // A backend reporting decimals wins over the built-in lists.
+  registerCurrencies({ currency: 'XAF', currencies: [{ code: 'XAF', decimals: 0 }, { code: 'CLF', decimals: 4 }] })
+  assert.equal(minorUnits('XAF'), 0)
+  assert.equal(toMajor({ amount: 12345, currency: 'CLF' }), 1.2345)
+  assert.equal(minorUnits(), 0, 'the store currency the backend named is the default')
+})

@@ -96,7 +96,8 @@ function absolute(url, base = '') {
  * not have is a way to get rich results suspended.
  */
 function productSchema(p, url, config) {
-  const currency = p.price?.currency || config.pricing?.currency || 'USD'
+  // No assumed currency: a price without one is left out rather than claimed in dollars.
+  const currency = p.price?.currency || config.pricing?.currency
   const prices = (p.variants || []).map((v) => v.price?.amount).filter(Number.isFinite)
   const low = prices.length ? Math.min(...prices) : p.price?.amount
   const high = prices.length ? Math.max(...prices) : p.price?.amount

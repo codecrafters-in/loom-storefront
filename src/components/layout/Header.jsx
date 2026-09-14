@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from '../ui/index.jsx'
 import { useCart } from '../../store/CartContext.jsx'
@@ -10,6 +10,13 @@ import useAsync from '../../hooks/useAsync.js'
 import api from '../../lib/api/index.js'
 import { docsLinkVisible } from '../../lib/docs-link.js'
 import useFocusTrap from '../../hooks/useFocusTrap.js'
+import { isMock } from '../../lib/config.js'
+import { t } from '../../i18n/index.js'
+
+// Only a live store can offer several currencies; the demo build leaves the switcher out.
+const CurrencySwitcher = isMock ? null : lazy(() => import('./CurrencySwitcher.jsx'))
+// Only a store whose website has several languages shows it; loaded then.
+const LanguageSwitcher = lazy(() => import('./LanguageSwitcher.jsx'))
 
 // Submenu entries are categories ({ slug, name }) or links the merchant added
 // by hand ({ label, to }).
@@ -109,17 +116,17 @@ export default function Header() {
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
-            aria-label="Open menu"
+            aria-label={t('Open menu')}
             className={`${iconBtn} lg:hidden`}
           >
             <Icon name="menu" size={20} />
           </button>
 
-          <Link to="/" aria-label={`${config.store?.name} home`}>
+          <Link to="/" aria-label={t('{store} home', { store: config.store?.name })}>
             <Logo config={config} />
           </Link>
 
-          <nav className="ml-8 hidden items-center gap-1 lg:flex" aria-label="Main">
+          <nav className="ms-8 hidden items-center gap-1 lg:flex" aria-label={t('Main')}>
             {primary.map((item) => (
               <div
                 key={item.label}
@@ -138,11 +145,11 @@ export default function Header() {
                 </NavLink>
 
                 {item.children.length > 0 && openMenu === item.label && (
-                  <div className="absolute left-0 top-full w-56 pt-1">
+                  <div className="absolute start-0 top-full w-56 pt-1">
                     <ul className="rounded-xs border border-line bg-surface p-1.5 shadow-card">
                       <li>
                         <Link to={item.to} className="block rounded-xs px-3 py-2 text-[13px] font-medium hover:bg-sunken">
-                          All {item.label.toLowerCase()}
+                          {t('All {category}', { category: item.label.toLowerCase() })}
                         </Link>
                       </li>
                       {item.children.map((c) => (
@@ -160,32 +167,44 @@ export default function Header() {
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-0.5">
+          <div className="ms-auto flex items-center gap-0.5">
             {features.search !== false && (
             <form onSubmit={submit} className="hidden items-center md:flex">
-              <label className="sr-only" htmlFor="site-search">Search products</label>
+              <label className="sr-only" htmlFor="site-search">{t('Search products')}</label>
               <div className="relative">
-                <Icon name="search" size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+                <Icon name="search" size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-faint" />
                 <input
                   id="site-search"
                   ref={searchRef}
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="Search"
-                  className="field h-10 w-44 pl-9 transition-[width] focus:w-64"
+                  placeholder={t('Search')}
+                  className="field h-10 w-44 ps-9 transition-[width] focus:w-64"
                 />
               </div>
             </form>
             )}
 
+            {config.i18n?.languages?.length > 1 && (
+              <Suspense fallback={null}>
+                <LanguageSwitcher className="me-1 hidden sm:inline-flex" />
+              </Suspense>
+            )}
+
+            {!isMock && config.pricing?.currencies?.length > 1 && (
+              <Suspense fallback={null}>
+                <CurrencySwitcher className="me-1 hidden sm:inline-flex" />
+              </Suspense>
+            )}
+
             {features.search !== false && (
-              <button type="button" onClick={() => setSearchOpen((v) => !v)} aria-label="Search" className={`${iconBtn} md:hidden`}>
+              <button type="button" onClick={() => setSearchOpen((v) => !v)} aria-label={t('Search')} className={`${iconBtn} md:hidden`}>
                 <Icon name="search" size={19} />
               </button>
             )}
 
             {features.wishlist !== false && (
-              <Link to="/wishlist" aria-label={`Saved items (${savedCount})`} className={iconBtn}>
+              <Link to="/wishlist" aria-label={t('Saved items ({count})', { count: savedCount })} className={iconBtn}>
                 <Icon name="heart" size={19} />
                 {savedCount > 0 && <Dot>{savedCount}</Dot>}
               </Link>
@@ -201,7 +220,7 @@ export default function Header() {
             {features.accounts !== false && (
               <Link
                 to={signedIn ? '/account' : '/login'}
-                aria-label={signedIn ? 'Your account' : 'Sign in'}
+                aria-label={signedIn ? t('Your account') : t('Sign in')}
                 className={iconBtn}
               >
                 <Icon name="user" size={19} />
@@ -210,13 +229,13 @@ export default function Header() {
                 {signedIn && (
                   <span
                     aria-hidden="true"
-                    className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-good ring-2 ring-page"
+                    className="absolute end-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-good ring-2 ring-page"
                   />
                 )}
               </Link>
             )}
 
-            <button type="button" onClick={() => setOpen(true)} aria-label={`Your bag (${count})`} className={iconBtn}>
+            <button type="button" onClick={() => setOpen(true)} aria-label={t('Your bag ({count})', { count })} className={iconBtn}>
               <Icon name="bag" size={19} />
               {count > 0 && <Dot>{count}</Dot>}
             </button>
@@ -226,13 +245,13 @@ export default function Header() {
         {searchOpen && (
           <form onSubmit={submit} className="wrap pb-3 md:hidden">
             <div className="relative">
-              <Icon name="search" size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+              <Icon name="search" size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-faint" />
               <input
                 ref={searchRef}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search products"
-                className="field pl-9"
+                placeholder={t('Search products')}
+                className="field ps-9"
               />
             </div>
           </form>
@@ -246,15 +265,15 @@ export default function Header() {
         className={`fixed inset-0 z-40 bg-ink/35 transition-opacity lg:hidden ${menuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
       />
       <nav
-        aria-label="Mobile"
+        aria-label={t('Mobile')}
         ref={menuRef}
         tabIndex={-1}
         {...(menuOpen ? {} : { inert: '' })}
-        className={`fixed left-0 top-0 z-50 h-[100dvh] w-[min(84vw,20rem)] bg-page shadow-panel transition-transform lg:hidden ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed start-0 top-0 z-50 h-[100dvh] w-[min(84vw,20rem)] bg-page shadow-panel transition-transform lg:hidden ${menuOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'}`}
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <Logo config={config} size={20} />
-          <button type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu" className="text-muted hover:text-ink">
+          <button type="button" onClick={() => setMenuOpen(false)} aria-label={t('Close menu')} className="text-muted hover:text-ink">
             <Icon name="close" size={20} />
           </button>
         </div>
@@ -263,7 +282,7 @@ export default function Header() {
             <li key={item.label} className="border-b border-line py-1">
               <Link to={item.to} className="block py-3 text-[15px]">{item.label}</Link>
               {item.children.length > 0 && (
-                <ul className="pb-2 pl-3">
+                <ul className="pb-2 ps-3">
                   {item.children.map((c) => (
                     <li key={subKey(c)}>
                       <Link to={subTo(c)} className="block py-2 text-[13px] text-muted">{c.name || c.label}</Link>
@@ -275,7 +294,7 @@ export default function Header() {
           ))}
           <li>
             <Link to={signedIn ? '/account' : '/login'} className="block py-3.5 text-[15px] text-muted">
-              {signedIn ? 'Your account' : 'Sign in'}
+              {signedIn ? t('Your account') : t('Sign in')}
             </Link>
           </li>
           {/* The floating pill is desktop-only — the bottom of a phone screen
@@ -285,7 +304,7 @@ export default function Header() {
             <li className="border-t border-line pt-1">
               <Link to="/docs" className="flex items-center gap-2 py-3.5 text-[15px] text-muted">
                 <Icon name="info" size={16} />
-                Docs &amp; API
+                {t('Docs & API')}
               </Link>
             </li>
           )}
@@ -297,7 +316,7 @@ export default function Header() {
 
 function Dot({ children }) {
   return (
-    <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 font-mono text-[9px] text-accent-ink tabular-nums">
+    <span className="absolute end-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 font-mono text-[9px] text-accent-ink tabular-nums">
       {children}
     </span>
   )

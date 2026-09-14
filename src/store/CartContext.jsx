@@ -5,6 +5,7 @@ import { onExternalWrite, STORAGE_KEYS } from '../lib/crossTab.js'
 import { addToCart as trackAdd, removeFromCart as trackRemove } from '../lib/analytics.js'
 import { cartProblem } from '../lib/cart-lines.js'
 import { isMock } from '../lib/config.js'
+import { t } from '../i18n/index.js'
 
 /**
  * Cart state.
@@ -88,7 +89,7 @@ export function CartProvider({ children }) {
        * product and its choices, extras, typed text, a combo's items and the
        * optional products added with it.
        */
-      add: async (item, quantity = 1, label = 'Added to your bag') => {
+      add: async (item, quantity = 1, label = t('Added to your bag')) => {
         const request = typeof item === 'string' ? { variantId: item, quantity } : { ...item, quantity: item.quantity ?? quantity }
         const next = await run(() => api.addToCart(request), {
           successMessage: label,
@@ -106,14 +107,14 @@ export function CartProvider({ children }) {
       remove: (lineId) => {
         // Captured before the call, because after it the line is gone.
         const line = cart?.lines?.find((l) => l.id === lineId)
-        return run(() => api.removeCartLine(lineId), { successMessage: 'Removed' }).then((next) => {
+        return run(() => api.removeCartLine(lineId), { successMessage: t('Removed') }).then((next) => {
           trackRemove(line)
           return next
         })
       },
-      applyDiscount: (code) => run(() => api.applyDiscount(code), { successMessage: 'Code applied' }),
+      applyDiscount: (code) => run(() => api.applyDiscount(code), { successMessage: t('Code applied') }),
       clear: () => run(() => api.clearCart()),
-      cancelPayment: () => run(() => api.cancelCartPayment(), { successMessage: 'Payment cancelled. You can change your bag now.' }),
+      cancelPayment: () => run(() => api.cancelCartPayment(), { successMessage: t('Payment cancelled. You can change your bag now.') }),
       refresh: () => api.getCart().then((c) => setCart(tell(push, c))),
     }),
     [cart, loading, busy, open, run, push],

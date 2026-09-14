@@ -1,6 +1,7 @@
 import api from './api/index.js'
 import { ApiError } from './api/contracts.js'
 import { loadScript } from './payments/load-script.js'
+import { addressPrefix } from '../i18n/index.js'
 
 /**
  * Checkout, in five modes.
@@ -108,7 +109,8 @@ export async function startCheckout({
 function absolute(path) {
   if (!path) return ''
   if (/^https?:\/\//.test(path)) return path
-  return new URL(path, window.location.origin).toString()
+  // A root path keeps the page's language address (`/fr`), so the shopper comes back in their language.
+  return new URL(path.startsWith('/') ? addressPrefix() + path : path, window.location.origin).toString()
 }
 
 /** `createUrl` may be a full URL (a payment service) or a path on the store API. */

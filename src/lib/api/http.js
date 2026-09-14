@@ -14,6 +14,8 @@ import { config } from '../config.js'
 import { adminFetch } from '../admin-session.js'
 import { ApiError, ContractError, assertCart, assertList, assertMoney, assertProduct } from './contracts.js'
 import { ACCESS_HEADER, accessRequired, accessToken } from '../access.js'
+import { chosenPricelist } from '../pricelist.js'
+import { currentLanguage, languageFromAddress } from '../../i18n/index.js'
 
 const SESSION_KEY = 'loom.session'
 
@@ -64,6 +66,9 @@ async function send(method, path, { query, body, auth }) {
   const timer = setTimeout(() => controller.abort(), config.api.timeout)
   // A store in maintenance or behind a password answers only calls that carry its access token.
   const access = accessToken()
+  const pricelist = chosenPricelist()
+  // A language in the page address is asked for; without one the backend answers in the store's default.
+  const language = languageFromAddress() ? currentLanguage() : ''
   try {
     return await fetch(url(path, query), {
       method,
@@ -75,6 +80,9 @@ async function send(method, path, { query, body, auth }) {
         ...(body ? { 'content-type': 'application/json' } : {}),
         ...(auth ? { authorization: `Bearer ${auth}` } : {}),
         ...(access ? { [ACCESS_HEADER]: access } : {}),
+        // The currency the shopper picked; the server varies its cached answers on it.
+        ...(pricelist ? { 'x-loom-pricelist': pricelist } : {}),
+        ...(language ? { 'x-loom-lang': language } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
     })
@@ -382,6 +390,12 @@ export async function saveForLater(lineId, productSlug) {
 export async function removeCartLine(lineId) {
   const cart = await ensureCart()
   return assertCart(await del(`/carts/${cart.id}/lines/${lineId}`), 'DELETE /carts/:id/lines/:lineId')
+}
+
+/** Price the bag with another of the store's pricelists (the currency switcher). */
+export async function setCartPricelist(pricelistId) {
+  const cart = await ensureCart()
+  return assertCart(await post(`/carts/${cart.id}/pricelist`, { pricelist_id: pricelistId }), 'POST /carts/:id/pricelist')
 }
 
 export async function applyDiscount(code) {

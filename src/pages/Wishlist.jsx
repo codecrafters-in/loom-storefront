@@ -5,6 +5,7 @@ import ProductGrid from '../components/product/ProductGrid.jsx'
 import Promises from '../components/layout/Promises.jsx'
 import { Button, Empty, ErrorState } from '../components/ui/index.jsx'
 import { useWishlist } from '../store/WishlistContext.jsx'
+import { t, plural } from '../i18n/index.js'
 
 export default function Wishlist() {
   const { slugs } = useWishlist()
@@ -13,11 +14,11 @@ export default function Wishlist() {
 
   return (
     <>
-      <Seo title={'Saved'} noindex />
+      <Seo title={t('Saved')} noindex />
       <div className="wrap py-10">
-        <h1 className="text-display-lg">Saved</h1>
+        <h1 className="text-display-lg">{t('Saved')}</h1>
         <p className="mt-3 text-[15px] text-muted">
-          {loading ? 'Loading…' : `${data?.total ?? 0} ${data?.total === 1 ? 'item' : 'items'} you came back to.`}
+          {loading ? t('Loading…') : plural(data?.total ?? 0, '{count} item you came back to.', '{count} items you came back to.')}
         </p>
       </div>
 
@@ -27,9 +28,9 @@ export default function Wishlist() {
         ) : !loading && !data?.items.length ? (
           <Empty
             icon="heart"
-            title="Nothing saved yet"
-            body="Tap the heart on anything you want to think about. It will be here when you come back."
-            action={<Button to="/shop" size="lg">Browse the shop</Button>}
+            title={t('Nothing saved yet')}
+            body={t('Tap the heart on anything you want to think about. It will be here when you come back.')}
+            action={<Button to="/shop" size="lg">{t('Browse the shop')}</Button>}
           />
         ) : (
           <ProductGrid products={data?.items || []} loading={loading} skeletonCount={4} />

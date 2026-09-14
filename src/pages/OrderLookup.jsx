@@ -6,6 +6,7 @@ import { Button, ErrorState } from '../components/ui/index.jsx'
 import { useAuth } from '../store/AuthContext.jsx'
 import { useCaptcha } from '../components/Captcha.jsx'
 import { withCaptcha } from '../lib/captcha.js'
+import { t } from '../i18n/index.js'
 
 /**
  * Find an order without an account.
@@ -47,18 +48,18 @@ export default function OrderLookup() {
 
   return (
     <>
-      <Seo title="Find your order" noindex />
+      <Seo title={t('Find your order')} noindex />
       <div className="wrap max-w-md py-16 pb-24">
-        <p className="eyebrow">Order lookup</p>
-        <h1 className="mt-3 text-display-lg">Find your order</h1>
+        <p className="eyebrow">{t('Order lookup')}</p>
+        <h1 className="mt-3 text-display-lg">{t('Find your order')}</h1>
         <p className="mt-4 text-[15px] leading-relaxed text-muted">
-          Your order number is in your order confirmation email.
+          {t('Your order number is in your order confirmation email.')}
         </p>
 
         <form onSubmit={submit} className="mt-8 space-y-5">
           <div>
             <label htmlFor="order-number" className="mb-1.5 block text-[13px] font-medium">
-              Order number
+              {t('Order number')}
             </label>
             <input
               id="order-number"
@@ -72,7 +73,7 @@ export default function OrderLookup() {
 
           <div>
             <label htmlFor="order-email" className="mb-1.5 block text-[13px] font-medium">
-              Email address
+              {t('Email address')}
             </label>
             <input
               id="order-email"
@@ -85,8 +86,7 @@ export default function OrderLookup() {
               required
             />
             <p className="mt-1.5 text-[12px] text-faint">
-              The one you used at checkout. Both have to match — an order number on its own would
-              let anyone read anyone&rsquo;s order.
+              {t('The one you used at checkout. Both have to match — an order number on its own would let anyone read anyone’s order.')}
             </p>
           </div>
 
@@ -99,26 +99,26 @@ export default function OrderLookup() {
           )}
 
           <Button as="button" type="submit" size="lg" full disabled={busy}>
-            {busy ? 'Looking…' : 'Find my order'}
+            {busy ? t('Looking…') : t('Find my order')}
           </Button>
         </form>
 
         <p className="mt-8 text-[13px] leading-relaxed text-muted">
           {signedIn ? (
             <>
-              Signed in — everything you have ordered with this account is under{' '}
+              {t('Signed in — everything you have ordered with this account is under')}{' '}
               <a href="/account/orders" className="link-underline text-ink">
-                your orders
+                {t('your orders')}
               </a>
               .
             </>
           ) : (
             <>
-              Ordered with an account?{' '}
+              {t('Ordered with an account?')}{' '}
               <a href="/login" className="link-underline text-ink">
-                Sign in
+                {t('Sign in')}
               </a>{' '}
-              and they are all there.
+              {t('and they are all there.')}
             </>
           )}
         </p>

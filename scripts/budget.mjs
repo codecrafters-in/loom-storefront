@@ -32,13 +32,16 @@ const DIST = path.join(ROOT, 'dist')
  * point of the whole file.
  *
  * Two JavaScript budgets, because two different things get built, read from the
- * same setting vite.config.js reads. A live store (`VITE_DATA_SOURCE=api`) is
+ * setting the build was made with (dist/.vite/loom-build.json, written by vite.config.js). A live store (`VITE_DATA_SOURCE=api`) is
  * what shoppers download, so it has the tight number: about 6% over its build
  * when this was split. The demo also carries the whole demo backend (`mock.js`)
  * in its first download, which no live store ships; it had crept up to the old
  * shared 125 KB, so it gets 130 KB, and the live number came down from 125 to 115.
  */
-const LIVE = (loadEnv('production', ROOT, 'VITE_').VITE_DATA_SOURCE || 'mock').toLowerCase() === 'api'
+const BUILD_INFO = path.join(DIST, '.vite/loom-build.json')
+const LIVE = fs.existsSync(BUILD_INFO)
+  ? JSON.parse(fs.readFileSync(BUILD_INFO, 'utf8')).dataSource === 'api'
+  : (loadEnv('production', ROOT, 'VITE_').VITE_DATA_SOURCE || 'mock').toLowerCase() === 'api'
 const BUDGET = {
   js: (LIVE ? 115 : 130) * 1024,
   css: 12 * 1024,

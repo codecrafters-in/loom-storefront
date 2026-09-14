@@ -6,6 +6,7 @@ import CartDrawer from '../cart/CartDrawer.jsx'
 import DemoBar from '../DemoBar.jsx'
 import CompareTray from '../product/CompareTray.jsx'
 import { useStorefrontState } from '../../store/StorefrontContext.jsx'
+import { t } from '../../i18n/index.js'
 
 // Rarely shown, so not in every visitor's first download.
 const StoreGate = lazy(() => import('./StoreGate.jsx'))
@@ -39,9 +40,9 @@ export default function Layout() {
     <div className="flex min-h-[100dvh] flex-col">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-xs focus:bg-ink focus:px-4 focus:py-2 focus:text-page"
+        className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-50 focus:rounded-xs focus:bg-ink focus:px-4 focus:py-2 focus:text-page"
       >
-        Skip to content
+        {t('Skip to content')}
       </a>
       <Header />
       <main id="main" className="flex-1">

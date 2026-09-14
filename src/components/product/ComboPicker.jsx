@@ -2,6 +2,7 @@ import { useId } from 'react'
 import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
 import { formatMoney } from '../../lib/money.js'
+import { t } from '../../i18n/index.js'
 
 /**
  * Choosing a set: one item from each group.
@@ -51,7 +52,7 @@ export default function ComboPicker({ groups = [], picks = {}, onPick, total }) 
                     {options && <span className="block text-[12px] text-faint">{options}</span>}
                   </span>
                   <span className="shrink-0 text-[13px] tabular-nums text-muted">
-                    {item.available === false ? 'Sold out' : item.extraPrice?.amount > 0 ? `+${formatMoney(item.extraPrice)}` : 'Included'}
+                    {item.available === false ? t('Sold out') : item.extraPrice?.amount > 0 ? `+${formatMoney(item.extraPrice)}` : t('Included')}
                   </span>
                 </label>
               )
@@ -61,7 +62,7 @@ export default function ComboPicker({ groups = [], picks = {}, onPick, total }) 
       ))}
       {total && (
         <p className="mt-4 flex justify-between border-t border-line pt-3 text-[14px]">
-          <span className="text-muted">Set total</span>
+          <span className="text-muted">{t('Set total')}</span>
           <span className="tabular-nums">{formatMoney(total)}</span>
         </p>
       )}

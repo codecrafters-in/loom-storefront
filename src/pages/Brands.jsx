@@ -4,6 +4,7 @@ import Seo from '../components/Seo.jsx'
 import useAsync from '../hooks/useAsync.js'
 import Promises from '../components/layout/Promises.jsx'
 import { Button, Empty, ErrorState, Skeleton } from '../components/ui/index.jsx'
+import { t, plural } from '../i18n/index.js'
 
 /**
  * Every brand the store sells, each linking to its own page (`/brands/:slug`).
@@ -17,11 +18,11 @@ export default function Brands() {
 
   return (
     <>
-      <Seo title="Brands" description="Shop by brand." />
+      <Seo title={t('Brands')} description={t('Shop by brand.')} />
       <div className="wrap py-10">
-        <h1 className="text-display-lg">Brands</h1>
+        <h1 className="text-display-lg">{t('Brands')}</h1>
         <p className="mt-3 text-[15px] text-muted">
-          {loading ? 'Loading…' : `${brands.length} ${brands.length === 1 ? 'brand' : 'brands'}`}
+          {loading ? t('Loading…') : plural(brands.length, '{count} brand', '{count} brands')}
         </p>
       </div>
 
@@ -33,7 +34,7 @@ export default function Brands() {
             {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-32 w-full" />)}
           </div>
         ) : !brands.length ? (
-          <Empty icon="package" title="No brands yet" body="Products will show their brand here once they have one." action={<Button to="/shop" size="lg">Browse the shop</Button>} />
+          <Empty icon="package" title={t('No brands yet')} body={t('Products will show their brand here once they have one.')} action={<Button to="/shop" size="lg">{t('Browse the shop')}</Button>} />
         ) : (
           <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {brands.map((b) => (
@@ -45,7 +46,7 @@ export default function Brands() {
                     <span aria-hidden="true" className="grid h-10 w-10 place-items-center rounded-full bg-sunken font-display text-lg">{b.name.slice(0, 1)}</span>
                   )}
                   <p className="mt-3 text-[15px] font-medium">{b.name}</p>
-                  <p className="mt-1 text-[12px] text-muted">{b.count} {b.count === 1 ? 'product' : 'products'}</p>
+                  <p className="mt-1 text-[12px] text-muted">{plural(b.count, '{count} product', '{count} products')}</p>
                 </Link>
               </li>
             ))}

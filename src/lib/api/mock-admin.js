@@ -239,6 +239,11 @@ export async function getDeliverySlots() {
   await latency()
   return { required: false, slots: [], selected: null }
 }
+/** The demo prices in one currency: nothing to switch to. */
+export async function setCartPricelist() {
+  await latency()
+  throw new ApiError('The demo has one currency.', { status: 422, code: 'invalid_pricelist' })
+}
 export async function getPickupLocations() {
   await latency()
   return { locations: [], selected: null }

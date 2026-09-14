@@ -1,3 +1,5 @@
+import { t } from '../../i18n/index.js'
+
 /**
  * The store's contact details from Odoo (`store.contact`): on the contact page
  * and, compact, in the footer. Renders nothing when the store has none.
@@ -19,12 +21,12 @@ export default function ContactDetails({ contact, compact = false, className = '
   const link = 'text-accent link-underline'
 
   const rows = [
-    email && ['Email', <a key="email" href={`mailto:${email}`} className={link}>{email}</a>],
-    phone && ['Phone', <a key="phone" href={`tel:${phone.replace(/[^\d+]/g, '')}`} className={link}>{phone}</a>],
+    email && [t('Email'), <a key="email" href={`mailto:${email}`} className={link}>{email}</a>],
+    phone && [t('Phone'), <a key="phone" href={`tel:${phone.replace(/[^\d+]/g, '')}`} className={link}>{phone}</a>],
     whatsappUrl && ['WhatsApp', <a key="wa" href={whatsappUrl} className={link} target="_blank" rel="noopener noreferrer">{whatsapp}</a>],
-    hours && ['Hours', hours],
-    !compact && address.length > 0 && ['Address', <span key="address">{address.map((line) => <span key={line} className="block">{line}</span>)}</span>],
-    social.length > 0 && ['Follow', (
+    hours && [t('Hours'), hours],
+    !compact && address.length > 0 && [t('Address'), <span key="address">{address.map((line) => <span key={line} className="block">{line}</span>)}</span>],
+    social.length > 0 && [t('Follow'), (
       <span key="social" className="flex flex-wrap gap-x-3 gap-y-1">
         {social.map((s) => (
           <a key={s.network} href={s.url} className={link} target="_blank" rel="noopener noreferrer me">{NETWORKS[s.network] || s.network}</a>

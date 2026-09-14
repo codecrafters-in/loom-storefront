@@ -66,7 +66,8 @@ function watch() {
   })
 }
 
-export const CURRENCY = config.store.currency
+// The demo catalogue is written in dollars unless the build says otherwise.
+export const CURRENCY = config.store.currency || 'USD'
 export const nowIso = () => new Date().toISOString()
 export const KEY = {
   discounts: 'loom.discounts',
@@ -1813,6 +1814,7 @@ export const saveForLater = later('saveForLater')
 export const getDeliverySlots = later('getDeliverySlots')
 export const getPickupLocations = later('getPickupLocations')
 export const setPickupLocation = later('setPickupLocation')
+export const setCartPricelist = later('setCartPricelist')
 export const listPaymentMethods = later('listPaymentMethods')
 export const deletePaymentMethod = later('deletePaymentMethod')
 export const adminSendTestNotification = later('adminSendTestNotification')

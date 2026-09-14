@@ -15,9 +15,10 @@ import { test, expect } from '../support/fixtures.js'
 import { settings, uniqueEmail } from '../support/env.js'
 import { Shop } from '../support/shop.js'
 
-async function openStore(browser, baseURL) {
+/** `prefix`: a language address. The Kuwait store's default language is Arabic; this test reads it in English. */
+async function openStore(browser, baseURL, { prefix = '' } = {}) {
   const context = await browser.newContext({ baseURL })
-  return { context, shop: new Shop(await context.newPage()) }
+  return { context, shop: new Shop(await context.newPage(), { prefix }) }
 }
 
 test('S-9 two stores on one Odoo: catalogue, orders, sign-up and branding are separate', { tag: '@S-9' }, async ({ browser, page, shop, store }) => {
@@ -25,12 +26,12 @@ test('S-9 two stores on one Odoo: catalogue, orders, sign-up and branding are se
   const variant = await store.variant('e2e-merino-crew', { Color: 'Blue', Size: 'S' })
   const { order } = await store.placeOrder({ token, email, lines: [{ variantId: variant.id }] })
 
-  const kw = await openStore(browser, settings.storefront2Url)
+  const kw = await openStore(browser, settings.storefront2Url, { prefix: '/en' })
   try {
     // Branding: each storefront is its own shop.
     await page.goto('/')
     await expect(page).toHaveTitle(/E2E Store/)
-    await kw.shop.page.goto('/')
+    await kw.shop.page.goto('/en/')
     await expect(kw.shop.page).toHaveTitle(/E2E Kuwait Store/)
 
     // Catalogue: a product of one website is not sold on the other.
@@ -44,7 +45,7 @@ test('S-9 two stores on one Odoo: catalogue, orders, sign-up and branding are se
 
     // Orders: an order placed on store e2e is not in the account on store e2e-kw.
     await kw.shop.login(email, password)
-    await kw.shop.page.goto('/account/orders')
+    await kw.shop.page.goto('/en/account/orders')
     await expect(kw.shop.page.getByText('No orders yet', { exact: false }).first()).toBeVisible()
     await expect(kw.shop.page.getByText(`Order ${order.number}`)).toHaveCount(0)
 
@@ -56,7 +57,7 @@ test('S-9 two stores on one Odoo: catalogue, orders, sign-up and branding are se
   }
 
   // Customers: a new shopper can create an account on the second store.
-  const signup = await openStore(browser, settings.storefront2Url)
+  const signup = await openStore(browser, settings.storefront2Url, { prefix: '/en' })
   try {
     await signup.shop.register({ firstName: 'Noor', lastName: 'Kuwait', email: uniqueEmail('s9-kw-signup'), password: 'e2e-s9-password' })
     await expect(signup.shop.page).toHaveURL(/\/account/, { timeout: 20_000 })

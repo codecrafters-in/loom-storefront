@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
 import Seo from '../components/Seo.jsx'
 import RegionField from '../components/address/RegionField.jsx'
+import useAddressLayout from '../components/address/useAddressLayout.js'
+import { postcodeLabel } from '../lib/addressLayout.js'
 import { Link, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import api from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
@@ -11,25 +13,26 @@ import { useWishlist } from '../store/WishlistContext.jsx'
 import { Badge, Button, Empty, ErrorState, Icon, Skeleton } from '../components/ui/index.jsx'
 import { formatMoney } from '../lib/money.js'
 import { isMock } from '../lib/config.js'
+import { t, plural, mark } from '../i18n/index.js'
 
 const TABS = [
-  { to: '/account', end: true, label: 'Overview', icon: 'user' },
-  { to: '/account/orders', label: 'Orders', icon: 'package' },
-  { to: '/account/addresses', label: 'Addresses', icon: 'map-pin' },
+  { to: '/account', end: true, label: mark('Overview'), icon: 'user' },
+  { to: '/account/orders', label: mark('Orders'), icon: 'package' },
+  { to: '/account/addresses', label: mark('Addresses'), icon: 'map-pin' },
 ]
 // Only where the store takes payments on the storefront: that is where "Save for next time" is offered.
-const PAYMENT_TAB = { to: '/account/payment-methods', label: 'Payment methods', icon: 'shield' }
+const PAYMENT_TAB = { to: '/account/payment-methods', label: mark('Payment methods'), icon: 'shield' }
 // Points and store credit from the backend's loyalty programs; the demo has none.
-const REWARDS_TAB = { to: '/account/rewards', label: 'Rewards', icon: 'award' }
+const REWARDS_TAB = { to: '/account/rewards', label: mark('Rewards'), icon: 'award' }
 
 const STATUS_TONE = { placed: 'new', paid: 'bestseller', fulfilled: 'bestseller', delivered: 'bestseller', cancelled: 'sold-out', refunded: 'sold-out' }
-const STATUS_LABEL = { placed: 'Placed', pending: 'Awaiting payment', paid: 'Paid', fulfilled: 'On its way', delivered: 'Delivered', cancelled: 'Cancelled', refunded: 'Refunded' }
+const STATUS_LABEL = { placed: mark('Placed'), pending: mark('Awaiting payment'), paid: mark('Paid'), fulfilled: mark('On its way'), delivered: mark('Delivered'), cancelled: mark('Cancelled'), refunded: mark('Refunded') }
 
-const statusLabel = (status) => STATUS_LABEL[status] || (status ? status[0].toUpperCase() + status.slice(1) : '')
+const statusLabel = (status) => (STATUS_LABEL[status] && t(STATUS_LABEL[status])) || (status ? status[0].toUpperCase() + status.slice(1) : '')
 
 function useAccountLocale() {
   const config = useStorefront()
-  const countries = config.commerce?.countries?.length ? config.commerce.countries : [['US', 'United States']]
+  const countries = config.commerce?.countries?.length ? config.commerce.countries : [['US', t('United States')]]
   return { config, locale: config.pricing?.locale || 'en-US', countries }
 }
 
@@ -58,7 +61,7 @@ export default function Account() {
 
   return (
     <div className="wrap py-10 pb-20 sm:py-12">
-      <Seo title="Your account" noindex />
+      <Seo title={t('Your account')} noindex />
 
       <header className="flex flex-wrap items-center justify-between gap-5 border-b border-line pb-8">
         <div className="flex min-w-0 items-center gap-4">
@@ -66,9 +69,9 @@ export default function Account() {
             {initials}
           </span>
           <div className="min-w-0">
-            <p className="eyebrow">Your account</p>
+            <p className="eyebrow">{t('Your account')}</p>
             <h1 className="mt-1.5 truncate text-display-md">
-              {customer.firstName ? `Hello, ${customer.firstName}` : 'Hello'}
+              {customer.firstName ? t('Hello, {name}', { name: customer.firstName }) : t('Hello')}
             </h1>
             <p className="mt-1 truncate text-[13px] text-muted">{customer.email}</p>
           </div>
@@ -79,7 +82,7 @@ export default function Account() {
           icon="log-out"
           onClick={async () => { await logout(); navigate('/') }}
         >
-          Sign out
+          {t('Sign out')}
         </Button>
       </header>
 
@@ -89,12 +92,12 @@ export default function Account() {
           full-width rows on a phone push the orders below the fold on a page
           whose whole purpose is to get someone to their orders.
         */}
-        <nav aria-label="Account" className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0">
-          {tabs.map((t) => (
+        <nav aria-label={t('Account')} className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0">
+          {tabs.map((tab) => (
             <NavLink
-              key={t.to}
-              to={t.to}
-              end={t.end}
+              key={tab.to}
+              to={tab.to}
+              end={tab.end}
               className={({ isActive }) =>
                 `flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xs border px-3 py-2.5 text-[14px] transition-colors lg:border-transparent ${
                   isActive
@@ -103,8 +106,8 @@ export default function Account() {
                 }`
               }
             >
-              <Icon name={t.icon} size={16} />
-              {t.label}
+              <Icon name={tab.icon} size={16} />
+              {t(tab.label)}
             </NavLink>
           ))}
         </nav>
@@ -197,9 +200,9 @@ function OrderCard({ order, locale }) {
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[15px] font-medium">Order {order.number}</p>
+          <p className="text-[15px] font-medium">{t('Order {number}', { number: order.number })}</p>
           <p className="mt-1 text-[12px] text-faint">
-            {formatDate(order.placedAt, locale)} · {items} {items === 1 ? 'item' : 'items'}
+            {formatDate(order.placedAt, locale)} · {plural(items, '{count} item', '{count} items')}
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -214,10 +217,10 @@ function OrderCard({ order, locale }) {
               <div className="shot rounded-xs"><img src={line.image?.url} alt="" loading="lazy" /></div>
             </div>
           ))}
-          {extra > 0 && <span className="pl-1 text-[12px] text-faint">+{extra}</span>}
+          {extra > 0 && <span className="ps-1 text-[12px] text-faint">+{extra}</span>}
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 text-[13px] text-muted transition-colors group-hover:text-ink">
-          View order <Icon name="arrow-right" size={14} />
+          {t('View order')} <Icon name="arrow-right" size={14} className="rtl:-scale-x-100" />
         </span>
       </div>
     </Link>
@@ -238,10 +241,10 @@ function Overview() {
     <div className="space-y-8">
       <section aria-labelledby="latest-order">
         <div className="flex items-center justify-between gap-3">
-          <h2 id="latest-order" className="eyebrow">Latest order</h2>
+          <h2 id="latest-order" className="eyebrow">{t('Latest order')}</h2>
           {orders.data?.items?.length > 1 && (
             <Link to="/account/orders" className="text-[13px] text-accent link-underline">
-              All {orders.data.items.length} orders
+              {plural(orders.data.items.length, 'All {count} orders', 'All {count} orders')}
             </Link>
           )}
         </div>
@@ -254,8 +257,8 @@ function Overview() {
             <OrderCard order={latest} locale={locale} />
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-4 rounded-xs border border-dashed border-line p-5">
-              <p className="text-[14px] text-muted">No orders yet. When you place one, you can follow it from here.</p>
-              <Button to="/shop" size="sm" variant="quiet" iconRight="arrow-right">Start shopping</Button>
+              <p className="text-[14px] text-muted">{t('No orders yet. When you place one, you can follow it from here.')}</p>
+              <Button to="/shop" size="sm" variant="quiet" iconRight="arrow-right">{t('Start shopping')}</Button>
             </div>
           )}
         </div>
@@ -265,17 +268,17 @@ function Overview() {
         <PersonalDetails />
 
         <Card
-          title="Default address"
+          title={t('Default address')}
           action={
             <Link to="/account/addresses" className="text-[13px] text-accent link-underline">
-              {customer.addresses.length ? 'Manage' : 'Add'}
+              {customer.addresses.length ? t('Manage') : t('Add')}
             </Link>
           }
         >
           {defaultAddress ? (
             <AddressLines address={defaultAddress} countries={countries} />
           ) : (
-            <p className="text-[14px] text-muted">No address saved yet. Add one and checkout fills it in for you.</p>
+            <p className="text-[14px] text-muted">{t('No address saved yet. Add one and checkout fills it in for you.')}</p>
           )}
         </Card>
       </div>
@@ -287,11 +290,11 @@ function Overview() {
         >
           <span className="flex items-center gap-3 text-[14px]">
             <span className="grid h-9 w-9 place-items-center rounded-full bg-sunken text-muted"><Icon name="heart" size={16} /></span>
-            Saved items
+            {t('Saved items')}
           </span>
           <span className="flex items-center gap-2 text-[14px] tabular-nums text-muted group-hover:text-ink">
             {savedCount}
-            <Icon name="chevron-right" size={16} />
+            <Icon name="chevron-right" size={16} className="rtl:-scale-x-100" />
           </span>
         </Link>
       )}
@@ -320,7 +323,7 @@ function PersonalDetails() {
     setBusy(true)
     try {
       await update(form)
-      push('Details saved')
+      push(t('Details saved'))
       setForm(null)
     } catch (err) {
       push(err.message, { tone: 'error' })
@@ -332,30 +335,30 @@ function PersonalDetails() {
   const name = [customer.firstName, customer.lastName].filter(Boolean).join(' ')
 
   return (
-    <Card title="Personal details" action={!form && <TextAction onClick={start}>Edit</TextAction>}>
+    <Card title={t('Personal details')} action={!form && <TextAction onClick={start}>{t('Edit')}</TextAction>}>
       {form ? (
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <AddressField id="fn" label="First name" value={form.firstName} onChange={set('firstName')} autoComplete="given-name" autoFocus />
-            <AddressField id="ln" label="Last name" value={form.lastName} onChange={set('lastName')} autoComplete="family-name" />
+            <AddressField id="fn" label={t('First name')} value={form.firstName} onChange={set('firstName')} autoComplete="given-name" autoFocus />
+            <AddressField id="ln" label={t('Last name')} value={form.lastName} onChange={set('lastName')} autoComplete="family-name" />
           </div>
-          <AddressField id="ph" label="Phone" type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" />
+          <AddressField id="ph" label={t('Phone')} type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" />
           <div className="grid gap-4 sm:grid-cols-2">
-            <AddressField id="co" label="Company (optional)" value={form.company} onChange={set('company')} autoComplete="organization" />
-            <AddressField id="vat" label="Tax ID (optional)" value={form.vat} onChange={set('vat')} />
+            <AddressField id="co" label={t('Company (optional)')} value={form.company} onChange={set('company')} autoComplete="organization" />
+            <AddressField id="vat" label={t('Tax ID (optional)')} value={form.vat} onChange={set('vat')} />
           </div>
-          <p className="text-[12px] text-faint">Your email, {customer.email}, is how you sign in, so it can’t be changed here.</p>
+          <p className="text-[12px] text-faint">{t('Your email, {email}, is how you sign in, so it can’t be changed here.', { email: customer.email })}</p>
           <div className="flex gap-3">
-            <Button as="button" type="submit" size="sm" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button>
-            <Button size="sm" variant="ghost" onClick={() => setForm(null)} disabled={busy}>Cancel</Button>
+            <Button as="button" type="submit" size="sm" disabled={busy}>{busy ? t('Saving…') : t('Save')}</Button>
+            <Button size="sm" variant="ghost" onClick={() => setForm(null)} disabled={busy}>{t('Cancel')}</Button>
           </div>
         </form>
       ) : (
         <dl className="space-y-3.5">
-          <Detail label="Name" value={name} empty="Add your name" onAdd={start} />
-          <Detail label="Email" value={customer.email} />
-          <Detail label="Phone" value={customer.phone} empty="Add a phone number" onAdd={start} />
-          {(customer.company || customer.vat) && <Detail label="Company" value={[customer.company, customer.vat && `Tax ID ${customer.vat}`].filter(Boolean).join(' · ')} />}
+          <Detail label={t('Name')} value={name} empty={t('Add your name')} onAdd={start} />
+          <Detail label={t('Email')} value={customer.email} />
+          <Detail label={t('Phone')} value={customer.phone} empty={t('Add a phone number')} onAdd={start} />
+          {(customer.company || customer.vat) && <Detail label={t('Company')} value={[customer.company, customer.vat && t('Tax ID {vat}', { vat: customer.vat })].filter(Boolean).join(' · ')} />}
         </dl>
       )}
     </Card>
@@ -374,9 +377,9 @@ function Orders() {
     return (
       <Empty
         icon="package"
-        title="No orders yet"
-        body="When you place one, it will show up here with tracking."
-        action={<Button to="/shop">Shop everything</Button>}
+        title={t('No orders yet')}
+        body={t('When you place one, it will show up here with tracking.')}
+        action={<Button to="/shop">{t('Shop everything')}</Button>}
       />
     )
   }
@@ -384,8 +387,8 @@ function Orders() {
   return (
     <>
       <PageHeading
-        title="Orders"
-        note={`${data.items.length} ${data.items.length === 1 ? 'order' : 'orders'}, newest first.`}
+        title={t('Orders')}
+        note={plural(data.items.length, '{count} order, newest first.', '{count} orders, newest first.')}
       />
       <ul className="mt-6 space-y-4">
         {data.items.map((order) => (
@@ -399,8 +402,8 @@ function Orders() {
 /* ── addresses ───────────────────────────────────────────────────────────── */
 
 const ADDRESS_LABELS = {
-  name: 'Full name', line1: 'Address', city: 'City', region: 'State / region',
-  postalCode: 'Postcode', country: 'Country', phone: 'Phone',
+  name: mark('Full name'), line1: mark('Address'), city: mark('City'), region: mark('State / region'),
+  postalCode: mark('Postcode'), country: mark('Country'), phone: mark('Phone'),
 }
 
 const blankAddress = (country) => ({
@@ -447,7 +450,7 @@ function Addresses() {
     try {
       await saveAddress(editing)
       setEditing(null)
-      push('Address saved')
+      push(t('Address saved'))
     } catch (err) {
       setProblems(err.detail?.fields || [])
       push(err.message, { tone: 'error' })
@@ -459,7 +462,7 @@ function Addresses() {
   const makeDefault = async (address) => {
     try {
       await saveAddress({ ...address, isDefault: true })
-      push('Default address updated')
+      push(t('Default address updated'))
     } catch (err) {
       // An address saved before the store asked for a state cannot be re-saved
       // as it is — open it with the missing fields marked instead of failing.
@@ -471,7 +474,7 @@ function Addresses() {
   const remove = async (address) => {
     try {
       await deleteAddress(address.id)
-      push('Address removed')
+      push(t('Address removed'))
     } catch (err) {
       push(err.message, { tone: 'error' })
     } finally {
@@ -492,42 +495,49 @@ function Addresses() {
     setEditing((a) => (a ? { ...a, region: value } : a))
   }, [])
 
+  // The address in its country's own order and words; called before the early return below, as hooks must be.
+  const layout = useAddressLayout(editing?.country || defaultCountry)
+
   if (editing) {
     const name = countryName(countries, editing.country)
     return (
       <>
-        <PageHeading title={editing.id ? 'Edit address' : 'New address'} />
+        <PageHeading title={editing.id ? t('Edit address') : t('New address')} />
         <form onSubmit={save} noValidate={false} className="mt-6 max-w-xl space-y-4 rounded-xs border border-line bg-surface p-5 sm:p-6">
-          <AddressField id="a-name" label="Full name" required invalid={invalid('name')} value={editing.name} onChange={set('name')} autoComplete="name" autoFocus />
-          <AddressField id="a-l1" label="Address" required invalid={invalid('line1')} value={editing.line1} onChange={set('line1')} autoComplete="address-line1" />
-          <AddressField id="a-l2" label="Apartment, suite (optional)" value={editing.line2 || ''} onChange={set('line2')} autoComplete="address-line2" />
+          <AddressField id="a-name" label={t('Full name')} required invalid={invalid('name')} value={editing.name} onChange={set('name')} autoComplete="name" autoFocus />
+          <AddressField id="a-l1" label={t('Address')} required invalid={invalid('line1')} value={editing.line1} onChange={set('line1')} autoComplete="address-line1" />
+          <AddressField id="a-l2" label={t('Apartment, suite (optional)')} value={editing.line2 || ''} onChange={set('line2')} autoComplete="address-line2" />
           <div className="grid gap-4 sm:grid-cols-2">
-            <AddressField id="a-city" label="City" required invalid={invalid('city')} value={editing.city} onChange={set('city')} autoComplete="address-level2" />
-            <RegionField id="a-region" country={editing.country || defaultCountry} invalid={invalid('region')} value={editing.region || ''} onChange={setRegion} />
+            {layout.short.map((field) => {
+              if (field === 'city') return <AddressField key={field} id="a-city" label={t('City')} required invalid={invalid('city')} value={editing.city} onChange={set('city')} autoComplete="address-level2" />
+              if (field === 'region') return <RegionField key={field} id="a-region" label={layout.labels.region} country={editing.country || defaultCountry} invalid={invalid('region')} value={editing.region || ''} onChange={setRegion} />
+              if (field === 'postalCode') {
+                return <AddressField key={field} id="a-pc" label={postcodeLabel(layout)} required={layout.postcodeRequired} invalid={invalid('postalCode')} value={editing.postalCode} onChange={set('postalCode')} autoComplete="postal-code" />
+              }
+              return (
+                <div key={field}>
+                  <label htmlFor="a-country" className="mb-1.5 block text-[13px] font-medium">{t('Country')}</label>
+                  <select
+                    id="a-country"
+                    className={`field ${invalid('country') ? 'border-sale' : ''}`}
+                    aria-invalid={invalid('country') || undefined}
+                    value={editing.country || defaultCountry}
+                    onChange={set('country')}
+                    autoComplete="country"
+                  >
+                    {/* An address saved for a country the store no longer ships to stays selectable. */}
+                    {editing.country && !countries.some(([code]) => code === editing.country) && (
+                      <option value={editing.country}>{editing.country}</option>
+                    )}
+                    {countries.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+                  </select>
+                </div>
+              )
+            })}
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <AddressField id="a-pc" label="Postcode" required invalid={invalid('postalCode')} value={editing.postalCode} onChange={set('postalCode')} autoComplete="postal-code" />
-            <div>
-              <label htmlFor="a-country" className="mb-1.5 block text-[13px] font-medium">Country</label>
-              <select
-                id="a-country"
-                className={`field ${invalid('country') ? 'border-sale' : ''}`}
-                aria-invalid={invalid('country') || undefined}
-                value={editing.country || defaultCountry}
-                onChange={set('country')}
-                autoComplete="country"
-              >
-                {/* An address saved for a country the store no longer ships to stays selectable. */}
-                {editing.country && !countries.some(([code]) => code === editing.country) && (
-                  <option value={editing.country}>{editing.country}</option>
-                )}
-                {countries.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
-              </select>
-            </div>
-          </div>
-          <AddressField id="a-phone" label="Phone (for delivery updates)" type="tel" value={editing.phone || ''} onChange={set('phone')} autoComplete="tel" />
+          <AddressField id="a-phone" label={t('Phone (for delivery updates)')} type="tel" value={editing.phone || ''} onChange={set('phone')} autoComplete="tel" />
           <div>
-            <label htmlFor="a-type" className="mb-1.5 block text-[13px] font-medium">Use this address for</label>
+            <label htmlFor="a-type" className="mb-1.5 block text-[13px] font-medium">{t('Use this address for')}</label>
             <select
               id="a-type"
               className="field"
@@ -537,8 +547,8 @@ function Addresses() {
                 setEditing((a) => ({ ...a, type, isDefault: type === 'billing' ? false : a.isDefault }))
               }}
             >
-              <option value="shipping">Deliveries</option>
-              <option value="billing">Invoices (billing address)</option>
+              <option value="shipping">{t('Deliveries')}</option>
+              <option value="billing">{t('Invoices (billing address)')}</option>
             </select>
           </div>
           {editing.type !== 'billing' && (
@@ -549,19 +559,19 @@ function Addresses() {
               onChange={(e) => setEditing((a) => ({ ...a, isDefault: e.target.checked }))}
               className="h-4 w-4 accent-[rgb(var(--accent))]"
             />
-            Use as my default address
+            {t('Use as my default address')}
           </label>
           )}
           {problems.length > 0 && (
             <p role="alert" className="text-[13px] text-sale">
               {problems.includes('region') && editing.region
-                ? `"${editing.region}" is not a state of ${name}. Use the state's full name or its code.`
-                : `Please add: ${problems.map((field) => ADDRESS_LABELS[field] || field).join(', ')}.`}
+                ? t('"{region}" is not a state of {country}. Use the state\'s full name or its code.', { region: editing.region, country: name })
+                : t('Please add: {fields}.', { fields: problems.map((field) => (ADDRESS_LABELS[field] && t(ADDRESS_LABELS[field])) || field).join(', ') })}
             </p>
           )}
           <div className="flex gap-3 pt-1">
-            <Button as="button" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save address'}</Button>
-            <Button variant="ghost" onClick={() => setEditing(null)} disabled={busy}>Cancel</Button>
+            <Button as="button" type="submit" disabled={busy}>{busy ? t('Saving…') : t('Save address')}</Button>
+            <Button variant="ghost" onClick={() => setEditing(null)} disabled={busy}>{t('Cancel')}</Button>
           </div>
         </form>
       </>
@@ -572,36 +582,36 @@ function Addresses() {
     return (
       <Empty
         icon="map-pin"
-        title="No addresses saved"
-        body="Add one and checkout fills it in for you."
-        action={<Button icon="plus" onClick={() => open(blankAddress(defaultCountry))}>Add an address</Button>}
+        title={t('No addresses saved')}
+        body={t('Add one and checkout fills it in for you.')}
+        action={<Button icon="plus" onClick={() => open(blankAddress(defaultCountry))}>{t('Add an address')}</Button>}
       />
     )
   }
 
   return (
     <>
-      <PageHeading title="Addresses" note="Checkout starts with your default address. You can change it there too." />
+      <PageHeading title={t('Addresses')} note={t('Checkout starts with your default address. You can change it there too.')} />
       <ul className="mt-6 grid gap-4 sm:grid-cols-2">
         {customer.addresses.map((a) => (
           <li key={a.id} className={`flex flex-col rounded-xs border bg-surface p-5 ${a.isDefault ? 'border-ink' : 'border-line'}`}>
             <div className="flex items-start justify-between gap-3">
               <AddressLines address={a} countries={countries} />
-              {a.isDefault && <Badge kind="bestseller">Default</Badge>}
-              {a.type === 'billing' && <Badge kind="new">Billing</Badge>}
+              {a.isDefault && <Badge kind="bestseller">{t('Default')}</Badge>}
+              {a.type === 'billing' && <Badge kind="new">{t('Billing')}</Badge>}
             </div>
             <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-5">
               {confirming === a.id ? (
                 <>
-                  <span className="text-[13px] text-ink">Remove this address?</span>
-                  <TextAction tone="danger" onClick={() => remove(a)}>Remove</TextAction>
-                  <TextAction onClick={() => setConfirming(null)}>Keep</TextAction>
+                  <span className="text-[13px] text-ink">{t('Remove this address?')}</span>
+                  <TextAction tone="danger" onClick={() => remove(a)}>{t('Remove')}</TextAction>
+                  <TextAction onClick={() => setConfirming(null)}>{t('Keep')}</TextAction>
                 </>
               ) : (
                 <>
-                  <TextAction onClick={() => open(a)}>Edit</TextAction>
-                  {!a.isDefault && a.type !== 'billing' && <TextAction onClick={() => makeDefault(a)}>Set as default</TextAction>}
-                  <TextAction tone="danger" onClick={() => setConfirming(a.id)}>Remove</TextAction>
+                  <TextAction onClick={() => open(a)}>{t('Edit')}</TextAction>
+                  {!a.isDefault && a.type !== 'billing' && <TextAction onClick={() => makeDefault(a)}>{t('Set as default')}</TextAction>}
+                  <TextAction tone="danger" onClick={() => setConfirming(a.id)}>{t('Remove')}</TextAction>
                 </>
               )}
             </div>
@@ -614,7 +624,7 @@ function Addresses() {
             className="flex h-full min-h-[10rem] w-full flex-col items-center justify-center gap-2 rounded-xs border border-dashed border-line p-5 text-[14px] text-muted transition-colors hover:border-ink hover:text-ink"
           >
             <Icon name="plus" size={18} />
-            Add a new address
+            {t('Add a new address')}
           </button>
         </li>
       </ul>
@@ -634,7 +644,7 @@ function PaymentMethods() {
   const remove = async (method) => {
     try {
       setItems((await api.deletePaymentMethod(method.id)).items)
-      push('Payment method removed')
+      push(t('Payment method removed'))
     } catch (err) {
       push(err.message, { tone: 'error' })
     } finally {
@@ -648,15 +658,15 @@ function PaymentMethods() {
     return (
       <Empty
         icon="shield"
-        title="No saved payment methods"
-        body={'Tick "Save for next time" when you pay, and the card or account appears here for a faster checkout.'}
+        title={t('No saved payment methods')}
+        body={t('Tick "Save for next time" when you pay, and the card or account appears here for a faster checkout.')}
       />
     )
   }
 
   return (
     <>
-      <PageHeading title="Payment methods" note="Kept by the payment provider. This shop never sees or stores your full card number." />
+      <PageHeading title={t('Payment methods')} note={t('Kept by the payment provider. This shop never sees or stores your full card number.')} />
       <ul className="mt-6 grid gap-4 sm:grid-cols-2">
         {list.map((m) => (
           <li key={m.id} className="flex flex-col rounded-xs border border-line bg-surface p-5">
@@ -665,12 +675,12 @@ function PaymentMethods() {
             <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-5">
               {confirming === m.id ? (
                 <>
-                  <span className="text-[13px] text-ink">Remove this payment method?</span>
-                  <TextAction tone="danger" onClick={() => remove(m)}>Remove</TextAction>
-                  <TextAction onClick={() => setConfirming(null)}>Keep</TextAction>
+                  <span className="text-[13px] text-ink">{t('Remove this payment method?')}</span>
+                  <TextAction tone="danger" onClick={() => remove(m)}>{t('Remove')}</TextAction>
+                  <TextAction onClick={() => setConfirming(null)}>{t('Keep')}</TextAction>
                 </>
               ) : (
-                <TextAction tone="danger" onClick={() => setConfirming(m.id)}>Remove</TextAction>
+                <TextAction tone="danger" onClick={() => setConfirming(m.id)}>{t('Remove')}</TextAction>
               )}
             </div>
           </li>
@@ -688,22 +698,22 @@ function Rewards() {
   if (loading) return <Skeleton className="h-40 w-full" />
   if (error) return <ErrorState error={error} onRetry={reload} />
   if (!data?.items.length) {
-    return <Empty icon="award" title="No rewards yet" body="Points and store credit you earn with your orders appear here." />
+    return <Empty icon="award" title={t('No rewards yet')} body={t('Points and store credit you earn with your orders appear here.')} />
   }
   const points = (value) => new Intl.NumberFormat(locale).format(value)
   return (
     <>
-      <PageHeading title="Rewards" note="Your points and store credit. Use them in your bag at checkout." />
+      <PageHeading title={t('Rewards')} note={t('Your points and store credit. Use them in your bag at checkout.')} />
       <ul className="mt-6 space-y-4">
         {data.items.map((card) => (
           <li key={card.id} className="rounded-xs border border-line bg-surface p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
               <p className="text-[15px] font-medium">{card.program}</p>
               <p className="text-[20px] tabular-nums">
-                {card.balance ? formatMoney(card.balance) : `${points(card.points)} ${card.pointName || 'points'}`}
+                {card.balance ? formatMoney(card.balance) : `${points(card.points)} ${card.pointName || t('points')}`}
               </p>
             </div>
-            {card.expiresAt && <p className="mt-1 text-[12px] text-faint">Valid until {formatDate(card.expiresAt, locale)}</p>}
+            {card.expiresAt && <p className="mt-1 text-[12px] text-faint">{t('Valid until {date}', { date: formatDate(card.expiresAt, locale) })}</p>}
             {card.history?.length > 0 && (
               <ul className="mt-4 divide-y divide-line border-t border-line text-[13px]">
                 {card.history.map((entry, index) => (

@@ -36,7 +36,7 @@ const SURFACE = [
   'getOrderPaymentOptions', 'createOrderPayment', 'cancelCartPayment', 'listPaymentMethods', 'deletePaymentMethod',
   'getExpressOptions', 'getShippingOptions', 'checkServiceability',
   'addCode', 'removeCode', 'claimReward', 'getGiftCard', 'getLoyalty', 'saveForLater',
-  'getDeliverySlots', 'getPickupLocations', 'setPickupLocation',
+  'getDeliverySlots', 'getPickupLocations', 'setPickupLocation', 'setCartPricelist',
   'adminPlaceOrder', 'adminGetOrder', 'adminListOrders',
   'login', 'register', 'logout', 'getMe', 'updateMe', 'saveAddress', 'deleteAddress', 'getCountry',
   'getWishlist', 'addToWishlist', 'removeFromWishlist',

@@ -13,15 +13,37 @@ import { config } from './config.js'
  */
 
 const ZERO_DECIMAL = new Set(['JPY', 'KRW', 'VND', 'CLP', 'ISK'])
+// Dinars and rials are counted in fils and baisa: a thousand to one. Shown with two decimals, 24.560 KWD read as 245.60.
+const THREE_DECIMAL = new Set(['BHD', 'IQD', 'JOD', 'KWD', 'LYD', 'OMR', 'TND'])
 
-export const money = (amount, currency = config.store.currency) => ({ amount, currency })
+/**
+ * What the backend says about its currencies (`pricing.currency` and `pricing.currencies[].decimals` in the settings
+ * document). It wins over the lists above, which only cover the demo and a backend that does not say.
+ */
+const reported = new Map()
+let storeCurrency = ''
 
-export function minorUnits(currency = config.store.currency) {
-  return ZERO_DECIMAL.has(currency.toUpperCase()) ? 0 : 2
+export function registerCurrencies(pricing) {
+  if (!pricing) return
+  if (pricing.currency) storeCurrency = String(pricing.currency).toUpperCase()
+  for (const entry of pricing.currencies || []) {
+    if (entry?.code && Number.isInteger(entry.decimals)) reported.set(String(entry.code).toUpperCase(), entry.decimals)
+  }
+}
+
+/** The store's currency: the backend's, else the build's, else the demo catalogue's. */
+const defaultCurrency = () => storeCurrency || config.store.currency || 'USD'
+
+export const money = (amount, currency = defaultCurrency()) => ({ amount, currency })
+
+export function minorUnits(currency = defaultCurrency()) {
+  const code = String(currency || '').toUpperCase()
+  if (reported.has(code)) return reported.get(code)
+  return ZERO_DECIMAL.has(code) ? 0 : THREE_DECIMAL.has(code) ? 3 : 2
 }
 
 /** Major units (128.5) → minor (12850). Only for turning authored data into money. */
-export function toMinor(major, currency = config.store.currency) {
+export function toMinor(major, currency = defaultCurrency()) {
   return Math.round(major * 10 ** minorUnits(currency))
 }
 

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Icon } from '../ui/index.jsx'
 import { isMock } from '../../lib/config.js'
+import { t, plural, mark } from '../../i18n/index.js'
 
 /**
  * Fit and fabric — the two blocks that decide whether an apparel order sticks.
@@ -17,9 +18,9 @@ import { isMock } from '../../lib/config.js'
  */
 
 const VERDICT = {
-  'true-to-size': { label: 'True to size', tone: 'text-good', icon: 'check' },
-  'runs-small': { label: 'Runs small', tone: 'text-sale', icon: 'info' },
-  'runs-large': { label: 'Runs large', tone: 'text-sale', icon: 'info' },
+  'true-to-size': { label: mark('True to size'), tone: 'text-good', icon: 'check' },
+  'runs-small': { label: mark('Runs small'), tone: 'text-sale', icon: 'info' },
+  'runs-large': { label: mark('Runs large'), tone: 'text-sale', icon: 'info' },
 }
 
 export function FitBlock({ product, onOpenChart, flat = false }) {
@@ -33,15 +34,15 @@ export function FitBlock({ product, onOpenChart, flat = false }) {
   return (
     <section className={flat ? '' : 'mt-8 rounded-xs border border-line bg-surface p-5'}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {!flat && <h2 className="text-[13px] font-medium">Fit</h2>}
+        {!flat && <h2 className="text-[13px] font-medium">{t('Fit')}</h2>}
         {product.sizeChart && (
           <button
             type="button"
             onClick={onOpenChart}
-            className="ml-auto inline-flex items-center gap-1.5 text-[13px] text-accent link-underline"
+            className="ms-auto inline-flex items-center gap-1.5 text-[13px] text-accent link-underline"
           >
             <Icon name="filter" size={14} />
-            {product.sizeChart.name || 'Size chart'}
+            {product.sizeChart.name || t('Size chart')}
           </button>
         )}
       </div>
@@ -49,7 +50,7 @@ export function FitBlock({ product, onOpenChart, flat = false }) {
       {v && (
         <p className={`${flat ? 'mt-1' : 'mt-3'} inline-flex items-center gap-1.5 text-[14px] font-medium ${v.tone}`}>
           <Icon name={v.icon} size={15} />
-          {v.label}
+          {t(v.label)}
         </p>
       )}
 
@@ -58,17 +59,17 @@ export function FitBlock({ product, onOpenChart, flat = false }) {
           {/* One bar rather than three numbers: the shape of it is readable at a
               glance, and the glance is all most people give it. */}
           <div className="flex h-2 overflow-hidden rounded-full bg-sunken" role="img"
-            aria-label={`${fb.small}% say it runs small, ${fb.true}% true to size, ${fb.large}% runs large`}>
+            aria-label={t('{small}% say it runs small, {true}% true to size, {large}% runs large', { small: fb.small, true: fb.true, large: fb.large })}>
             <span className="bg-sale/50" style={{ width: `${fb.small}%` }} />
             <span className="bg-good" style={{ width: `${fb.true}%` }} />
             <span className="bg-accent/50" style={{ width: `${fb.large}%` }} />
           </div>
           <div className="mt-2 flex justify-between text-[11px] text-faint">
-            <span>Runs small {fb.small}%</span>
-            <span className="font-medium text-ink">True to size {fb.true}%</span>
-            <span>Runs large {fb.large}%</span>
+            <span>{t('Runs small {percent}%', { percent: fb.small })}</span>
+            <span className="font-medium text-ink">{t('True to size {percent}%', { percent: fb.true })}</span>
+            <span>{t('Runs large {percent}%', { percent: fb.large })}</span>
           </div>
-          <p className="mt-2 text-[12px] text-faint">From {fit.sample} verified purchases.</p>
+          <p className="mt-2 text-[12px] text-faint">{plural(fit.sample, 'From {count} verified purchase.', 'From {count} verified purchases.')}</p>
         </div>
       )}
 
@@ -77,7 +78,7 @@ export function FitBlock({ product, onOpenChart, flat = false }) {
       {fit.model && (
         <p className="mt-3 flex items-center gap-2 text-[13px] text-muted">
           <Icon name="user" size={14} className="text-faint" />
-          Model is {fit.model.label} ({fit.model.height}cm) and wears a {fit.model.size}
+          {t('Model is {label} ({height}cm) and wears a {size}', { label: fit.model.label, height: fit.model.height, size: fit.model.size })}
         </p>
       )}
     </section>
@@ -89,17 +90,17 @@ export function FabricBlock({ product, flat = false }) {
   if (!f) return null
   return (
     <section className={flat ? '' : 'mt-4 rounded-xs border border-line bg-surface p-5'}>
-      {!flat && <h2 className="text-[13px] font-medium">Fabric</h2>}
+      {!flat && <h2 className="text-[13px] font-medium">{t('Fabric')}</h2>}
       <dl className={`grid gap-x-6 gap-y-3 sm:grid-cols-2 ${flat ? '' : 'mt-3'}`}>
-        <Fact label="Composition" value={f.composition.map(([m, pct]) => `${pct}% ${m}`).join(', ')} />
-        {f.weight && <Fact label="Weight" value={`${f.weight} gsm`} />}
-        {f.weave && <Fact label="Construction" value={f.weave} />}
-        {f.origin && <Fact label="Made in" value={f.origin} />}
+        <Fact label={t('Composition')} value={f.composition.map(([m, pct]) => `${pct}% ${m}`).join(', ')} />
+        {f.weight && <Fact label={t('Weight')} value={t('{weight} gsm', { weight: f.weight })} />}
+        {f.weave && <Fact label={t('Construction')} value={f.weave} />}
+        {f.origin && <Fact label={t('Made in')} value={f.origin} />}
       </dl>
 
       {f.certifications?.length > 0 && (
         <div className="mt-5 border-t border-line pt-4">
-          <p className="eyebrow">Certified</p>
+          <p className="eyebrow">{t('Certified')}</p>
           <ul className="mt-2.5 flex flex-wrap gap-2">
             {f.certifications.map((c) => (
               <li
@@ -114,7 +115,7 @@ export function FabricBlock({ product, flat = false }) {
           {/* Third-party marks are worth naming because they are checkable —
               which is the whole difference between a certification and a claim. */}
           <p className="mt-2.5 text-[11px] leading-relaxed text-faint">
-            Independently audited. Certificate numbers on request.
+            {t('Independently audited. Certificate numbers on request.')}
           </p>
         </div>
       )}
@@ -140,11 +141,11 @@ export function ChartTable({ chart }) {
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-[14px]">
         <thead>
-          <tr className="border-b border-line text-left">
+          <tr className="border-b border-line text-start">
             {chart.columns.map((c, i) => (
-              <th key={c} className="py-2.5 pr-4 font-medium">
+              <th key={c} className="py-2.5 pe-4 font-medium">
                 {c}
-                {i > 0 && chart.unit && <span className="ml-1 text-[11px] font-normal text-faint">{chart.unit}</span>}
+                {i > 0 && chart.unit && <span className="ms-1 text-[11px] font-normal text-faint">{chart.unit}</span>}
               </th>
             ))}
           </tr>
@@ -153,7 +154,7 @@ export function ChartTable({ chart }) {
           {chart.rows.map((row) => (
             <tr key={row[0]} className="border-b border-line">
               {row.map((cell, i) => (
-                <td key={i} className={`py-2.5 pr-4 tabular-nums ${i === 0 ? 'font-medium text-ink' : 'text-muted'}`}>
+                <td key={i} className={`py-2.5 pe-4 tabular-nums ${i === 0 ? 'font-medium text-ink' : 'text-muted'}`}>
                   {cell}
                 </td>
               ))}
@@ -189,15 +190,15 @@ export function SizeChartModal({ product, open, onClose }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={chart.name || 'Size chart'}
+        aria-label={chart.name || t('Size chart')}
         className="relative max-h-[88dvh] w-full overflow-y-auto rounded-t-xl bg-page p-6 shadow-panel sm:max-w-2xl sm:rounded-xs"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="font-display text-xl">{chart.name || 'Size chart'}</h2>
+            <h2 className="font-display text-xl">{chart.name || t('Size chart')}</h2>
             <p className="mt-1 text-[13px] text-muted">{product.title}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-muted hover:text-ink">
+          <button type="button" onClick={onClose} aria-label={t('Close')} className="text-muted hover:text-ink">
             <Icon name="close" size={20} />
           </button>
         </div>
@@ -208,11 +209,9 @@ export function SizeChartModal({ product, open, onClose }) {
 
         {isMock && (
           <div className="mt-5 rounded-xs bg-accent-soft/60 p-4">
-            <p className="text-[13px] font-medium text-accent">The one measurement worth taking</p>
+            <p className="text-[13px] font-medium text-accent">{t('The one measurement worth taking')}</p>
             <p className="mt-1.5 text-[13px] leading-relaxed text-accent/90">
-              Find a garment you already own and like the fit of. Lay it flat and measure across the
-              chest, 2.5cm below the armhole. Double it, and match that number to the table above.
-              It transfers between brands in a way that a letter size does not.
+              {t('Find a garment you already own and like the fit of. Lay it flat and measure across the chest, 2.5cm below the armhole. Double it, and match that number to the table above. It transfers between brands in a way that a letter size does not.')}
             </p>
           </div>
         )}

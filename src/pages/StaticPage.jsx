@@ -7,6 +7,7 @@ import { Breadcrumbs, ErrorState, Skeleton } from '../components/ui/index.jsx'
 import Seo from '../components/Seo.jsx'
 import ContactDetails from '../components/content/ContactDetails.jsx'
 import { useStorefront } from '../store/StorefrontContext.jsx'
+import { t } from '../i18n/index.js'
 
 const ContactForm = lazy(() => import('../components/content/ContactForm.jsx'))
 
@@ -46,15 +47,15 @@ function Table({ rows }) {
     <div className="mt-5 overflow-x-auto">
       <table className="w-full border-collapse text-[14px]">
         <thead>
-          <tr className="border-b border-line text-left">
-            {rows[0].map((h, i) => <th key={i} className="py-2.5 pr-4 font-medium">{h}</th>)}
+          <tr className="border-b border-line text-start">
+            {rows[0].map((h, i) => <th key={i} className="py-2.5 pe-4 font-medium">{h}</th>)}
           </tr>
         </thead>
         <tbody>
           {rows.slice(1).map((row, r) => (
             <tr key={r} className="border-b border-line">
               {row.map((cell, i) => (
-                <td key={i} className={`py-2.5 pr-4 tabular-nums ${i === 0 ? 'text-ink' : 'text-muted'}`}>{cell}</td>
+                <td key={i} className={`py-2.5 pe-4 tabular-nums ${i === 0 ? 'text-ink' : 'text-muted'}`}>{cell}</td>
               ))}
             </tr>
           ))}
@@ -125,7 +126,7 @@ export default function StaticPage() {
     <>
       <Seo title={page.seo?.title || page.title} description={page.seo?.description || page.intro} path={`/pages/${slug}`} />
       <div className="wrap max-w-3xl py-10 pb-20">
-        <Breadcrumbs trail={[{ label: 'Home', to: '/' }, { label: page.title }]} />
+        <Breadcrumbs trail={[{ label: t('Home'), to: '/' }, { label: page.title }]} />
         <h1 className="mt-6 text-display-lg">{page.title}</h1>
         {page.intro && <p className="mt-5 text-[17px] leading-relaxed text-muted">{page.intro}</p>}
         <div className="mt-12 space-y-12">

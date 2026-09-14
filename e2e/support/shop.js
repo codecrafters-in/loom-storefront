@@ -11,7 +11,9 @@ import { expect } from '@playwright/test'
 import { US_ADDRESS } from './store-api.js'
 
 export class Shop {
-  constructor(page) {
+  /** `prefix`: a language address such as `/en`, put before every page this helper opens. */
+  constructor(page, { prefix = '' } = {}) {
+    this.prefix = prefix
     this.page = page
   }
 
@@ -52,7 +54,7 @@ export class Shop {
   /* ── product page ─────────────────────────────────────────────────────── */
 
   async openProduct(slug) {
-    await this.page.goto(`/product/${slug}`)
+    await this.page.goto(`${this.prefix}/product/${slug}`)
     await expect(this.page.getByRole('heading', { level: 1 })).toBeVisible()
   }
 
@@ -170,7 +172,7 @@ export class Shop {
   async login(email, password, { via = 'url' } = {}) {
     const page = this.page
     if (via === 'header') await page.getByRole('link', { name: 'Sign in' }).click()
-    else await page.goto('/login')
+    else await page.goto(`${this.prefix}/login`)
     await expect(page.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible()
     await page.locator('#email').fill(email)
     await page.locator('#password').fill(password)
@@ -180,7 +182,7 @@ export class Shop {
 
   async register({ firstName = 'Robin', lastName = 'Tester', email, password }) {
     const page = this.page
-    await page.goto('/login')
+    await page.goto(`${this.prefix}/login`)
     await page.getByRole('button', { name: 'Create one' }).click()
     await page.locator('#firstName').fill(firstName)
     await page.locator('#lastName').fill(lastName)

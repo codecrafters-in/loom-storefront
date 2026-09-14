@@ -3,6 +3,7 @@ import api from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import Seo from '../components/Seo.jsx'
 import { Empty, ErrorState, Pagination, Skeleton } from '../components/ui/index.jsx'
+import { t } from '../i18n/index.js'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 
 /** The store's blog, from the backend's blog app (`GET /blog`). */
@@ -21,20 +22,20 @@ export default function Blog() {
 
   return (
     <>
-      <Seo title="Blog" />
+      <Seo title={t('Blog')} />
       <div className="wrap py-10 pb-20">
-        <h1 className="text-display-lg">Blog</h1>
+        <h1 className="text-display-lg">{t('Blog')}</h1>
         {data?.tags?.length > 0 && (
-          <div className="mt-6 flex flex-wrap gap-2" aria-label="Topics">
-            {[undefined, ...data.tags].map((t) => (
+          <div className="mt-6 flex flex-wrap gap-2" aria-label={t('Topics')}>
+            {[undefined, ...data.tags].map((topic) => (
               <button
-                key={t || 'all'}
+                key={topic || 'all'}
                 type="button"
-                aria-pressed={tag === t}
-                onClick={() => go({ tag: t, page: undefined })}
-                className={`rounded-full border px-3 py-1 text-[13px] ${tag === t ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:border-ink'}`}
+                aria-pressed={tag === topic}
+                onClick={() => go({ tag: topic, page: undefined })}
+                className={`rounded-full border px-3 py-1 text-[13px] ${tag === topic ? 'border-ink bg-ink text-page' : 'border-line text-muted hover:border-ink'}`}
               >
-                {t || 'All'}
+                {topic || t('All')}
               </button>
             ))}
           </div>
@@ -47,7 +48,7 @@ export default function Blog() {
               {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-72 w-full" />)}
             </div>
           ) : !data?.items.length ? (
-            <Empty icon="info" title="No posts yet" body="New posts will appear here." />
+            <Empty icon="info" title={t('No posts yet')} body={t('New posts will appear here.')} />
           ) : (
             <>
               <ul className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">

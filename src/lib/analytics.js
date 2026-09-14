@@ -1,4 +1,5 @@
 import { config } from './config.js'
+import { toMajor } from './money.js'
 
 /**
  * One `track()`, pushing to `window.dataLayer`.
@@ -85,14 +86,15 @@ export function track(event, params = {}) {
 /**
  * GA4 wants money in major units and a currency beside it. Everything else in
  * this codebase is minor units, so the conversion happens here rather than at
- * eight call sites that would each get it slightly wrong.
+ * eight call sites that would each get it slightly wrong — by the currency's own
+ * decimals, not a hundred (a dinar is a thousand fils).
  */
-const money = (m) => (m ? { value: m.amount / 100, currency: m.currency } : {})
+const money = (m) => (m ? { value: toMajor(m), currency: m.currency } : {})
 
 export const itemOf = (product, extra = {}) => ({
   item_id: product?.slug,
   item_name: product?.title,
-  price: product?.price ? product.price.amount / 100 : undefined,
+  price: product?.price ? toMajor(product.price) : undefined,
   item_brand: config.store?.name,
   item_category: product?.categories?.[0],
   ...extra,
@@ -122,7 +124,7 @@ const lineItem = (line, quantity) => ({
   item_id: line?.productSlug,
   item_name: line?.title,
   quantity: quantity ?? line?.quantity,
-  price: line?.price ? line.price.amount / 100 : undefined,
+  price: line?.price ? toMajor(line.price) : undefined,
   item_brand: config.store?.name,
   item_variant: line?.options ? Object.values(line.options).join(' / ') : undefined,
 })
@@ -147,13 +149,13 @@ export const purchase = (order) =>
   track('purchase', {
     transaction_id: order?.number || order?.id,
     ...money(order?.total),
-    shipping: order?.shipping ? order.shipping.amount / 100 : 0,
-    tax: order?.tax ? order.tax.amount / 100 : 0,
+    shipping: order?.shipping ? toMajor(order.shipping) : 0,
+    tax: order?.tax ? toMajor(order.tax) : 0,
     items: (order?.lines || []).map((l) => ({
       item_id: l.productSlug,
       item_name: l.title,
       quantity: l.quantity,
-      price: l.price ? l.price.amount / 100 : undefined,
+      price: l.price ? toMajor(l.price) : undefined,
     })),
   })
 

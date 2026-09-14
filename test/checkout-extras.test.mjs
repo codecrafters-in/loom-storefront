@@ -136,3 +136,29 @@ test('delivery slots and shops to collect from use the documented routes', async
   await http.createPayment('bag', { email: 'a@example.com', deliverySlot: '3:2026-09-16' })
   assert.equal(calls.at(-1).body.delivery_slot, '3:2026-09-16')
 })
+
+test('the chosen currency travels with every call, and the bag can switch to it', async () => {
+  shared.clear()
+  shared.set('loom.cart_id', 'bag')
+  const { choosePricelist } = await import('../src/lib/pricelist.js')
+  const seen = []
+  globalThis.fetch = async (url, init = {}) => {
+    const { pathname } = new URL(url)
+    seen.push({ path: pathname, pricelist: init.headers?.['x-loom-pricelist'], body: init.body ? JSON.parse(init.body) : undefined })
+    const answer = pathname === '/carts/bag' || pathname === '/carts/bag/pricelist' ? cartBody('bag') : { items: [], total: 0 }
+    return new Response(JSON.stringify(answer), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+
+  await http.listProducts({})
+  assert.equal(seen.at(-1).pricelist, undefined, 'no choice, no header')
+
+  choosePricelist(7)
+  await http.listProducts({})
+  assert.equal(seen.at(-1).pricelist, '7')
+  await http.setCartPricelist(7)
+  assert.deepEqual(seen.at(-1), { path: '/carts/bag/pricelist', pricelist: '7', body: { pricelist_id: 7 } })
+
+  choosePricelist('')
+  await http.listProducts({})
+  assert.equal(seen.at(-1).pricelist, undefined)
+})

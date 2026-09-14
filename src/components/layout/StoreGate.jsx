@@ -5,6 +5,7 @@ import { Button } from '../ui/index.jsx'
 import Logo from '../ui/Logo.jsx'
 import Seo from '../Seo.jsx'
 import { useAdminAuth } from '../../store/AdminAuthContext.jsx'
+import { t } from '../../i18n/index.js'
 
 /**
  * What a shopper sees instead of the shop when there is no shop to show: the
@@ -25,10 +26,10 @@ function Shell({ config, children }) {
 export function StoreUnavailable({ config, onRetry }) {
   return (
     <Shell config={config}>
-      <Seo title="Store unavailable" noindex />
-      <h1 className="mt-8 text-display-md">This store is unavailable right now</h1>
-      <p className="mt-4 text-[15px] leading-relaxed text-muted">Please try again in a few minutes.</p>
-      <Button className="mt-8" onClick={onRetry}>Try again</Button>
+      <Seo title={t('Store unavailable')} noindex />
+      <h1 className="mt-8 text-display-md">{t('This store is unavailable right now')}</h1>
+      <p className="mt-4 text-[15px] leading-relaxed text-muted">{t('Please try again in a few minutes.')}</p>
+      <Button className="mt-8" onClick={onRetry}>{t('Try again')}</Button>
     </Shell>
   )
 }
@@ -47,7 +48,7 @@ export function ClosedStore({ config, onUnlocked }) {
       saveAccess(await request())
       onUnlocked()
     } catch (err) {
-      setError(err.message || 'That did not work. Please try again.')
+      setError(err.message || t('That did not work. Please try again.'))
     } finally {
       setBusy(false)
     }
@@ -55,7 +56,7 @@ export function ClosedStore({ config, onUnlocked }) {
 
   const preview = signedIn && (
     <Button variant="outline" className="mt-6" disabled={busy} onClick={() => unlock(() => api.adminAccess())}>
-      Preview as admin
+      {t('Preview as admin')}
     </Button>
   )
   const alert = error && <p role="alert" className="mt-4 text-[14px] text-sale">{error}</p>
@@ -63,8 +64,8 @@ export function ClosedStore({ config, onUnlocked }) {
   if (access.mode === 'maintenance') {
     return (
       <Shell config={config}>
-        <Seo title="Back soon" noindex />
-        <h1 className="mt-8 text-display-md">We will be back soon</h1>
+        <Seo title={t('Back soon')} noindex />
+        <h1 className="mt-8 text-display-md">{t('We will be back soon')}</h1>
         {access.message && <p className="mt-4 text-[15px] leading-relaxed text-muted">{access.message}</p>}
         {alert}
         {preview}
@@ -74,9 +75,9 @@ export function ClosedStore({ config, onUnlocked }) {
 
   return (
     <Shell config={config}>
-      <Seo title="Password required" noindex />
-      <h1 className="mt-8 text-display-md">This store is opening soon</h1>
-      <p className="mt-4 text-[15px] leading-relaxed text-muted">Enter the store password to continue.</p>
+      <Seo title={t('Password required')} noindex />
+      <h1 className="mt-8 text-display-md">{t('This store is opening soon')}</h1>
+      <p className="mt-4 text-[15px] leading-relaxed text-muted">{t('Enter the store password to continue.')}</p>
       <form
         className="mt-8 flex gap-2"
         onSubmit={(e) => {
@@ -84,7 +85,7 @@ export function ClosedStore({ config, onUnlocked }) {
           unlock(() => api.requestAccess(password))
         }}
       >
-        <label htmlFor="store-password" className="sr-only">Store password</label>
+        <label htmlFor="store-password" className="sr-only">{t('Store password')}</label>
         <input
           id="store-password"
           type="password"
@@ -94,7 +95,7 @@ export function ClosedStore({ config, onUnlocked }) {
           onChange={(e) => setPassword(e.target.value)}
           className="field"
         />
-        <Button type="submit" disabled={busy} className="shrink-0">{busy ? '…' : 'Enter'}</Button>
+        <Button type="submit" disabled={busy} className="shrink-0">{busy ? '…' : t('Enter')}</Button>
       </form>
       {alert}
       {preview}

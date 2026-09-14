@@ -5,6 +5,7 @@ import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
 import { optionsOf } from '../../lib/variants.js'
 import { useWishlist } from '../../store/WishlistContext.jsx'
+import { t } from '../../i18n/index.js'
 
 // Downloaded the first time somebody asks for a quick look, not with the grid.
 const QuickView = lazy(() => import('./QuickView.jsx'))
@@ -77,10 +78,10 @@ export default function ProductCard({ product, priority = false, className = '' 
                 className="absolute inset-0 h-full w-full scale-[1.02] object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
               />
             )}
-            {badge && <Badge kind={badge} className="absolute left-3 top-3" />}
+            {badge && <Badge kind={badge} className="absolute start-3 top-3" />}
             {soldOut && (
               <span className="absolute inset-x-0 bottom-0 bg-ink/75 py-2 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-page">
-                Sold out
+                {t('Sold out')}
               </span>
             )}
           </div>
@@ -90,8 +91,8 @@ export default function ProductCard({ product, priority = false, className = '' 
           type="button"
           onClick={() => toggle(product.slug, product.title)}
           aria-pressed={saved}
-          aria-label={saved ? `Remove ${product.title} from saved` : `Save ${product.title}`}
-          className="absolute right-2.5 top-2.5 grid h-9 w-9 place-items-center rounded-full bg-surface/85 text-ink backdrop-blur transition-colors hover:bg-surface"
+          aria-label={saved ? t('Remove {title} from saved', { title: product.title }) : t('Save {title}', { title: product.title })}
+          className="absolute end-2.5 top-2.5 grid h-9 w-9 place-items-center rounded-full bg-surface/85 text-ink backdrop-blur transition-colors hover:bg-surface"
         >
           <Icon name="heart" size={16} filled={saved} className={saved ? 'text-sale' : ''} />
         </button>
@@ -101,10 +102,10 @@ export default function ProductCard({ product, priority = false, className = '' 
         <button
           type="button"
           onClick={() => setQuick(true)}
-          aria-label={`Quick view: ${product.title}`}
+          aria-label={t('Quick view: {title}', { title: product.title })}
           className="absolute inset-x-2.5 bottom-2.5 hidden h-9 items-center justify-center rounded-xs bg-page/90 text-[12px] font-medium text-ink opacity-0 backdrop-blur transition-opacity focus-visible:opacity-100 group-hover:opacity-100 sm:flex"
         >
-          Quick view
+          {t('Quick view')}
         </button>
       </div>
 
@@ -129,7 +130,7 @@ export default function ProductCard({ product, priority = false, className = '' 
             which two to open here, and "runs small" is the fact that decides it. */}
         {product.fit?.verdict && product.fit.verdict !== 'true-to-size' && (
           <p className="mt-1.5 text-[12px] text-sale">
-            {product.fit.verdict === 'runs-small' ? 'Runs small' : 'Runs large'}
+            {product.fit.verdict === 'runs-small' ? t('Runs small') : t('Runs large')}
           </p>
         )}
 

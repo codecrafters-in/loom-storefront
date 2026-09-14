@@ -124,17 +124,17 @@ function Block({ block }) {
       return <hr className="my-10 border-line" />
     case 'quote':
       return (
-        <blockquote className="mb-4 border-l-2 border-accent bg-accent-soft/40 py-3 pl-4 text-[14px] leading-relaxed text-muted">
+        <blockquote className="mb-4 border-s-2 border-accent bg-accent-soft/40 py-3 ps-4 text-[14px] leading-relaxed text-muted">
           {inline(block.text)}
         </blockquote>
       )
     case 'list':
       return block.ordered ? (
-        <ol className="mb-4 list-decimal space-y-2 pl-5 text-[14px] leading-relaxed text-muted">
+        <ol className="mb-4 list-decimal space-y-2 ps-5 text-[14px] leading-relaxed text-muted">
           {block.items.map((it, i) => <li key={i}>{inline(it)}</li>)}
         </ol>
       ) : (
-        <ul className="mb-4 list-disc space-y-2 pl-5 text-[14px] leading-relaxed text-muted">
+        <ul className="mb-4 list-disc space-y-2 ps-5 text-[14px] leading-relaxed text-muted">
           {block.items.map((it, i) => <li key={i}>{inline(it)}</li>)}
         </ul>
       )
@@ -143,7 +143,7 @@ function Block({ block }) {
         <div className="mb-5 overflow-x-auto rounded-xs border border-line">
           <table className="w-full border-collapse text-[13px]">
             <thead>
-              <tr className="border-b border-line bg-sunken/40 text-left">
+              <tr className="border-b border-line bg-sunken/40 text-start">
                 {block.header.map((h, i) => <th key={i} className="p-2.5 font-medium">{inline(h)}</th>)}
               </tr>
             </thead>

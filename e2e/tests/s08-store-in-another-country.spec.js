@@ -3,9 +3,11 @@
  * decimals), its own language (Arabic), and its own address rules (no postcode).
  *
  * Runs against store `e2e-kw` (second website, dev server on port 5175).
- * Checklist: Q1 Q2 Q3 F5. Gap report §6: 🟡 — 3-decimal currencies, USD filter,
- * postcode required, English-only UI. Tax by fiscal position (F5) is not
- * asserted here: the throwaway database has no Kuwaiti fiscal position.
+ * Checklist: Q1 Q2 Q3 F5. Gap report §6: ✅ since Phase 6 — dinars with three
+ * decimals, the filter in KWD, no postcode required, and the store's Arabic
+ * default for its text and products. The shopper who reads English uses the
+ * store's `/en/` addresses. Tax by fiscal position (F5) is not asserted here:
+ * the throwaway database has no Kuwaiti fiscal position.
  */
 import { test, expect } from '../support/fixtures.js'
 import { settings, uniqueEmail } from '../support/env.js'
@@ -21,19 +23,12 @@ const KUWAIT = {
 
 test.use({ baseURL: settings.storefront2Url })
 
-test.fail(
+test(
   'S-8 store in another country: dinar prices with three decimals, Arabic content, checkout without a postcode',
-  {
-    tag: '@S-8',
-    annotation: [
-      { type: 'gap', description: '#18 3-decimal currencies (KWD) display 10x too large' },
-      { type: 'gap', description: '#19 price filter always shows USD' },
-      { type: 'gap', description: '#20 postcode required in checkout for every country' },
-      { type: 'gap', description: 'P1 §4: no UI translations / language switcher (A5, Q3)' },
-      { type: 'new-bug', description: 'store API resolves the language against the host website, so store e2e-kw never serves its Arabic default (see report)' },
-    ],
-  },
-  async ({ browser, page, shop, store2 }) => {
+  { tag: '@S-8' },
+  async ({ browser, page, store2 }) => {
+    // The rest of this test reads the store in English: its `/en/` addresses.
+    const shop = new Shop(page, { prefix: '/en' })
     const product = await store2.product('e2e-merino-crew')
     expect(product.price.currency).toBe('KWD')
     const dinars = (product.price.amount / 1000).toFixed(3) // e.g. 24.560
@@ -54,7 +49,7 @@ test.fail(
     await expect.soft(page.getByText(new RegExp(dinars.replace('.', '\\.'))).first()).toBeVisible()
 
     // The price filter in the store's currency.
-    await page.goto('/shop')
+    await page.goto('/en/shop')
     const slider = page.getByRole('slider', { name: 'Maximum price' }).first()
     await expect(slider).toBeAttached()
     const priceFilter = page.locator('div', { has: slider }).last()

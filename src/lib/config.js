@@ -30,7 +30,8 @@ export const config = {
 
   store: {
     name: env.VITE_STORE_NAME || '',
-    currency: env.VITE_CURRENCY || 'USD',
+    // Empty unless set: a live store's currency comes from its backend, the demo's from its own catalogue.
+    currency: env.VITE_CURRENCY || '',
     locale: env.VITE_LOCALE || 'en-US',
     /** In major units, the way a merchandiser would write it. */
     freeShippingOver: num(env.VITE_FREE_SHIPPING_OVER, 150),

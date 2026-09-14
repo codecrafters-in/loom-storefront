@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import * as media from '../../lib/media.js'
 import { responsive } from '../../lib/images.js'
+import { t } from '../../i18n/index.js'
 
 const VideoEmbed = lazy(() => import('./VideoEmbed.jsx'))
 
@@ -112,7 +113,7 @@ function Embed({ poster, embedUrl, alt, className }) {
     <button
       type="button"
       onClick={() => setPlaying(true)}
-      aria-label={alt ? `Play video: ${alt}` : 'Play video'}
+      aria-label={alt ? t('Play video: {title}', { title: alt }) : t('Play video')}
       className="group relative block h-full w-full"
     >
       {poster ? <img src={poster} alt="" className={className} /> : <span className="block h-full w-full bg-sunken" />}

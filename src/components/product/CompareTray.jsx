@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Icon } from '../ui/index.jsx'
+import { t } from '../../i18n/index.js'
 import { clearCompare, compared, serverCompared, subscribeCompare, toggleCompare } from '../../lib/compare.js'
 
 export const useCompared = () => useSyncExternalStore(subscribeCompare, compared, serverCompared)
@@ -16,14 +17,14 @@ export default function CompareTray() {
   const { pathname } = useLocation()
   if (!list.length || pathname === '/compare') return null
   return (
-    <div className="fixed bottom-4 left-4 z-20 flex items-center gap-1 rounded-full border border-line bg-page/95 py-1 pl-4 pr-1 text-[13px] shadow-panel backdrop-blur">
+    <div className="fixed bottom-4 start-4 z-20 flex items-center gap-1 rounded-full border border-line bg-page/95 py-1 ps-4 pe-1 text-[13px] shadow-panel backdrop-blur">
       <Link to={`/compare?slugs=${list.map(encodeURIComponent).join(',')}`} className="link-underline font-medium">
-        Compare ({list.length})
+        {t('Compare ({count})', { count: list.length })}
       </Link>
       <button
         type="button"
         onClick={clearCompare}
-        aria-label="Clear comparison"
+        aria-label={t('Clear comparison')}
         className="grid h-8 w-8 place-items-center rounded-full text-faint transition-colors hover:text-ink"
       >
         <Icon name="close" size={14} />
@@ -43,7 +44,7 @@ export function CompareToggle({ slug, className = '' }) {
       className={`inline-flex items-center gap-1.5 text-[13px] text-muted transition-colors hover:text-ink ${className}`}
     >
       <Icon name={on ? 'check' : 'plus'} size={14} />
-      {on ? 'Comparing' : 'Compare'}
+      {on ? t('Comparing') : t('Compare')}
     </button>
   )
 }

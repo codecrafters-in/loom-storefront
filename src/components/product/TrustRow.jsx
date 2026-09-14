@@ -5,6 +5,7 @@ import { Icon } from '../ui/index.jsx'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { formatMoney } from '../../lib/money.js'
 import { isMock } from '../../lib/config.js'
+import { t, plural } from '../../i18n/index.js'
 
 // Only a real backend can say whether a postcode is served; the demo build leaves the checker out.
 const DeliveryCheck = isMock ? null : lazy(() => import('./DeliveryCheck.jsx'))
@@ -32,27 +33,30 @@ export default function TrustRow({ flat = false }) {
   const rows = [
     eta && {
       icon: 'truck',
-      strong: `Arrives ${new Date(eta.arrivesAt).toLocaleDateString(config.pricing?.locale || 'en-US', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-      })}`,
-      rest: eta.shipsToday ? `if you order before ${eta.cutoff}` : `orders after the cutoff ship tomorrow`,
+      strong: t('Arrives {date}', {
+        date: new Date(eta.arrivesAt).toLocaleDateString(config.pricing?.locale || 'en-US', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+        }),
+      }),
+      rest: eta.shipsToday ? t('if you order before {cutoff}', { cutoff: eta.cutoff }) : t('orders after the cutoff ship tomorrow'),
     },
     free && {
       icon: 'package',
-      strong: `Free shipping over ${formatMoney({ amount: free, currency: config.pricing?.currency || 'USD' })}`,
+      strong: t('Free shipping over {amount}', { amount: formatMoney({ amount: free, currency: config.pricing?.currency || 'USD' }) }),
+      // The demo's own promises stay in English and out of the catalogs: a live store's build must not carry them.
       rest: isMock ? 'tracked, and insured until it reaches you' : '',
     },
     days > 0 && {
       icon: 'refresh',
-      strong: isMock ? `Free ${days}-day returns` : `${days}-day returns`,
+      strong: isMock ? `Free ${days}-day returns` : plural(days, '{count}-day returns', '{count}-day returns'),
       rest: isMock ? 'prepaid label in every parcel — try it on at home' : '',
     },
     trust.repairs === true && {
       icon: 'shield',
-      strong: 'Repaired, not replaced',
-      rest: 'we mend anything we made, for as long as we exist',
+      strong: t('Repaired, not replaced'),
+      rest: t('we mend anything we made, for as long as we exist'),
     },
   ].filter(Boolean)
 
@@ -98,7 +102,7 @@ export function PaymentsRow({ className = '' }) {
     <div className={`mt-8 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-4 ${className}`}>
       <span className="inline-flex items-center gap-1.5 text-[11px] text-faint">
         <Icon name="shield" size={13} className="text-good" />
-        Secure checkout
+        {t('Secure checkout')}
       </span>
       {payments.map((p) => (
         <span key={p} className="rounded-xs border border-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-faint">
@@ -125,8 +129,8 @@ export function SocialProof({ product }) {
   const boughtFloor = limits.bought ?? 25
   const savedFloor = limits.saved ?? 20
   const notes = []
-  if (s.boughtLast30Days >= boughtFloor) notes.push(`${s.boughtLast30Days} bought in the last 30 days`)
-  if (s.savedCount >= savedFloor) notes.push(`${s.savedCount} people have this saved`)
+  if (s.boughtLast30Days >= boughtFloor) notes.push(plural(s.boughtLast30Days, '{count} bought in the last 30 days', '{count} bought in the last 30 days'))
+  if (s.savedCount >= savedFloor) notes.push(plural(s.savedCount, '{count} person has this saved', '{count} people have this saved'))
   if (!notes.length) return null
 
   return (

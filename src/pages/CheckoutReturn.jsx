@@ -5,6 +5,7 @@ import api from '../lib/api/index.js'
 import { failureMessage, isFailed, isSettled, pollPayment } from '../lib/payments/index.js'
 import { useCart } from '../store/CartContext.jsx'
 import { Button, Empty, Icon } from '../components/ui/index.jsx'
+import { t } from '../i18n/index.js'
 
 /**
  * Where a gateway's hosted page sends the shopper back.
@@ -51,25 +52,25 @@ export default function CheckoutReturn() {
 
   return (
     <>
-      <Seo title="Confirming payment" noindex />
+      <Seo title={t('Confirming payment')} noindex />
       <div className="wrap max-w-xl py-20">
         {state.phase === 'checking' && (
           <div role="status" className="flex flex-col items-center gap-4 text-center">
             <Icon name="refresh" size={22} className="animate-spin text-accent" />
-            <h1 className="text-display-md">Confirming your payment…</h1>
-            <p className="text-[14px] text-muted">This usually takes a few seconds. Please keep this page open.</p>
+            <h1 className="text-display-md">{t('Confirming your payment…')}</h1>
+            <p className="text-[14px] text-muted">{t('This usually takes a few seconds. Please keep this page open.')}</p>
           </div>
         )}
 
         {state.phase === 'timeout' && (
           <div role="status" className="text-center">
-            <h1 className="text-display-md">Still waiting on the payment provider</h1>
+            <h1 className="text-display-md">{t('Still waiting on the payment provider')}</h1>
             <p className="mt-4 text-[14px] leading-relaxed text-muted">
-              If your payment went through, we will email you as soon as it is confirmed. There is no need to pay again.
+              {t('If your payment went through, we will email you as soon as it is confirmed. There is no need to pay again.')}
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              {state.payment?.order && <Button to={`/order/${state.payment.order.id}`}>View your order</Button>}
-              <Button to="/orders/lookup" variant="quiet">Find an order</Button>
+              {state.payment?.order && <Button to={`/order/${state.payment.order.id}`}>{t('View your order')}</Button>}
+              <Button to="/orders/lookup" variant="quiet">{t('Find an order')}</Button>
             </div>
           </div>
         )}
@@ -77,16 +78,16 @@ export default function CheckoutReturn() {
         {(state.phase === 'missing' || state.phase === 'error') && (
           <Empty
             icon="package"
-            title={state.phase === 'missing' ? 'We could not find that payment' : 'We could not check your payment'}
+            title={state.phase === 'missing' ? t('We could not find that payment') : t('We could not check your payment')}
             body={
               state.phase === 'missing'
-                ? 'The link may be incomplete. If you were charged, your order confirmation will arrive by email.'
-                : state.error?.message || 'Please try again in a moment.'
+                ? t('The link may be incomplete. If you were charged, your order confirmation will arrive by email.')
+                : state.error?.message || t('Please try again in a moment.')
             }
             action={
               <div className="flex flex-wrap justify-center gap-3">
-                <Button to="/checkout">Back to checkout</Button>
-                <Link to="/orders/lookup" className="self-center text-[13px] text-muted link-underline">Find an order</Link>
+                <Button to="/checkout">{t('Back to checkout')}</Button>
+                <Link to="/orders/lookup" className="self-center text-[13px] text-muted link-underline">{t('Find an order')}</Link>
               </div>
             }
           />

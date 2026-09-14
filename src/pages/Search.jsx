@@ -7,6 +7,7 @@ import { search as trackSearch } from '../lib/analytics.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
 import { Button, Empty, ErrorState } from '../components/ui/index.jsx'
 import { useBootstrap } from '../store/StorefrontContext.jsx'
+import { t, plural } from '../i18n/index.js'
 
 export default function Search() {
   const [params] = useSearchParams()
@@ -29,15 +30,15 @@ export default function Search() {
 
   return (
     <>
-      <Seo title={q ? `“${q}”` : 'Search'} noindex />
+      <Seo title={q ? `“${q}”` : t('Search')} noindex />
       <div className="wrap py-12 pb-20">
-      <p className="eyebrow">Search</p>
+      <p className="eyebrow">{t('Search')}</p>
       <h1 className="mt-3 text-display-lg">
-        {q ? <>“{q}”</> : 'What are you after?'}
+        {q ? <>“{q}”</> : t('What are you after?')}
       </h1>
       {q && (
         <p className="mt-3 text-[15px] text-muted">
-          {loading ? 'Looking…' : `${data?.total ?? 0} ${data?.total === 1 ? 'result' : 'results'}`}
+          {loading ? t('Looking…') : plural(data?.total ?? 0, '{count} result', '{count} results')}
         </p>
       )}
 
@@ -46,7 +47,7 @@ export default function Search() {
           <ErrorState error={error} onRetry={reload} />
         ) : !q ? (
           <div>
-            <p className="text-[15px] text-muted">Try a category:</p>
+            <p className="text-[15px] text-muted">{t('Try a category:')}</p>
             <ul className="mt-5 flex flex-wrap gap-2.5">
               {categories.map((c) => (
                 <li key={c.slug}>
@@ -63,9 +64,9 @@ export default function Search() {
         ) : !loading && !data?.items.length ? (
           <Empty
             icon="search"
-            title={`Nothing for “${q}”`}
-            body="Try a category, a brand, or something broader."
-            action={<Button to="/shop" size="lg">Browse everything</Button>}
+            title={t('Nothing for “{q}”', { q })}
+            body={t('Try a category, a brand, or something broader.')}
+            action={<Button to="/shop" size="lg">{t('Browse everything')}</Button>}
           />
         ) : (
           <ProductGrid products={data?.items || []} loading={loading} skeletonCount={8} />

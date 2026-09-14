@@ -5,6 +5,8 @@ import { config, isMock } from '../lib/config.js'
 import { ACCESS_EVENT, accessToken } from '../lib/access.js'
 import { storefront as demo } from '../data/storefront.js'
 import { defaults as neutral } from '../data/defaults.js'
+import { registerCurrencies } from '../lib/money.js'
+import { currentLanguage, languageFromAddress, setLanguage, setOverrides } from '../i18n/index.js'
 
 /**
  * The theme configuration, resolved once at boot.
@@ -118,6 +120,16 @@ export function StorefrontProvider({ children }) {
   }, [])
 
   const cfg = useMemo(() => merge(merge(defaults, fromEnv()), remote), [remote])
+  // Before anything below formats a price: amounts divide by each currency's own decimals (3 for KWD).
+  registerCurrencies(cfg.pricing)
+  // Wording the merchant changed in Odoo, for the language on screen: before anything below renders a word.
+  setOverrides(cfg.uiStrings?.[currentLanguage()] || null)
+
+  // No language in the address: the store's own (an Arabic store's text in Arabic, like its products).
+  useEffect(() => {
+    const preferred = cfg.i18n?.default
+    if (!languageFromAddress() && preferred && preferred !== currentLanguage()) setLanguage(preferred)
+  }, [cfg.i18n?.default])
 
   // Loaded only for a store with a theme; the prerendered page already carries its colours.
   useEffect(() => {

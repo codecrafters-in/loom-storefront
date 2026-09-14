@@ -154,8 +154,8 @@ built-in mark, which inherits `currentColor` and stays sharp at any size. See
     "currency": "USD",
     "locale": "en-US",
     "currencies": [
-      { "code": "USD", "label": "US Dollar", "symbol": "$" },
-      { "code": "INR", "label": "Indian Rupee", "symbol": "₹" }
+      { "code": "USD", "label": "US Dollar", "symbol": "$", "decimals": 2, "position": "before" },
+      { "code": "INR", "label": "Indian Rupee", "symbol": "₹", "decimals": 2, "position": "before" }
     ],
     "showTaxNote": true,
     "taxNote": "Tax calculated at checkout."
@@ -166,9 +166,13 @@ built-in mark, which inherits `currentColor` and stays sharp at any size. See
 `showTaxNote` renders `taxNote` under the cart totals.
 
 - `currency` is the display default and what `Intl.NumberFormat` formats with.
-- `currencies` populates the switcher. One entry hides it.
-- Zero-decimal currencies (JPY, KRW, VND, CLP, ISK) are handled — see
-  [DATA-MODEL.md](DATA-MODEL.md#money).
+- `currencies` populates the currency switcher in the header (live stores only). One entry, or entries without a
+  `pricelistId`, hides it. Picking one sends that `pricelistId` as the `X-Loom-Pricelist` header on every call, moves
+  the bag (`POST /carts/:id/pricelist`) and reloads, so prices come back from the backend in that currency.
+- `decimals` is how many decimals amounts of that currency have (3 for KWD, 0 for JPY); the Odoo backend sends it
+  and every price, the price filter and analytics use it. Without it zero- and three-decimal currencies are still
+  known — see [DATA-MODEL.md](DATA-MODEL.md#money). `position` is informational: prices are laid out by
+  `Intl.NumberFormat` for the store's `locale`, which places the symbol the way shoppers there expect.
 
 > **Prices are not converted client-side.** The theme formats what the API sent
 > it. If you offer multiple currencies, the API returns prices already in the
@@ -348,6 +352,37 @@ rail looks broken; a slightly-off rail does not.
 The `automatic` scoring weights a shared *leaf* category above a shared
 top-level one on purpose — "another merino thing" is a better suggestion than
 "another knit".
+
+### `i18n`
+
+```json
+{
+  "i18n": {
+    "languages": [
+      { "code": "en_US", "urlCode": "en", "name": "English (US)", "direction": "ltr" },
+      { "code": "ar_001", "urlCode": "ar", "name": "العربية", "direction": "rtl" }
+    ],
+    "default": "en",
+    "current": "en"
+  },
+  "uiStrings": { "fr": { "Add to bag": "Ajouter au panier" } }
+}
+```
+
+The storefront's own text is in `src/i18n`: English is the source and the key, and `src/i18n/catalogs/<code>.js`
+holds French, Spanish, German, Italian, Portuguese, Dutch, Arabic and Hindi (machine drafts; have them reviewed).
+
+- An address starting with a language code (`/fr/shop`) shows that language: its catalog loads first, every API call
+  sends `X-Loom-Lang: fr`, and `<html lang dir>` follow it (Arabic is right to left).
+- Without one, the store's `default` language is shown, for the storefront's text as for the backend's content.
+- `languages` lists what the Odoo website offers; the language switcher links between them.
+- `uiStrings` (optional, per language) replaces any of the storefront's text with the merchant's own wording.
+- A right-to-left language (`direction: "rtl"`, e.g. Arabic) sets `dir="rtl"`: spacing and alignment use logical
+  utilities (`ms-`, `pe-`, `text-start`), the menu and bag drawers slide in from the other side, and arrows that follow
+  reading order are mirrored (`rtl:-scale-x-100`).
+- Addresses handed to a payment page keep the language (`/fr/order/…`), so the shopper comes back in it.
+- `node scripts/i18n-extract.mjs` lists the translatable text in `src/i18n/source.json` and prints each catalog's
+  coverage; `--missing fr` prints what French lacks.
 
 ### `checkout`
 

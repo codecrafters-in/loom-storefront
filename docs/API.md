@@ -26,8 +26,15 @@ works unchanged.** Nothing else needs editing.
 
 Never a float and never a formatted string. `0.1 + 0.2` is not `0.3` in binary
 floating point, and a cart that adds up in floats is eventually a cent out on a
-real invoice. Zero-decimal currencies (JPY, KRW, VND, CLP, ISK) use whole units;
-`src/lib/money.js` knows the list.
+real invoice. An amount is in the currency's smallest unit: cents for USD, fils for KWD (three decimals), whole yen
+for JPY. The settings document says how many decimals each currency has (`pricing.currencies[].decimals`) and
+`src/lib/money.js` divides by that; without it, it knows the zero-decimal (JPY, KRW, VND, CLP, ISK) and three-decimal
+(BHD, IQD, JOD, KWD, LYD, OMR, TND) currencies.
+
+**Currency and language** travel as headers on every call when the shopper chose them: `X-Loom-Pricelist: <id>` (the
+currency switcher, one of `pricing.currencies[].pricelistId`) and `X-Loom-Lang: fr` (a language address such as
+`/fr/shop`). Without them the backend answers in the store's default currency and language. Its cached answers vary on
+both headers, and its error `message`s come in the requested language while `code`s never change.
 
 **Errors** use the HTTP status, plus a JSON body the theme will surface verbatim:
 
@@ -893,6 +900,7 @@ client that recalculates them will eventually disagree with the invoice.
 | `POST` | `/carts/:id/lines/:lineId/save` | Save for later, signed in: the product joins saved items and the line leaves the bag (a guest's is saved in the browser and the line deleted) |
 | `GET` | `/carts/:id/slots?method=` | `{ required, slots: [{ id, label, date, from, to, startsAt, endsAt, remaining }], selected }` — delivery slots for a method |
 | `GET` | `/carts/:id/pickup-locations?method=&zip=&country=` | `{ locations: [{ id, name, street, city, region, postalCode, country, distanceKm, inStock }], selected }` — shops to collect from, nearest first |
+| `POST` | `/carts/:id/pricelist` | `{ pricelist_id }` — moves the bag to another currency's pricelist; returns `Cart` |
 | `POST` | `/carts/:id/pickup-location` | `{ method, location_id }` — collect from that shop; returns `Cart` |
 | `DELETE` | `/carts/:id/lines` | Empties the cart |
 | `POST` | `/carts/:id/discount` | `{ code }` — `""` clears it |
@@ -1268,9 +1276,17 @@ Use the state's full name or its code.`
 ```json
 {
   "code": "IN", "name": "India", "stateRequired": true, "zipRequired": true,
-  "states": [{ "code": "GJ", "name": "Gujarat" }, { "code": "MH", "name": "Maharashtra" }]
+  "states": [{ "code": "GJ", "name": "Gujarat" }, { "code": "MH", "name": "Maharashtra" }],
+  "fields": ["line1", "line2", "city", "region", "postalCode", "country"],
+  "labels": { "region": "State", "postalCode": "PIN code" }
 }
 ```
+
+`fields` (optional) lists the address fields in the country's own order, and leaves out what the country does not
+use: no `postalCode` for a country without postcodes. `labels` (optional) are the words shoppers there use. The
+checkout, billing and address-book forms lay out city, state, postcode and country in that order with those words,
+mark the postcode optional when `zipRequired` is false, and fall back to today's form (a required "Postcode", "State
+/ region") when a backend sends neither.
 
 When `states` has entries, **State / region** is a dropdown of those codes — the
 same codes the backend matches, so a picked state is never refused. An empty list,

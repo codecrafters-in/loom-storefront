@@ -9,13 +9,14 @@ import Seo from '../components/Seo.jsx'
 import { useBootstrap, useStorefront } from '../store/StorefrontContext.jsx'
 import { categoryTrail, flattenCategories } from '../lib/categories.js'
 import { Breadcrumbs, Button, Empty, ErrorState, Icon, Pagination } from '../components/ui/index.jsx'
+import { t, plural, mark } from '../i18n/index.js'
 
 const SORTS = [
-  ['featured', 'Featured'],
-  ['newest', 'Newest'],
-  ['price-asc', 'Price, low to high'],
-  ['price-desc', 'Price, high to low'],
-  ['rating', 'Best rated'],
+  ['featured', mark('Featured')],
+  ['newest', mark('Newest')],
+  ['price-asc', mark('Price, low to high')],
+  ['price-desc', mark('Price, high to low')],
+  ['rating', mark('Best rated')],
 ]
 
 const PER_PAGE = 12
@@ -160,8 +161,8 @@ export default function Shop({ mode = 'category' }) {
     }
   }, [drawer])
 
-  const title = brand ? maker?.name || '' : col?.title || meta?.name || 'All products'
-  const blurb = brand ? maker?.description || '' : col?.blurb || meta?.blurb || 'Everything we make, in one place.'
+  const title = brand ? maker?.name || '' : col?.title || meta?.name || t('All products')
+  const blurb = brand ? maker?.description || '' : col?.blurb || meta?.blurb || t('Everything we make, in one place.')
   const clear = () => setFilters({ sort: filters.sort, page: 1 })
   const count = data?.total ?? 0
 
@@ -182,8 +183,8 @@ export default function Shop({ mode = 'category' }) {
       <div className="wrap pt-8">
         <Breadcrumbs
           trail={[
-            { label: 'Home', to: '/' },
-            { label: mode === 'collection' ? 'Collections' : 'Shop', to: '/shop' },
+            { label: t('Home'), to: '/' },
+            { label: mode === 'collection' ? t('Collections') : t('Shop'), to: '/shop' },
             // Every ancestor by name, linked; the page itself last, unlinked.
             ...trail.slice(0, -1).map((c) => ({ label: c.name, to: `/shop/${c.slug}` })),
             ...(slug ? [{ label: title || slug }] : []),
@@ -206,25 +207,25 @@ export default function Shop({ mode = 'category' }) {
         <div>
           <div className="mb-6 flex items-center justify-between gap-4 border-b border-line pb-4">
             <p className="text-[13px] text-faint tabular-nums">
-              {loading ? 'Loading…' : `${count} ${count === 1 ? 'product' : 'products'}`}
+              {loading ? t('Loading…') : plural(count, '{count} product', '{count} products')}
             </p>
             <div className="flex items-center gap-2">
               <Button variant="quiet" size="sm" icon="filter" className="lg:hidden" onClick={() => setDrawer(true)}>
-                Filter
+                {t('Filter')}
               </Button>
-              <label className="sr-only" htmlFor="sort">Sort by</label>
+              <label className="sr-only" htmlFor="sort">{t('Sort by')}</label>
               <div className="relative">
                 <select
                   id="sort"
                   value={filters.sort}
                   onChange={(e) => setFilters({ ...filters, sort: e.target.value, page: 1 })}
-                  className="field h-9 appearance-none py-0 pr-8 text-[13px]"
+                  className="field h-9 appearance-none py-0 pe-8 text-[13px]"
                 >
                   {SORTS.map(([v, l]) => (
-                    <option key={v} value={v}>{l}</option>
+                    <option key={v} value={v}>{t(l)}</option>
                   ))}
                 </select>
-                <Icon name="chevron-down" size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-faint" />
+                <Icon name="chevron-down" size={14} className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-faint" />
               </div>
             </div>
           </div>
@@ -234,9 +235,9 @@ export default function Shop({ mode = 'category' }) {
           ) : !loading && !data?.items.length ? (
             <Empty
               icon="search"
-              title="Nothing matches that"
-              body="Try removing a filter, or browse everything."
-              action={<Button onClick={clear}>Clear filters</Button>}
+              title={t('Nothing matches that')}
+              body={t('Try removing a filter, or browse everything.')}
+              action={<Button onClick={clear}>{t('Clear filters')}</Button>}
             />
           ) : (
             <>
@@ -266,18 +267,18 @@ export default function Shop({ mode = 'category' }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Filters"
-        className={`fixed bottom-0 left-0 right-0 z-50 max-h-[85dvh] overflow-y-auto rounded-t-xl bg-page p-5 shadow-panel transition-transform lg:hidden ${drawer ? 'translate-y-0' : 'translate-y-full'}`}
+        aria-label={t('Filters')}
+        className={`fixed bottom-0 start-0 end-0 z-50 max-h-[85dvh] overflow-y-auto rounded-t-xl bg-page p-5 shadow-panel transition-transform lg:hidden ${drawer ? 'translate-y-0' : 'translate-y-full'}`}
       >
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="font-display text-lg">Filter</h2>
-          <button type="button" onClick={() => setDrawer(false)} aria-label="Close filters" className="text-muted">
+          <h2 className="font-display text-lg">{t('Filter')}</h2>
+          <button type="button" onClick={() => setDrawer(false)} aria-label={t('Close filters')} className="text-muted">
             <Icon name="close" size={20} />
           </button>
         </div>
         {panel}
         <Button full size="lg" className="mt-8" onClick={() => setDrawer(false)}>
-          Show {count} results
+          {plural(count, 'Show {count} result', 'Show {count} results')}
         </Button>
       </div>
 

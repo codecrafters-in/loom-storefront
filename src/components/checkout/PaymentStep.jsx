@@ -3,6 +3,7 @@ import { Icon, Skeleton } from '../ui/index.jsx'
 import { driverFor } from '../../lib/payments/drivers/index.js'
 import { OUTCOMES } from '../../lib/payments/drivers/demo.js'
 import { formatMoney } from '../../lib/money.js'
+import { t } from '../../i18n/index.js'
 
 /**
  * The payment methods the backend offers for this cart.
@@ -26,7 +27,7 @@ export default function PaymentStep({
 }) {
   return (
     <fieldset className="mt-10" disabled={disabled} aria-busy={loading || undefined}>
-      <legend className="mb-4 text-[13px] font-medium uppercase tracking-[0.08em]">Payment</legend>
+      <legend className="mb-4 text-[13px] font-medium uppercase tracking-[0.08em]">{t('Payment')}</legend>
 
       {loading && !methods.length && <Skeleton className="h-28 w-full" />}
 
@@ -38,7 +39,7 @@ export default function PaymentStep({
 
       {!loading && !error && methods.length === 0 && (
         <p className="rounded-xs border border-line bg-surface p-3.5 text-[13px] text-muted">
-          No payment method can take this order to this address. Check the country, or contact us and we will sort it out.
+          {t('No payment method can take this order to this address. Check the country, or contact us and we will sort it out.')}
         </p>
       )}
 
@@ -61,15 +62,15 @@ export default function PaymentStep({
                     {method.name}
                     {method.test && (
                       <span className="rounded-xs bg-accent-soft px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-accent">
-                        Test
+                        {t('Test')}
                       </span>
                     )}
                   </span>
                   <span className="block text-[13px] text-faint">
-                    {method.saved ? `Saved ${method.methodName || 'method'}` : method.providerName !== method.name ? method.providerName : ''}
+                    {method.saved ? t('Saved {method}', { method: method.methodName || t('method') }) : method.providerName !== method.name ? method.providerName : ''}
                   </span>
                   {method.fee?.amount > 0 && (
-                    <span className="block text-[13px] text-muted">Adds a {formatMoney(method.fee)} fee</span>
+                    <span className="block text-[13px] text-muted">{t('Adds a {fee} fee', { fee: formatMoney(method.fee) })}</span>
                   )}
                 </span>
                 <MethodMarks method={method} />
@@ -90,7 +91,7 @@ export default function PaymentStep({
                     onChange={(e) => onSaveMethod(e.target.checked)}
                     className="h-4 w-4 accent-[rgb(var(--accent))]"
                   />
-                  Save for next time
+                  {t('Save for next time')}
                 </label>
               )}
 
@@ -136,11 +137,11 @@ function DemoCardFields({ value, onChange }) {
   return (
     <div className="space-y-3 border-t border-line px-4 py-4">
       <p className="text-[12px] leading-relaxed text-faint">
-        Test mode — no card is charged. Use any number, and choose what the payment should do.
+        {t('Test mode — no card is charged. Use any number, and choose what the payment should do.')}
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor="demo-card-number" className="mb-1.5 block text-[13px] font-medium">Test card number</label>
+          <label htmlFor="demo-card-number" className="mb-1.5 block text-[13px] font-medium">{t('Test card number')}</label>
           <input
             id="demo-card-number"
             className="field"
@@ -151,9 +152,9 @@ function DemoCardFields({ value, onChange }) {
           />
         </div>
         <div>
-          <label htmlFor="demo-outcome" className="mb-1.5 block text-[13px] font-medium">Outcome</label>
+          <label htmlFor="demo-outcome" className="mb-1.5 block text-[13px] font-medium">{t('Outcome')}</label>
           <select id="demo-outcome" className="field" value={value.outcome} onChange={set('outcome')}>
-            {OUTCOMES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            {OUTCOMES.map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}
           </select>
         </div>
       </div>

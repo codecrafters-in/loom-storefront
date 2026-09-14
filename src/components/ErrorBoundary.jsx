@@ -2,6 +2,7 @@ import { Component } from 'react'
 import { Button } from './ui/index.jsx'
 import { track } from '../lib/analytics.js'
 import { describeError, shouldReset } from '../lib/errors.js'
+import { t } from '../i18n/index.js'
 
 /**
  * What a shopper sees when a render throws.
@@ -55,15 +56,15 @@ export default class ErrorBoundary extends Component {
 
     return (
       <div className="wrap flex min-h-[50vh] flex-col items-center justify-center py-20 text-center">
-        <p className="eyebrow">Something went wrong</p>
-        <h1 className="mt-4 text-display-md">This page did not load</h1>
+        <p className="eyebrow">{t('Something went wrong')}</p>
+        <h1 className="mt-4 text-display-md">{t('This page did not load')}</h1>
         <p className="mt-4 max-w-md text-[15px] leading-relaxed text-muted">
-          Not your fault, and nothing in your bag has been lost. Reloading usually fixes it.
+          {t('Not your fault, and nothing in your bag has been lost. Reloading usually fixes it.')}
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Button onClick={() => window.location.reload()}>Reload the page</Button>
+          <Button onClick={() => window.location.reload()}>{t('Reload the page')}</Button>
           <Button to="/" variant="quiet">
-            Back to the shop
+            {t('Back to the shop')}
           </Button>
         </div>
       </div>

@@ -19,6 +19,7 @@ import StaticPage from './pages/StaticPage.jsx'
 import Docs from './pages/Docs.jsx'
 import { Skeleton } from './components/ui/index.jsx'
 import { isMock } from './lib/config.js'
+import { useLanguage } from './i18n/index.js'
 
 // Split the routes a browsing visitor never reaches. Checkout and account are
 // the biggest of these and the least visited, which is exactly the trade
@@ -68,10 +69,12 @@ const Loading = () => (
 )
 
 export default function App() {
+  // Everything below the settings starts again in a new language, so every piece of text is in it.
+  const language = useLanguage()
   return (
     <ToastProvider>
       <StorefrontProvider>
-        <AdminAuthProvider>
+        <AdminAuthProvider key={language}>
         <AuthProvider>
         <WishlistProvider>
           <CartProvider>

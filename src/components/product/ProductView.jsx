@@ -26,6 +26,7 @@ import {
   SpecCarousel,
   ManufacturerRows,
 } from './Enrichment.jsx'
+import { t, plural } from '../../i18n/index.js'
 
 /*
  * Everything here that only exists after a tap is its own chunk: the zoom, the
@@ -64,7 +65,7 @@ function Accordion({ title, defaultOpen = false, children }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-4 py-4 text-left"
+        className="flex w-full items-center justify-between gap-4 py-4 text-start"
       >
         <span className="text-[14px] font-medium">{title}</span>
         <Icon
@@ -184,14 +185,14 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
   const sizeAside = (option, onClick = openChart) =>
     option.role !== 'size' ? null : product.sizeChart ? (
       <button type="button" onClick={onClick} className="text-[12px] text-accent link-underline">
-        {product.sizeChart.name || 'Size chart'}
+        {product.sizeChart.name || t('Size chart')}
       </button>
     ) : isMock ? (
-      <Link to="/pages/size-guide" className="text-[12px] text-muted link-underline">Size guide</Link>
+      <Link to="/pages/size-guide" className="text-[12px] text-muted link-underline">{t('Size guide')}</Link>
     ) : null
 
   const submit = (request) =>
-    add(request, request.quantity, `${product.title} added to your bag`).catch(() => {
+    add(request, request.quantity, t('{title} added to your bag', { title: product.title })).catch(() => {
       /* the bag has already said why, in a toast */
     })
 
@@ -240,7 +241,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                     <button
                       type="button"
                       onClick={() => setShot(i)}
-                      aria-label={`View ${img.type === 'video' ? 'video' : 'image'} ${i + 1} of ${gallery.length}`}
+                      aria-label={img.type === 'video' ? t('View video {index} of {total}', { index: i + 1, total: gallery.length }) : t('View image {index} of {total}', { index: i + 1, total: gallery.length })}
                       aria-current={i === shot}
                       className={`shot relative w-full rounded-xs ring-1 transition-shadow ${
                         i === shot ? 'ring-ink' : 'ring-line hover:ring-muted'
@@ -280,7 +281,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               <Frame
                 zoomable={current?.type !== 'video'}
                 onZoom={() => setZoomOpen(true)}
-                label={`View ${product.title} full screen`}
+                label={t('View {title} full screen', { title: product.title })}
               >
                 {/* A short viewport crops the panel. Biasing the crop above
                     centre keeps the collar and the face. */}
@@ -307,7 +308,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                 {current?.type !== 'video' && (
                   <span
                     aria-hidden="true"
-                    className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-page/80 text-ink backdrop-blur-sm"
+                    className="absolute end-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-page/80 text-ink backdrop-blur-sm"
                   >
                     <Icon name="search" size={16} />
                   </span>
@@ -349,12 +350,12 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           </div>
           {!isMock && product.priceTiers?.length > 0 && (
             <table className="mt-3 text-[13px]">
-              <caption className="sr-only">Price per item by quantity</caption>
+              <caption className="sr-only">{t('Price per item by quantity')}</caption>
               <tbody>
                 {product.priceTiers.map((tier) => (
                   <tr key={tier.minQuantity}>
-                    <td className="pr-4 text-muted">{tier.minQuantity}+ items</td>
-                    <td className="tabular-nums">{formatMoney(tier.price)} each</td>
+                    <td className="pe-4 text-muted">{plural(tier.minQuantity, '{count}+ items', '{count}+ items')}</td>
+                    <td className="tabular-nums">{t('{price} each', { price: formatMoney(tier.price) })}</td>
                   </tr>
                 ))}
               </tbody>
@@ -380,7 +381,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             tabs={[
               {
                 id: 'fabric',
-                label: labels.fabric || 'Materials & care',
+                label: labels.fabric || t('Materials & care'),
                 when: Boolean(product.fabric) || product.care?.length > 0,
                 render: () => (
                   <>
@@ -400,19 +401,19 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               },
               {
                 id: 'specs',
-                label: labels.specs || 'Specifications',
+                label: labels.specs || t('Specifications'),
                 when: specList?.length > 0 || Object.keys(product.enrichment?.specs || {}).length > 0,
                 render: () => <SpecCarousel specs={product.enrichment.specs} specList={specList} />,
               },
               {
                 id: 'features',
-                label: labels.features || 'Features',
+                label: labels.features || t('Features'),
                 when: product.enrichment?.features?.length > 0,
                 render: () => <FeatureCarousel items={product.enrichment.features} />,
               },
               {
                 id: 'details',
-                label: labels.details || 'Details',
+                label: labels.details || t('Details'),
                 when: product.details?.length > 0,
                 render: () => (
                   <ul className="space-y-2.5">
@@ -427,7 +428,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               },
               {
                 id: 'manufacturer',
-                label: labels.manufacturer || 'Manufacturer info',
+                label: labels.manufacturer || t('Manufacturer info'),
                 when: Boolean(product.enrichment?.manufacturer),
                 render: () => (
                   <ManufacturerRows
@@ -451,7 +452,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           {note && (
             <p className={`mt-3 text-[13px] ${note.low ? 'text-sale' : 'text-muted'}`}>
               {note.text}
-              {note.low && summary ? ` in ${summary}` : ''}.
+              {note.low && summary ? ` ${t('in {summary}', { summary })}` : ''}.
             </p>
           )}
 
@@ -471,7 +472,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               disabled={preview || !choice.ready || busy}
               onClick={buy}
             >
-              {choice.blocker || (busy ? 'Adding…' : 'Add to bag')}
+              {choice.blocker || (busy ? t('Adding…') : t('Add to bag'))}
             </Button>
             {config.features?.wishlist !== false && (
             <Button
@@ -479,7 +480,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               size="lg"
               square
               aria-pressed={saved}
-              aria-label={saved ? 'Remove from saved' : 'Save for later'}
+              aria-label={saved ? t('Remove from saved') : t('Save for later')}
               onClick={() => !preview && toggle(product.slug, product.title)}
               className="justify-self-end sm:justify-self-auto"
             >
@@ -500,18 +501,18 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                 decides whether an apparel order gets kept, and it means nothing
                 under a notebook. */}
             {model.options.some((o) => o.role === 'size') && product.fit && (
-              <Accordion title="Fit & sizing" defaultOpen>
+              <Accordion title={t('Fit & sizing')} defaultOpen>
                 <FitBlock product={product} flat onOpenChart={openChart} />
               </Accordion>
             )}
 
             {product.sizeChart && !hasSizeOption && (
-              <Accordion title={product.sizeChart.name || 'Measurements'}>
+              <Accordion title={product.sizeChart.name || t('Measurements')}>
                 <ChartTable chart={product.sizeChart} />
               </Accordion>
             )}
 
-            <Accordion title="Delivery & returns">
+            <Accordion title={t('Delivery & returns')}>
               {/* Copy from settings, numbers from the commerce config. */}
               <div className="space-y-3 text-[14px] leading-relaxed text-muted">
                 {deliveryPolicy.map((line) => (
@@ -551,13 +552,13 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           <button
             type="button"
             onClick={() => (model.options.length ? setSheetOpen(true) : scrollToBuy())}
-            className="min-w-0 flex-1 text-left"
+            className="min-w-0 flex-1 text-start"
           >
             <p className="truncate text-[13px] font-medium">{product.title}</p>
             {model.options.length > 0 && (
               <p className="flex items-center gap-1 truncate text-[12px] text-faint">
                 <span className="truncate">
-                  {[summary, choice.missing && `select ${choice.missing.name.toLowerCase()}`].filter(Boolean).join(' · ')}
+                  {[summary, choice.missing && t('select {option}', { option: choice.missing.name.toLowerCase() })].filter(Boolean).join(' · ')}
                 </span>
                 <Icon name="chevron-down" size={12} className="shrink-0 rotate-180" />
               </p>
@@ -570,7 +571,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             disabled={busy || choice.stuck}
             onClick={() => (choice.ready ? buy() : choice.missing ? setSheetOpen(true) : scrollToBuy())}
           >
-            {choice.missing ? `Choose ${choice.missing.name.toLowerCase()}` : choice.blocker || 'Add to bag'}
+            {choice.missing ? t('Choose {option}', { option: choice.missing.name.toLowerCase() }) : choice.blocker || t('Add to bag')}
           </Button>
         </div>
       </div>

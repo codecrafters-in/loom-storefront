@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { Icon } from '../ui/index.jsx'
 import { formatMoney } from '../../lib/money.js'
 import { choiceState, selectionLabel } from '../../lib/variants.js'
+import { t } from '../../i18n/index.js'
 
 /**
  * The options, whatever they are.
@@ -47,18 +48,18 @@ function OptionField({ choice: c, option: o, index, aside }) {
             id={id}
             value={c.selection[o.id] ?? ''}
             onChange={(e) => e.target.value && c.pickChoice(o.id, e.target.value)}
-            className="field h-11 appearance-none pr-9 text-[14px]"
+            className="field h-11 appearance-none pe-9 text-[14px]"
           >
-            {!chosen && <option value="">Select {o.name.toLowerCase()}</option>}
+            {!chosen && <option value="">{t('Select {option}', { option: o.name.toLowerCase() })}</option>}
             {o.choices.map((x, k) => (
               <option key={x.id} value={x.id} disabled={!offered(states[k])}>
                 {x.name}
                 {plusPrice(x)}
-                {states[k] === 'sold-out' ? ' — sold out' : states[k] === 'absent' ? ' — not available' : ''}
+                {states[k] === 'sold-out' ? ` — ${t('sold out')}` : states[k] === 'absent' ? ` — ${t('not available')}` : ''}
               </option>
             ))}
           </select>
-          <Icon name="chevron-down" size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-faint" />
+          <Icon name="chevron-down" size={15} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-faint" />
         </div>
         {custom}
       </div>
@@ -71,7 +72,7 @@ function OptionField({ choice: c, option: o, index, aside }) {
         {o.name}
         {chosen && <span className="font-normal text-muted">: {chosen.name}</span>}
       </legend>
-      {aside && <div className="absolute right-0 top-0">{aside}</div>}
+      {aside && <div className="absolute end-0 top-0">{aside}</div>}
 
       {o.displayType === 'radio' ? (
         <div className="mt-3 space-y-2">
@@ -97,7 +98,7 @@ function OptionField({ choice: c, option: o, index, aside }) {
                 {/* Hidden from the accessible name, so the radio is called what the
                     choice is called; the price follows the selection anyway. */}
                 <span aria-hidden="true" className="text-[13px] tabular-nums text-muted">
-                  {off ? (states[k] === 'sold-out' ? 'Sold out' : 'Not available') : plusPrice(x)}
+                  {off ? (states[k] === 'sold-out' ? t('Sold out') : t('Not available')) : plusPrice(x)}
                 </span>
               </label>
             )
@@ -117,7 +118,7 @@ function OptionField({ choice: c, option: o, index, aside }) {
                 type="button"
                 onClick={() => c.pickChoice(o.id, x.id)}
                 aria-pressed={on}
-                title={offered(state) ? x.name : `${x.name} — ${state === 'absent' ? 'not available' : 'sold out'}`}
+                title={offered(state) ? x.name : `${x.name} — ${state === 'absent' ? t('not available') : t('sold out')}`}
                 className={`relative grid place-items-center overflow-hidden ring-1 ring-inset transition-shadow ${
                   tile ? 'h-14 w-14 rounded-xs' : 'h-11 w-11 rounded-full'
                 } ${on ? 'ring-2 ring-ink ring-offset-2 ring-offset-page' : 'ring-ink/15 hover:ring-muted'} ${
@@ -128,7 +129,7 @@ function OptionField({ choice: c, option: o, index, aside }) {
                 {tile && <img src={x.image.url} alt="" className="h-full w-full object-cover" />}
                 <span className="sr-only">
                   {x.name}
-                  {state === 'sold-out' ? ' (sold out)' : state === 'absent' ? ' (not available)' : ''}
+                  {state === 'sold-out' ? ` (${t('sold out')})` : state === 'absent' ? ` (${t('not available')})` : ''}
                 </span>
                 {state === 'sold-out' && <span aria-hidden="true" className="absolute h-[1.5px] w-8 -rotate-45 bg-ink/60" />}
               </button>
@@ -149,9 +150,9 @@ function OptionField({ choice: c, option: o, index, aside }) {
                 aria-pressed={on}
                 title={
                   state === 'sold-out'
-                    ? `${x.name} is sold out${before ? ` in ${before}` : ''}`
+                    ? (before ? t('{name} is sold out in {selection}', { name: x.name, selection: before }) : t('{name} is sold out', { name: x.name }))
                     : state === 'absent'
-                      ? `${x.name} is not made${before ? ` in ${before}` : ''}`
+                      ? (before ? t('{name} is not made in {selection}', { name: x.name, selection: before }) : t('{name} is not made', { name: x.name }))
                       : undefined
                 }
                 className={`relative h-12 min-w-[3.5rem] rounded-xs border px-3.5 text-sm transition-colors ${
@@ -166,7 +167,7 @@ function OptionField({ choice: c, option: o, index, aside }) {
               >
                 {x.name}
                 {!offered(state) && (
-                  <span className="sr-only">{state === 'sold-out' ? ' — sold out' : ' — not available in this combination'}</span>
+                  <span className="sr-only">{state === 'sold-out' ? ` — ${t('sold out')}` : ` — ${t('not available in this combination')}`}</span>
                 )}
                 {/* A struck-through choice reads as "gone"; a dashed outline reads
                     as "not offered". Only the first gets the line. */}
@@ -178,7 +179,7 @@ function OptionField({ choice: c, option: o, index, aside }) {
       )}
 
       {before && states.includes('absent') && (
-        <p className="mt-3 text-[12px] text-faint">Dashed choices are not made in {before}.</p>
+        <p className="mt-3 text-[12px] text-faint">{t('Dashed choices are not made in {selection}.', { selection: before })}</p>
       )}
       {custom}
     </fieldset>
@@ -201,7 +202,7 @@ export function ExtraOptions({ choice: c }) {
       <fieldset key={o.id} className="mt-8">
         <legend className="text-[13px] font-medium">
           {o.name}
-          {!o.required && <span className="font-normal text-faint"> (optional)</span>}
+          {!o.required && <span className="font-normal text-faint"> ({t('optional')})</span>}
         </legend>
         <div className="mt-3 space-y-2">
           {!o.multiple && !o.required && (
@@ -213,7 +214,7 @@ export function ExtraOptions({ choice: c }) {
                 onChange={() => c.toggleExtra(o.id, null)}
                 className="h-4 w-4 accent-[rgb(var(--accent))]"
               />
-              <span className="flex-1">None</span>
+              <span className="flex-1">{t('None')}</span>
             </label>
           )}
           {o.choices.map((x) => {
@@ -246,10 +247,10 @@ function CustomText({ choice, value, onChange }) {
   return (
     <div className="mt-2">
       <label htmlFor={id} className="mb-1 block text-[12px] text-muted">
-        Your {choice.name.toLowerCase()}
+        {t('Your {option}', { option: choice.name.toLowerCase() })}
       </label>
       <input id={id} value={value} maxLength={200} onChange={(e) => onChange(e.target.value)} className="field h-10 text-[14px]" />
-      <p className="mt-1 text-right text-[11px] tabular-nums text-faint">{value.length}/200</p>
+      <p className="mt-1 text-end text-[11px] tabular-nums text-faint">{value.length}/200</p>
     </div>
   )
 }

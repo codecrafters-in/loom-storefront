@@ -13,6 +13,7 @@ import { viewItem } from '../lib/analytics.js'
 import { remember } from '../lib/recentlyViewed.js'
 import { useAuth } from '../store/AuthContext.jsx'
 import RecentlyViewed from '../components/product/RecentlyViewed.jsx'
+import { t, plural } from '../i18n/index.js'
 
 export default function Product() {
   const { slug } = useParams()
@@ -56,9 +57,9 @@ export default function Product() {
         {error.status === 404 ? (
           <Empty
             icon="search"
-            title="We could not find that product"
-            body="It may have sold out and been retired."
-            action={<Button to="/shop">Browse everything</Button>}
+            title={t('We could not find that product')}
+            body={t('It may have sold out and been retired.')}
+            action={<Button to="/shop">{t('Browse everything')}</Button>}
           />
         ) : (
           <ErrorState error={error} onRetry={reload} />
@@ -79,8 +80,8 @@ export default function Product() {
       <div className="wrap wrap-tight pt-8">
         <Breadcrumbs
           trail={[
-            { label: 'Home', to: '/' },
-            { label: 'Shop', to: '/shop' },
+            { label: t('Home'), to: '/' },
+            { label: t('Shop'), to: '/shop' },
             ...trail.map((c) => ({ label: c.name, to: `/shop/${c.slug}` })),
             { label: product.title },
           ]}
@@ -99,7 +100,7 @@ export default function Product() {
           offers, as it always did. */}
       {product.accessories?.length > 0 && (
         <section className="wrap wrap-tight pb-16">
-          <h2 className="text-display-md">Frequently bought together</h2>
+          <h2 className="text-display-md">{t('Frequently bought together')}</h2>
           <div className="mt-8">
             <ProductGrid products={product.accessories} />
           </div>
@@ -111,7 +112,7 @@ export default function Product() {
       <section id="reviews" className="border-t border-line bg-surface">
         <div className="wrap wrap-tight grid gap-10 py-16 md:grid-cols-[18rem_1fr]">
           <div>
-            <h2 className="text-display-md">Reviews</h2>
+            <h2 className="text-display-md">{t('Reviews')}</h2>
             {reviews.data?.summary && (
               <>
                 <div className="mt-5 flex items-baseline gap-3">
@@ -119,8 +120,8 @@ export default function Product() {
                   <Rating value={reviews.data.summary.average} showCount={false} size={15} />
                 </div>
                 <p className="mt-2 text-[13px] text-faint">
-                  {reviews.data.summary.count} reviews
-                  {reviews.data.summary.withPhotos > 0 && ` · ${reviews.data.summary.withPhotos} with photos`}
+                  {plural(reviews.data.summary.count, '{count} review', '{count} reviews')}
+                  {reviews.data.summary.withPhotos > 0 && ` · ${plural(reviews.data.summary.withPhotos, '{count} with photos', '{count} with photos')}`}
                 </p>
                 <ul className="mt-6 space-y-1.5">
                   {reviews.data.summary.breakdown.map((b) => (
@@ -132,7 +133,7 @@ export default function Product() {
                           style={{ width: `${(b.count / reviews.data.summary.count) * 100}%` }}
                         />
                       </span>
-                      <span className="w-8 text-right tabular-nums">{b.count}</span>
+                      <span className="w-8 text-end tabular-nums">{b.count}</span>
                     </li>
                   ))}
                 </ul>
@@ -148,23 +149,23 @@ export default function Product() {
                   <span className="text-[13px] font-medium">{r.author}</span>
                   {r.verified && (
                     <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-good">
-                      <Icon name="check" size={11} /> Verified
+                      <Icon name="check" size={11} /> {t('Verified')}
                     </span>
                   )}
-                  <time className="ml-auto text-[12px] text-faint" dateTime={r.createdAt}>
+                  <time className="ms-auto text-[12px] text-faint" dateTime={r.createdAt}>
                     {new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                   </time>
                 </div>
                 <p className="mt-3 text-[14px] leading-relaxed text-muted">{r.body}</p>
                 {(r.size || r.height || r.fit) && (
                   <p className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-faint">
-                    {r.size && <span>Bought size <span className="text-muted">{r.size}</span></span>}
-                    {r.height && <span>Height <span className="text-muted">{r.height}</span></span>}
+                    {r.size && <span>{t('Bought size')} <span className="text-muted">{r.size}</span></span>}
+                    {r.height && <span>{t('Height')} <span className="text-muted">{r.height}</span></span>}
                     {r.fit && (
                       <span>
-                        Fit{' '}
+                        {t('Fit')}{' '}
                         <span className={r.fit === 'true' ? 'text-good' : 'text-muted'}>
-                          {r.fit === 'true' ? 'true to size' : `runs ${r.fit}`}
+                          {r.fit === 'true' ? t('true to size') : r.fit === 'small' ? t('runs small') : r.fit === 'large' ? t('runs large') : t('runs {fit}', { fit: r.fit })}
                         </span>
                       </span>
                     )}
@@ -174,7 +175,7 @@ export default function Product() {
                   <ul className="mt-3 flex gap-2">
                     {r.photos.map((ph, i) => (
                       <li key={i} className="w-16">
-                        <div className="shot rounded-xs"><img src={ph.url} alt="Customer photo" loading="lazy" /></div>
+                        <div className="shot rounded-xs"><img src={ph.url} alt={t('Customer photo')} loading="lazy" /></div>
                       </li>
                     ))}
                   </ul>
@@ -190,7 +191,7 @@ export default function Product() {
       {/* The store's alternatives when it named them, computed recommendations when it did not. */}
       {(product.alternatives?.length > 0 || related.data?.items?.length > 0) && (
         <section className="wrap wrap-tight py-16">
-          <h2 className="text-display-md">{recs.title || 'You might also like'}</h2>
+          <h2 className="text-display-md">{recs.title || t('You might also like')}</h2>
           <div className="mt-8">
             <ProductGrid products={product.alternatives?.length ? product.alternatives : related.data.items} />
           </div>

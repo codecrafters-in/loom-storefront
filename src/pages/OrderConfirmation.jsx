@@ -11,6 +11,7 @@ import { config } from '../lib/config.js'
 import { useAuth } from '../store/AuthContext.jsx'
 import { nestLines } from '../lib/cart-lines.js'
 import LineDetails from '../components/cart/LineDetails.jsx'
+import { t } from '../i18n/index.js'
 
 const PayNow = lazy(() => import('../components/checkout/PayNow.jsx'))
 
@@ -66,7 +67,7 @@ export default function OrderConfirmation() {
     return (
       <div className="wrap py-20">
         {error.status === 404
-          ? <Empty icon="package" title="Order not found" body="Check the link, or sign in to see your orders." action={<Button to="/account/orders">Your orders</Button>} />
+          ? <Empty icon="package" title={t('Order not found')} body={t('Check the link, or sign in to see your orders.')} action={<Button to="/account/orders">{t('Your orders')}</Button>} />
           : <ErrorState error={error} onRetry={reload} />}
       </div>
     )
@@ -85,7 +86,7 @@ export default function OrderConfirmation() {
         </span>
         <h1 className="mt-6 text-display-lg">{stage.title}</h1>
         <p className="mt-4 text-[15px] leading-relaxed text-muted">
-          Order <strong className="text-ink">{order.number}</strong> {stage.body}
+          {t('Order')} <strong className="text-ink">{order.number}</strong> {stage.body}
         </p>
 
         {order.canPay && (
@@ -102,7 +103,7 @@ export default function OrderConfirmation() {
         {(tracking?.code || tracking?.url) && order.status !== 'cancelled' && (
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-xs border border-line bg-surface p-5">
             <div className="min-w-0">
-              <p className="eyebrow">Tracking</p>
+              <p className="eyebrow">{t('Tracking')}</p>
               <p className="mt-2 text-[14px]">
                 {tracking.carrier && <span className="text-muted">{tracking.carrier} · </span>}
                 {tracking.code && <span className="font-mono">{tracking.code}</span>}
@@ -110,7 +111,7 @@ export default function OrderConfirmation() {
             </div>
             {tracking.url && (
               <Button href={tracking.url} target="_blank" rel="noreferrer" size="sm" variant="quiet" iconRight="arrow-right">
-                Track parcel
+                {t('Track parcel')}
               </Button>
             )}
           </div>
@@ -119,7 +120,7 @@ export default function OrderConfirmation() {
         {/* Only a paid order carries these; before payment the backend answers 404 for the files anyway. */}
         {order.downloads?.length > 0 && (
           <div className="mt-8 rounded-xs border border-line bg-surface p-5">
-            <p className="eyebrow">Downloads</p>
+            <p className="eyebrow">{t('Downloads')}</p>
             <ul className="mt-3 space-y-2">
               {order.downloads.map((d) => (
                 <li key={d.id}>
@@ -136,7 +137,7 @@ export default function OrderConfirmation() {
         <div className="mt-10 rounded-xs border border-line bg-surface">
           <ul className="divide-y divide-line px-6">
             {nestLines(order.lines).map(({ line: l, depth }) => (
-              <li key={l.id} className={`flex gap-4 py-5 ${depth ? 'pl-6' : ''}`}>
+              <li key={l.id} className={`flex gap-4 py-5 ${depth ? 'ps-6' : ''}`}>
                 <div className="w-16 shrink-0">
                   <div className="shot rounded-xs"><Media sizes={SIZES.thumb} src={l.image?.url} type={l.image?.type} alt="" loading="lazy" className="h-full w-full object-cover" /></div>
                 </div>
@@ -149,27 +150,27 @@ export default function OrderConfirmation() {
             ))}
           </ul>
           <dl className="space-y-2.5 border-t border-line px-6 py-5 text-sm">
-            <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd className="tabular-nums">{formatMoney(order.subtotal)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">{t('Subtotal')}</dt><dd className="tabular-nums">{formatMoney(order.subtotal)}</dd></div>
             {order.discount?.amount > 0 && (
-              <div className="flex justify-between text-sale"><dt>{order.discountCode?.label || 'Discount'}</dt><dd className="tabular-nums">−{formatMoney(order.discount)}</dd></div>
+              <div className="flex justify-between text-sale"><dt>{order.discountCode?.label || t('Discount')}</dt><dd className="tabular-nums">−{formatMoney(order.discount)}</dd></div>
             )}
-            <div className="flex justify-between"><dt className="text-muted">Shipping</dt><dd className="tabular-nums">{order.shipping.amount === 0 ? 'Free' : formatMoney(order.shipping)}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted">Tax</dt><dd className="tabular-nums">{formatMoney(order.tax)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">{t('Shipping')}</dt><dd className="tabular-nums">{order.shipping.amount === 0 ? t('Free') : formatMoney(order.shipping)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">{t('Tax')}</dt><dd className="tabular-nums">{formatMoney(order.tax)}</dd></div>
             {order.fee?.amount > 0 && (
-              <div className="flex justify-between"><dt className="text-muted">Cash on delivery fee</dt><dd className="tabular-nums">{formatMoney(order.fee)}</dd></div>
+              <div className="flex justify-between"><dt className="text-muted">{t('Cash on delivery fee')}</dt><dd className="tabular-nums">{formatMoney(order.fee)}</dd></div>
             )}
             {order.giftWrap?.amount > 0 && (
-              <div className="flex justify-between"><dt className="text-muted">Gift wrapping</dt><dd className="tabular-nums">{formatMoney(order.giftWrap)}</dd></div>
+              <div className="flex justify-between"><dt className="text-muted">{t('Gift wrapping')}</dt><dd className="tabular-nums">{formatMoney(order.giftWrap)}</dd></div>
             )}
-            <div className="flex justify-between border-t border-line pt-3 text-base"><dt>Total</dt><dd className="tabular-nums">{formatMoney(order.total)}</dd></div>
+            <div className="flex justify-between border-t border-line pt-3 text-base"><dt>{t('Total')}</dt><dd className="tabular-nums">{formatMoney(order.total)}</dd></div>
             {order.refundedTotal?.amount > 0 && (
-              <div className="flex justify-between text-muted"><dt>Refunded</dt><dd className="tabular-nums">−{formatMoney(order.refundedTotal)}</dd></div>
+              <div className="flex justify-between text-muted"><dt>{t('Refunded')}</dt><dd className="tabular-nums">−{formatMoney(order.refundedTotal)}</dd></div>
             )}
           </dl>
         </div>
 
         <div className="mt-8 rounded-xs border border-line p-6">
-          <h2 className="eyebrow">{order.pickupLocation ? 'Collect from' : 'Shipping to'}</h2>
+          <h2 className="eyebrow">{order.pickupLocation ? t('Collect from') : t('Shipping to')}</h2>
           <address className="mt-3 not-italic text-[14px] leading-relaxed text-muted">
             {order.pickupLocation ? (
               <>
@@ -188,14 +189,14 @@ export default function OrderConfirmation() {
           </address>
           {order.deliverySlot && (
             <p className="mt-3 text-[14px] text-muted">
-              Delivery slot: <span className="text-ink">{order.deliverySlot.date} · {order.deliverySlot.from}–{order.deliverySlot.to}</span>
+              {t('Delivery slot:')} <span className="text-ink">{order.deliverySlot.date} · {order.deliverySlot.from}–{order.deliverySlot.to}</span>
             </p>
           )}
         </div>
 
         {(order.billingAddress || order.company || order.vat) && (
           <div className="mt-4 rounded-xs border border-line p-6">
-            <h2 className="eyebrow">Billing</h2>
+            <h2 className="eyebrow">{t('Billing')}</h2>
             <address className="mt-3 not-italic text-[14px] leading-relaxed text-muted">
               {order.company && <>{order.company}<br /></>}
               {order.billingAddress && (
@@ -207,28 +208,28 @@ export default function OrderConfirmation() {
                   {order.vat && <br />}
                 </>
               )}
-              {order.vat && <>Tax ID {order.vat}</>}
+              {order.vat && <>{t('Tax ID {vat}', { vat: order.vat })}</>}
             </address>
           </div>
         )}
 
         {(order.note || order.giftMessage || order.giftWrapped) && (
           <div className="mt-6 rounded-xs border border-line p-6 text-[14px] leading-relaxed text-muted">
-            <h2 className="eyebrow">Your notes</h2>
-            {order.note && <p className="mt-3 whitespace-pre-line"><span className="text-ink">Delivery instructions:</span> {order.note}</p>}
-            {order.giftWrapped && <p className="mt-3 text-ink">Gift wrapped</p>}
-            {order.giftMessage && <p className="mt-3 whitespace-pre-line"><span className="text-ink">Gift message:</span> {order.giftMessage}</p>}
+            <h2 className="eyebrow">{t('Your notes')}</h2>
+            {order.note && <p className="mt-3 whitespace-pre-line"><span className="text-ink">{t('Delivery instructions:')}</span> {order.note}</p>}
+            {order.giftWrapped && <p className="mt-3 text-ink">{t('Gift wrapped')}</p>}
+            {order.giftMessage && <p className="mt-3 whitespace-pre-line"><span className="text-ink">{t('Gift message:')}</span> {order.giftMessage}</p>}
           </div>
         )}
 
         <div className="mt-10 flex flex-wrap gap-3">
-          <Button to="/shop" size="lg">Keep shopping</Button>
+          <Button to="/shop" size="lg">{t('Keep shopping')}</Button>
           {signedIn || config.features?.accounts === false ? (
-            <Button to="/account/orders" variant="outline" size="lg">Your orders</Button>
+            <Button to="/account/orders" variant="outline" size="lg">{t('Your orders')}</Button>
           ) : (
             // After a guest order: an account for next time, with the email already filled in.
             <Button to="/login" state={{ mode: 'register', email: order.email, from: '/account' }} variant="outline" size="lg">
-              Create an account
+              {t('Create an account')}
             </Button>
           )}
         </div>
@@ -245,22 +246,28 @@ export default function OrderConfirmation() {
  */
 function orderStage(order) {
   if (order.status === 'cancelled') {
-    return { icon: 'close', tone: 'muted', title: 'Order cancelled.', body: 'was cancelled. If you were charged, the refund goes back the way you paid.' }
+    return { icon: 'close', tone: 'muted', title: t('Order cancelled.'), body: t('was cancelled. If you were charged, the refund goes back the way you paid.') }
   }
   if (order.status === 'refunded') {
-    return { icon: 'refresh', tone: 'muted', title: 'Refunded.', body: 'was refunded. The money goes back the way you paid; your bank can take a few days to show it.' }
+    return { icon: 'refresh', tone: 'muted', title: t('Refunded.'), body: t('was refunded. The money goes back the way you paid; your bank can take a few days to show it.') }
   }
   if (order.canPay) {
-    return { icon: 'info', tone: 'muted', title: 'Payment due.', body: `is waiting for a payment of ${formatMoney(order.amountDue)}.` }
+    return { icon: 'info', tone: 'muted', title: t('Payment due.'), body: t('is waiting for a payment of {amount}.', { amount: formatMoney(order.amountDue) }) }
   }
   if (order.status === 'delivered') {
-    return { icon: 'check', title: 'Delivered.', body: `has arrived. Questions about it? Reply to the email we sent to ${order.email}.` }
+    return { icon: 'check', title: t('Delivered.'), body: t('has arrived. Questions about it? Reply to the email we sent to {email}.', { email: order.email }) }
   }
   if (order.status === 'fulfilled') {
-    return { icon: 'truck', title: 'On its way.', body: 'has shipped. Follow it with the tracking below.' }
+    return { icon: 'truck', title: t('On its way.'), body: t('has shipped. Follow it with the tracking below.') }
   }
   if (order.payment?.status === 'pending') {
-    return { icon: 'check', title: 'Thank you.', body: `is placed. ${order.payment.method ? `You pay by ${order.payment.method} — ` : ''}we confirm it by email to ${order.email}.` }
+    return {
+      icon: 'check',
+      title: t('Thank you.'),
+      body: order.payment.method
+        ? t('is placed. You pay by {method} — we confirm it by email to {email}.', { method: order.payment.method, email: order.email })
+        : t('is placed. We confirm it by email to {email}.', { email: order.email }),
+    }
   }
-  return { icon: 'check', title: 'Thank you.', body: `is confirmed. A receipt is on its way to ${order.email}.` }
+  return { icon: 'check', title: t('Thank you.'), body: t('is confirmed. A receipt is on its way to {email}.', { email: order.email }) }
 }

@@ -3,6 +3,7 @@ import { Icon } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
 import { attributes, attributeByKey, attributeGroups } from '../../data/attributes.js'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
+import { t } from '../../i18n/index.js'
 
 /**
  * Product enrichment, in three places rather than one.
@@ -29,7 +30,7 @@ export function ProductHighlights({ enrichment, limit = 6 }) {
 
   return (
     <section className="mt-7 border-t border-line pt-6">
-      <h2 className="text-[13px] font-medium">Highlights</h2>
+      <h2 className="text-[13px] font-medium">{t('Highlights')}</h2>
       <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4">
         {rows.map((row) => (
           <div key={row.key}>
@@ -160,7 +161,7 @@ export function ProductAssurances({ product, className = '' }) {
 
   return (
     <section className={`mt-6 border-t border-line pt-5 ${className}`}>
-      <h2 className="eyebrow">Comes with</h2>
+      <h2 className="eyebrow">{t('Comes with')}</h2>
       <ul className="mt-3.5 space-y-2">
         {rows.map((r, i) => (
           <li key={`${r.label}-${i}`}>
@@ -172,7 +173,7 @@ export function ProductAssurances({ product, className = '' }) {
                   type="button"
                   onClick={() => setOpen(open === i ? null : i)}
                   aria-expanded={open === i}
-                  aria-label={`What ${r.label} means`}
+                  aria-label={t('What {label} means', { label: r.label })}
                   className="shrink-0 rounded-full text-faint transition-colors hover:text-ink"
                 >
                   <Icon name="info" size={14} className={open === i ? 'text-ink' : ''} />
@@ -180,7 +181,7 @@ export function ProductAssurances({ product, className = '' }) {
               )}
             </div>
             {r.note && open === i && (
-              <p className="mt-1.5 pl-[26px] text-[12px] leading-relaxed text-muted">{r.note}</p>
+              <p className="mt-1.5 ps-[26px] text-[12px] leading-relaxed text-muted">{r.note}</p>
             )}
           </li>
         ))}
@@ -220,7 +221,7 @@ export function ProductAssurances({ product, className = '' }) {
  * pills is two lines of chrome above the content; a scrolling one is one line,
  * and the half-visible pill at the edge is what tells you to keep going.
  */
-export function DetailTabs({ title = 'All details', tabs = [], defaultOpen = true }) {
+export function DetailTabs({ title = t('All details'), tabs = [], defaultOpen = true }) {
   const usable = tabs.filter((t) => t && t.when !== false)
   const [open, setOpen] = useState(defaultOpen)
   const [tab, setTab] = useState(null)
@@ -237,7 +238,7 @@ export function DetailTabs({ title = 'All details', tabs = [], defaultOpen = tru
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          aria-label={open ? `Collapse ${title}` : `Expand ${title}`}
+          aria-label={open ? t('Collapse {title}', { title }) : t('Expand {title}', { title })}
           className="grid h-8 w-8 shrink-0 place-items-center rounded-xs border border-line text-muted transition-colors hover:border-ink hover:text-ink"
         >
           <Icon name="chevron-down" size={15} className={open ? 'rotate-180' : ''} />
@@ -361,7 +362,7 @@ function FeatureCard({ feature: f, solo }) {
           onClick={() => setExpanded((v) => !v)}
           className="mt-1 self-start text-[13px] font-medium text-accent hover:underline"
         >
-          {expanded ? 'less' : 'more'}
+          {expanded ? t('less') : t('more')}
         </button>
       )}
     </li>
@@ -373,13 +374,13 @@ function CarouselArrow({ side, hidden, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      aria-label={side === 'left' ? 'Previous' : 'Next'}
+      aria-label={side === 'left' ? t('Previous') : t('Next')}
       tabIndex={hidden ? -1 : 0}
       className={`absolute top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-line bg-page text-ink shadow-sm transition-opacity ${
-        side === 'left' ? '-left-1' : '-right-1'
+        side === 'left' ? '-start-1' : '-end-1'
       } ${hidden ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
     >
-      <Icon name={side === 'left' ? 'chevron-left' : 'chevron-right'} size={16} />
+      <Icon name={side === 'left' ? 'chevron-left' : 'chevron-right'} size={16} className="rtl:-scale-x-100" />
     </button>
   )
 }
@@ -414,7 +415,7 @@ export function SpecCarousel({ specs, specList }) {
       const byGroup = new Map()
       for (const s of specList) {
         const id = s.group || 'general'
-        const group = byGroup.get(id) || { id, label: s.groupLabel || s.group || 'General', rows: [] }
+        const group = byGroup.get(id) || { id, label: s.groupLabel || s.group || t('General'), rows: [] }
         group.rows.push({ key: s.key, label: s.label || s.key, value: s.unit ? `${s.value} ${s.unit}` : String(s.value) })
         byGroup.set(id, group)
       }
@@ -459,12 +460,12 @@ export function SpecCarousel({ specs, specList }) {
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="text-[13px] font-medium">{groups[page]?.label}</p>
           <div className="flex items-center gap-1.5">
-            <span className="mr-1 font-mono text-[11px] tabular-nums text-faint">
+            <span className="me-1 font-mono text-[11px] tabular-nums text-faint">
               {page + 1} / {groups.length}
             </span>
-            <CarouselButton label="Previous section" disabled={page === 0} onClick={() => go(page - 1)} icon="chevron-left" />
+            <CarouselButton label={t('Previous section')} disabled={page === 0} onClick={() => go(page - 1)} icon="chevron-left" />
             <CarouselButton
-              label="Next section"
+              label={t('Next section')}
               disabled={page === groups.length - 1}
               onClick={() => go(page + 1)}
               icon="chevron-right"
@@ -481,7 +482,7 @@ export function SpecCarousel({ specs, specList }) {
         {groups.map((g, i) => (
           <div
             key={g.id}
-            className="w-full shrink-0 snap-start pr-px"
+            className="w-full shrink-0 snap-start pe-px"
             /* Nothing in a slide is focusable, so hiding it from the
                accessibility tree is enough — no `inert` needed, and `inert`
                would risk swallowing the touch that starts the next swipe. */
@@ -507,7 +508,7 @@ export function SpecCarousel({ specs, specList }) {
               key={g.id}
               type="button"
               onClick={() => go(i)}
-              aria-label={`Show ${g.label}`}
+              aria-label={t('Show {label}', { label: g.label })}
               aria-current={i === page}
               className={`h-1.5 rounded-full transition-all ${
                 i === page ? 'w-5 bg-ink' : 'w-1.5 bg-line hover:bg-faint'
@@ -581,7 +582,7 @@ function Manufacturer({ info = {}, maker }) {
           India's Legal Metrology rules mandate the manufacturer and packer
           address, the country of origin and the net quantity on a listing. */}
       <p className="mt-4 text-[12px] leading-relaxed text-faint">
-        Published to meet packaged-goods disclosure rules. Contact us if anything here is unclear.
+        {t('Published to meet packaged-goods disclosure rules. Contact us if anything here is unclear.')}
       </p>
     </div>
   )

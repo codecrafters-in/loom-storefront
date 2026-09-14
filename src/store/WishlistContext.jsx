@@ -3,6 +3,7 @@ import api from '../lib/api/index.js'
 import { useToast } from './ToastContext.jsx'
 import { onExternalWrite, STORAGE_KEYS } from '../lib/crossTab.js'
 import { track } from '../lib/analytics.js'
+import { t } from '../i18n/index.js'
 
 /**
  * Saved items.
@@ -36,7 +37,7 @@ export function WishlistProvider({ children }) {
   useEffect(() => onExternalWrite(STORAGE_KEYS.wishlist, reload), [reload])
 
   const toggle = useCallback(
-    async (slug, title = 'Item') => {
+    async (slug, title = t('Item')) => {
       const saved = slugs.includes(slug)
       setSlugs((s) => (saved ? s.filter((x) => x !== slug) : [slug, ...s])) // optimistic
       try {
@@ -46,10 +47,10 @@ export function WishlistProvider({ children }) {
         // un-saving, and inventing one gives an analyst a metric nothing else
         // in their reports can be compared against.
         if (!saved) track('add_to_wishlist', { items: [{ item_id: slug, item_name: title }] })
-        push(saved ? `${title} removed from saved` : `${title} saved`)
+        push(saved ? t('{title} removed from saved', { title }) : t('{title} saved', { title }))
       } catch (err) {
         setSlugs((s) => (saved ? [slug, ...s] : s.filter((x) => x !== slug))) // roll back
-        push(err.message || 'Could not update your saved items.', { tone: 'error' })
+        push(err.message || t('Could not update your saved items.'), { tone: 'error' })
       }
     },
     [slugs, push],

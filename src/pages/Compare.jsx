@@ -9,6 +9,7 @@ import { attributeByKey, attributeGroups } from '../data/attributes.js'
 import { optionsOf } from '../lib/variants.js'
 import { COMPARE_LIMIT, toggleCompare } from '../lib/compare.js'
 import { useCompared } from '../components/product/CompareTray.jsx'
+import { t } from '../i18n/index.js'
 
 /**
  * Up to four products, side by side, a row per fact.
@@ -48,12 +49,12 @@ export default function Compare() {
 
   return (
     <>
-      <Seo title="Compare" noindex />
+      <Seo title={t('Compare')} noindex />
       <div className="wrap py-10">
-        <h1 className="text-display-lg">Compare</h1>
+        <h1 className="text-display-lg">{t('Compare')}</h1>
         {products.length > 0 && (
           <p className="mt-3 text-[15px] text-muted">
-            {products.length} of up to {COMPARE_LIMIT} products, side by side.
+            {t('{count} of up to {limit} products, side by side.', { count: products.length, limit: COMPARE_LIMIT })}
           </p>
         )}
       </div>
@@ -66,14 +67,14 @@ export default function Compare() {
         ) : !products.length ? (
           <Empty
             icon="search"
-            title="Nothing to compare yet"
-            body="Press Compare on up to four products and they line up here."
-            action={<Button to="/shop" size="lg">Browse the shop</Button>}
+            title={t('Nothing to compare yet')}
+            body={t('Press Compare on up to four products and they line up here.')}
+            action={<Button to="/shop" size="lg">{t('Browse the shop')}</Button>}
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[40rem] table-fixed border-collapse text-left text-[13px]">
-              <caption className="sr-only">The products being compared, one column each</caption>
+            <table className="w-full min-w-[40rem] table-fixed border-collapse text-start text-[13px]">
+              <caption className="sr-only">{t('The products being compared, one column each')}</caption>
               <colgroup>
                 <col className="w-36" />
                 {products.map((p) => (
@@ -98,17 +99,17 @@ export default function Compare() {
                         onClick={() => remove(p.slug)}
                         className="mt-1.5 inline-flex items-center gap-1 text-[12px] text-faint transition-colors hover:text-sale"
                       >
-                        <Icon name="close" size={12} /> Remove
+                        <Icon name="close" size={12} /> {t('Remove')}
                       </button>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                <Row label="Price" cells={products.map((p) => <Price key={p.slug} price={p.price} compareAt={p.compareAtPrice} size="sm" />)} />
-                <Row label="Brand" cells={products.map((p) => p.brand?.name || '—')} />
-                <Row label="Rating" cells={products.map((p) => (p.rating?.count ? `${p.rating.average} of 5 (${p.rating.count})` : '—'))} />
-                <Row label="Availability" cells={products.map((p) => (p.variants.some((v) => v.available) ? 'In stock' : 'Sold out'))} />
+                <Row label={t('Price')} cells={products.map((p) => <Price key={p.slug} price={p.price} compareAt={p.compareAtPrice} size="sm" />)} />
+                <Row label={t('Brand')} cells={products.map((p) => p.brand?.name || '—')} />
+                <Row label={t('Rating')} cells={products.map((p) => (p.rating?.count ? t('{average} of 5 ({count})', { average: p.rating.average, count: p.rating.count }) : '—'))} />
+                <Row label={t('Availability')} cells={products.map((p) => (p.variants.some((v) => v.available) ? t('In stock') : t('Sold out')))} />
                 {optionNames.map((name) => (
                   <Row
                     key={`option-${name}`}
@@ -118,7 +119,7 @@ export default function Compare() {
                 ))}
                 {groups.map((g) => [
                   <tr key={`group-${g.label}`}>
-                    <th colSpan={products.length + 1} scope="colgroup" className="eyebrow pb-2 pt-8 text-left font-normal">
+                    <th colSpan={products.length + 1} scope="colgroup" className="eyebrow pb-2 pt-8 text-start font-normal">
                       {g.label}
                     </th>
                   </tr>,
@@ -138,7 +139,7 @@ export default function Compare() {
 function Row({ label, cells }) {
   return (
     <tr className="border-t border-line">
-      <th scope="row" className="py-3 pr-3 align-top text-[12px] font-normal text-faint">{label}</th>
+      <th scope="row" className="py-3 pe-3 align-top text-[12px] font-normal text-faint">{label}</th>
       {cells.map((cell, i) => (
         <td key={i} className="break-words px-3 py-3 align-top">{cell}</td>
       ))}
@@ -162,14 +163,14 @@ function specRows(products) {
   for (const p of products) {
     if (p.enrichment?.specList?.length) {
       for (const s of p.enrichment.specList) {
-        add(s.group || 'general', s.groupLabel || s.group || 'General', s.key, s.label || s.key, p.slug, s.unit ? `${s.value} ${s.unit}` : String(s.value))
+        add(s.group || 'general', s.groupLabel || s.group || t('General'), s.key, s.label || s.key, p.slug, s.unit ? `${s.value} ${s.unit}` : String(s.value))
       }
       continue
     }
     for (const [key, value] of Object.entries(p.enrichment?.specs || {})) {
       const a = attributeByKey[key]
       const group = a?.group || 'general'
-      add(group, attributeGroups.find((g) => g.id === group)?.label || 'General', key, a ? `${a.label}${a.unit ? ` (${a.unit})` : ''}` : key, p.slug, String(value))
+      add(group, attributeGroups.find((g) => g.id === group)?.label || t('General'), key, a ? `${a.label}${a.unit ? ` (${a.unit})` : ''}` : key, p.slug, String(value))
     }
   }
   return { groups: [...groups.values()].map((g) => ({ label: g.label, rows: [...g.rows] })), valueOf }

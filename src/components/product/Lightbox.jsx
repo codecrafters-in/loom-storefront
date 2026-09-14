@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
 import useFocusTrap from '../../hooks/useFocusTrap.js'
+import { t } from '../../i18n/index.js'
 
 /**
  * The photograph, full screen, with zoom.
@@ -131,7 +132,7 @@ export default function Lightbox({ images = [], index = 0, onIndex, onClose }) {
       className="fixed inset-0 z-50 flex flex-col bg-ink/95"
       role="dialog"
       aria-modal="true"
-      aria-label="Product photographs"
+      aria-label={t('Product photographs')}
     >
       <div className="flex items-center justify-between gap-3 px-3 py-3 text-page sm:px-5">
         <span className="font-mono text-[11px] tabular-nums text-page/70">
@@ -141,14 +142,14 @@ export default function Lightbox({ images = [], index = 0, onIndex, onClose }) {
         <div className="flex items-center gap-1">
           {zoomable && (
             <>
-              <IconButton label="Zoom out" icon="minus" disabled={zoom <= 1} onClick={() => zoomTo(zoom - 0.5)} />
+              <IconButton label={t('Zoom out')} icon="minus" disabled={zoom <= 1} onClick={() => zoomTo(zoom - 0.5)} />
               <span className="w-12 text-center font-mono text-[11px] tabular-nums text-page/70">
                 {Math.round(zoom * 100)}%
               </span>
-              <IconButton label="Zoom in" icon="plus" disabled={zoom >= MAX_ZOOM} onClick={() => zoomTo(zoom + 0.5)} />
+              <IconButton label={t('Zoom in')} icon="plus" disabled={zoom >= MAX_ZOOM} onClick={() => zoomTo(zoom + 0.5)} />
             </>
           )}
-          <IconButton label="Close" icon="close" onClick={onClose} />
+          <IconButton label={t('Close')} icon="close" onClick={onClose} />
         </div>
       </div>
 
@@ -195,7 +196,7 @@ export default function Lightbox({ images = [], index = 0, onIndex, onClose }) {
               key={img.id || i}
               type="button"
               onClick={() => { reset(); onIndex(i) }}
-              aria-label={`Photograph ${i + 1}`}
+              aria-label={t('Photograph {index}', { index: i + 1 })}
               aria-current={i === index}
               className={`w-14 shrink-0 overflow-hidden rounded-xs ring-1 transition-opacity ${
                 i === index ? 'opacity-100 ring-page' : 'opacity-50 ring-transparent hover:opacity-90'
@@ -231,12 +232,12 @@ function Arrow({ side, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      aria-label={side === 'left' ? 'Previous photograph' : 'Next photograph'}
+      aria-label={side === 'left' ? t('Previous photograph') : t('Next photograph')}
       className={`absolute top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-page/85 text-ink transition-colors hover:bg-page ${
-        side === 'left' ? 'left-3' : 'right-3'
+        side === 'left' ? 'start-3' : 'end-3'
       }`}
     >
-      <Icon name={side === 'left' ? 'chevron-left' : 'chevron-right'} size={20} />
+      <Icon name={side === 'left' ? 'chevron-left' : 'chevron-right'} size={20} className="rtl:-scale-x-100" />
     </button>
   )
 }
