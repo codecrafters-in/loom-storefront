@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react'
-import { useLocation, useParams, useSearchParams, Link } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import api from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import { Button, Empty, ErrorState, Icon, Skeleton } from '../components/ui/index.jsx'
@@ -9,11 +9,15 @@ import { SIZES } from '../lib/images.js'
 import { formatMoney } from '../lib/money.js'
 import { config } from '../lib/config.js'
 import { useAuth } from '../store/AuthContext.jsx'
+import { useCart } from '../store/CartContext.jsx'
+import { useStorefront } from '../store/StorefrontContext.jsx'
+import { useToast } from '../store/ToastContext.jsx'
 import { nestLines } from '../lib/cart-lines.js'
 import LineDetails from '../components/cart/LineDetails.jsx'
-import { t } from '../i18n/index.js'
+import { t, mark } from '../i18n/index.js'
 
 const PayNow = lazy(() => import('../components/checkout/PayNow.jsx'))
+const ReturnWizard = lazy(() => import('../components/account/ReturnWizard.jsx'))
 
 /**
  * A download link as the backend gave it. `GET /orders/:id/downloads/:doc` is a
@@ -114,6 +118,29 @@ export default function OrderConfirmation() {
                 {t('Track parcel')}
               </Button>
             )}
+          </div>
+        )}
+
+        {order.timeline?.length > 1 && <Timeline events={order.timeline} />}
+
+        {order.invoices?.length > 0 && (
+          <div className="mt-8 rounded-xs border border-line bg-surface p-5">
+            <p className="eyebrow">{t('Invoices')}</p>
+            <ul className="mt-3 space-y-2">
+              {order.invoices.map((invoice) => (
+                <li key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 text-[14px]">
+                  <a
+                    href={downloadUrl(invoice.url)}
+                    onClick={(e) => saveDownload(e, { url: invoice.url, name: `${invoice.number.replaceAll('/', '-')}.pdf` })}
+                    className="inline-flex items-center gap-2 text-accent link-underline"
+                  >
+                    <Icon name="package" size={15} />
+                    {invoice.kind === 'credit_note' ? t('Credit note {number}', { number: invoice.number }) : t('Invoice {number}', { number: invoice.number })}
+                  </a>
+                  <span className="tabular-nums text-muted">{formatMoney(invoice.total)}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
@@ -222,6 +249,10 @@ export default function OrderConfirmation() {
           </div>
         )}
 
+        {(order.cancellation || order.canReorder || order.canReturn) && (
+          <OrderActions order={order} onChange={setFresh} />
+        )}
+
         <div className="mt-10 flex flex-wrap gap-3">
           <Button to="/shop" size="lg">{t('Keep shopping')}</Button>
           {signedIn || config.features?.accounts === false ? (
@@ -236,6 +267,121 @@ export default function OrderConfirmation() {
       </div>
       <Promises />
     </>
+  )
+}
+
+const EVENT_LABEL = {
+  placed: mark('Placed'), paid: mark('Paid'), shipped: mark('Shipped'), delivered: mark('Delivered'),
+  cancelled: mark('Cancelled'), refunded: mark('Refunded'),
+}
+
+/** What happened to the order and when, oldest first (`order.timeline`, from Odoo). */
+function Timeline({ events }) {
+  const locale = useStorefront().pricing?.locale || 'en-US'
+  const when = (iso) => new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
+  return (
+    <div className="mt-8 rounded-xs border border-line bg-surface p-5">
+      <p className="eyebrow">{t('Progress')}</p>
+      <ol className="mt-4 space-y-3 border-s border-line ps-5">
+        {events.map((event) => (
+          <li key={`${event.kind}-${event.at}`} className="relative text-[14px]">
+            <span aria-hidden="true" className="absolute -start-[25px] top-1.5 h-2 w-2 rounded-full bg-ink" />
+            <span className="text-ink">{t(EVENT_LABEL[event.kind] || event.kind)}</span>
+            <span className="text-muted"> · {when(event.at)}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
+/**
+ * Cancel (or ask to), as far as the store's policy allows, and buy the same things again. The cancellation is
+ * confirmed in place, with an optional reason, because it cannot be undone.
+ */
+function OrderActions({ order, onChange }) {
+  const { refresh } = useCart()
+  const { push } = useToast()
+  const navigate = useNavigate()
+  const [reason, setReason] = useState(null)
+  const [returning, setReturning] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const cancellation = order.cancellation
+  const asking = cancellation?.mode === 'request'
+
+  const cancel = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      onChange(await api.cancelOrder(order.id, { reason }))
+      setReason(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const buyAgain = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const cart = await api.reorder(order.id)
+      await refresh().catch(() => {})
+      for (const notice of cart.notices || []) push(notice.message)
+      navigate('/cart')
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mt-8 rounded-xs border border-line p-5">
+      {cancellation?.requestedAt ? (
+        <p className="text-[14px] text-muted">{t('You asked us to cancel this order. We will email you our answer.')}</p>
+      ) : reason !== null ? (
+        <form onSubmit={cancel} className="space-y-3">
+          <p className="text-[14px] text-ink">
+            {asking
+              ? t('We will look at your request and email you.')
+              : cancellation?.mode === 'refund'
+                ? t('The order is cancelled at once and the payment refunded the way you paid.')
+                : t('The order is cancelled at once.')}
+          </p>
+          <label htmlFor="cancel-reason" className="block text-[13px] font-medium">{t('Reason (optional)')}</label>
+          <textarea id="cancel-reason" rows={2} maxLength={500} className="field h-auto py-2" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <div className="flex flex-wrap gap-3">
+            <Button as="button" type="submit" size="sm" variant="danger" disabled={busy}>
+              {busy ? t('Just a moment…') : asking ? t('Send request') : t('Cancel order')}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setReason(null)} disabled={busy}>{t('Keep order')}</Button>
+          </div>
+        </form>
+      ) : null}
+      {error && <p className="mt-3 text-[13px] text-sale">{error}</p>}
+      {reason === null && (
+        <div className="flex flex-wrap gap-3">
+          {order.canReorder && (
+            <Button size="sm" variant="quiet" icon="refresh" onClick={buyAgain} disabled={busy}>{t('Buy again')}</Button>
+          )}
+          {order.canReturn && !returning && (
+            <Button size="sm" variant="quiet" icon="package" onClick={() => setReturning(true)} disabled={busy}>{t('Return items')}</Button>
+          )}
+          {cancellation && !cancellation.requestedAt && (
+            <Button size="sm" variant="ghost" onClick={() => setReason('')} disabled={busy}>
+              {asking ? t('Ask to cancel') : t('Cancel order')}
+            </Button>
+          )}
+        </div>
+      )}
+      {returning && (
+        <Suspense fallback={<Skeleton className="mt-4 h-40 w-full" />}>
+          <ReturnWizard order={order} onChanged={() => api.getOrder(order.id).then(onChange).catch(() => {})} />
+        </Suspense>
+      )}
+    </div>
   )
 }
 

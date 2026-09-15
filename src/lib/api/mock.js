@@ -1428,14 +1428,14 @@ export async function getPayment(paymentId) {
  * addresses and totals. On a shared laptop that is a real disclosure, and it is
  * the kind a demo backend teaches an integrator to reproduce.
  */
-export async function listOrders() {
+export async function listOrders({ page = 1, perPage = 20 } = {}) {
   await latency()
   const me = read(KEY.customer, null)
   if (!me) throw new ApiError('Sign in to see your orders.', { status: 401, code: 'unauthenticated' })
-  const items = read(KEY.orders, []).filter(
+  const all = read(KEY.orders, []).filter(
     (o) => o.email?.toLowerCase() === me.email?.toLowerCase(),
   )
-  return { items, total: items.length }
+  return { items: all.slice((page - 1) * perPage, page * perPage), total: all.length, page, perPage }
 }
 
 /**
@@ -1523,7 +1523,7 @@ export async function lookupOrder({ number, email } = {}) {
   return withDownloads(order)
 }
 
-const DEMO_CUSTOMER = {
+export const DEMO_CUSTOMER = {
   id: 'cus_demo',
   email: 'demo@loom.store',
   firstName: 'Sam',
@@ -1781,7 +1781,7 @@ export async function subscribe(email) {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email || '')) {
     throw new ApiError('That does not look like an email address.', { status: 422, code: 'invalid_email' })
   }
-  return { ok: true }
+  return { ok: true, status: 'pending' }
 }
 
 
@@ -1881,3 +1881,39 @@ export async function popularSearches() {
 export async function logSearch(q) {
   return { term: String(q || '').trim().toLowerCase(), results: 0 }
 }
+
+// The demo's account, after-purchase and community calls (mock-account.js), loaded with the first of them.
+const laterAccount = (name) => async (...args) => (await import('./mock-account.js'))[name](...args)
+export const getQuestions = laterAccount('getQuestions')
+export const askQuestion = laterAccount('askQuestion')
+export const createAlert = laterAccount('createAlert')
+export const stopAlerts = laterAccount('stopAlerts')
+export const confirmNewsletter = laterAccount('confirmNewsletter')
+export const unsubscribeNewsletter = laterAccount('unsubscribeNewsletter')
+export const createReview = laterAccount('createReview')
+export const forgotPassword = laterAccount('forgotPassword')
+export const resetPassword = laterAccount('resetPassword')
+export const signupWithToken = laterAccount('signupWithToken')
+export const verifyEmail = laterAccount('verifyEmail')
+export const resendVerification = laterAccount('resendVerification')
+export const changePassword = laterAccount('changePassword')
+export const changeEmail = laterAccount('changeEmail')
+export const confirmEmailChange = laterAccount('confirmEmailChange')
+export const exportData = laterAccount('exportData')
+export const deleteAccount = laterAccount('deleteAccount')
+export const getCompany = laterAccount('getCompany')
+export const inviteMember = laterAccount('inviteMember')
+export const updateMember = laterAccount('updateMember')
+export const removeMember = laterAccount('removeMember')
+export const requestQuote = laterAccount('requestQuote')
+export const getOrderReturns = laterAccount('getOrderReturns')
+export const listReturns = laterAccount('listReturns')
+export const createReturn = laterAccount('createReturn')
+export const cancelReturn = laterAccount('cancelReturn')
+export const cancelOrder = laterAccount('cancelOrder')
+export const reorder = laterAccount('reorder')
+export const requestLoginCode = laterAccount('requestLoginCode')
+export const startOAuth = laterAccount('startOAuth')
+export const finishOAuth = laterAccount('finishOAuth')
+export const verifyLoginCode = laterAccount('verifyLoginCode')
+export const recoverCart = laterAccount('recoverCart')

@@ -27,7 +27,7 @@ const adapter = apiMode ? http : mock
 
 const SURFACE = [
   'getStorefront', 'getBootstrap',
-  'listProducts', 'getProduct', 'getRelated', 'listCategories', 'listCollections', 'getReviews',
+  'listProducts', 'getProduct', 'getRelated', 'listCategories', 'listCollections', 'getReviews', 'createReview', 'getQuestions', 'askQuestion', 'confirmNewsletter', 'unsubscribeNewsletter', 'createAlert', 'stopAlerts',
   'getCombination', 'listBrands', 'getBrand',
   'listPages', 'getPage', 'sendContact', 'recordConsent', 'requestAccess', 'adminAccess', 'listBlogPosts', 'getBlogPost',
   'getCart', 'addToCart', 'updateCartLine', 'removeCartLine', 'applyDiscount', 'clearCart',
@@ -39,7 +39,10 @@ const SURFACE = [
   'getDeliverySlots', 'getPickupLocations', 'setPickupLocation', 'setCartPricelist', 'setCartAttribution',
   'suggestSearch', 'popularSearches', 'logSearch',
   'adminPlaceOrder', 'adminGetOrder', 'adminListOrders',
-  'login', 'register', 'logout', 'getMe', 'updateMe', 'saveAddress', 'deleteAddress', 'getCountry',
+  'login', 'register', 'logout', 'forgotPassword', 'resetPassword', 'signupWithToken', 'verifyEmail', 'resendVerification', 'recoverCart',
+  'changePassword', 'changeEmail', 'confirmEmailChange', 'exportData', 'deleteAccount', 'requestLoginCode', 'verifyLoginCode', 'startOAuth', 'finishOAuth',
+  'getCompany', 'inviteMember', 'updateMember', 'removeMember', 'requestQuote', 'cancelOrder', 'reorder',
+  'getOrderReturns', 'createReturn', 'cancelReturn', 'listReturns', 'getMe', 'updateMe', 'saveAddress', 'deleteAddress', 'getCountry',
   'getWishlist', 'addToWishlist', 'removeFromWishlist',
   'subscribe', 'getDeliveryEstimate',
   'adminListProducts', 'adminSaveProduct', 'adminDeleteProduct',
@@ -108,7 +111,12 @@ const CACHEABLE = {
 const PRICED = ['listProducts', 'getProduct', 'getRelated', 'getCombination', 'getBootstrap']
 
 const PURGES = {
-  login: PRICED, register: PRICED, logout: PRICED,
+  login: PRICED, register: PRICED, logout: PRICED, resetPassword: PRICED, signupWithToken: PRICED,
+  forgotPassword: [], verifyEmail: [], resendVerification: [], recoverCart: [],
+  changePassword: [], changeEmail: [], confirmEmailChange: [], exportData: [], requestLoginCode: [],
+  deleteAccount: PRICED, verifyLoginCode: PRICED, startOAuth: [], finishOAuth: PRICED,
+  inviteMember: [], updateMember: [], removeMember: [], requestQuote: [], cancelOrder: ['listOrders', 'getOrder'], reorder: [], createReview: ['getReviews'], askQuestion: [], confirmNewsletter: [], unsubscribeNewsletter: [], createAlert: [], stopAlerts: [],
+  createReturn: ['getOrderReturns', 'listReturns', 'getOrder'], cancelReturn: ['getOrderReturns', 'listReturns', 'getOrder'],
   addToCart: [], updateCartLine: [], removeCartLine: [], applyDiscount: [], clearCart: [],
   checkout: ['listProducts', 'getProduct', 'getCombination', 'getBootstrap'],
   // Options apply the address and delivery to the cart, so they are a write — never joined or cached.

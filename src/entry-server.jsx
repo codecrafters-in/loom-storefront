@@ -105,7 +105,7 @@ export const apiBaseUrl = isMock ? '' : config.api.baseUrl
 export const sentryDsn = config.monitoring.sentryDsn
 
 // Different for every visitor: the app's shell, rendered in their browser and never cached.
-const PRIVATE = /^\/(?:cart|checkout|order|orders|login|account|wishlist|search|compare|admin)(?:\/|$)/
+const PRIVATE = /^\/(?:cart|checkout|order|orders|login|forgot-password|reset-password|create-account|verify-email|confirm-email|newsletter|alerts|account|wishlist|search|compare|admin)(?:\/|$)/
 
 const listing = (params, extra) => ['listProducts', [listingQuery({ ...filtersFromParams(params), ...extra })]]
 

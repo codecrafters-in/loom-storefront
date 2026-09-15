@@ -606,3 +606,17 @@ test('the demo keeps one code: adding applies it, removing clears it, and the ne
   await api.clearCart()
 })
 
+
+/* ── pay on invoice (a company allowed it in Odoo) ─────────────────────── */
+
+test('pay on invoice is offered like an offline method and asks for no gateway', () => {
+  const invoice = { id: 'invoice', providerId: null, methodId: null, provider: 'invoice', code: 'invoice', flow: 'offline', name: 'Pay on invoice' }
+  const [method] = payments.visibleMethods({ methods: [invoice] }, () => false)
+  assert.equal(method.key, 'method:invoice')
+  assert.equal(payments.nextStep({ ...invoice, status: 'pending', order }), 'done', 'a confirmed order waiting for its invoice is finished')
+
+  const body = payments.paymentBody({ email: 'buyer@example.com', method })
+  assert.equal(body.payOnInvoice, true)
+  assert.equal('providerId' in body, false)
+  assert.equal('methodId' in body, false)
+})

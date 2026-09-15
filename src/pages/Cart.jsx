@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import Seo from '../components/Seo.jsx'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '../store/AuthContext.jsx'
 import { useCart } from '../store/CartContext.jsx'
 import { useToast } from '../store/ToastContext.jsx'
 import { useWishlist } from '../store/WishlistContext.jsx'
@@ -28,6 +29,18 @@ export default function Cart() {
   const [working, setWorking] = useState(false)
   const [giftCode, setGiftCode] = useState('')
   const [gift, setGift] = useState(null)
+  const [params, setParams] = useSearchParams()
+
+  // A link from the store's "you left something in your bag" email: that bag becomes this browser's bag.
+  useEffect(() => {
+    const token = params.get('recover')
+    const order = params.get('order')
+    if (isMock || !token || !order) return
+    api.recoverCart({ order, token })
+      .then(() => refresh())
+      .catch(() => push(t('This bag is no longer available.'), { tone: 'error' }))
+      .finally(() => setParams({}, { replace: true }))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Once per bag opened on this page, not on every quantity change.
   useEffect(() => {
@@ -283,6 +296,7 @@ export default function Cart() {
             {short
               ? <Button as="button" type="button" full size="lg" className="mt-6" disabled>{t('Checkout')}</Button>
               : <Button to="/checkout" full size="lg" className="mt-6">{t('Checkout')}</Button>}
+            {config.features?.quotes && <QuoteRequest cartId={cart.id} />}
             <Link to="/shop" className="mt-4 block text-center text-[13px] text-muted link-underline">
               {t('Continue shopping')}
             </Link>
@@ -323,3 +337,50 @@ function RewardChoice({ reward, disabled, onClaim }) {
   )
 }
 
+/**
+ * A business buyer's other way out of the bag: the store's sales team prices it and emails a quote, which they accept
+ * and pay from their account. Signed-in customers only (the quote needs somewhere to go).
+ */
+function QuoteRequest({ cartId }) {
+  const { signedIn } = useAuth()
+  const { refresh } = useCart()
+  const { push } = useToast()
+  const navigate = useNavigate()
+  const [note, setNote] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  if (!signedIn) {
+    return (
+      <p className="mt-4 text-center text-[13px] text-muted">
+        <Link to="/login" state={{ from: '/cart' }} className="link-underline">{t('Sign in to request a quote')}</Link>
+      </p>
+    )
+  }
+  if (note === null) {
+    return (
+      <p className="mt-4 text-center text-[13px]">
+        <button type="button" className="link-underline text-muted" onClick={() => setNote('')}>{t('Request a quote instead')}</button>
+      </p>
+    )
+  }
+  const send = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await api.requestQuote(cartId, { note })
+      await refresh().catch(() => {})
+      push(t('Quote request sent. We will email you the quote.'))
+      navigate('/account/orders')
+    } catch (err) {
+      push(err.message, { tone: 'error' })
+      setBusy(false)
+    }
+  }
+  return (
+    <form onSubmit={send} className="mt-5 space-y-3">
+      <label htmlFor="quote-note" className="block text-[13px] font-medium">{t('Anything the sales team should know? (optional)')}</label>
+      <textarea id="quote-note" rows={3} maxLength={4000} className="field h-auto py-2" value={note} onChange={(e) => setNote(e.target.value)} />
+      <Button as="button" type="submit" variant="quiet" full disabled={busy}>{busy ? t('Sending…') : t('Send quote request')}</Button>
+    </form>
+  )
+}

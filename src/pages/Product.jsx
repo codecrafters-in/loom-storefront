@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from 'react'
-import { useParams } from 'react-router-dom'
+import { useEffect, useMemo, lazy, Suspense, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import api, { peek } from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
@@ -14,6 +14,9 @@ import { remember } from '../lib/recentlyViewed.js'
 import { useAuth } from '../store/AuthContext.jsx'
 import RecentlyViewed from '../components/product/RecentlyViewed.jsx'
 import { t, plural } from '../i18n/index.js'
+
+const ReviewForm = lazy(() => import('../components/product/ReviewForm.jsx'))
+const ProductQuestions = lazy(() => import('../components/product/ProductQuestions.jsx'))
 
 export default function Product() {
   const { slug } = useParams()
@@ -31,6 +34,9 @@ export default function Product() {
     [slug, recs.strategy, recs.limit],
     { skip: recs.strategy === 'off' },
   )
+  // `?review=1`: the link in the review request email opens the form.
+  const [reviewParams] = useSearchParams()
+  const [writing, setWriting] = useState(reviewParams.get('review') === '1')
   const reviews = useAsync(() => api.getReviews(slug), [slug], {
     skip: config.features?.reviews === false,
   })
@@ -151,8 +157,17 @@ export default function Product() {
                 </ul>
               </>
             )}
+            {config.features?.reviewPolicy && !writing && (
+              <Button size="sm" variant="quiet" className="mt-6" onClick={() => setWriting(true)}>{t('Write a review')}</Button>
+            )}
           </div>
 
+          <div>
+          {writing && (
+            <Suspense fallback={<Skeleton className="mb-8 h-64 w-full" />}>
+              <ReviewForm product={product} onDone={() => reviews.reload?.()} onCancel={() => setWriting(false)} />
+            </Suspense>
+          )}
           <ul className="divide-y divide-line">
             {(reviews.data?.items || []).map((r) => (
               <li key={r.id} className="py-6 first:pt-0">
@@ -195,8 +210,15 @@ export default function Product() {
               </li>
             ))}
           </ul>
+          </div>
         </div>
       </section>
+      )}
+
+      {config.features?.questions && (
+        <Suspense fallback={null}>
+          <ProductQuestions product={product} />
+        </Suspense>
       )}
 
       {/* related */}

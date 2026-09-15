@@ -14,6 +14,8 @@ const VARIANTS = {
   outline: 'border border-ink text-ink hover:bg-ink hover:text-page',
   ghost: 'text-ink hover:bg-sunken',
   quiet: 'border border-line bg-surface text-ink hover:border-ink',
+  // Something that cannot be undone, such as closing an account.
+  danger: 'bg-sale text-page hover:bg-ink disabled:hover:bg-sale',
 }
 const SIZES = {
   sm: 'h-9 px-3.5 text-[13px]',

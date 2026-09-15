@@ -2,6 +2,28 @@
 
 Newest first. Each entry links to the page with the detail.
 
+## What's new — Phase 9: accounts, after the order, reviews and more
+
+Pages and calls for what the Odoo backend added in its Phase 9. Details: [API.md](API.md#accounts-and-sign-in).
+
+- **Password and invitation links:** `/forgot-password`, `/reset-password`, `/create-account`, `/verify-email`,
+  `/confirm-email`; a banner asks an unverified customer to confirm their email.
+- **Account › Sign-in & privacy:** change password and email, download my data, close the account.
+- **Sign in** with a text-message code (`features.phoneLogin`) or a provider (`features.socialLogin`, back at
+  `/login/oauth`); business details and newsletter consent at sign-up.
+- **Account › Company:** colleagues and their roles, for a customer with a company name.
+- **Orders:** more pages, a progress timeline, invoices, cancel or ask to cancel, buy again; returns with a step-by-step
+  form and **Account › Returns**.
+- **Checkout:** pay on invoice (a method with `code: "invoice"`), newsletter consent; **Request a quote** from the bag
+  (`features.quotes`).
+- **Product pages:** write a review (`features.reviewPolicy`, `?review=1` opens the form), questions and answers
+  (`features.questions`), **Email me when it is back** on a sold-out option (`features.stockAlerts`).
+- **Newsletter:** double opt-in with `/newsletter/confirm` and `/newsletter/unsubscribe`; alert emails stop at
+  `/alerts/unsubscribe`.
+- **Live chat:** Odoo's own chat when `features.liveChat` is set; the Content-Security-Policy allows the API's origin
+  for its script, styles, fonts and websocket.
+- Account, after-purchase and community calls load with their first use, so the first download stays within budget.
+
 ## What's new — Phase 8: monitoring and large catalogues
 
 - **Error reports to Sentry** without its SDK (`VITE_SENTRY_DSN`; `SENTRY_DSN` for the render handler): render errors,

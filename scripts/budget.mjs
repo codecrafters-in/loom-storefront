@@ -43,7 +43,9 @@ const LIVE = fs.existsSync(BUILD_INFO)
   ? JSON.parse(fs.readFileSync(BUILD_INFO, 'utf8')).dataSource === 'api'
   : (loadEnv('production', ROOT, 'VITE_').VITE_DATA_SOURCE || 'mock').toLowerCase() === 'api'
 const BUDGET = {
-  js: (LIVE ? 115 : 130) * 1024,
+  // Phase 9 (accounts, orders after purchase, returns, reviews, questions, alerts) added about 35 calls to the API
+  // surface and nine routes that every page carries; their pages, forms and calls load on use. +1.5 KB each.
+  js: (LIVE ? 116.5 : 131.5) * 1024,
   css: 12 * 1024,
 }
 

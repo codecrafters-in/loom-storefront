@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Seo from '../components/Seo.jsx'
 import RegionField from '../components/address/RegionField.jsx'
 import useAddressLayout from '../components/address/useAddressLayout.js'
@@ -14,6 +14,7 @@ import { Badge, Button, Empty, ErrorState, Icon, Skeleton } from '../components/
 import { formatMoney } from '../lib/money.js'
 import { isMock } from '../lib/config.js'
 import { t, plural, mark } from '../i18n/index.js'
+import { RETURN_STATUS, RETURN_TONE } from '../lib/returns.js'
 
 const TABS = [
   { to: '/account', end: true, label: mark('Overview'), icon: 'user' },
@@ -24,9 +25,14 @@ const TABS = [
 const PAYMENT_TAB = { to: '/account/payment-methods', label: mark('Payment methods'), icon: 'shield' }
 // Points and store credit from the backend's loyalty programs; the demo has none.
 const REWARDS_TAB = { to: '/account/rewards', label: mark('Rewards'), icon: 'award' }
+// Returns asked for from any order (live stores: the demo delivers nothing).
+const RETURNS_TAB = { to: '/account/returns', label: mark('Returns'), icon: 'refresh' }
+// A business customer (a company name on their details): colleagues and roles.
+const COMPANY_TAB = { to: '/account/company', label: mark('Company'), icon: 'building' }
+const SECURITY_TAB = { to: '/account/security', label: mark('Sign-in & privacy'), icon: 'lock' }
 
-const STATUS_TONE = { placed: 'new', paid: 'bestseller', fulfilled: 'bestseller', delivered: 'bestseller', cancelled: 'sold-out', refunded: 'sold-out' }
-const STATUS_LABEL = { placed: mark('Placed'), pending: mark('Awaiting payment'), paid: mark('Paid'), fulfilled: mark('On its way'), delivered: mark('Delivered'), cancelled: mark('Cancelled'), refunded: mark('Refunded') }
+const STATUS_TONE = { quote: 'new', placed: 'new', paid: 'bestseller', fulfilled: 'bestseller', delivered: 'bestseller', cancelled: 'sold-out', refunded: 'sold-out' }
+const STATUS_LABEL = { quote: mark('Quote requested'), placed: mark('Placed'), pending: mark('Awaiting payment'), paid: mark('Paid'), fulfilled: mark('On its way'), delivered: mark('Delivered'), cancelled: mark('Cancelled'), refunded: mark('Refunded') }
 
 const statusLabel = (status) => (STATUS_LABEL[status] && t(STATUS_LABEL[status])) || (status ? status[0].toUpperCase() + status.slice(1) : '')
 
@@ -51,7 +57,7 @@ export default function Account() {
   const { customer, loading, logout } = useAuth()
   const navigate = useNavigate()
   const checkoutMode = useStorefront().checkout?.mode
-  const tabs = [...TABS, ...(checkoutMode === 'payments' ? [PAYMENT_TAB] : []), ...(isMock ? [] : [REWARDS_TAB])]
+  const tabs = [...TABS, ...(checkoutMode === 'payments' ? [PAYMENT_TAB] : []), ...(isMock ? [] : [REWARDS_TAB, RETURNS_TAB]), ...(customer?.company && !isMock ? [COMPANY_TAB] : []), SECURITY_TAB]
 
   if (loading) return <div className="wrap py-16"><Skeleton className="h-72 w-full" /></div>
   if (!customer) return <Navigate to="/login" state={{ from: '/account' }} replace />
@@ -119,6 +125,9 @@ export default function Account() {
             <Route path="addresses" element={<Addresses />} />
             <Route path="payment-methods" element={<PaymentMethods />} />
             <Route path="rewards" element={<Rewards />} />
+            <Route path="returns" element={<Returns />} />
+            <Route path="company" element={<Company />} />
+            <Route path="security" element={<Security />} />
             <Route path="*" element={<Navigate to="/account" replace />} />
           </Routes>
         </div>
@@ -239,6 +248,7 @@ function Overview() {
 
   return (
     <div className="space-y-8">
+      {customer.emailVerified === false && <VerifyBanner email={customer.email} />}
       <section aria-labelledby="latest-order">
         <div className="flex items-center justify-between gap-3">
           <h2 id="latest-order" className="eyebrow">{t('Latest order')}</h2>
@@ -347,7 +357,7 @@ function PersonalDetails() {
             <AddressField id="co" label={t('Company (optional)')} value={form.company} onChange={set('company')} autoComplete="organization" />
             <AddressField id="vat" label={t('Tax ID (optional)')} value={form.vat} onChange={set('vat')} />
           </div>
-          <p className="text-[12px] text-faint">{t('Your email, {email}, is how you sign in, so it can’t be changed here.', { email: customer.email })}</p>
+          <p className="text-[12px] text-faint">{t('Your email, {email}, is how you sign in. Change it under Sign-in & privacy.', { email: customer.email })}</p>
           <div className="flex gap-3">
             <Button as="button" type="submit" size="sm" disabled={busy}>{busy ? t('Saving…') : t('Save')}</Button>
             <Button size="sm" variant="ghost" onClick={() => setForm(null)} disabled={busy}>{t('Cancel')}</Button>
@@ -369,11 +379,26 @@ function PersonalDetails() {
 
 function Orders() {
   const { locale } = useAccountLocale()
+  const { push } = useToast()
   const { data, error, loading, reload } = useAsync(() => api.listOrders(), [])
+  // Later pages, added under the first by "Show more orders".
+  const [more, setMore] = useState({ items: [], page: 1, busy: false })
+  const items = [...(data?.items || []), ...more.items]
+  const total = data?.total ?? items.length
+  const loadMore = async () => {
+    setMore((m) => ({ ...m, busy: true }))
+    try {
+      const next = await api.listOrders({ page: more.page + 1 })
+      setMore((m) => ({ items: [...m.items, ...next.items], page: m.page + 1, busy: false }))
+    } catch (err) {
+      push(err.message, { tone: 'error' })
+      setMore((m) => ({ ...m, busy: false }))
+    }
+  }
 
   if (loading) return <Skeleton className="h-64 w-full" />
   if (error) return <ErrorState error={error} onRetry={reload} />
-  if (!data?.items.length) {
+  if (!items.length) {
     return (
       <Empty
         icon="package"
@@ -388,13 +413,18 @@ function Orders() {
     <>
       <PageHeading
         title={t('Orders')}
-        note={plural(data.items.length, '{count} order, newest first.', '{count} orders, newest first.')}
+        note={plural(total, '{count} order, newest first.', '{count} orders, newest first.')}
       />
       <ul className="mt-6 space-y-4">
-        {data.items.map((order) => (
+        {items.map((order) => (
           <li key={order.id}><OrderCard order={order} locale={locale} /></li>
         ))}
       </ul>
+      {items.length < total && (
+        <div className="mt-6 text-center">
+          <Button variant="quiet" onClick={loadMore} disabled={more.busy}>{more.busy ? t('Just a moment…') : t('Show more orders')}</Button>
+        </div>
+      )}
     </>
   )
 }
@@ -733,3 +763,338 @@ function Rewards() {
   )
 }
 
+/** Until the address is confirmed: orders placed as a guest with it stay out of the account. */
+function VerifyBanner({ email }) {
+  const [state, setState] = useState('idle')
+  const resend = async () => {
+    setState('sending')
+    try {
+      await api.resendVerification()
+      setState('sent')
+    } catch {
+      setState('failed')
+    }
+  }
+  return (
+    <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xs border border-line bg-surface p-4">
+      <p className="text-[14px] text-muted">
+        {state === 'sent'
+          ? t('A new link is on its way to {email}.', { email })
+          : t('Please confirm {email} with the link we emailed you. Orders you placed as a guest will then show here.', { email })}
+      </p>
+      {state !== 'sent' && (
+        <Button size="sm" variant="quiet" onClick={resend} disabled={state === 'sending'}>
+          {state === 'failed' ? t('Try again') : t('Send the link again')}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+/* ── sign-in and privacy ─────────────────────────────────────────────────── */
+
+function Security() {
+  const { customer } = useAuth()
+  return (
+    <div className="space-y-6">
+      <PageHeading title={t('Sign-in & privacy')} note={t('Your password, your sign-in email, and what the store keeps about you.')} />
+      <PasswordCard />
+      <EmailCard email={customer.email} />
+      <DataCard />
+      <CloseAccountCard />
+    </div>
+  )
+}
+
+/** A form that opens in place: `fields` start empty, `run` sends them, `done` follows a success. */
+function useInlineForm(fields, run, done) {
+  const [form, setForm] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const open = () => { setForm(fields); setError(null) }
+  const close = () => setForm(null)
+  const set = (k) => (e) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
+    setForm((f) => ({ ...f, [k]: value }))
+  }
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await run(form)
+      setForm(null)
+      done?.(res)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return { form, busy, error, open, close, set, submit }
+}
+
+function FormButtons({ busy, onCancel, label, tone }) {
+  return (
+    <div className="flex gap-3">
+      <Button as="button" type="submit" size="sm" variant={tone} disabled={busy}>{busy ? t('Saving…') : label}</Button>
+      <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>{t('Cancel')}</Button>
+    </div>
+  )
+}
+
+function PasswordCard() {
+  const { push } = useToast()
+  const f = useInlineForm({ current: '', password: '' }, api.changePassword, () => push(t('Password changed. Other devices are signed out.')))
+  return (
+    <Card title={t('Password')} action={!f.form && <TextAction onClick={f.open}>{t('Change')}</TextAction>}>
+      {f.form ? (
+        <form onSubmit={f.submit} className="space-y-4">
+          <AddressField id="pw-current" label={t('Current password')} type="password" required value={f.form.current} onChange={f.set('current')} autoComplete="current-password" autoFocus />
+          <AddressField id="pw-new" label={t('New password')} type="password" required minLength={8} value={f.form.password} onChange={f.set('password')} autoComplete="new-password" />
+          <p className="text-[12px] text-faint">{t('At least {count} characters.', { count: 8 })}</p>
+          {f.error && <p className="text-[13px] text-sale">{f.error}</p>}
+          <FormButtons busy={f.busy} onCancel={f.close} label={t('Change password')} />
+        </form>
+      ) : (
+        <p className="text-[14px] text-muted">{t('Changing it signs you out on every other device.')}</p>
+      )}
+    </Card>
+  )
+}
+
+function EmailCard({ email }) {
+  const [pending, setPending] = useState('')
+  const f = useInlineForm({ email: '', password: '' }, api.changeEmail, (res) => setPending(res.sent === false ? '' : res.pendingEmail))
+  return (
+    <Card title={t('Sign-in email')} action={!f.form && <TextAction onClick={f.open}>{t('Change')}</TextAction>}>
+      {f.form ? (
+        <form onSubmit={f.submit} className="space-y-4">
+          <AddressField id="em-new" label={t('New email')} type="email" required value={f.form.email} onChange={f.set('email')} autoComplete="email" autoFocus />
+          <AddressField id="em-password" label={t('Your password')} type="password" required value={f.form.password} onChange={f.set('password')} autoComplete="current-password" />
+          {f.error && <p className="text-[13px] text-sale">{f.error}</p>}
+          <FormButtons busy={f.busy} onCancel={f.close} label={t('Send a confirmation link')} />
+        </form>
+      ) : (
+        <div className="space-y-2 text-[14px]">
+          <p className="text-ink">{email}</p>
+          {pending && (
+            <p role="status" className="text-muted">
+              {t('We sent a link to {email}. Your sign-in email changes when you open it.', { email: pending })}
+            </p>
+          )}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function DataCard() {
+  const [state, setState] = useState('idle')
+  const download = async () => {
+    setState('busy')
+    try {
+      const blob = await api.exportData()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'my-data.json'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setState('idle')
+    } catch {
+      setState('failed')
+    }
+  }
+  return (
+    <Card title={t('Your data')}>
+      <p className="text-[14px] text-muted">{t('Download your profile, addresses, orders and saved items as a file.')}</p>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Button size="sm" variant="quiet" onClick={download} disabled={state === 'busy'}>
+          {state === 'busy' ? t('Preparing…') : t('Download my data')}
+        </Button>
+        {state === 'failed' && <p className="text-[13px] text-sale">{t('The download did not work. Please try again.')}</p>}
+      </div>
+    </Card>
+  )
+}
+
+function CloseAccountCard() {
+  const { deleteAccount } = useAuth()
+  const { push } = useToast()
+  const navigate = useNavigate()
+  const f = useInlineForm({ password: '', stopEmails: true }, deleteAccount, () => {
+    push(t('Your account is closed.'))
+    navigate('/', { replace: true })
+  })
+  return (
+    <Card title={t('Close your account')} action={!f.form && <TextAction tone="danger" onClick={f.open}>{t('Close account')}</TextAction>}>
+      {f.form ? (
+        <form onSubmit={f.submit} className="space-y-4">
+          <p className="text-[14px] text-muted">
+            {t('You will be signed out and will not be able to sign in again. The store keeps your orders and invoices, as the law requires.')}
+          </p>
+          <AddressField id="close-password" label={t('Your password')} type="password" required value={f.form.password} onChange={f.set('password')} autoComplete="current-password" autoFocus />
+          <label className="flex items-center gap-2.5 text-[14px]">
+            <input type="checkbox" checked={f.form.stopEmails} onChange={f.set('stopEmails')} />
+            {t('Also stop all marketing emails to this address')}
+          </label>
+          {f.error && <p className="text-[13px] text-sale">{f.error}</p>}
+          <FormButtons busy={f.busy} onCancel={f.close} label={t('Close my account')} tone="danger" />
+        </form>
+      ) : (
+        <p className="text-[14px] text-muted">{t('Your saved addresses, saved items and sign-in are removed.')}</p>
+      )}
+    </Card>
+  )
+}
+
+/* ── company ─────────────────────────────────────────────────────────────── */
+
+const ROLE_LABEL = { admin: mark('Administrator'), buyer: mark('Buyer') }
+
+function Company() {
+  const { push } = useToast()
+  const [company, setCompany] = useState(null)
+  const [failed, setFailed] = useState(false)
+  const invite = useInlineForm({ email: '', name: '', role: 'buyer' }, api.inviteMember, (next) => {
+    setCompany(next)
+    push(t('Invitation sent'))
+  })
+
+  useEffect(() => {
+    let alive = true
+    api.getCompany().then((next) => alive && setCompany(next)).catch(() => alive && setFailed(true))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const act = async (run) => {
+    try {
+      setCompany(await run())
+    } catch (err) {
+      push(err.message, { tone: 'error' })
+    }
+  }
+
+  if (failed) return <p className="text-[14px] text-sale">{t('Your company could not be loaded. Please try again.')}</p>
+  if (!company) return <Skeleton className="h-48 w-full" />
+  const name = company.company?.name || ''
+
+  return (
+    <div className="space-y-6">
+      <PageHeading title={t('Company')} note={name || t('Invite colleagues to order for your company.')} />
+      {!company.canManage ? (
+        <Card title={t('Your role')}>
+          <p className="text-[14px] text-muted">{t('You order for {company}. An administrator manages who else can.', { company: name })}</p>
+        </Card>
+      ) : (
+        <Card title={t('People')} action={!invite.form && <TextAction onClick={invite.open}>{t('Invite someone')}</TextAction>}>
+          {invite.form && (
+            <form onSubmit={invite.submit} className="mb-6 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <AddressField id="invite-name" label={t('Name')} value={invite.form.name} onChange={invite.set('name')} autoFocus />
+                <AddressField id="invite-email" label={t('Email')} type="email" required value={invite.form.email} onChange={invite.set('email')} />
+              </div>
+              <div>
+                <label htmlFor="invite-role" className="mb-1.5 block text-[13px] font-medium">{t('Role')}</label>
+                <select id="invite-role" className="field" value={invite.form.role} onChange={invite.set('role')}>
+                  <option value="buyer">{t('Buyer')}</option>
+                  <option value="admin">{t('Administrator')}</option>
+                </select>
+              </div>
+              {invite.error && <p className="text-[13px] text-sale">{invite.error}</p>}
+              <FormButtons busy={invite.busy} onCancel={invite.close} label={t('Send invitation')} />
+            </form>
+          )}
+          {company.members.length ? (
+            <ul className="divide-y divide-line">
+              {company.members.map((member) => (
+                <li key={member.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-[14px] text-ink">
+                      {member.name}
+                      {member.you && <span className="text-muted"> · {t('you')}</span>}
+                    </p>
+                    <p className="truncate text-[13px] text-muted">{member.email}</p>
+                  </div>
+                  {member.you ? (
+                    <span className="text-[13px] text-muted">{t(ROLE_LABEL[member.role])}</span>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <label htmlFor={`role-${member.id}`} className="sr-only">{t('Role')}</label>
+                      <select
+                        id={`role-${member.id}`}
+                        className="field h-9 py-0 text-[13px]"
+                        value={member.role}
+                        onChange={(e) => act(() => api.updateMember(member.id, { role: e.target.value }))}
+                      >
+                        <option value="buyer">{t('Buyer')}</option>
+                        <option value="admin">{t('Administrator')}</option>
+                      </select>
+                      <TextAction
+                        tone="danger"
+                        onClick={() => window.confirm(t('Remove {name}? They will no longer be able to sign in.', { name: member.name })) && act(() => api.removeMember(member.id))}
+                      >
+                        {t('Remove')}
+                      </TextAction>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[14px] text-muted">{t('Invite a colleague and {company} becomes a company account, with you as its administrator.', { company: name || t('your company') })}</p>
+          )}
+          <p className="mt-4 text-[12px] text-faint">{t('Administrators invite people and see every order of the company. Buyers see their own orders.')}</p>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+/* ── returns ─────────────────────────────────────────────────────────────── */
+
+function Returns() {
+  const { locale } = useAccountLocale()
+  const { data, error, loading, reload } = useAsync(() => api.listReturns(), [])
+
+  if (loading) return <Skeleton className="h-48 w-full" />
+  if (error) return <ErrorState error={error} onRetry={reload} />
+  if (!data?.items.length) {
+    return (
+      <Empty
+        icon="refresh"
+        title={t('No returns')}
+        body={t('To return something, open the order and choose Return items.')}
+        action={<Button to="/account/orders">{t('Your orders')}</Button>}
+      />
+    )
+  }
+  return (
+    <>
+      <PageHeading title={t('Returns')} note={plural(data.total, '{count} return, newest first.', '{count} returns, newest first.')} />
+      <ul className="mt-6 space-y-4">
+        {data.items.map((item) => (
+          <li key={item.id} className="rounded-xs border border-line bg-surface p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[15px] font-medium">{t('Return {number}', { number: item.number })}</p>
+                <p className="mt-1 text-[12px] text-faint">
+                  {formatDate(item.createdAt, locale)} · <Link to={`/order/${item.orderId}`} className="link-underline">{t('Order {number}', { number: item.orderNumber })}</Link>
+                </p>
+              </div>
+              <Badge kind={RETURN_TONE[item.status] || 'new'}>{t(RETURN_STATUS[item.status] || item.status)}</Badge>
+            </div>
+            <p className="mt-3 text-[14px] text-muted">{item.lines.map((line) => `${line.quantity} × ${line.title}`).join(', ')}</p>
+            {item.instructions && <p className="mt-3 whitespace-pre-line text-[14px] text-ink">{item.instructions}</p>}
+            {item.rejectReason && <p className="mt-3 text-[14px] text-muted">{item.rejectReason}</p>}
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}

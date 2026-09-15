@@ -279,6 +279,7 @@ export async function getReviews(slug, { page = 1, perPage = 5 } = {}) {
   return res
 }
 
+
 /* ── cart ──────────────────────────────────────────────────────────────── */
 
 const CART_KEY = 'loom.cart_id'
@@ -476,7 +477,9 @@ export async function checkout({ email, shippingAddress, shippingMethod = 'stand
   return order
 }
 
-export const listOrders = () => get('/orders').then((r) => assertList(r, 'GET /orders'))
+/** A page of the customer's orders, newest first: `{items, total, page, perPage}`. */
+export const listOrders = ({ page = 1, perPage } = {}) =>
+  get('/orders', perPage ? { page, per_page: perPage } : { page }).then((r) => assertList(r, 'GET /orders'))
 export const getOrder = (orderId) => get(`/orders/${encodeURIComponent(orderId)}`)
 
 /* ── on-site payments (checkout.mode "payments") ───────────────────────── */
@@ -500,6 +503,9 @@ const checkoutFields = (body = {}) => ({
   accept_terms: body.acceptTerms,
   // One of `getDeliverySlots`, when the delivery method offers slots.
   delivery_slot: body.deliverySlot,
+  // Ticked "email me news and offers": a newsletter subscription waiting for its confirmation email.
+  newsletter: body.newsletter || undefined,
+  newsletter_consent: body.newsletter ? body.newsletterConsent : undefined,
 })
 
 function assertPayment(payment, where) {
@@ -533,6 +539,8 @@ export async function createPayment(cartIdArg, body = {}) {
     provider_id: body.providerId,
     method_id: body.methodId,
     token_id: body.tokenId,
+    // A company allowed to pay on invoice: the order is confirmed without a payment (method `code: invoice`).
+    pay_on_invoice: body.payOnInvoice || undefined,
     save_method: Boolean(body.saveMethod),
     success_url: body.successUrl,
     cancel_url: body.cancelUrl,
@@ -662,6 +670,46 @@ async function mergeGuestWishlist(res) {
 
 export const login = (body) => post('/auth/login', body).then(storeSession).then(mergeGuestWishlist)
 export const register = (body) => post('/auth/register', body).then(storeSession).then(mergeGuestWishlist)
+
+/*
+ * Account, after-purchase and community calls load with their first use (http-account.js): a shopper who is only
+ * browsing never needs them, and they would otherwise add to every page's first download.
+ */
+const later = (name) => async (...args) => (await import('./http-account.js'))[name](...args)
+export const getQuestions = later('getQuestions')
+export const askQuestion = later('askQuestion')
+export const createAlert = later('createAlert')
+export const stopAlerts = later('stopAlerts')
+export const confirmNewsletter = later('confirmNewsletter')
+export const unsubscribeNewsletter = later('unsubscribeNewsletter')
+export const createReview = later('createReview')
+export const getOrderReturns = later('getOrderReturns')
+export const createReturn = later('createReturn')
+export const cancelReturn = later('cancelReturn')
+export const listReturns = later('listReturns')
+export const cancelOrder = later('cancelOrder')
+export const reorder = later('reorder')
+export const forgotPassword = later('forgotPassword')
+export const resetPassword = later('resetPassword')
+export const signupWithToken = later('signupWithToken')
+export const verifyEmail = later('verifyEmail')
+export const resendVerification = later('resendVerification')
+export const changePassword = later('changePassword')
+export const changeEmail = later('changeEmail')
+export const confirmEmailChange = later('confirmEmailChange')
+export const exportData = later('exportData')
+export const deleteAccount = later('deleteAccount')
+export const getCompany = later('getCompany')
+export const inviteMember = later('inviteMember')
+export const updateMember = later('updateMember')
+export const removeMember = later('removeMember')
+export const requestQuote = later('requestQuote')
+export const requestLoginCode = later('requestLoginCode')
+export const startOAuth = later('startOAuth')
+export const finishOAuth = later('finishOAuth')
+export const verifyLoginCode = later('verifyLoginCode')
+export const recoverCart = later('recoverCart')
+
 export async function logout() {
   try {
     await post('/auth/logout', {})
@@ -762,8 +810,12 @@ export const removeFromWishlist = (slug) =>
  * the settings document). Login, register and order lookup take it the same
  * way, inside the body the page passes in.
  */
-export const subscribe = (email, { captchaToken } = {}) =>
-  post('/newsletter', captchaToken ? { email, captchaToken } : { email })
+/**
+ * Double opt-in: `{status: 'pending'}` while the confirmation email is on its way, `'confirmed'` when the address was
+ * already subscribed. `consent` is the wording the visitor agreed to, kept with the subscription.
+ */
+export const subscribe = (email, { captchaToken, source, consent } = {}) =>
+  post('/newsletter', { email, ...(captchaToken ? { captchaToken } : {}), ...(source ? { source } : {}), ...(consent ? { consent } : {}) })
 
 /** Optional. If the endpoint 404s the caller falls back to the shipping copy. */
 export const getDeliveryEstimate = ({ method = 'standard', country = 'US' } = {}) =>
@@ -917,3 +969,6 @@ export const adminListDiscounts = () => get('/admin/discounts').then((r) => asse
 export const adminSaveDiscount = (body) => post('/admin/discounts', body)
 export const adminDeleteDiscount = (code) => del(`/admin/discounts/${encodeURIComponent(code)}`)
 export const adminReset = () => post('/admin/reset', {})
+
+// For http-account.js, which shares this adapter's session, bag and request helpers.
+export { get, post, request, send, customerToken, storeSession, mergeGuestWishlist, SESSION_KEY, CART_KEY, FRESH_CART_KEY }

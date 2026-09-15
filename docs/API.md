@@ -1313,7 +1313,7 @@ See [CHECKOUT.md](CHECKOUT.md) for the flows and how to add a gateway driver.
 
 | Method | Route | Returns |
 | --- | --- | --- |
-| `GET` | `/orders` | `{ items: Order[], total }` |
+| `GET` | `/orders?page=&per_page=` | `{ items: Order[], total, page, perPage }` (`listOrders({ page })`) |
 | `GET` | `/orders/:id` | `Order` |
 | `POST` | `/auth/login` | `{ token, customer }` |
 | `POST` | `/auth/register` | `{ token, customer }` |
@@ -1385,7 +1385,7 @@ its code the next time the form opens. The demo adapter answers from
 }
 ```
 
-`status` — `placed` `paid` `fulfilled` `delivered` `cancelled` `refunded`.
+`status` — `quote` `placed` `paid` `fulfilled` `delivered` `cancelled` `refunded` (`quote`: a quote request not yet confirmed).
 
 `amountDue` is what is left to pay, and `canPay` says the order page may offer
 **Pay now** for it (never for cash on delivery, which is paid at the door).
@@ -1406,6 +1406,63 @@ owner, or to the holder of the order link, and answers `404` before payment.
 payment in their own vocabulary.
 
 ---
+
+## Accounts and sign-in
+
+Everything a customer does with their account beyond signing in. The adapter functions (in `src/lib/api/http-account.js`,
+loaded with the first of them) are named in brackets; the backend's detail is the Odoo addon's `docs/API_REFERENCE.md`.
+
+| Method | Route | Returns |
+| --- | --- | --- |
+| `POST` | `/auth/password/forgot` `{ email }` | `{ ok }` — the same whether or not the email has an account (`forgotPassword`) |
+| `POST` | `/auth/password/reset` `{ token, password }` | `{ token, customer }` — from `/reset-password?token=` (`resetPassword`) |
+| `POST` | `/auth/signup` `{ token, password }` | `{ token, customer }` — from an invitation, `/create-account?token=` (`signupWithToken`) |
+| `POST` | `/auth/verify` `{ token }` · `/me/verify/resend` | `{ ok }` — `/verify-email?token=`; the Customer carries `emailVerified` (`verifyEmail`, `resendVerification`) |
+| `POST` | `/me/password` `{ current, password }` | `{ ok }` — other sessions end (`changePassword`) |
+| `POST` | `/me/email` `{ email, password }` | `{ ok, pendingEmail }`; `/confirm-email?token=` calls `POST /auth/email/confirm` (`changeEmail`, `confirmEmailChange`) |
+| `GET` | `/me/export` | A JSON file of what the store keeps about the customer (`exportData` → Blob) |
+| `POST` | `/me/delete` `{ password, stopEmails }` | `{ ok }` — the account is closed and this browser signed out (`deleteAccount`) |
+| `POST` | `/auth/otp/request` `{ phone }` · `/auth/otp/verify` `{ phone, code }` | `{ ok }` · `{ token, customer }` when `features.phoneLogin` (`requestLoginCode`, `verifyLoginCode`) |
+| `POST` | `/auth/oauth/start` `{ provider }` · `/auth/oauth` `{ state, accessToken }` | `{ url, state }` · `{ token, customer }` for `features.socialLogin: [{ id, name, label }]`; the provider returns to `/login/oauth` (`startOAuth`, `finishOAuth`) |
+| `GET` | `/me/company` | `{ company, role, canManage, members }` (`getCompany`); `POST /me/company/members`, `PATCH`/`DELETE /me/company/members/:id` (`inviteMember`, `updateMember`, `removeMember`) |
+| `POST` | `/carts/recover` `{ order, token }` | The bag from the abandoned-cart email, `/cart?recover=…&order=…` (`recoverCart`) |
+| `POST` | `/carts/:id/quote` `{ note }` | `{ orderId, number }` when `features.quotes` (`requestQuote`) |
+
+`POST /auth/register` also takes `company`, `vat` and `newsletter` with `newsletterConsent`. The sign-in page offers a
+text-message code and provider buttons when the store has them.
+
+## After the order
+
+| Method | Route | Returns |
+| --- | --- | --- |
+| `GET` | `/orders/:id/invoices/:invoiceId` | The invoice PDF — `order.invoices: [{ id, number, kind, date, total, paymentState, url }]`, saved with `downloadFile` |
+| `POST` | `/orders/:id/cancel` `{ reason }` | `Order` — `order.cancellation: { mode: cancel, refund or request, requestedAt }` says what the button does (`cancelOrder`) |
+| `POST` | `/orders/:id/reorder` `{ cart_id }` | `Cart` with `notices` — the order's items in the bag (`reorder`) |
+| `GET` | `/orders/:id/returns` | `{ options: { days, until, methods, reasons, lines }, items: Return[] }` (`getOrderReturns`) |
+| `POST` | `/orders/:id/returns` `{ method, note, lines: [{ lineId, quantity, reasonId, comment }], photos }` | `Return` (`createReturn`); `POST /orders/:id/returns/:returnId/cancel` (`cancelReturn`) |
+| `GET` | `/returns` | `{ items: Return[], total }` — **Account › Returns** (`listReturns`) |
+
+The Order adds `timeline: [{ kind, at }]` (placed, paid, shipped, delivered, refunded, cancelled), `invoices`,
+`cancellation`, `canReorder` and `canReturn`. A Return is `{ id, number, status, method, createdAt, orderId,
+orderNumber, lines, instructions, rejectReason, value, canCancel }`; `status` is `requested`, `approved`, `received`,
+`refunded`, `exchanged`, `credited`, `rejected` or `cancelled`.
+
+A company allowed to pay on invoice gets a payment method with `code: "invoice"` and `flow: "offline"`; choosing it
+sends `payOnInvoice: true` with `createPayment` and the order is placed without a gateway.
+
+## Reviews, questions and alerts
+
+| Method | Route | Returns |
+| --- | --- | --- |
+| `POST` | `/products/:slug/reviews` `{ rating, title, body, size, height, fit, photos, name, email }` | `{ id, status: approved or pending }` — who may write one is `features.reviewPolicy` (`createReview`); `?review=1` on a product page opens the form |
+| `GET` | `/products/:slug/questions` | `{ items: [{ id, question, answer, author, askedAt, answeredAt }], total }` when `features.questions` (`getQuestions`) |
+| `POST` | `/products/:slug/questions` `{ question, name, email }` | `{ id, status: pending }` (`askQuestion`) |
+| `POST` | `/products/:slug/alerts` `{ variantId, kind: stock or price, email }` | `{ ok, status: waiting }` — **Email me when it is back** on a sold-out option, when `features.stockAlerts` (`createAlert`) |
+| `POST` | `/alerts/unsubscribe` `{ token }` | `{ ok }` — from `/alerts/unsubscribe?token=` (`stopAlerts`) |
+
+Photos are `[{ name, data }]`, `data` a data URL; up to three, 5 MB each. `review`, `question` and `alert` are captcha
+actions. `features.liveChat: { provider: 'odoo', origin, loaderUrl }` loads Odoo's live chat once the page is idle
+(and only with analytics consent when the store asks for consent).
 
 ## Pages, contact, consent, access and blog
 
@@ -1452,9 +1509,14 @@ fails keeps them for the next sign-in.
 
 ## Newsletter
 
-`POST /newsletter` with `{ email }` → `{ ok: true }`, plus `captchaToken` in the
-body when [captcha](#captcha) is on for `newsletter`. Return
-`422 invalid_email` for a malformed address.
+`POST /newsletter` with `{ email, source, consent }` → `{ ok: true, status }`, plus `captchaToken` in the body when
+[captcha](#captcha) is on for `newsletter`. `422 invalid_email` for a malformed address.
+
+Subscriptions are double opt-in: `status` is `pending` while the confirmation email is on its way (the footer says to
+check the inbox) and `confirmed` when the address was already subscribed. `consent` is the wording the visitor agreed
+to; `source` is `footer`, `register` or `checkout` (sign-up and checkout send `newsletter: true` with the wording).
+The email's links open `/newsletter/confirm?token=` and `/newsletter/unsubscribe?token=`, which call
+`POST /newsletter/confirm` and `POST /newsletter/unsubscribe` with `{ token }`.
 
 ---
 

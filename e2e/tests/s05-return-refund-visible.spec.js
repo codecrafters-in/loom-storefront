@@ -1,45 +1,49 @@
 /**
- * S-5 — A customer asks to return an order, the merchant refunds it in Odoo,
+ * S-5 — A customer returns a delivered order, the merchant refunds it in Odoo,
  * and the customer can see the refund.
  *
- * Checklist: H9 K6 G9. Gap report §6: ❌ — no returns, no refund status (both
- * listed under §4 P1, without a number).
+ * Checklist: H9 K6 G9. Gap report §6: ✅ since Phase 9 — returns with reasons from
+ * the order page, handled in Storefront › Returns, and the refund on the order's
+ * progress and in the returns list.
  */
-import { test, expect, gaps } from '../support/fixtures.js'
+import { test, expect } from '../support/fixtures.js'
 import { uniqueEmail } from '../support/env.js'
 
-test.fail(
-  'S-5 customer requests a return, merchant refunds in Odoo, customer sees the refund',
-  gaps('@S-5', 'P1 §4: no return / RMA request for customers (H9, K6)', 'P1 §4: refund status never shown to the customer (G9)'),
+test(
+  'S-5 customer returns a delivered order, merchant refunds it in Odoo, customer sees the refund',
+  { tag: '@S-5' },
   async ({ page, shop, store, odoo }) => {
     const { email, password, token } = await store.register({ email: uniqueEmail('s5-return') })
     const variant = await store.variant('e2e-merino-crew', { Color: 'Red', Size: 'M' })
     const { order } = await store.placeOrder({ token, email, lines: [{ variantId: variant.id }] })
+    const saleOrder = await odoo.orderByNumber(order.number)
+    await odoo.deliverOrder(saleOrder.id)
 
     await shop.login(email, password)
     await page.goto(`/order/${order.id}`)
     await expect(page.getByText(order.number).first()).toBeVisible()
 
     // 1. The customer asks to send it back.
-    await page
-      .getByRole('button', { name: /request (a )?return|return (items|this order)|start a return/i })
-      .or(page.getByRole('link', { name: /request (a )?return|return (items|this order)|start a return/i }))
-      .first()
-      .click()
-    await page.getByLabel(/reason/i).fill('Too small')
-    await page.getByRole('button', { name: /submit|send|request/i }).click()
-    await expect(page.getByText(/return request(ed)?|we have your return/i).first()).toBeVisible()
+    await page.getByRole('button', { name: 'Return items' }).click()
+    await page.getByRole('checkbox', { name: /Merino/ }).check()
+    await page.getByLabel('Reason', { exact: true }).selectOption({ label: 'Too small' })
+    await page.getByRole('radio', { name: 'Refund to the way I paid' }).check()
+    await page.getByRole('button', { name: 'Send return request' }).click()
+    await expect(page.getByText(/Return RET-\d+ sent/)).toBeVisible()
 
-    // 2. The merchant refunds it in Odoo: invoice, then a credit note for all of it.
-    const saleOrder = await odoo.orderByNumber(order.number)
-    const [invoice] = await odoo.invoiceOrder(saleOrder.id)
-    const refunds = await odoo.refundInvoice(invoice.id)
-    expect(refunds).toHaveLength(1)
+    // 2. The merchant approves it, receives the parcel and refunds it (Storefront › Returns in Odoo).
+    const [request] = await odoo.searchRead('loom.return.request', [['order_id', '=', saleOrder.id]], ['id', 'state'])
+    expect(request.state).toBe('requested')
+    for (const step of ['action_approve', 'action_receive', 'action_refund']) {
+      await odoo.call('loom.return.request', step, [[request.id]])
+    }
 
-    // 3. The customer sees it, on the order page and in the API behind it.
+    // 3. The customer sees it: on the order page, in the API behind it, and under Account › Returns.
     await page.reload()
-    await expect(page.getByText(/refund(ed)?/i).first()).toBeVisible()
+    await expect(page.getByText('Refunded').first()).toBeVisible()
     const refreshed = await store.ok('GET', `/orders/${order.id}`, { token })
-    expect(JSON.stringify(refreshed)).toMatch(/refund/i)
+    expect(refreshed.refundedTotal.amount).toBeGreaterThan(0)
+    await page.goto('/account/returns')
+    await expect(page.getByText('Refunded').first()).toBeVisible()
   },
 )

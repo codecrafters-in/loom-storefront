@@ -35,6 +35,12 @@ const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation.jsx'))
 const OrderLookup = lazy(() => import('./pages/OrderLookup.jsx'))
 const Account = lazy(() => import('./pages/Account.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword.jsx'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword.jsx'))
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail.jsx'))
+const ConfirmEmail = lazy(() => import('./pages/ConfirmEmail.jsx'))
+const OAuthReturn = lazy(() => import('./pages/OAuthReturn.jsx'))
+const TokenLink = lazy(() => import('./pages/TokenLink.jsx'))
 const Search = lazy(() => import('./pages/Search.jsx'))
 const Compare = lazy(() => import('./pages/Compare.jsx'))
 const Brands = lazy(() => import('./pages/Brands.jsx'))
@@ -105,6 +111,16 @@ export default function App() {
                   <Route path="order/:id" element={<OrderConfirmation />} />
                   <Route path="orders/lookup" element={<OrderLookup />} />
                   <Route path="login" element={<Login />} />
+                  {/* Where a sign-in provider (Google and others, from Odoo's OAuth app) sends the shopper back. */}
+                  <Route path="login/oauth" element={<OAuthReturn />} />
+                  <Route path="forgot-password" element={<ForgotPassword />} />
+                  <Route path="reset-password" element={<ResetPassword />} />
+                  <Route path="create-account" element={<ResetPassword invitation />} />
+                  <Route path="verify-email" element={<VerifyEmail />} />
+                  <Route path="confirm-email" element={<ConfirmEmail />} />
+                  <Route path="newsletter/confirm" element={<TokenLink kind="newsletterConfirm" />} />
+                  <Route path="newsletter/unsubscribe" element={<TokenLink kind="newsletterUnsubscribe" />} />
+                  <Route path="alerts/unsubscribe" element={<TokenLink kind="alertsStop" />} />
                   <Route path="account/*" element={<Account />} />
                   <Route path="pages/:slug" element={<StaticPage />} />
                   <Route path="blog" element={<Blog />} />

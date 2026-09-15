@@ -68,7 +68,7 @@ export default function Checkout() {
   const [billing, setBilling] = useState({ name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country: fallbackCountry })
   const [business, setBusiness] = useState({ on: Boolean(customer?.company || customer?.vat), company: customer?.company || '', vat: customer?.vat || '' })
   // Delivery instructions, a gift message and wrapping, and the terms box, as far as the store's settings offer them.
-  const [extras, setExtras] = useState({ note: '', giftMessage: '', giftWrap: false, acceptTerms: false })
+  const [extras, setExtras] = useState({ note: '', giftMessage: '', giftWrap: false, acceptTerms: false, newsletter: false })
   const setExtra = (key) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
     setExtras((x) => ({ ...x, [key]: value }))
@@ -82,6 +82,7 @@ export default function Checkout() {
     ...(extras.giftMessage.trim() ? { giftMessage: extras.giftMessage.trim() } : {}),
     ...(extras.giftWrap ? { giftWrap: true } : {}),
     ...(extras.acceptTerms ? { acceptTerms: true } : {}),
+    ...(extras.newsletter ? { newsletter: true, newsletterConsent: t('Email me news and offers') } : {}),
     ...(chosenShipping?.slots && deliverySlot ? { deliverySlot } : {}),
   })
 
@@ -660,6 +661,13 @@ export default function Checkout() {
               </div>
             )}
           </Section>
+        )}
+
+        {config.features?.newsletter !== false && !isMock && (
+          <label className="mt-6 flex items-center gap-2.5 text-[13px] text-muted">
+            <input type="checkbox" checked={extras.newsletter} onChange={setExtra('newsletter')} className="h-4 w-4 accent-[rgb(var(--accent))]" />
+            {t('Email me news and offers')}
+          </label>
         )}
 
         {payments && stage === 'payment' && (

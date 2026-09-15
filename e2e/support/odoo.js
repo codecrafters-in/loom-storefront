@@ -134,6 +134,44 @@ export class Odoo {
     return refundIds
   }
 
+  /**
+   * Inventory > Delivery > Validate for every open delivery of the order, then **Mark as delivered**: what a
+   * merchant does when the parcel has arrived. Returns need a delivered order.
+   */
+  async deliverOrder(orderId) {
+    const pickings = await this.searchRead('stock.picking', [
+      ['sale_id', '=', orderId], ['picking_type_code', '=', 'outgoing'], ['state', 'not in', ['done', 'cancel']],
+    ], ['id', 'state'])
+    const context = { skip_backorder: true, skip_sms: true, skip_expired: true }
+    for (const picking of pickings) {
+      if (picking.state === 'draft') await this.call('stock.picking', 'action_confirm', [[picking.id]])
+      await this.call('stock.picking', 'action_assign', [[picking.id]])
+      const moves = await this.searchRead('stock.move', [['picking_id', '=', picking.id]], ['id', 'product_uom_qty'])
+      for (const move of moves) await this.write('stock.move', [move.id], { quantity: move.product_uom_qty, picked: true })
+      await this.call('stock.picking', 'button_validate', [[picking.id]], { context })
+    }
+    await this.call('sale.order', 'action_loom_mark_delivered', [[orderId]])
+  }
+
+  /** Sends Odoo's email through `host:port` until the returned function is called (see support/smtp.js). */
+  async useMailServer(port, host = '127.0.0.1') {
+    const id = await this.create('ir.mail_server', {
+      name: 'e2e catcher', smtp_host: host, smtp_port: port, smtp_encryption: 'none', sequence: 1,
+    })
+    return () => this.call('ir.mail_server', 'unlink', [[id]])
+  }
+
+  /** The newest email Odoo made for an address (sent or not: a test database has no mail server). */
+  async lastEmailTo(email) {
+    const mails = await this.searchRead(
+      'mail.mail',
+      ['|', ['email_to', 'ilike', email], ['recipient_ids.email', '=ilike', email]],
+      ['subject', 'body_html', 'email_to'],
+      { order: 'id desc', limit: 1 },
+    )
+    return mails[0] || null
+  }
+
   /** Messages Odoo recorded on a document (emails sent to the customer show up here). */
   messages(model, resId, fields = ['subject', 'message_type', 'partner_ids', 'body', 'email_from']) {
     return this.searchRead('mail.message', [['model', '=', model], ['res_id', '=', resId]], fields, { order: 'id asc' })

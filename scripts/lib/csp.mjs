@@ -95,16 +95,19 @@ export function apiOriginFrom(env = {}) {
  */
 export function buildPolicy({ hashes = [], apiOrigin = '', connect = [] } = {}) {
   const api = apiOrigin ? [apiOrigin] : []
+  // Odoo's live chat (`features.liveChat`) is a script, styles and fonts from the store's own Odoo, talking over its
+  // websocket: the same origin the API is already trusted from.
+  const socket = apiOrigin ? [apiOrigin.replace(/^http/, 'ws')] : []
   const directives = [
     ['default-src', "'self'"],
     ['base-uri', "'self'"],
     ['object-src', "'none'"],
-    ['script-src', "'self'", ...hashes, ...THIRD_PARTY.script],
-    ['connect-src', "'self'", ...api, ...THIRD_PARTY.connect, ...connect],
+    ['script-src', "'self'", ...hashes, ...api, ...THIRD_PARTY.script],
+    ['connect-src', "'self'", ...api, ...socket, ...THIRD_PARTY.connect, ...connect],
     ['img-src', "'self'", 'data:', 'blob:', 'https:', ...api],
     ['media-src', "'self'", 'data:', 'blob:', 'https:', ...api],
-    ['style-src', "'self'", "'unsafe-inline'", ...THIRD_PARTY.style],
-    ['font-src', "'self'", 'data:', ...THIRD_PARTY.font],
+    ['style-src', "'self'", "'unsafe-inline'", ...api, ...THIRD_PARTY.style],
+    ['font-src', "'self'", 'data:', ...api, ...THIRD_PARTY.font],
     ['frame-src', ...THIRD_PARTY.frame],
     ['form-action', "'self'", ...api],
   ]

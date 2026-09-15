@@ -226,7 +226,10 @@ to fifty countries does not send fifty state lists with every page.
   "features": {
     "wishlist": true, "reviews": true, "search": true,
     "accounts": true, "discountCodes": true, "newsletter": true,
-    "currencySwitcher": true
+    "currencySwitcher": true,
+    "signup": true, "phoneLogin": false, "socialLogin": [],
+    "quotes": false, "reviewPolicy": "buyers", "questions": false,
+    "stockAlerts": true, "liveChat": null
   }
 }
 ```
@@ -234,6 +237,19 @@ to fifty countries does not send fifty state lists with every page.
 Setting one to `false` removes its entry points — the heart on product cards,
 the search field, the account icon, the discount field in the cart. Routes stay
 reachable so an existing bookmark does not 404; nothing links to them.
+
+The account and community ones come from the Odoo store form:
+
+| Key | Shows |
+| --- | --- |
+| `signup` | "Create account" on the sign-in page (off when the website opens accounts by invitation) |
+| `phoneLogin` | Sign in with a text-message code |
+| `socialLogin` | `[{ id, name, label }]`: a button per sign-in provider |
+| `quotes` | **Request a quote** in the bag, for signed-in customers |
+| `reviewPolicy` | `buyers`, `accounts` or `anyone`: who sees **Write a review** (no button when `null`) |
+| `questions` | Questions and answers on product pages |
+| `stockAlerts` | **Email me when it is back** on a sold-out option |
+| `liveChat` | `{ provider: "odoo", origin, loaderUrl }`: Odoo's live chat, loaded when the page is idle |
 
 There is no `currencySwitcher`. Multiple currencies are a backend negotiation —
 the API returns prices already in the currency it was asked for — and a client

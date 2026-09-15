@@ -42,25 +42,38 @@ export function AuthProvider({ children }) {
     [],
   )
 
+  const signIn = (call) => async (body) => {
+    const res = await call(body)
+    adopt(res.customer?.id)
+    setCustomer(res.customer)
+    return res
+  }
+
   const value = useMemo(
     () => ({
       customer,
       loading,
       signedIn: !!customer,
-      login: async (body) => {
-        const res = await api.login(body)
-        // Somebody who browsed for ten minutes and then signed in to check out
-        // should not lose the ten minutes.
-        adopt(res.customer?.id)
-        setCustomer(res.customer)
-        return res
+      // Every way of signing in: the account's customer, and what was browsed as a guest kept for it. Somebody who
+      // browsed for ten minutes and then signed in to check out should not lose the ten minutes.
+      login: signIn(api.login),
+      register: signIn(api.register),
+      /** A password from a reset or invitation link. */
+      resetPassword: signIn(api.resetPassword),
+      signupWithToken: signIn(api.signupWithToken),
+      /** A code sent by text message. */
+      verifyLoginCode: signIn(api.verifyLoginCode),
+      /** A provider from Odoo's OAuth app. */
+      finishOAuth: signIn(api.finishOAuth),
+      /** The new sign-in email was confirmed from its link. */
+      emailChanged: (email) => setCustomer((current) => (current ? { ...current, email, emailVerified: true } : current)),
+      /** The account is closed: signed out here. */
+      deleteAccount: async (body) => {
+        await api.deleteAccount(body)
+        setCustomer(null)
       },
-      register: async (body) => {
-        const res = await api.register(body)
-        adopt(res.customer?.id)
-        setCustomer(res.customer)
-        return res
-      },
+      /** The address was confirmed (maybe in another tab): the account now knows. */
+      markVerified: () => setCustomer((current) => (current ? { ...current, emailVerified: true } : current)),
       logout: async () => {
         await api.logout()
         setCustomer(null)

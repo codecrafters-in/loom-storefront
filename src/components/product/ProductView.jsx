@@ -28,6 +28,8 @@ import {
 } from './Enrichment.jsx'
 import { t, plural } from '../../i18n/index.js'
 
+const NotifyMe = lazy(() => import('./NotifyMe.jsx'))
+
 /*
  * Everything here that only exists after a tap is its own chunk: the zoom, the
  * sheet the sticky bar opens, the offer of optional products, and the set
@@ -489,6 +491,11 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             </Button>
             )}
           </div>
+          {choice.unavailable && config.features?.stockAlerts && !preview && (
+            <Suspense fallback={null}>
+              <NotifyMe product={product} variant={choice.variant} />
+            </Suspense>
+          )}
           {!preview && <CompareToggle slug={product.slug} className="mt-4" />}
 
           <TrustRow flat />

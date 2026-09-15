@@ -27,9 +27,9 @@ export default function Footer() {
     setBusy(true)
     try {
       const captchaToken = await captcha.getToken()
-      await api.subscribe(email, { captchaToken })
+      const res = await api.subscribe(email, { captchaToken, source: 'footer', consent: t('Newsletter') })
       setEmail('')
-      push(t('Thanks — check your inbox to confirm.'))
+      push(res?.status === 'confirmed' ? t('You are already subscribed. Thank you!') : t('Thanks — check your inbox to confirm.'))
     } catch (err) {
       push(err.message || t('Could not subscribe.'), { tone: 'error' })
     } finally {

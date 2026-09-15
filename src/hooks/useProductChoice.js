@@ -118,6 +118,8 @@ export default function useProductChoice(product, { live = true } = {}) {
     shown,
     missing,
     blocker,
+    // The chosen option exists but is sold out ("Notify me" instead of "Add to bag").
+    unavailable: !missing && !invalid && unavailable,
     ready: !blocker,
     // Nothing the shopper can choose will fix these; the sticky bar disables rather than scrolls.
     stuck: !missing && !set.missing.length && !needsText.length && Boolean(blocker),

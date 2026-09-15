@@ -5,7 +5,7 @@ import Footer from './Footer.jsx'
 import CartDrawer from '../cart/CartDrawer.jsx'
 import DemoBar from '../DemoBar.jsx'
 import CompareTray from '../product/CompareTray.jsx'
-import { useStorefrontState } from '../../store/StorefrontContext.jsx'
+import { useStorefront, useStorefrontState } from '../../store/StorefrontContext.jsx'
 import { t } from '../../i18n/index.js'
 import { pageView } from '../../lib/analytics.js'
 
@@ -13,10 +13,13 @@ import { pageView } from '../../lib/analytics.js'
 const StoreGate = lazy(() => import('./StoreGate.jsx'))
 // Only for a store that asks for cookie consent.
 const ConsentBanner = lazy(() => import('../consent/ConsentBanner.jsx'))
+// Only a store with Odoo's live chat on loads its loader.
+const LiveChat = lazy(() => import('./LiveChat.jsx'))
 
 export default function Layout() {
   const { pathname } = useLocation()
   const state = useStorefrontState()
+  const chat = useStorefront().features?.liveChat
 
   // A route change should land you at the top of the new page, not halfway
   // down it where the previous one happened to be scrolled.
@@ -55,6 +58,11 @@ export default function Layout() {
         <Outlet />
       </main>
       <Footer />
+      {chat && (
+        <Suspense fallback={null}>
+          <LiveChat />
+        </Suspense>
+      )}
       <CartDrawer />
       <CompareTray />
       <DemoBar />
