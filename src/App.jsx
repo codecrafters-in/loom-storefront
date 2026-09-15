@@ -161,6 +161,9 @@ export default function App() {
                   <Route path="discounts" element={<AdminDiscounts />} />
                   <Route path="storefront" element={<AdminStorefront />} />
                   <Route path="data" element={<AdminData />} />
+                  {/* The documentation for the store's team, live store or demo. */}
+                  <Route path="docs" element={<Docs base="/admin/docs" />} />
+                  <Route path="docs/:page" element={<Docs base="/admin/docs" />} />
                 </Route>
               </Routes>
             </Suspense>

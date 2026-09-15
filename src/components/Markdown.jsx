@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, createContext, useContext } from 'react'
+import { Link } from 'react-router-dom'
+import { docPages, docPath } from '../data/docs.js'
 import { Icon } from './ui/index.jsx'
 
 /**
@@ -12,9 +14,23 @@ import { Icon } from './ui/index.jsx'
  * Code fences get a copy button, because half of what these pages contain is
  * meant to be pasted into an AI or a terminal.
  */
-export default function Markdown({ source }) {
+/** Where links to other documents go: `/docs` on the demo, `/admin/docs` in the back office. */
+const LinkBase = createContext('/docs')
+
+export default function Markdown({ source, linkBase = '/docs' }) {
   const blocks = useMemo(() => parse(source || ''), [source])
-  return <div className="max-w-3xl">{blocks.map((b, i) => <Block key={i} block={b} />)}</div>
+  return (
+    <LinkBase.Provider value={linkBase}>
+      <div className="max-w-3xl">{blocks.map((b, i) => <Block key={i} block={b} />)}</div>
+    </LinkBase.Provider>
+  )
+}
+
+/** A link to another document (`[Checkout](CHECKOUT.md)`), kept on the page the reader is on: /docs or /admin/docs. */
+function DocLink({ file, children }) {
+  const base = useContext(LinkBase)
+  const slug = docPages.find((p) => p.file.toLowerCase() === file.toLowerCase())?.slug || file.replace(/\.md$/, '').toLowerCase()
+  return <Link to={docPath(slug, base)} className="text-accent link-underline">{children}</Link>
 }
 
 function parse(src) {
@@ -209,17 +225,14 @@ function inline(text) {
     } else {
       const link = /\[([^\]]+)\]\(([^)]+)\)/.exec(token)
       const href = link[2]
-      const internal = href.endsWith('.md')
       parts.push(
-        <a
-          key={m.index}
-          href={internal ? `/admin/docs/${href.replace(/\.md$/, '').toLowerCase()}` : href}
-          target={internal ? undefined : '_blank'}
-          rel={internal ? undefined : 'noreferrer'}
-          className="text-accent link-underline"
-        >
-          {link[1]}
-        </a>,
+        href.endsWith('.md') ? (
+          <DocLink key={m.index} file={href}>{link[1]}</DocLink>
+        ) : (
+          <a key={m.index} href={href} target="_blank" rel="noreferrer" className="text-accent link-underline">
+            {link[1]}
+          </a>
+        ),
       )
     }
     last = m.index + token.length

@@ -34,4 +34,4 @@ export const docPages = [
 ]
 
 /** The canonical path for a document. */
-export const docPath = (slug) => (slug === 'readme' ? '/docs' : `/docs/${slug}`)
+export const docPath = (slug, base = '/docs') => (slug === 'readme' ? base : `${base}/${slug}`)

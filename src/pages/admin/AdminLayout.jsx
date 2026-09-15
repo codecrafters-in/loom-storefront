@@ -32,7 +32,8 @@ const NAV = [
   { to: '/admin/discounts', label: 'Discounts', icon: 'sparkle' },
   { to: '/admin/storefront', label: 'Storefront', icon: 'star' },
   { to: '/admin/data', label: 'Import / export', icon: 'refresh' },
-  { to: '/docs', label: 'Developer docs', icon: 'info' },
+  // Inside the back office: a live store has no public /docs, and this link used to land on "Page not found".
+  { to: '/admin/docs', label: 'Developer docs', icon: 'info' },
 ]
 
 // Returns, reviews and questions come from shoppers on a live store; the demo has

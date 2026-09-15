@@ -71,7 +71,11 @@ export async function loadDoc(slug) {
  */
 const seeded = (slug) => globalThis.__LOOM_DOCS__?.[slug] ?? null
 
-export default function Docs() {
+/**
+ * `base`: where the documents live. `/docs` is public on the demo; in the back office they are at `/admin/docs`, so a
+ * live store's team can read them while its customers are not offered an API reference.
+ */
+export default function Docs({ base = '/docs' }) {
   const { page } = useParams()
   const navigate = useNavigate()
   const active = docPages.find((p) => p.slug === (page || 'readme')) || docPages[0]
@@ -107,7 +111,7 @@ export default function Docs() {
         <Breadcrumbs
           trail={[
             { label: 'Home', to: '/' },
-            ...(active.slug === 'readme' ? [{ label: 'Docs' }] : [{ label: 'Docs', to: '/docs' }, { label: active.title }]),
+            ...(active.slug === 'readme' ? [{ label: 'Docs' }] : [{ label: 'Docs', to: base }, { label: active.title }]),
           ]}
         />
 
@@ -122,7 +126,7 @@ export default function Docs() {
                       <li key={p.slug}>
                         <NavLink
                           end
-                          to={docPath(p.slug)}
+                          to={docPath(p.slug, base)}
                           className={({ isActive }) =>
                             `block rounded-xs px-2.5 py-2 text-[13px] transition-colors ${
                               isActive ? 'bg-sunken text-ink' : 'text-muted hover:text-ink'
@@ -156,7 +160,7 @@ export default function Docs() {
                 id="doc"
                 className="field"
                 value={active.slug}
-                onChange={(e) => navigate(docPath(e.target.value))}
+                onChange={(e) => navigate(docPath(e.target.value, base))}
               >
                 {groups.map((g) => (
                   <optgroup key={g} label={g}>
@@ -190,7 +194,7 @@ export default function Docs() {
             ) : source === null ? (
               <Skeleton className="h-96 w-full" />
             ) : (
-              <Markdown source={source} />
+              <Markdown source={source} linkBase={base} />
             )}
           </div>
         </div>
