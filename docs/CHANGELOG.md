@@ -7,6 +7,7 @@ Newest first. Each entry links to the page with the detail.
 For the Odoo backend's rules-based returns, cancellation requests and customer-visible order messages. Details:
 [API.md](API.md#after-the-order), [ADMIN.md](ADMIN.md) and [USER-GUIDE.md](USER-GUIDE.md#answer-a-request-to-cancel).
 
+- **Discount codes at checkout:** the checkout summary has the discount code box (apply and remove), not only the full bag page; applying a code after the payment step opened prepares the payment again for the new total.
 - **Order page › Returns:** the order's returns (`returnCount`) as cards with their status and what happens next —
   approved and how to send the items back, a refund on its way, or the amount refunded (`refunded`). **Return items**
   opens the form.

@@ -21,6 +21,7 @@ import { Button, Empty, Icon } from '../components/ui/index.jsx'
 import { formatMoney } from '../lib/money.js'
 import { nestLines } from '../lib/cart-lines.js'
 import LineDetails from '../components/cart/LineDetails.jsx'
+import DiscountCode from '../components/cart/DiscountCode.jsx'
 import { isMock } from '../lib/config.js'
 import { t, addressPrefix } from '../i18n/index.js'
 
@@ -786,6 +787,14 @@ export default function Checkout() {
               </li>
             ))}
           </ul>
+          {config.features?.discountCodes !== false && (
+            <DiscountCode
+              className="mt-6 border-t border-line pt-5"
+              disabled={busy}
+              // The payment was prepared for the old total: prepare it again for the new one.
+              onChange={() => stage === 'payment' && setStage('details')}
+            />
+          )}
           <dl className="mt-6 space-y-2.5 border-t border-line pt-5 text-sm">
             <div className="flex justify-between"><dt className="text-muted">{t('Subtotal')}</dt><dd className="tabular-nums">{formatMoney(cart.subtotal)}</dd></div>
             {cart.codes || cart.promotions ? (
