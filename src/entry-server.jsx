@@ -13,6 +13,7 @@ import { config, isMock } from './lib/config.js'
 import { currentLanguage, isRightToLeft, languageFromPath, setLanguage } from './i18n/index.js'
 import { baseFontsHref, fontsHref, themeCss, themeHead } from './lib/theme.js'
 import { blogEnabled } from './lib/blog.js'
+import { loadMoreSections } from './components/home/load-more.js'
 
 /**
  * One route, rendered to HTML at build time.
@@ -26,7 +27,8 @@ import { blogEnabled } from './lib/blog.js'
 
 /** Resolve what a route reads, and hand back the payload to inline in the page. */
 export async function prime(reads = []) {
-  await api.getBootstrap()
+  // The newer home section types are a chunk of their own, and `renderToString` writes nothing for code still loading.
+  await Promise.all([api.getBootstrap(), loadMoreSections()])
   // A read that fails still renders — a product page whose reviews are down is
   // a product page, and refusing to prerender it helps nobody.
   await Promise.all(reads.map(([name, args]) => api[name](...args).catch(() => null)))

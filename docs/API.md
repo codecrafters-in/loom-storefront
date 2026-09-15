@@ -219,6 +219,12 @@ returns is optional too; omitted keys keep their defaults.
 }
 ```
 
+`home` is the home page as an ordered list of typed sections: `hero`, `category-strip`, `product-rail`, `editorial`,
+`collection-grid`, `rich-text` and `promises`, and `image-banner`, `image-tiles`, `features`, `testimonials`,
+`logo-bar`, `faq`, `newsletter`, `featured-product` and `countdown`. Every type's fields, with an example:
+[CONFIGURATION.md](CONFIGURATION.md#home). The storefront skips a type it does not know and leaves out an item missing
+what it needs, so a backend can send what a merchant has half filled in, or types newer than the deployed theme.
+
 Cache it hard — it changes when a merchant saves settings, not per request.
 
 ### Captcha

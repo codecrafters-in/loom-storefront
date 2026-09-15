@@ -45,6 +45,9 @@ const PATHS = {
   thermometer: 'M14 14.8V4a2 2 0 1 0-4 0v10.8a4 4 0 1 0 4 0Z',
 }
 
+/** Whether the set has an icon by this name: names in content from the backend fall back to one it has. */
+export const hasIcon = (name) => typeof name === 'string' && Object.hasOwn(PATHS, name)
+
 export default function Icon({ name, size = 20, className = '', filled = false, strokeWidth = 1.5, ...rest }) {
   const d = PATHS[name]
   if (!d) return null

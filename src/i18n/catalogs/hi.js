@@ -847,4 +847,10 @@ export default {
   "Thank you. Your message was sent, and we will reply to {email}.": "धन्यवाद। आपका संदेश भेज दिया गया है, हम {email} पर जवाब देंगे।",
   "Write your message.": "अपना संदेश लिखें।",
   "Your message could not be sent. Please try again.": "आपका संदेश नहीं भेजा जा सका। कृपया फिर कोशिश करें।",
+  "Learn more": "और जानें",
+  "View product": "प्रोडक्ट देखें",
+  "days": "दिन",
+  "hours": "घंटे",
+  "minutes": "मिनट",
+  "seconds": "सेकंड",
 }

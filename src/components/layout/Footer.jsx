@@ -1,8 +1,7 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Icon } from '../ui/index.jsx'
-import api, { isMock } from '../../lib/api/index.js'
-import { useToast } from '../../store/ToastContext.jsx'
+import { isMock } from '../../lib/api/index.js'
+import useNewsletter from '../../hooks/useNewsletter.js'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { useAdminAuth } from '../../store/AdminAuthContext.jsx'
 import Logo from '../ui/Logo.jsx'
@@ -10,36 +9,14 @@ import { config as envConfig } from '../../lib/config.js'
 import { docsLinkVisible } from '../../lib/docs-link.js'
 import { footerLayout } from '../../lib/footer.js'
 import { withoutBlogLinks } from '../../lib/blog.js'
-import { useCaptcha } from '../Captcha.jsx'
 import ContactDetails from '../content/ContactDetails.jsx'
 import { t } from '../../i18n/index.js'
 
 export default function Footer() {
-  const [email, setEmail] = useState('')
-  const [busy, setBusy] = useState(false)
-  const { push } = useToast()
   const config = useStorefront()
   const { signedIn: isAdmin } = useAdminAuth()
-  // Deferred to the first focus: this footer is on every page, and a captcha
-  // script on every page is a cost every shopper pays for one small form.
-  const captcha = useCaptcha('newsletter', { defer: true })
-
-  const submit = async (e) => {
-    e.preventDefault()
-    setBusy(true)
-    try {
-      const captchaToken = await captcha.getToken()
-      const res = await api.subscribe(email, { captchaToken, source: 'footer', consent: t('Newsletter') })
-      setEmail('')
-      push(res?.status === 'confirmed' ? t('You are already subscribed. Thank you!') : t('Thanks — check your inbox to confirm.'))
-    } catch (err) {
-      push(err.message || t('Could not subscribe.'), { tone: 'error' })
-    } finally {
-      // Single-use, and the form stays on screen for another address.
-      captcha.reset()
-      setBusy(false)
-    }
-  }
+  // The same sign-up as the home page's newsletter section; its captcha waits for the first focus.
+  const { email, setEmail, busy, submit, captcha } = useNewsletter('footer')
 
   // No links into a blog the store switched off.
   const cols = withoutBlogLinks(config.navigation?.footer || [], config)

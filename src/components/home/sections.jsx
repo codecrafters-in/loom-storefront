@@ -1,13 +1,15 @@
+import { lazy, Suspense, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
 import ProductGrid from '../product/ProductGrid.jsx'
 import Promises from '../layout/Promises.jsx'
-import { Button, ErrorState, Icon } from '../ui/index.jsx'
+import SectionHead from './SectionHead.jsx'
+import { loadMoreSections, moreSections } from './load-more.js'
+import { Button, ErrorState } from '../ui/index.jsx'
 import { useBootstrap } from '../../store/StorefrontContext.jsx'
 import { railKey } from '../../lib/api/railKey.js'
 import { findCategory } from '../../lib/categories.js'
-import { t } from '../../i18n/index.js'
 
 /**
  * The home page is data.
@@ -16,6 +18,10 @@ import { t } from '../../i18n/index.js'
  * type to a component. Anything unrecognised is skipped with a development
  * warning, so an admin panel that emits a section type newer than the deployed
  * build leaves a gap instead of taking the page down.
+ *
+ * The first seven types are here. The newer nine (banners, tiles, features,
+ * testimonials, logos, questions, sign-up, one product, a countdown) are in
+ * sections-more.jsx, a chunk of its own: see `later` below.
  */
 
 function Hero({ section }) {
@@ -57,22 +63,6 @@ function Hero({ section }) {
         </div>
       </div>
     </section>
-  )
-}
-
-function SectionHead({ eyebrow, title, ctaLabel, ctaTo }) {
-  return (
-    <div className="flex items-end justify-between gap-6">
-      <div>
-        {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-        <h2 className={`text-display-md ${eyebrow ? 'mt-3' : ''}`}>{title}</h2>
-      </div>
-      {ctaTo && (
-        <Link to={ctaTo} className="hidden shrink-0 items-center gap-1.5 text-sm text-muted transition-colors hover:text-ink sm:inline-flex">
-          {ctaLabel || t('See all')} <Icon name="arrow-right" size={15} className="rtl:-scale-x-100" />
-        </Link>
-      )}
-    </div>
   )
 }
 
@@ -206,6 +196,36 @@ function RichText({ section }) {
   )
 }
 
+/**
+ * A type from sections-more.jsx, which downloads as a chunk of its own (load-more.js).
+ *
+ * Where the chunk is already in (always on the server, and in the browser
+ * before it hydrates a page with one of these types) the section renders
+ * straight away; otherwise it waits in a Suspense boundary. That is decided
+ * once per section: switching later would remount it and lose what the
+ * shopper had typed. A chunk that fails to download leaves a gap, as an
+ * unknown type does.
+ */
+function later(name) {
+  const Waiting = lazy(() =>
+    loadMoreSections().then(
+      (module) => ({ default: module[name] }),
+      () => ({ default: function Missing() { return null } }),
+    ),
+  )
+  function MoreSection({ section }) {
+    const [Ready] = useState(() => moreSections()?.[name])
+    const Component = Ready || Waiting
+    return (
+      <Suspense fallback={null}>
+        <Component section={section} />
+      </Suspense>
+    )
+  }
+  MoreSection.displayName = name
+  return MoreSection
+}
+
 const REGISTRY = {
   hero: Hero,
   'category-strip': CategoryStrip,
@@ -214,6 +234,15 @@ const REGISTRY = {
   'collection-grid': CollectionGrid,
   'rich-text': RichText,
   promises: () => <Promises />,
+  'image-banner': later('ImageBanner'),
+  'image-tiles': later('ImageTiles'),
+  features: later('Features'),
+  testimonials: later('Testimonials'),
+  'logo-bar': later('LogoBar'),
+  faq: later('Faq'),
+  newsletter: later('Newsletter'),
+  'featured-product': later('FeaturedProduct'),
+  countdown: later('Countdown'),
 }
 
 export default function Section({ section }) {

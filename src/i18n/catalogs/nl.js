@@ -847,4 +847,10 @@ export default {
   "Thank you. Your message was sent, and we will reply to {email}.": "Bedankt. Je bericht is verstuurd en we antwoorden naar {email}.",
   "Write your message.": "Schrijf je bericht.",
   "Your message could not be sent. Please try again.": "Je bericht kon niet worden verstuurd. Probeer het opnieuw.",
+  "Learn more": "Meer informatie",
+  "View product": "Bekijk product",
+  "days": "dagen",
+  "hours": "uren",
+  "minutes": "minuten",
+  "seconds": "seconden",
 }

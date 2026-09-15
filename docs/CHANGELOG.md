@@ -7,6 +7,28 @@ Newest first. Each entry links to the page with the detail.
 With the Odoo module's 19.0.2.2.0 previews of the home page, menu and footer. Details:
 [CONFIGURATION.md](CONFIGURATION.md#navigation).
 
+Nine new home section types, with the fields each takes in [CONFIGURATION.md](CONFIGURATION.md#home):
+
+- **Image banner** (`image-banner`): a wide photo with copy and up to two buttons over a dark gradient, lower than the
+  hero; copy at the start or centred.
+- **Image tiles** (`image-tiles`): two to four large photo links side by side on computers; stacked on phones, where
+  four make two by two.
+- **Features** (`features`): columns of an icon or a small photo, a title, a few words and a link, in even rows.
+- **Testimonials** (`testimonials`): quote cards with stars, the author and their photo, and a link to the product;
+  a row that scrolls sideways on phones and tablets, up to three per row on computers.
+- **Logo bar** (`logo-bar`): brand or press logos (or their names), wrapping in even rows; sideways on phones.
+- **Questions** (`faq`): questions that open in place, with a link under them.
+- **Newsletter** (`newsletter`): the footer's sign-up as a band of its own, with the same captcha and messages; hidden
+  when the newsletter is switched off.
+- **Featured product** (`featured-product`): one product, large, with its brand, price (a sale price when it has one)
+  and a button to its page.
+- **Countdown** (`countdown`): a promotion band with the days, hours, minutes and seconds left, counting down in the
+  browser and gone when the time is up.
+- **Only downloaded when used:** the nine types are a chunk of their own that loads on a page with one of them, and the
+  server-rendered page already has them in its HTML. An item missing what it needs is left out instead of breaking the
+  section.
+- **Demo home page:** features, customer quotes, a newsletter band and questions.
+
 - **Footer columns:** any number of columns lays out in even rows — four make two by two on phones, one row on tablets,
   and sit beside the brand column on a laptop — instead of the brand column plus a fixed three, which left a fourth
   alone on a second row (`src/lib/footer.js`).
