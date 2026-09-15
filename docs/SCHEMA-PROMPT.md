@@ -287,6 +287,12 @@ put the catalogue into a state the storefront renders wrongly.
   shoppers pay on the storefront or on a hosted page of mine — as a real column,
   because the API branches on it. Ask me whether to store it as
   `jsonb` or as normalised tables, and give me your recommendation with a reason.
+  The home page is an ordered list of typed sections (`hero`, `category-strip`, `product-rail`, `editorial`,
+  `collection-grid`, `rich-text`, `promises`, `image-banner`, `image-tiles`, `features`, `testimonials`, `logo-bar`,
+  `faq`, `newsletter`, `featured-product`, `countdown`), each with its own fields (the storefront's
+  docs/CONFIGURATION.md lists them). Several hold a list of items — tiles, features, quotes, logos, questions — with
+  images; a `featured-product` section points at a product, which must survive that product being renamed or
+  archived; a `countdown` has an `endsAt` timestamp with its time zone. Weigh those in the recommendation.
 - `admin_users` — with hashed passwords, and say which algorithm and cost
 - `webhook_events` — outbound delivery log with retry state
 - `audit_log` — actor, entity, before, after, at

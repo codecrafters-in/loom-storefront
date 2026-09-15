@@ -911,4 +911,10 @@ export default {
   "Thank you. Your message was sent, and we will reply to {email}.": "شكرًا لك. تم إرسال رسالتك، وسنرد عليك على {email}.",
   "Write your message.": "اكتب رسالتك.",
   "Your message could not be sent. Please try again.": "تعذّر إرسال رسالتك. يُرجى المحاولة مرة أخرى.",
+  "Learn more": "اعرف المزيد",
+  "View product": "عرض المنتج",
+  "days": "أيام",
+  "hours": "ساعات",
+  "minutes": "دقائق",
+  "seconds": "ثوانٍ",
 }

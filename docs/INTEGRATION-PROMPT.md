@@ -644,6 +644,36 @@ typed sections), recommendation strategy, checkout mode and feature flags.
 
 If I want merchant-editable settings, ask me and I will paste the schema.
 
+If my merchants edit the home page, `home` is an array of `{ type, …fields }`. Any type may also carry `eyebrow`,
+`title`, `body` (plain text, a blank line between paragraphs), `ctaLabel` + `ctaTo` (a "See all" link) and
+`actions: [{ label, to, variant }]` with `variant` one of `accent`, `primary`, `outline`, `ghost`, `quiet`. An image is
+`{ url, alt, srcset? }`, `srcset` being `[{ width, url }]`.
+
+```
+hero              image, focal (CSS object-position), actions
+category-strip    source: { parent, limit }
+product-rail      source: { sort, category, collection, tags, limit }   (products also in bootstrap `rails`)
+editorial         image, body (string or array of paragraphs), action: { label, to }
+collection-grid   source: { limit }
+rich-text         action: { label, to }
+promises          no fields: shows the settings' `promises`
+image-banner      image, focal, align: "start" | "center", actions (2 at most)
+image-tiles       items: [{ title, body?, label?, to, image }]               2 to 4
+features          items: [{ icon?, image?, title, body?, label?, to? }]      2 to 6
+testimonials      items: [{ quote, author, detail?, rating? (1-5), image?, product?: { slug, title } }]
+logo-bar          items: [{ name, image?, to? }]
+faq               items: [{ question, answer }], ctaLabel, ctaTo
+newsletter        placeholder?                           (hidden when features.newsletter is false)
+featured-product  product (the summary GET /products returns: slug, title, subtitle?, price,
+                  compareAtPrice?, images, brand?), body, ctaLabel?
+countdown         endsAt (ISO 8601 with its offset), image?, actions
+```
+
+Send only what the merchant filled in: the storefront leaves out an item missing a required field, skips a section
+with nothing left to show, and ignores fields and types it does not know. A `featured-product` section stores a
+reference to the product and sends its current summary, so a price change reaches the home page; a `countdown` whose
+`endsAt` has passed can be left in, the storefront stops showing it.
+
 ### Write API — only if I ask for it
 
 If I want to manage the catalogue from the storefront rather than from my own

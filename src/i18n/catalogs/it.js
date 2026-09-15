@@ -863,4 +863,10 @@ export default {
   "Thank you. Your message was sent, and we will reply to {email}.": "Grazie. Il tuo messaggio è stato inviato e ti risponderemo a {email}.",
   "Write your message.": "Scrivi il tuo messaggio.",
   "Your message could not be sent. Please try again.": "Non è stato possibile inviare il messaggio. Riprova.",
+  "Learn more": "Scopri di più",
+  "View product": "Vedi prodotto",
+  "days": "giorni",
+  "hours": "ore",
+  "minutes": "minuti",
+  "seconds": "secondi",
 }

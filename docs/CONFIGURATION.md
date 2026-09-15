@@ -360,12 +360,108 @@ or duplicate freely.
 **A "New this season" rail is just a `product-rail` with `source.sort: "newest"`.**
 Want a sale rail? `{ "type": "product-rail", "title": "Sale", "source": { "tags": ["sale"], "limit": 8 } }`.
 
+#### Banners, tiles, features, quotes, logos, questions, sign-up, one product, a countdown
+
+Nine more types, for the rest of a home page. They share these fields:
+
+| Common field | Meaning |
+| --- | --- |
+| `eyebrow`, `title` | The small line over the title, and the title |
+| `body` | Plain text; a blank line starts a new paragraph |
+| `ctaLabel`, `ctaTo` | The "See all" link at the right of the title, from tablets up |
+| `actions` | Buttons, `[{ "label", "to", "variant" }]`; `variant` is `accent`, `primary`, `outline`, `ghost` or `quiet` |
+
+An image is `{ "url", "alt", "srcset" }`, where the optional `srcset` lists the sizes the backend keeps,
+`[{ "width", "url" }]`. A link to another site (`https://…`) opens in a new tab.
+
+**Send what the merchant filled in.** An item missing what it needs (a tile without its photo, a question without an
+answer) is left out, a section left with nothing shows nothing, and fields a type does not know are ignored.
+
+```json
+{
+  "home": [
+    { "type": "image-banner", "eyebrow": "The linen edit", "title": "Made for the warm half of the year.",
+      "body": "…", "focal": "50% 40%", "align": "start",
+      "image": { "url": "https://cdn.example/linen.jpg", "alt": "Linen shirts drying outside" },
+      "actions": [{ "label": "Shop linen", "to": "/collections/the-linen-edit", "variant": "accent" },
+                  { "label": "Fabric & care", "to": "/pages/care", "variant": "outline" }] },
+
+    { "type": "image-tiles", "title": "Shop the season",
+      "items": [
+        { "title": "Knitwear", "body": "Merino and lambswool.", "label": "Shop now", "to": "/shop/knitwear",
+          "image": { "url": "…", "alt": "…" } },
+        { "title": "Outerwear", "to": "/shop/outerwear", "image": { "url": "…", "alt": "…" } }
+      ] },
+
+    { "type": "features", "eyebrow": "Why LOOM", "title": "Fewer things, made properly.",
+      "items": [
+        { "icon": "leaf", "title": "Named mills, natural fibres", "body": "…" },
+        { "image": { "url": "…", "alt": "" }, "title": "Measured, not guessed", "body": "…",
+          "label": "Size guide", "to": "/pages/size-guide" }
+      ] },
+
+    { "type": "testimonials", "eyebrow": "From customers", "title": "Worn in, not worn out.",
+      "items": [
+        { "quote": "Two winters in and it has not pilled once.", "author": "Maya R.", "detail": "Brooklyn, NY",
+          "rating": 5, "image": { "url": "…", "alt": "" },
+          "product": { "slug": "merino-crew-knit", "title": "Fine Merino Crew" } }
+      ] },
+
+    { "type": "logo-bar", "eyebrow": "As seen in",
+      "items": [
+        { "name": "Monocle", "image": { "url": "https://cdn.example/monocle.svg", "alt": "Monocle" },
+          "to": "https://monocle.com" },
+        { "name": "The Gentlewoman" }
+      ] },
+
+    { "type": "faq", "title": "Questions, answered", "ctaLabel": "Contact us", "ctaTo": "/pages/contact",
+      "items": [
+        { "question": "How do I find my size?", "answer": "First paragraph.\n\nSecond paragraph." }
+      ] },
+
+    { "type": "newsletter", "title": "Letters from the workroom", "body": "…", "placeholder": "you@example.com" },
+
+    { "type": "featured-product", "eyebrow": "Coat of the season", "body": "…", "ctaLabel": "View product",
+      "product": { "slug": "wool-overcoat", "title": "Double-Faced Wool Overcoat", "subtitle": "Camel",
+        "price": { "amount": 38000, "currency": "USD" }, "compareAtPrice": { "amount": 46000, "currency": "USD" },
+        "images": [{ "url": "…", "alt": "…" }], "brand": { "name": "LOOM" } } },
+
+    { "type": "countdown", "eyebrow": "Winter sale", "title": "Up to 40% off outerwear", "body": "…",
+      "endsAt": "2026-12-01T23:59:00Z", "image": { "url": "…", "alt": "" },
+      "actions": [{ "label": "Shop the sale", "to": "/shop?tags=sale", "variant": "accent" }] }
+  ]
+}
+```
+
+| Type | Fields | What shows |
+| --- | --- | --- |
+| `image-banner` | `image`, `focal`, `align` (`start` or `center`, default `start`), `actions` (two at most) | A wide photo with light copy over a dark gradient: 360px tall on phones, up to 520px on computers. Nothing without `image` |
+| `image-tiles` | `items: [{ title, body, label, to, image }]`, 2 to 4; `body` and `label` optional | Large photo links with the title over the photo, as many columns as tiles on a computer. Stacked on phones, where four make two by two. The whole tile is the link |
+| `features` | `items: [{ icon, image, title, body, label, to }]`, 2 to 6; only `title` is required | Columns of an icon (or a small photo), a title, text and a link (`label`, default "Learn more"), in even rows: four make two by two on tablets and one row on computers |
+| `testimonials` | `items: [{ quote, author, detail, rating, image, product: { slug, title } }]`; `quote` and `author` required | Quote cards with stars for a `rating` of 1 to 5, the author with a small round photo, and a link to the product. They scroll sideways on phones and tablets; up to three per row on computers |
+| `logo-bar` | `items: [{ name, image, to }]` | Logos at most 40px tall, or the name in capitals without an image; links with `to`. Scrolls sideways on phones, wraps in even rows from tablets |
+| `faq` | `items: [{ question, answer }]`, `ctaLabel`, `ctaTo` | A centred list of questions that open in place, all closed at first; the link (default "More questions") sits under the list |
+| `newsletter` | `placeholder` | A band with an email field and Join, the footer's sign-up (sent with `source: "home"`). Hidden when `features.newsletter` is `false` |
+| `featured-product` | `product`, `body`, `ctaLabel` (default "View product") | The product's photo on one side; title (the section's, else the product's), brand, price (a sale price when `compareAtPrice` is higher), text and a button to `/product/:slug` on the other. Stacked on phones. Nothing without `product` |
+| `countdown` | `endsAt`, `image`, `actions` | A promotion band with days, hours, minutes and seconds left, counting down in the browser. Nothing once `endsAt` has passed |
+
+- **`icon`** is one of the theme's icon names — `leaf`, `ruler`, `recycle`, `truck`, `refresh`, `shield`, `award`,
+  `sparkle`, `droplet`, `sun`, `wind`, `thermometer`, `package`, `heart`, `star`, `check` and the rest of
+  `src/components/ui/Icon.jsx`. A name the theme does not have shows a tick.
+- **`product`** is the summary a product card gets from `GET /products`: `slug`, `title`, `subtitle`, `price`,
+  `compareAtPrice`, `images`, `brand` (`{ "name" }` or a plain string).
+- **`endsAt`** is an ISO 8601 date-time. Give its offset (`Z`, `+05:30`); one without is read as UTC, so the page
+  rendered on the server and the one in the shopper's browser agree on when the promotion ends.
+
+These nine download as a chunk of their own, only on a page that has one of them; pages rendered on the server include
+them in the HTML.
+
 An unrecognised `type` is skipped with a console warning in development. That is
 deliberate: an admin panel emitting a section type newer than the deployed build
 leaves a gap rather than taking the page down.
 
 Adding a new type is one entry in the registry at the bottom of
-`src/components/home/sections.jsx`.
+`src/components/home/sections.jsx`, and a component there or in `sections-more.jsx`.
 
 ### `recommendations`
 
