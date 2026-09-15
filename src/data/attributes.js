@@ -82,6 +82,19 @@ export const attributes = [
 
 export const attributeByKey = Object.fromEntries(attributes.map((a) => [a.key, a]))
 
+/** A specification key the theme has no wording for ("tastingNotes", "made_in"), made readable: "Tasting notes", "Made in". */
+export const readableKey = (key) => {
+  const words = String(key || '').replace(/[_-]+/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim().toLowerCase()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/**
+ * The name a shopper sees for a specification: the theme's own wording, then the label the store sent with it (a
+ * merchant's own specification, in the shopper's language), then the key made readable.
+ */
+export const specLabel = (key, specList) =>
+  attributeByKey[key]?.label || (specList || []).find((spec) => spec.key === key)?.label || readableKey(key)
+
 /** Icons a feature card can use. Anything else is an image URL. */
 /**
  * Ready-made service rows for the assurances block.

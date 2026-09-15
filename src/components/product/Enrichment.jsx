@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Icon } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
-import { attributes, attributeByKey, attributeGroups } from '../../data/attributes.js'
+import { attributes, attributeByKey, attributeGroups, specLabel } from '../../data/attributes.js'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { t } from '../../i18n/index.js'
 
@@ -21,7 +21,7 @@ import { t } from '../../i18n/index.js'
  * shorter page rather than a set of empty headings.
  */
 
-const label = (key) => attributeByKey[key]?.label || key
+const label = (key, specList) => specLabel(key, specList)
 
 /** Six pairs, two columns, above the fold. */
 export function ProductHighlights({ enrichment, limit = 6 }) {
@@ -34,7 +34,7 @@ export function ProductHighlights({ enrichment, limit = 6 }) {
       <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4">
         {rows.map((row) => (
           <div key={row.key}>
-            <dt className="text-[12px] leading-snug text-faint">{row.label || label(row.key)}</dt>
+            <dt className="text-[12px] leading-snug text-faint">{row.label || label(row.key, enrichment?.specList)}</dt>
             <dd className="mt-0.5 text-[14px] leading-snug text-ink">{row.value}</dd>
           </div>
         ))}
