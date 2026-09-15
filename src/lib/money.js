@@ -31,6 +31,27 @@ export function registerCurrencies(pricing) {
   }
 }
 
+let storeLocale = ''
+
+/**
+ * The store's locale (`pricing.locale`), registered when the settings load, like the currencies above.
+ *
+ * Prices were formatted in the build's locale (`VITE_LOCALE`, en-US unless set), so a store in Germany showed
+ * "€1,234.50" whatever it chose in Odoo. An Odoo-style `de_DE` is accepted; a value that is not a locale is ignored.
+ */
+export function registerLocale(locale) {
+  if (!locale) return
+  try {
+    const [canonical] = Intl.getCanonicalLocales(String(locale).trim().replace(/_/g, '-'))
+    if (canonical) storeLocale = canonical
+  } catch {
+    /* not a locale: keep the one there was */
+  }
+}
+
+/** The locale prices and dates are shown in: the store's, else the build's. */
+export const displayLocale = () => storeLocale || config.store.locale || 'en-US'
+
 /** The store's currency: the backend's, else the build's, else the demo catalogue's. */
 const defaultCurrency = () => storeCurrency || config.store.currency || 'USD'
 
@@ -52,7 +73,10 @@ export function toMajor(m) {
   return m.amount / 10 ** minorUnits(m.currency)
 }
 
-export function formatMoney(m, { locale = config.store.locale } = {}) {
+/** The store's tax note for under a bag's totals (`pricing.showTaxNote` and `pricing.taxNote`), or '' for none. */
+export const taxNote = (pricing) => (pricing?.showTaxNote && typeof pricing.taxNote === 'string' ? pricing.taxNote.trim() : '')
+
+export function formatMoney(m, { locale = displayLocale() } = {}) {
   if (!m || typeof m.amount !== 'number') return ''
   const digits = minorUnits(m.currency)
   try {

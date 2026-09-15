@@ -4,9 +4,11 @@ import api, { peek } from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import Promises from '../components/layout/Promises.jsx'
 import { Breadcrumbs, ErrorState, Skeleton } from '../components/ui/index.jsx'
+import Media from '../components/ui/Media.jsx'
 import Seo from '../components/Seo.jsx'
 import ContactDetails from '../components/content/ContactDetails.jsx'
 import { useStorefront } from '../store/StorefrontContext.jsx'
+import { blockParts, groupBlocks, paragraphs } from '../lib/page-blocks.js'
 import { t } from '../i18n/index.js'
 
 const ContactForm = lazy(() => import('../components/content/ContactForm.jsx'))
@@ -15,20 +17,11 @@ const ContactForm = lazy(() => import('../components/content/ContactForm.jsx'))
  * An information page written in the backend (`GET /pages/:slug`): shipping,
  * returns, terms, privacy, FAQ, contact. Blocks are text, tables, images,
  * questions and answers, the store's contact details and a contact form.
+ * Which parts a block shows is decided in lib/page-blocks.js.
  */
-const paragraphs = (text) => (text || '').split(/\n{2,}/).map((t) => t.trim()).filter(Boolean)
 
-/** Consecutive question-and-answer blocks read as one list. */
-function grouped(blocks = []) {
-  const out = []
-  for (const block of blocks) {
-    const last = out[out.length - 1]
-    if (block.type === 'faq' && last?.type === 'faq-group') last.items.push(block)
-    else if (block.type === 'faq') out.push({ type: 'faq-group', items: [block] })
-    else out.push(block)
-  }
-  return out
-}
+/** The page's text column is 48rem at most. */
+const IMAGE_SIZES = '(min-width: 768px) 48rem, 100vw'
 
 function Text({ block }) {
   return (
@@ -65,6 +58,40 @@ function Table({ rows }) {
   )
 }
 
+/** A block's parts below its heading, in the order `blockParts` gives them. */
+function Parts({ block, parts, config }) {
+  return parts.map((part) => {
+    if (part === 'image') {
+      return (
+        <figure key="image" className="mt-5">
+          {/* Like a product photograph: the sizes the backend keeps (`image.srcset`), through the store's image CDN. */}
+          <Media
+            src={block.image.url}
+            srcset={block.image.srcset}
+            sizes={IMAGE_SIZES}
+            alt={block.image.alt || ''}
+            loading="lazy"
+            className="w-full rounded-xs"
+          />
+        </figure>
+      )
+    }
+    if (part === 'text') return <Text key="text" block={block} />
+    if (part === 'table') return <Table key="table" rows={block.table} />
+    if (part === 'contact') return <ContactDetails key="contact" contact={config.store?.contact} />
+    if (part === 'form') {
+      return (
+        <Suspense key="form" fallback={<Skeleton className="mt-5 h-72 w-full" />}>
+          <ContactForm />
+        </Suspense>
+      )
+    }
+    return null
+  })
+}
+
+const belowHeading = (parts) => parts.filter((part) => part !== 'heading')
+
 function Block({ block, config }) {
   if (block.type === 'faq-group') {
     return (
@@ -72,28 +99,19 @@ function Block({ block, config }) {
         {block.items.map((item, i) => (
           <details key={i} className="py-4">
             <summary className="cursor-pointer text-[16px] font-medium">{item.h}</summary>
-            <Text block={item} />
+            {/* The answer keeps its own image and table. */}
+            <Parts block={item} parts={belowHeading(blockParts(item, config.features))} config={config} />
           </details>
         ))}
       </section>
     )
   }
+  const parts = blockParts(block, config.features)
+  if (!parts.length) return null
   return (
     <section>
-      {block.h && <h2 className="text-display-md">{block.h}</h2>}
-      {block.type === 'image' && block.image?.url && (
-        <figure className="mt-5">
-          <img src={block.image.url} alt={block.image.alt || ''} loading="lazy" className="w-full rounded-xs" />
-        </figure>
-      )}
-      {block.type !== 'contact-form' && <Text block={block} />}
-      {block.table && <Table rows={block.table} />}
-      {block.type === 'contact' && <ContactDetails contact={config.store?.contact} />}
-      {block.type === 'contact-form' && config.features?.contactForm !== false && (
-        <Suspense fallback={<Skeleton className="mt-5 h-72 w-full" />}>
-          <ContactForm />
-        </Suspense>
-      )}
+      {parts.includes('heading') && <h2 className="text-display-md">{block.h}</h2>}
+      <Parts block={block} parts={belowHeading(parts)} config={config} />
     </section>
   )
 }
@@ -130,7 +148,7 @@ export default function StaticPage() {
         <h1 className="mt-6 text-display-lg">{page.title}</h1>
         {page.intro && <p className="mt-5 text-[17px] leading-relaxed text-muted">{page.intro}</p>}
         <div className="mt-12 space-y-12">
-          {grouped(page.blocks).map((block, i) => <Block key={i} block={block} config={config} />)}
+          {groupBlocks(page.blocks).map((block, i) => <Block key={i} block={block} config={config} />)}
         </div>
       </div>
       <Promises />

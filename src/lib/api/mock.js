@@ -634,8 +634,10 @@ export async function getPage(slug) {
 
 export async function sendContact(message = {}) {
   await latency()
-  if (!message.name || !message.email || !message.message) {
-    throw new ApiError('Please enter your name, a valid email address and a message.', { status: 422, code: 'missing_fields' })
+  // Like the backend: the fields that are missing, so the form can mark them.
+  const missing = ['name', 'email', 'message'].filter((key) => !String(message[key] || '').trim())
+  if (missing.length) {
+    throw new ApiError('Please enter your name, a valid email address and a message.', { status: 422, code: 'missing_fields', detail: { fields: missing } })
   }
   return { ok: true, id: `msg_${Date.now()}` }
 }

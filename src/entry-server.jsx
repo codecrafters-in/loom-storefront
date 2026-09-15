@@ -11,7 +11,8 @@ import { docPages, docPath } from './data/docs.js'
 import { flattenCategories } from './lib/categories.js'
 import { config, isMock } from './lib/config.js'
 import { currentLanguage, isRightToLeft, languageFromPath, setLanguage } from './i18n/index.js'
-import { fontsHref, themeCss } from './lib/theme.js'
+import { baseFontsHref, fontsHref, themeCss, themeHead } from './lib/theme.js'
+import { blogEnabled } from './lib/blog.js'
 
 /**
  * One route, rendered to HTML at build time.
@@ -148,6 +149,8 @@ async function readsFor(path, params, boot) {
     return [['getPage', [slug]]]
   }
   if (section === 'blog') {
+    // A blog the store switched off is not there: the not-found page, with a 404.
+    if (!blogEnabled(boot?.storefront)) return null
     if (slug) {
       await api.getBlogPost(slug)
       return [['getBlogPost', [slug]]]
@@ -225,8 +228,14 @@ export function render(url, { docs, basename } = {}) {
     // The store's colours and fonts in the page itself, so the first paint is already in them.
     const theme = peek.getBootstrap()?.storefront?.theme
     const css = themeCss(theme)
+    const base = baseFontsHref(theme)
     const fonts = fontsHref(theme)
-    const style = (css ? `<style id="loom-theme">${css}</style>` : '') + (fonts ? `<link rel="stylesheet" href="${fonts}" data-loom-fonts="1" />` : '')
+    // Also the store's icon and colour bar, and only the base fonts the theme uses: each replaces the template's own
+    // (server/handler.mjs `withoutReplacedHead`), so a crawler, a bookmark and the first paint see the store's.
+    const style = (css ? `<style id="loom-theme">${css}</style>` : '') +
+      (base ? `<link rel="stylesheet" id="loom-fonts" href="${base}" />` : '') +
+      (fonts ? `<link rel="stylesheet" href="${fonts}" data-loom-fonts="1" />` : '') +
+      themeHead(theme)
     return { html, head: style + head }
   } catch (err) {
     stopCollecting()

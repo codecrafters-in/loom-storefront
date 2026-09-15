@@ -14,6 +14,7 @@ import { remember } from '../lib/recentlyViewed.js'
 import { useAuth } from '../store/AuthContext.jsx'
 import RecentlyViewed from '../components/product/RecentlyViewed.jsx'
 import { t, plural } from '../i18n/index.js'
+import { displayLocale } from '../lib/money.js'
 
 const ReviewForm = lazy(() => import('../components/product/ReviewForm.jsx'))
 const ProductQuestions = lazy(() => import('../components/product/ProductQuestions.jsx'))
@@ -180,7 +181,7 @@ export default function Product() {
                     </span>
                   )}
                   <time className="ms-auto text-[12px] text-faint" dateTime={r.createdAt}>
-                    {new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                    {new Date(r.createdAt).toLocaleDateString(displayLocale(), { month: 'short', year: 'numeric' })}
                   </time>
                 </div>
                 <p className="mt-3 text-[14px] leading-relaxed text-muted">{r.body}</p>

@@ -18,7 +18,7 @@ import { SIZES } from '../lib/images.js'
 import { useCart } from '../store/CartContext.jsx'
 import { useAuth } from '../store/AuthContext.jsx'
 import { Button, Empty, Icon } from '../components/ui/index.jsx'
-import { formatMoney } from '../lib/money.js'
+import { formatMoney, taxNote } from '../lib/money.js'
 import { nestLines } from '../lib/cart-lines.js'
 import LineDetails from '../components/cart/LineDetails.jsx'
 import DiscountCode from '../components/cart/DiscountCode.jsx'
@@ -816,6 +816,7 @@ export default function Checkout() {
               <div className="flex justify-between"><dt className="text-muted">{t('Gift wrapping')}</dt><dd className="tabular-nums">{formatMoney(cart.giftWrap)}</dd></div>
             )}
           </dl>
+          {taxNote(config.pricing) && <p className="mt-2 text-[11px] text-faint">{taxNote(config.pricing)}</p>}
           <p className="mt-4 flex justify-between border-t border-line pt-4 text-lg">
             <span>{t('Total')}</span><span className="tabular-nums">{formatMoney(payableTotal(cart.total, chosenMethod))}</span>
           </p>

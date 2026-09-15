@@ -64,6 +64,25 @@ const TEMPLATE_HEAD = [
   /^\s*<meta (?:name|property)="(?:description|og:title|og:description|og:image|og:type|og:site_name|og:url|twitter:card|twitter:title|twitter:description|twitter:image|robots)"[^>]*>\n?/gm,
 ]
 
+/**
+ * The template's icons, browser colours and base font stylesheet, each dropped when the page's head brings the
+ * store's own (src/lib/theme.js `themeHead` and `baseFontsHref`). Left in, the browser would choose between the
+ * template's icon and the store's, and between two theme colours.
+ */
+const TEMPLATE_THEME = [
+  ['rel="icon"', /^\s*<link rel="(?:icon|apple-touch-icon)"[^>]*>\n?/gm],
+  ['name="theme-color"', /^\s*<meta name="theme-color"[^>]*>\n?/gm],
+  ['name="color-scheme"', /^\s*<meta name="color-scheme"[^>]*>\n?/gm],
+  ['id="loom-fonts"', /^\s*<link (?=[^>]*\bid="loom-fonts")[^>]*>\n?/gm],
+]
+
+/** `template` without the tags `head` replaces. Shared with scripts/prerender.mjs. */
+export function withoutReplacedHead(template, head = '') {
+  let out = template
+  for (const [marker, pattern] of TEMPLATE_THEME) if (head.includes(marker)) out = out.replace(pattern, '')
+  return out
+}
+
 const STATUS = { page: 200, 'not-found': 404, maintenance: 503, error: 503 }
 
 const seconds = (value, fallback) => {
@@ -91,7 +110,7 @@ export const seedScript = (name, payload) =>
 
 /** The page: the template with the route's head, the data it was rendered from, and its markup. */
 export function assemble(template, { html = '', head = '', seeds = {}, language = '', direction = 'ltr' } = {}) {
-  let out = template
+  let out = withoutReplacedHead(template, head)
   if (head.includes('<title>')) for (const pattern of TEMPLATE_HEAD) out = out.replace(pattern, '')
   if (language) out = out.replace(/<html\b[^>]*>/i, `<html lang="${language.replace(/[^\w-]/g, '')}" dir="${direction === 'rtl' ? 'rtl' : 'ltr'}">`)
   const scripts = Object.entries(seeds)

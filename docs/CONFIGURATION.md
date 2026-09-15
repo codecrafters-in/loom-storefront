@@ -155,6 +155,14 @@ Everything below is optional — omit a key and the default applies.
 built-in mark, which inherits `currentColor` and stays sharp at any size. See
 [THEMING.md](THEMING.md#the-logo).
 
+`theme.logoDarkUrl` (Odoo: *Logo on dark backgrounds*) replaces `logo.imageUrl` wherever the logo sits on the page
+colour (the header, the phone menu, the footer and the closed-store screen) when the theme's page colour is dark:
+relative luminance below 0.35. Without it the usual logo shows. `logo.height` is the header's height; the footer
+shows the logo at 1.2 times that (72 px at most) and the phone menu at 0.9 times (40 px at most).
+
+`theme.faviconUrl` is written into every server-rendered page as the favicon (`image/png`) and the home-screen icon,
+and `theme.colors.page` as the browser's `theme-color`, in place of the template's.
+
 ### `pricing`
 
 ```json
@@ -172,9 +180,11 @@ built-in mark, which inherits `currentColor` and stays sharp at any size. See
 }
 ```
 
-`showTaxNote` renders `taxNote` under the cart totals.
+`showTaxNote` renders `taxNote` under the totals on the bag page, in the bag drawer and in the checkout summary.
 
 - `currency` is the display default and what `Intl.NumberFormat` formats with.
+- `locale` is how every price and date is written (`de-DE`, or Odoo's `de_DE`): `1.234,50 €` for a German store. It
+  wins over `VITE_LOCALE`; a value that is not a locale is ignored.
 - `currencies` populates the currency switcher in the header (live stores only). One entry, or entries without a
   `pricelistId`, hides it. Picking one sends that `pricelistId` as the `X-Loom-Pricelist` header on every call, moves
   the bag (`POST /carts/:id/pricelist`) and reloads, so prices come back from the backend in that currency.
@@ -229,14 +239,16 @@ to fifty countries does not send fifty state lists with every page.
     "currencySwitcher": true,
     "signup": true, "phoneLogin": false, "socialLogin": [],
     "quotes": false, "reviewPolicy": "buyers", "questions": false,
-    "stockAlerts": true, "liveChat": null
+    "stockAlerts": true, "liveChat": null,
+    "blog": false, "contactForm": true
   }
 }
 ```
 
 Setting one to `false` removes its entry points — the heart on product cards,
-the search field, the account icon, the discount field in the cart. Routes stay
-reachable so an existing bookmark does not 404; nothing links to them.
+the search field, the account icon (in the header and the phone menu), the discount field in the cart. Routes stay
+reachable so an existing bookmark does not 404; nothing links to them. The blog is the exception: switched off, its
+addresses answer the not-found page.
 
 The account and community ones come from the Odoo store form:
 
@@ -250,6 +262,8 @@ The account and community ones come from the Odoo store form:
 | `questions` | Questions and answers on product pages |
 | `stockAlerts` | **Email me when it is back** on a sold-out option |
 | `liveChat` | `{ provider: "odoo", origin, loaderUrl }`: Odoo's live chat, loaded when the page is idle |
+| `blog` | The blog at `/blog` and `/blog/:slug`. `false` makes both answer the not-found page (a 404 when server-rendered) and leaves links to the blog out of the menu and footer. Only `false` turns it off |
+| `contactForm` | The contact form on store pages. `false` hides a `contact-form` block entirely, its heading and text included |
 
 There is no `currencySwitcher`. Multiple currencies are a backend negotiation —
 the API returns prices already in the currency it was asked for — and a client
@@ -592,6 +606,7 @@ the rest on.
   "trust": {
     "payments": ["Visa", "Mastercard", "Amex", "PayPal", "Apple Pay", "UPI"],
     "repairs": true,
+    "repairsText": "Free repairs for as long as you own it",
     "showCertifications": true,
     "showFitFeedback": true,
     "showSocialProof": true,
@@ -615,6 +630,7 @@ See [CRO.md](CRO.md).
 | --- | --- |
 | `payments` | Payment marks beside the secure-checkout line. Text labels, no logos to license |
 | `repairs` | The "repaired, not replaced" line |
+| `repairsText` | The store's own wording for that line, shown in its place. Without it the line reads "Repaired, not replaced — we mend anything we made, for as long as we exist" |
 | `showFitFeedback` | The fit verdict and purchaser distribution |
 | `showSocialProof` | Demand counts under the buy button |
 | `socialProofThresholds` | Below these, the block renders **nothing** rather than advertising low demand |

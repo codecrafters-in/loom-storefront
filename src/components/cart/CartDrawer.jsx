@@ -4,7 +4,7 @@ import { useCart } from '../../store/CartContext.jsx'
 import { Button, Icon, QuantityStepper, Empty } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
-import { formatMoney } from '../../lib/money.js'
+import { formatMoney, taxNote } from '../../lib/money.js'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import api from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
@@ -207,6 +207,8 @@ export default function CartDrawer() {
                   <dd className="tabular-nums">{cart.shipping.amount === 0 ? t('Free') : formatMoney(cart.shipping)}</dd>
                 </div>
               </dl>
+              {/* The store's tax note, as on the bag page: the drawer is where most shoppers read the total. */}
+              {taxNote(config.pricing) && <p className="mt-1.5 text-[11px] text-faint">{taxNote(config.pricing)}</p>}
               <p className="mt-2.5 flex justify-between border-t border-line pt-2.5 text-[15px] font-medium">
                 <span>{t('Total')}</span>
                 <span className="tabular-nums">{formatMoney(cart.total)}</span>

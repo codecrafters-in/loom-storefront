@@ -5,7 +5,8 @@ import { ToastProvider } from './store/ToastContext.jsx'
 import { CartProvider } from './store/CartContext.jsx'
 import { WishlistProvider } from './store/WishlistContext.jsx'
 import { AuthProvider } from './store/AuthContext.jsx'
-import { StorefrontProvider } from './store/StorefrontContext.jsx'
+import { StorefrontProvider, useStorefrontState } from './store/StorefrontContext.jsx'
+import { blogEnabled } from './lib/blog.js'
 import { AdminAuthProvider } from './store/AdminAuthContext.jsx'
 import RequireAdmin from './components/admin/RequireAdmin.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
@@ -79,6 +80,16 @@ const Loading = () => (
   </div>
 )
 
+/**
+ * The blog's pages, or the not-found page for a store that switched its blog off (`features.blog`). Waits for the
+ * settings: before they arrive a live store's defaults have the blog off, and a direct visit would be sent away.
+ */
+function BlogOnly({ children }) {
+  const { config, ready } = useStorefrontState()
+  if (!ready) return <Loading />
+  return blogEnabled(config) ? children : <Navigate to="/404" replace />
+}
+
 export default function App() {
   // Everything below the settings starts again in a new language, so every piece of text is in it.
   const language = useLanguage()
@@ -126,8 +137,8 @@ export default function App() {
                   <Route path="alerts/unsubscribe" element={<TokenLink kind="alertsStop" />} />
                   <Route path="account/*" element={<Account />} />
                   <Route path="pages/:slug" element={<StaticPage />} />
-                  <Route path="blog" element={<Blog />} />
-                  <Route path="blog/:slug" element={<BlogPost />} />
+                  <Route path="blog" element={<BlogOnly><Blog /></BlogOnly>} />
+                  <Route path="blog/:slug" element={<BlogOnly><BlogPost /></BlogOnly>} />
                   {/* The theme's documentation, on the demo only: a live store's
                       customers are not offered an API reference. */}
                   {isMock && <Route path="docs" element={<Docs />} />}

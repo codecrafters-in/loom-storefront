@@ -9,6 +9,7 @@ import Logo from '../ui/Logo.jsx'
 import useAsync from '../../hooks/useAsync.js'
 import api from '../../lib/api/index.js'
 import { docsLinkVisible } from '../../lib/docs-link.js'
+import { withoutBlogLinks } from '../../lib/blog.js'
 import useFocusTrap from '../../hooks/useFocusTrap.js'
 import { isMock } from '../../lib/config.js'
 import { t } from '../../i18n/index.js'
@@ -59,8 +60,8 @@ export default function Header() {
 
   const features = config.features || {}
   // A nav entry with `categorySlug` pulls that category's children in as a
-  // submenu, so the menu never has to restate the category tree.
-  const primary = (config.navigation?.primary?.length
+  // submenu, so the menu never has to restate the category tree. No links into a blog the store switched off.
+  const primary = withoutBlogLinks((config.navigation?.primary?.length
     ? config.navigation.primary
     : (cats?.items || []).map((c) => ({ label: c.name, categorySlug: c.slug }))
   ).map((item) => {
@@ -70,7 +71,9 @@ export default function Header() {
       to: item.to || (cat ? `/shop/${cat.slug}` : '/shop'),
       children: item.children || cat?.children || [],
     }
-  })
+  }), config)
+  const languages = config.i18n?.languages?.length > 1
+  const currencies = !isMock && config.pricing?.currencies?.length > 1
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -212,13 +215,13 @@ export default function Header() {
             </form>
             )}
 
-            {config.i18n?.languages?.length > 1 && (
+            {languages && (
               <Suspense fallback={null}>
                 <LanguageSwitcher className="me-1 hidden sm:inline-flex" />
               </Suspense>
             )}
 
-            {!isMock && config.pricing?.currencies?.length > 1 && (
+            {currencies && (
               <Suspense fallback={null}>
                 <CurrencySwitcher className="me-1 hidden sm:inline-flex" />
               </Suspense>
@@ -302,7 +305,8 @@ export default function Header() {
         className={`fixed start-0 top-0 z-50 h-[100dvh] w-[min(84vw,20rem)] bg-page shadow-panel transition-transform lg:hidden ${menuOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'}`}
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <Logo config={config} size={20} />
+          {/* A little smaller than in the header, from the store's own logo height, and kept inside the bar. */}
+          <Logo config={config} scale={0.9} max={40} />
           <button type="button" onClick={() => setMenuOpen(false)} aria-label={t('Close menu')} className="text-muted hover:text-ink">
             <Icon name="close" size={20} />
           </button>
@@ -322,11 +326,28 @@ export default function Header() {
               )}
             </li>
           ))}
-          <li>
-            <Link to={signedIn ? '/account' : '/login'} className="block py-3.5 text-[15px] text-muted">
-              {signedIn ? t('Your account') : t('Sign in')}
-            </Link>
-          </li>
+          {features.accounts !== false && (
+            <li>
+              <Link to={signedIn ? '/account' : '/login'} className="block py-3.5 text-[15px] text-muted">
+                {signedIn ? t('Your account') : t('Sign in')}
+              </Link>
+            </li>
+          )}
+          {/* The header's switchers are hidden on a phone, so they are here instead. */}
+          {(languages || currencies) && (
+            <li className="flex flex-wrap items-center gap-2 border-t border-line py-3.5 sm:hidden">
+              {languages && (
+                <Suspense fallback={null}>
+                  <LanguageSwitcher className="h-10" />
+                </Suspense>
+              )}
+              {currencies && (
+                <Suspense fallback={null}>
+                  <CurrencySwitcher />
+                </Suspense>
+              )}
+            </li>
+          )}
           {/* The floating pill is desktop-only — the bottom of a phone screen
               belongs to the buy bar. This is the same door, in the drawer that
               already exists, costing no space until it is opened. */}

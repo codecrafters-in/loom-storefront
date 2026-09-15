@@ -27,3 +27,13 @@ export function prefillCheckout(form, customer, touched = new Set()) {
   }
   return next
 }
+
+/**
+ * The contact form's name and email, filled from the signed-in customer. What the shopper already typed wins, and a
+ * customer with no name on the account leaves the name for them to write.
+ */
+export function prefillContact(form, customer) {
+  if (!customer) return form
+  const name = customer.name || [customer.firstName, customer.lastName].filter(Boolean).join(' ')
+  return { ...form, name: form.name || name || '', email: form.email || customer.email || '' }
+}

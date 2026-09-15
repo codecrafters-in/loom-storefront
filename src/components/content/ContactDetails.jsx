@@ -25,7 +25,10 @@ export default function ContactDetails({ contact, compact = false, className = '
     phone && [t('Phone'), <a key="phone" href={`tel:${phone.replace(/[^\d+]/g, '')}`} className={link}>{phone}</a>],
     whatsappUrl && ['WhatsApp', <a key="wa" href={whatsappUrl} className={link} target="_blank" rel="noopener noreferrer">{whatsapp}</a>],
     hours && [t('Hours'), hours],
-    !compact && address.length > 0 && [t('Address'), <span key="address">{address.map((line) => <span key={line} className="block">{line}</span>)}</span>],
+    // Compact, in the footer, the address is one line with commas: it was left out there altogether.
+    address.length > 0 && [t('Address'), compact
+      ? <span key="address">{address.join(', ')}</span>
+      : <span key="address">{address.map((line) => <span key={line} className="block">{line}</span>)}</span>],
     social.length > 0 && [t('Follow'), (
       <span key="social" className="flex flex-wrap gap-x-3 gap-y-1">
         {social.map((s) => (

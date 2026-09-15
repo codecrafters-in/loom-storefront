@@ -6,6 +6,7 @@ import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { formatMoney } from '../../lib/money.js'
 import { isMock } from '../../lib/config.js'
 import { t, plural } from '../../i18n/index.js'
+import { repairsLine } from '../../lib/trust.js'
 
 // Only a real backend can say whether a postcode is served; the demo build leaves the checker out.
 const DeliveryCheck = isMock ? null : lazy(() => import('./DeliveryCheck.jsx'))
@@ -33,6 +34,7 @@ export default function TrustRow({ flat = false, product = null }) {
   const policy = product?.returns
   const finalSale = policy?.returnable === false
   const days = finalSale ? 0 : policy?.returnable ? policy.days ?? 0 : config.commerce?.returnsWindowDays ?? 0
+  const repairs = repairsLine(trust)
 
   const rows = [
     eta && {
@@ -62,11 +64,8 @@ export default function TrustRow({ flat = false, product = null }) {
       strong: t('Final sale'),
       rest: t('this item cannot be returned'),
     },
-    trust.repairs === true && {
-      icon: 'shield',
-      strong: t('Repaired, not replaced'),
-      rest: t('we mend anything we made, for as long as we exist'),
-    },
+    // The store's own sentence (`trust.repairsText`) when it sends one.
+    repairs && { icon: 'shield', ...repairs },
   ].filter(Boolean)
 
   return (

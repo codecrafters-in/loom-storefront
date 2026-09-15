@@ -4,6 +4,7 @@ import Seo from '../components/Seo.jsx'
 import useAsync from '../hooks/useAsync.js'
 import Promises from '../components/layout/Promises.jsx'
 import { Button, Empty, ErrorState, Skeleton } from '../components/ui/index.jsx'
+import { useStorefront } from '../store/StorefrontContext.jsx'
 import { t, plural } from '../i18n/index.js'
 
 /**
@@ -15,10 +16,17 @@ import { t, plural } from '../i18n/index.js'
 export default function Brands() {
   const { data, error, loading, reload } = useAsync(() => api.listBrands(), [], { initial: peek.listBrands() })
   const brands = data?.items || []
+  const store = useStorefront().store?.name
+  // The store's own description rather than a sentence every store shares, naming the first few brands for a search
+  // result to show.
+  const names = brands.slice(0, 5).map((b) => b.name).join(', ')
+  const description = !store
+    ? t('Shop by brand.')
+    : names ? t('Brands at {store}: {names}.', { store, names }) : t('Brands at {store}.', { store })
 
   return (
     <>
-      <Seo title={t('Brands')} description={t('Shop by brand.')} />
+      <Seo title={t('Brands')} description={description} />
       <div className="wrap py-10">
         <h1 className="text-display-lg">{t('Brands')}</h1>
         <p className="mt-3 text-[15px] text-muted">
@@ -46,6 +54,8 @@ export default function Brands() {
                     <span aria-hidden="true" className="grid h-10 w-10 place-items-center rounded-full bg-sunken font-display text-lg">{b.name.slice(0, 1)}</span>
                   )}
                   <p className="mt-3 text-[15px] font-medium">{b.name}</p>
+                  {/* A short line from the brand's description, two lines at most so the cards keep one height. */}
+                  {b.description && <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-muted">{b.description}</p>}
                   <p className="mt-1 text-[12px] text-muted">{plural(b.count, '{count} product', '{count} products')}</p>
                 </Link>
               </li>

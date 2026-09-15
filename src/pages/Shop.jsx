@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import api, { peek } from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
@@ -167,7 +167,11 @@ export default function Shop({ mode = 'category' }) {
     }
   }, [drawer])
 
-  const title = brand ? maker?.name || '' : col?.title || meta?.name || t('All products')
+  // An unknown brand is the not-found page, as the server render answers it.
+  if (brand && brandMeta.error?.status === 404) return <Navigate to="/404" replace />
+
+  // The brand's name while it loads is a placeholder in the heading (below), never an empty one.
+  const title = brand ? maker?.name || (brandMeta.error ? slug : '') : col?.title || meta?.name || t('All products')
   const blurb = brand ? maker?.description || '' : col?.blurb || meta?.blurb || t('Everything we make, in one place.')
   const clear = () => setFilters({ sort: filters.sort, page: 1 })
   const count = data?.total ?? 0
@@ -190,7 +194,9 @@ export default function Shop({ mode = 'category' }) {
         <Breadcrumbs
           trail={[
             { label: t('Home'), to: '/' },
-            { label: mode === 'collection' ? t('Collections') : t('Shop'), to: '/shop' },
+            brand
+              ? { label: t('Brands'), to: '/brands' }
+              : { label: mode === 'collection' ? t('Collections') : t('Shop'), to: '/shop' },
             // Every ancestor by name, linked; the page itself last, unlinked.
             ...trail.slice(0, -1).map((c) => ({ label: c.name, to: `/shop/${c.slug}` })),
             ...(slug ? [{ label: title || slug }] : []),
@@ -198,7 +204,14 @@ export default function Shop({ mode = 'category' }) {
         />
         <header className="mt-6 max-w-2xl">
           {maker?.logo?.url && <img src={maker.logo.url} alt="" className="mb-5 h-10 w-auto" />}
-          <h1 className="text-display-lg">{title}</h1>
+          {title ? (
+            <h1 className="text-display-lg">{title}</h1>
+          ) : (
+            <h1 className="text-display-lg" aria-busy="true">
+              <span className="sr-only">{t('Loading…')}</span>
+              <span aria-hidden="true" className="skeleton inline-block h-[0.9em] w-64 max-w-full rounded-xs align-middle" />
+            </h1>
+          )}
           {blurb && <p className="mt-4 text-[15px] leading-relaxed text-muted">{blurb}</p>}
         </header>
       </div>

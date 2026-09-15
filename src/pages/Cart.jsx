@@ -8,7 +8,7 @@ import { useWishlist } from '../store/WishlistContext.jsx'
 import api from '../lib/api/index.js'
 import { Button, Empty, Icon, QuantityStepper, Skeleton } from '../components/ui/index.jsx'
 import Promises from '../components/layout/Promises.jsx'
-import { formatMoney } from '../lib/money.js'
+import { formatMoney, taxNote } from '../lib/money.js'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import { isMock } from '../lib/config.js'
 import Media from '../components/ui/Media.jsx'
@@ -287,8 +287,8 @@ export default function Cart() {
               <Row label={t('Shipping')} value={cart.shipping.amount === 0 ? t('Free') : formatMoney(cart.shipping)} />
               <Row label={t('Estimated tax')} value={formatMoney(cart.tax)} />
             </dl>
-            {config.pricing?.showTaxNote && config.pricing?.taxNote && (
-              <p className="mt-2 text-[11px] text-faint">{config.pricing.taxNote}</p>
+            {taxNote(config.pricing) && (
+              <p className="mt-2 text-[11px] text-faint">{taxNote(config.pricing)}</p>
             )}
             <p className="mt-4 flex justify-between border-t border-line pt-4 text-lg">
               <span>{t('Total')}</span>

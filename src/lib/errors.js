@@ -18,3 +18,15 @@ export const shouldReset = (hasError, previousKey, key) => Boolean(hasError) && 
 
 /** A label, not a stack trace. The stack goes to the console. */
 export const describeError = (error) => String(error?.message || error || 'Unknown error').slice(0, 200)
+
+/**
+ * The form fields a `422` answer names (`detail.fields`), as a set; empty for any other error.
+ *
+ * The API error keeps the whole JSON body as its `detail`, so Odoo's list is at `detail.detail.fields`; the demo
+ * adapter puts it at `detail.fields`. A form marks those fields rather than only repeating the message at the bottom.
+ */
+export function fieldErrors(error) {
+  if (error?.status !== 422) return new Set()
+  const fields = error.detail?.detail?.fields || error.detail?.fields
+  return new Set(Array.isArray(fields) ? fields.filter((field) => typeof field === 'string') : [])
+}

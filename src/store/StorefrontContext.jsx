@@ -6,7 +6,7 @@ import { config, isMock } from '../lib/config.js'
 import { ACCESS_EVENT, accessToken } from '../lib/access.js'
 import { storefront as demo } from '../data/storefront.js'
 import { defaults as neutral } from '../data/defaults.js'
-import { registerCurrencies } from '../lib/money.js'
+import { registerCurrencies, registerLocale } from '../lib/money.js'
 import { currentLanguage, languageFromAddress, setLanguage, setOverrides } from '../i18n/index.js'
 
 /**
@@ -123,6 +123,8 @@ export function StorefrontProvider({ children }) {
   const cfg = useMemo(() => merge(merge(defaults, fromEnv()), remote), [remote])
   // Before anything below formats a price: amounts divide by each currency's own decimals (3 for KWD).
   registerCurrencies(cfg.pricing)
+  // …and in the store's own locale (a German store's prices read 1.234,50 €), prices and dates alike.
+  registerLocale(cfg.pricing?.locale)
   // Image addresses through the store's image CDN, when it has one: before any image renders.
   setImageTemplate(cfg.media?.imageUrlTemplate)
   // Wording the merchant changed in Odoo, for the language on screen: before anything below renders a word.

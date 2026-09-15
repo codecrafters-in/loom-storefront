@@ -9,6 +9,7 @@ import Logo from '../ui/Logo.jsx'
 import { config as envConfig } from '../../lib/config.js'
 import { docsLinkVisible } from '../../lib/docs-link.js'
 import { footerLayout } from '../../lib/footer.js'
+import { withoutBlogLinks } from '../../lib/blog.js'
 import { useCaptcha } from '../Captcha.jsx'
 import ContactDetails from '../content/ContactDetails.jsx'
 import { t } from '../../i18n/index.js'
@@ -40,7 +41,8 @@ export default function Footer() {
     }
   }
 
-  const cols = config.navigation?.footer || []
+  // No links into a blog the store switched off.
+  const cols = withoutBlogLinks(config.navigation?.footer || [], config)
   // Any number of columns, in even rows: see lib/footer.js.
   const layout = footerLayout(cols.length)
 
@@ -54,7 +56,8 @@ export default function Footer() {
     <footer className="mt-24 border-t border-line bg-sunken/50">
       <div className={`wrap grid gap-12 py-16 ${layout.outer}`}>
         <div>
-          <Link to="/"><Logo config={config} size={26} /></Link>
+          {/* A little larger than in the header, from the store's own logo height. */}
+          <Link to="/"><Logo config={config} scale={1.2} max={72} /></Link>
           {config.store?.tagline && <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-muted">{config.store.tagline}</p>}
           <ContactDetails contact={config.store?.contact} compact className="mt-5" />
 

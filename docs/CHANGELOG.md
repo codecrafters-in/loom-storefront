@@ -18,6 +18,33 @@ With the Odoo module's 19.0.2.2.0 previews of the home page, menu and footer. De
   items keep their header icons. Demo Terms of sale and Privacy pages, and `checkout.termsUrl` is `/pages/terms`.
 - **From the Odoo backend:** `navigation` leaves out links to switched-off pages, and `checkout.termsUrl` follows the
   store's Terms page.
+- **Logo on a dark theme:** the logo uploaded for dark backgrounds (`theme.logoDarkUrl`) shows in the header, phone
+  menu, footer and closed-store screen whenever the store's page colour is dark. The footer and the phone menu size
+  the logo from the store's logo height rather than fixed sizes.
+- **Favicon and browser colour from the first byte:** the store's favicon (also the home-screen icon) and a browser
+  bar in the store's page colour are in the page as it is served, so link previews, bookmarks and the first moments
+  of a visit show the store's rather than the theme's.
+- **Prices and dates in the store's language settings:** prices and review dates follow the store's locale
+  (`pricing.locale`: a German store shows 1.234,50 €) instead of the build's.
+- **Fonts:** "System font" for headings is the device's own sans-serif, not a serif, and a store whose theme uses
+  neither Fraunces nor Inter no longer downloads them.
+- **Footer:** the store's address is in its contact details.
+- **Phone menu:** *Sign in* and *Your account* only when customer accounts are on, and the language and currency
+  switchers are in the menu on phones.
+- **Tax note:** also under the totals in the bag drawer and the checkout summary, not only on the bag page.
+- **Contact form:** in the shopper's language; the fields the store could not accept are marked, each with what to
+  fix; the captcha loads when the shopper starts filling it in; a signed-in customer's name and email are filled in.
+  A contact form block's text shows above the form, and with the contact form off (`features.contactForm`) the block
+  shows nothing, its heading included.
+- **Brands:** a short line of each brand's description on the Brands page, whose search description names the store.
+  A brand address that does not exist shows the not-found page, the heading is a placeholder while the brand loads,
+  and the breadcrumb reads Home › Brands › the brand.
+- **Store pages:** image blocks download a smaller copy on phones when the backend sends sizes, and questions keep
+  their image and table.
+- **Repairs line:** the store's own sentence (`trust.repairsText`) replaces the clothing-shop wording under the buy
+  button.
+- **Blog switched off** (`features.blog: false`): `/blog` and its posts show the not-found page with a 404, and menu
+  and footer links to the blog are left out.
 
 ## What's new — Phase 12: returns by rules, answered cancellations and order messages
 

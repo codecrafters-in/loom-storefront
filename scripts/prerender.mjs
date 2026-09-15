@@ -33,6 +33,7 @@ import { build } from 'vite'
 import { siteUrl } from './lib/site-url.mjs'
 import { builtFor } from './lib/build-mode.mjs'
 import { installBrowserGlobals } from '../server/globals.mjs'
+import { withoutReplacedHead } from '../server/handler.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = path.join(ROOT, 'dist')
@@ -112,7 +113,8 @@ async function main() {
       process.exitCode = 1
     }
 
-    const html = template
+    // The store's icon, colour bar and base fonts, when the route's head has them, in place of the template's.
+    const html = withoutReplacedHead(template, rendered.head)
       .replace(
         '</head>',
         `  ${rendered.head}\n    ${seedScript('__LOOM_CACHE__', payload)}` +

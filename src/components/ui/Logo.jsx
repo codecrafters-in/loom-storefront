@@ -1,4 +1,5 @@
 import { isMock } from '../../lib/config.js'
+import { logoHeight, logoImage } from '../../lib/logo.js'
 
 /**
  * The mark.
@@ -62,14 +63,20 @@ export function LoomMark({ size = 24, variant = 'tile', className = '' }) {
   )
 }
 
-export default function Logo({ config, className = '', size, variant = 'tile' }) {
+/**
+ * `size` fixes the height. Without it the height is the store's `store.logo.height` times `scale`, at most `max`, so
+ * the footer and the phone menu follow the height the store chose.
+ */
+export default function Logo({ config, className = '', size, scale = 1, max, variant = 'tile' }) {
   const logo = config?.store?.logo || {}
-  const height = size || logo.height || 26
+  const height = size || logoHeight(logo, { scale, max })
 
-  if (logo.imageUrl) {
+  // The dark-background artwork on a dark theme, when the store has one (lib/logo.js).
+  const image = logoImage(config)
+  if (image) {
     return (
       <img
-        src={logo.imageUrl}
+        src={image}
         alt={config?.store?.name || 'Home'}
         height={height}
         style={{ height }}
