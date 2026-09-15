@@ -736,9 +736,33 @@ DELETE /admin/library/:kind/:id
       "group": "general", "values": ["Button-down", "Spread"], "custom": true }
   ],
   "features":   [{ "id": "feature_x2", "icon": "leaf", "title": "…", "body": "…" }],
-  "assurances": [{ "id": "assurance_x3", "icon": "shield", "label": "Lifetime repairs" }]
+  "assurances": [{ "id": "assurance_x3", "icon": "shield", "label": "Lifetime repairs" }],
+  "productTypes": [
+    { "id": "7", "name": "Furniture", "productCount": 12,
+      "blocks": { "fit": false, "sizeChart": false, "composition": true, "compliance": true, "fitInReviews": false },
+      "labels": { "composition": "Materials", "care": "Care", "details": "Details", "weightUnit": "kg" },
+      "specKeys": ["wood", "length", "seat_height"] }
+  ],
+  "defaultProductTypeId": "7",
+  "options": [
+    { "name": "Finish", "displayType": "radio", "values": ["Natural oak", "Smoked oak"], "swatches": {},
+      "productTypeIds": ["7"] }
+  ]
 }
 ```
+
+**Product types.** `productTypes` has one entry per category in the store's
+category trees, including a type with no products yet, and
+`defaultProductTypeId` is the one a new product starts with. A product's type
+(`productTypeId` on `GET`/`POST`/`PATCH /admin/products`, resolved as
+`productType` on read) decides which blocks its page has — `fit`, `sizeChart`,
+`composition` (named by `labels.composition`, weighed in `labels.weightUnit`) and
+`compliance` — and `specKeys` are the specifications the type defines. An unknown
+type is `422 unknown_product_type`; a `POST` without one gets the type most
+neighbouring products use; changing a type drops the specification values the
+new type does not define. `options` are the option names and values products
+already use (`displayType` is `color`, `pills`, `radio`, `select` or `multi`),
+offered as suggestions in the editor, the product type's own first.
 
 **The attribute half fills itself in.** `POST /admin/products` reads the
 highlights and specifications it just saved, and any key the built-in vocabulary
@@ -775,10 +799,13 @@ Cache it hard. It changes when a merchant adds an attribute, not per request.
 
 ### The apparel blocks
 
-`fit`, `fabric`, `sizeChart` and `social` are optional, and they are the
-highest-value fields in the whole contract. Size and fit cause roughly two
-thirds of fashion returns; apparel return rates run 20–40%, the highest of any
-category. Reasoning and evidence: **[CRO.md](CRO.md)**.
+`fit`, `fabric`, `sizeChart` and `social` are optional, and they are not
+universal: a product has `fit`, `sizeChart` and `fabric` only where its product
+type has those blocks (see [The reuse library](#the-reuse-library)). A table has
+materials and no fit; coffee has ingredients. For a type that is worn and sized
+they are the highest-value fields in the whole contract. Size and fit cause
+roughly two thirds of fashion returns; apparel return rates run 20–40%, the
+highest of any category. Reasoning and evidence: **[CRO.md](CRO.md)**.
 
 | Field | Notes |
 | --- | --- |
@@ -1558,8 +1585,8 @@ storefront token**. Full guide, including the reference implementation at
 | Method | Route | Notes |
 | --- | --- | --- |
 | `GET` | `/admin/products?q=&page=&per_page=` | `{ items, total, page, perPage }` |
-| `POST` | `/admin/products` | Partial Product → Product |
-| `PATCH` | `/admin/products/:id` | Partial Product → Product |
+| `POST` | `/admin/products` | Partial Product → Product. `productTypeId` optional; without it the type most neighbours use |
+| `PATCH` | `/admin/products/:id` | Partial Product → Product. A new `productTypeId` drops specifications the type does not define; unknown is `422 unknown_product_type` |
 | `DELETE` | `/admin/products/:id` | |
 | `PATCH` | `/admin/variants/:id/inventory` | `{ quantity }` — set |
 | `POST` | `/admin/variants/:id/inventory` | `{ delta, reason?, operationId? }` — adjust |

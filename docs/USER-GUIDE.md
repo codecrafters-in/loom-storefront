@@ -15,22 +15,32 @@ move between the two. Shoppers never see it.
 
 **Products → New**
 
-Five tabs, filled in the order you would think about them:
+**Choose the product type first**, at the top of **Details**. On Odoo the type is
+the product's category, and it decides what the editor asks for: a shirt has fit,
+a size chart and fabric; a table has materials in kg and no size chart; coffee has
+ingredients in grams. The tabs follow it, filled in the order you would think
+about them:
 
 | Tab | What goes in it |
 | --- | --- |
-| **Details** | Title, slug, description, price, the Details and Care lists |
+| **Details** | Product type, title, slug, description, price, the details and care lists (named by the type) |
 | **Media** | Images, their alt text, and which colour each one belongs to |
-| **Variants** | Colours with swatches, sizes, then **Rebuild matrix** |
-| **Fit & fabric** | Fit verdict, model, size chart, composition, certifications |
-| **Highlights & specs** | Highlights, features, what it comes with, who made it, the spec table |
+| **Variants** | The options it is sold in (Colour, Size, Weight, Grind, Finish…), then the combinations you sell |
+| **Fit, size & fabric** | Only for a type that has them, and named after what it holds (*Materials*, *Ingredients*): fit verdict and model, size chart, composition, weight, certifications |
+| **Highlights & specs** | Highlights, features, what it comes with, who made it (where the type asks for it), the spec table |
 | **Organise** | Categories, tags, rating, demand counts, the related rail |
 
-Colours and sizes come first, then **Rebuild matrix** creates one row per
-combination. Fill in stock per row.
+On **Variants**, add each option by name (the ones your other products use are
+suggested), then its values. A colour option gets a swatch per value; any other
+option takes words. The editor lists the combinations that have no row yet: add
+them one by one or with **Add all**, then fill in stock per row. A product with no
+options is sold as one variant.
 
-> Rebuilding keeps everything you already typed. Adding a fourth colour does not
-> wipe the stock counts on the first three.
+> Adding values keeps everything you already typed. Adding a fourth colour does
+> not wipe the stock counts on the first three.
+
+> Changing the type of a product that is already saved asks first: specifications
+> the new type does not define are removed when you save.
 
 > **You will not lose what you type.** Unsaved changes stay in this browser, so a
 > reload or a crashed tab reopens the product with *Unsaved changes … were
@@ -422,9 +432,9 @@ An image tagged with a colour appears only when that colour is selected. Leave
 one on **All colours** — a fabric crop, a packshot, the size guide — and it stays
 in the gallery whichever colour is chosen.
 
-Then in **Variants**, each row's image picker points at the shot to jump to. Use
-**Rebuild matrix** and it wires itself: a new row takes the image tagged with its
-own colour if there is one.
+Then in **Variants**, each row's image picker points at the shot to jump to. Add
+the combinations with **Add all** and it wires itself: a new row takes the image
+tagged with its own colour if there is one.
 
 > This is what makes the main photograph change when a shopper taps a swatch.
 > Tag nothing and the gallery behaves exactly as it did before — one set of
@@ -632,7 +642,9 @@ history.
 Charts are shared. Nine products pointing at **tops** all update together, rather
 than nine copies of the same table drifting apart.
 
-Attach one on a product under **Fit & fabric → Use chart**.
+Attach one on a product under **Fit, size & fabric → Use chart** (the tab is named
+for what the product type has). The menu offers **Size charts** only when a product
+type in the store has a size chart.
 
 ---
 

@@ -42,8 +42,8 @@ picker. `id` is what `Variant.imageId` references as the fallback.
   price: Money                      // lowest variant price, for listings
   compareAtPrice: Money | null
   images: Image[]                   // at least two — the grid swaps on hover
-  options: { name: string, values: string[] }[]
-  swatches: Record<string, string>  // colour name → hex
+  options: { name: string, values: string[] }[]   // any names: Color, Size, Weight, Grind, Finish…
+  swatches: Record<string, string>  // colour value → hex, for a colour option only
   variants: Variant[]               // source of truth for stock
   categories: string[]              // leaf and ancestors
   tags: string[]
@@ -52,15 +52,43 @@ picker. `id` is what `Variant.imageId` references as the fallback.
   published: boolean                // false hides it from every storefront read
   createdAt: string                 // ISO 8601
 
-  fit?: Fit
-  fabric?: Fabric
-  sizeChartId?: string | null       // reference to a shared chart
+  productTypeId?: string | null     // admin read and write: the product's type (its category in the backend)
+  productType?: ProductType | null  // admin read: that type, resolved
+
+  fit?: Fit                         // only where the type has the fit block
+  fabric?: Fabric                   // only where the type has the composition block
+  sizeChartId?: string | null       // reference to a shared chart, where the type has one
   sizeChart?: SizeChart             // resolved from sizeChartId on read
   social?: Social
   enrichment?: Enrichment
   relatedSlugs?: string[]           // ordered; used only by the `manual` rail
 }
 ```
+
+### ProductType
+
+```ts
+{
+  id: string
+  name: string                      // "Clothing", "Furniture", "Coffee"
+  blocks: { fit, sizeChart, composition, compliance, fitInReviews: boolean }
+  labels: {
+    composition: string             // "Fabric", "Materials", "Ingredients", "Contents"
+    care: string                    // "Care"
+    details: string                 // "Details"
+    weightUnit: string              // "gsm", "kg", "g", or "" for none
+  }
+  specKeys: string[]                // the specification keys this type defines
+  productCount: number
+}
+```
+
+A product's type decides what its page is made of. Fit, size chart and
+composition are not universal: a table has no fit and no size chart, and its
+composition is its materials, weighed in kg. A block the type switches off is not
+rendered and not asked for in the admin editor, and its stored data is kept.
+`GET /admin/library` lists every type in the store with `defaultProductTypeId`.
+Changing a product's type drops the specifications the new type does not define.
 
 **`images[].color` is what makes the gallery follow the picker.** An image tagged
 with a colour shows only when that colour is selected; an untagged one — a fabric
@@ -85,8 +113,14 @@ before.
 }
 ```
 
-Stock lives here, not on the product. The size picker greys out sizes that are
-out of stock **in the selected colour**, which is only expressible per variant.
+`options` uses the product's own option names, whatever they are: `{ Color, Size }`
+for a shirt, `{ Weight, Grind }` for coffee, `{ Finish }` for a table, `{}` for a
+product with no options. Only a colour option (one the store shows as swatches,
+or one called Colour) has entries in `Product.swatches`.
+
+Stock lives here, not on the product. The picker greys out choices that are
+out of stock **in what the shopper has already chosen** (a size in the selected
+colour), which is only expressible per variant.
 
 A sold-out product returns its variants with `available: false` — never an empty
 array, or the page has no picker and nothing to add.
@@ -118,7 +152,7 @@ invent it — see [CRO.md](CRO.md).
 ```ts
 {
   composition: [string, number][]   // [["Merino wool", 100]]
-  weight: number | null             // gsm
+  weight: number | null             // in the product type's labels.weightUnit: gsm for cloth, kg, g
   weave: string
   origin: string
   certifications: string[]          // third-party marks only

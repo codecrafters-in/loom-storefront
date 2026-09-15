@@ -22,6 +22,19 @@ For the Odoo backend's rules-based returns, cancellation requests and customer-v
 - **Account › Returns:** the same explanation and the refunded amount on every return.
 - **Product pages:** a product's own returns policy (`product.returns`): *Final sale* for an item that cannot be
   returned, and its own number of days otherwise.
+- **Storefront admin › Products follows the product type.** A product's type is its Odoo product category
+  (`productTypeId`, `productType`), chosen at the top of **Details**. Its blocks decide the editor: the fit, size chart
+  and composition panels appear only where the type has them, in a tab named for what it holds (*Fit, size & fabric*,
+  *Materials*, *Ingredients*), with the type's words and weight unit; manufacturer rows only where it asks for
+  compliance (or the product already has some); and the preview shows the same blocks. Changing an existing product's
+  type asks first, naming the specifications it would lose. [ADMIN.md](ADMIN.md#products-and-their-type)
+- **Options of any name.** The Variants tab edits any options (Weight, Grind, Finish, Length…) with suggestions from
+  what the store already uses (`GET /admin/library` → `options`), swatches only for a colour option, and missing
+  combinations, *Add all* and bulk actions for any number of options. A new product starts with no options, or empty
+  Colour and Size for a type that is worn and sized. Specification suggestions put the type's own keys first
+  (`productType.specKeys`). [USER-GUIDE.md](USER-GUIDE.md#add-a-product)
+- **Size charts only where they are used.** The admin menu offers *Size charts* only when a product type has one
+  (`productTypes[].blocks.sizeChart`); the inventory search matches any option value.
 
 ## What's new — Phase 11: ready for the App Store
 

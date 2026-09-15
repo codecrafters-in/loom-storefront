@@ -2,7 +2,9 @@ import { NavLink, Outlet, Link } from 'react-router-dom'
 import { Icon } from '../../components/ui/index.jsx'
 import { LoomMark } from '../../components/ui/Logo.jsx'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
-import { isMock } from '../../lib/api/index.js'
+import api, { isMock } from '../../lib/api/index.js'
+import useAsync from '../../hooks/useAsync.js'
+import { usesSizeCharts } from '../../lib/product-types.js'
 import { useAdminAuth } from '../../store/AdminAuthContext.jsx'
 
 /**
@@ -23,7 +25,7 @@ const NAV = [
   { to: '/admin/products', label: 'Products', icon: 'package' },
   { to: '/admin/inventory', label: 'Inventory', icon: 'filter' },
   { to: '/admin/categories', label: 'Categories', icon: 'map-pin' },
-  { to: '/admin/size-charts', label: 'Size charts', icon: 'filter' },
+  { to: '/admin/size-charts', label: 'Size charts', icon: 'filter', sizeCharts: true },
   { to: '/admin/orders', label: 'Orders', icon: 'truck' },
   { to: '/admin/returns', label: 'Returns', icon: 'refresh', liveOnly: true },
   { to: '/admin/reviews', label: 'Reviews & questions', icon: 'star', liveOnly: true },
@@ -40,6 +42,12 @@ const VISIBLE_NAV = NAV.filter((n) => !isMock || !n.liveOnly)
 export default function AdminLayout() {
   const config = useStorefront()
   const { session, signOut } = useAdminAuth()
+  // Size charts are for product types that have one (clothing, rugs, rings). A
+  // furniture or coffee store has none, so the menu does not offer an empty
+  // screen. The demo keeps it; a backend without product types keeps it too.
+  const library = useAsync(() => api.listLibrary(), [], { skip: isMock })
+  const sizeCharts = isMock || Boolean(library.error) || (!library.loading && usesSizeCharts(library.data) !== false)
+  const nav = VISIBLE_NAV.filter((n) => !n.sizeCharts || sizeCharts)
   return (
     <div className="flex min-h-[100dvh] flex-col bg-page">
       <header className="border-b border-line bg-surface">
@@ -67,7 +75,7 @@ export default function AdminLayout() {
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 gap-8 px-5 py-8">
         <nav aria-label="Admin" className="hidden w-52 shrink-0 lg:block">
           <ul className="sticky top-8 space-y-0.5">
-            {VISIBLE_NAV.map((n) => (
+            {nav.map((n) => (
               <li key={n.to}>
                 <NavLink
                   to={n.to}
@@ -90,7 +98,7 @@ export default function AdminLayout() {
           {/* Mobile nav — a horizontal scroller rather than a hamburger, because
               an admin on a phone is usually doing one quick thing. */}
           <ul className="no-scrollbar mb-6 flex gap-2 overflow-x-auto lg:hidden">
-            {VISIBLE_NAV.map((n) => (
+            {nav.map((n) => (
               <li key={n.to}>
                 <NavLink
                   to={n.to}

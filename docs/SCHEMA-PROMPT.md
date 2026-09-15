@@ -102,8 +102,20 @@ Match these to the storefront's shapes.
   bug, not a styling choice), width, height, position, and an optional
   `option_value_id` so a colour can own its photograph. The storefront's gallery
   follows the colour picker when this is set.
-- `product_options` — product_id, name ("Color", "Size"), position
-- `option_values` — option_id, value, swatch_hex, position
+- `product_types` — id, name, and which blocks the type has: has_fit,
+  has_size_chart, has_composition, has_compliance, fit_in_reviews; its words:
+  composition_label ("Fabric", "Materials", "Ingredients"), care_label,
+  details_label, weight_unit ("gsm", "kg", "g" or empty). `products.product_type_id`
+  references it (in most systems a type *is* the category). The type decides
+  what a product's page is made of, so fit, size charts and composition are not
+  universal: a table has no fit and its composition is its materials
+- `product_type_attributes` — product_type_id, attribute_key: the
+  specification keys a type defines. Changing a product's type drops the values
+  its new type does not define
+- `product_options` — product_id, name (any name: "Color", "Size", "Weight",
+  "Grind", "Finish"), display_type, position
+- `option_values` — option_id, value, swatch_hex (only for a colour option),
+  position
 - `variants` — product_id, sku (unique), price, compare_at_price, inventory
   (cached), available (generated from inventory > 0), image_id (which shot to
   show when this variant is picked)
@@ -116,8 +128,12 @@ Match these to the storefront's shapes.
   request. Keep the recursive CTE for rebuilding those rows after a re-parent.
 - `collections`, `collection_products` — hand-curated sets
 
-**Apparel specifics.** These are the highest-value fields in an apparel
-catalogue — size and fit cause roughly two thirds of fashion returns:
+**Blocks some product types have.** Only for a type whose flags switch them on
+— clothing has all of them, a table has composition (its materials) and no fit or
+size chart, coffee has composition (its ingredients) and nothing else. For a type
+that is worn and sized they are the highest-value fields in the catalogue: size
+and fit cause roughly two thirds of fashion returns. Keep them in their own
+tables so a product of another type simply has no rows:
 - `size_charts` — id, unit, note, columns (ordered), shared across products
 - `size_chart_rows` — chart_id, position, cells
 - `product_fit` — product_id, verdict (`true-to-size` | `runs-small` |

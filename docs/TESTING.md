@@ -56,6 +56,7 @@ to change the code rather than the wait.
 | `payments-onsite` | Method routing, polling that backs off and gives up, the demo and Razorpay drivers, and the demo backend end to end |
 | `admin-orders` | Shipping with tracking reaching the shopper, delivery, cash on delivery, cancelling returning stock, filters and counts |
 | `admin-editor` | Slug rules while typing, highlights and specifications staying in sync, the admin category list |
+| `product-types` | The editor following the product type: tabs, panels and their names, missing combinations for any options, option and specification suggestions, the type-change warning, the demo's types |
 | `regions` | `getCountry` listing states, and the empty list that keeps a text box |
 | `prefill` | A refreshed checkout filling the default address without overwriting what was typed |
 

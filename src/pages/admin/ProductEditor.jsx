@@ -11,6 +11,13 @@ import ProductPreview from '../../components/admin/ProductPreview.jsx'
 import EnrichmentTab from '../../components/admin/EnrichmentTab.jsx'
 import { formatMoney, toMinor, toMajor } from '../../lib/money.js'
 import { slugify, slugProblem } from '../../lib/slug.js'
+import { specLabel } from '../../data/attributes.js'
+import {
+  colourOptionOf, droppedSpecs, editorTabs, fallbackType, frequentTags, isApparelType, knownSwatches,
+  missingCombinations, moveOption, optionAxes, optionNameProblem, optionNameSuggestions, optionsUntouched,
+  removeOption, renameOption, resolveProductType, setOptionValues, showCompliance, starterOptions, tabForError,
+  typeChangeWarning, typeOptionLabel, valueSuggestions, variantIdentity, variantLabel,
+} from '../../lib/product-types.js'
 
 /**
  * The whole product record.
@@ -42,14 +49,14 @@ const BLANK = () => ({
   price: { amount: 0, currency: 'USD' },
   compareAtPrice: null,
   images: [],
-  options: [
-    { name: 'Color', values: [] },
-    { name: 'Size', values: [] },
-  ],
+  // No options until the type is known: a table is not sold in Colour and Size.
+  // A new product whose type is worn and sized is given those two, empty, to start from.
+  options: [],
   swatches: {},
   variants: [],
   categories: [],
   rating: { average: 0, count: 0 },
+  productTypeId: null,
   fit: null,
   fabric: null,
   sizeChartId: null,
@@ -59,14 +66,8 @@ const BLANK = () => ({
   createdAt: new Date().toISOString(),
 })
 
-const TABS = [
-  ['details', 'Details'],
-  ['media', 'Media'],
-  ['variants', 'Variants'],
-  ['fit', 'Fit & fabric'],
-  ['enrichment', 'Highlights & specs'],
-  ['organise', 'Organise'],
-]
+const SIZE_SUGGESTIONS = ['XS', 'S', 'M', 'L', 'XL', 'One Size']
+const APPAREL_TAGS = ['cotton', 'linen', 'merino', 'cashmere', 'wool', 'silk', 'denim', 'leather', 'everyday', 'summer', 'winter', 'organic', 'recycled']
 
 /*
  * Unsaved work is kept in this browser until it is saved or discarded, so a
@@ -101,29 +102,11 @@ function forgetDraft(id) {
   }
 }
 
-/** Where a refused save is fixed, so the toast is not the only clue. */
-const ERROR_TABS = {
-  missing_title: 'details',
-  invalid_slug: 'details',
-  slug_taken: 'details',
-  invalid_assurance: 'enrichment',
-  invalid_feature: 'enrichment',
-  composition_total: 'fit',
-  unknown_country: 'fit',
-  unknown_size_chart: 'fit',
-  unknown_variant: 'variants',
-  variant_prices: 'variants',
-  invalid_inventory: 'variants',
-  unknown_image: 'media',
-}
-const tabForError = (code = '') => ERROR_TABS[code] || (code.startsWith('invalid_spec') ? 'enrichment' : null)
-
 // A real backend stores photographs; the local demo also plays video.
 const UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const UPLOAD_ACCEPT = isMock ? 'image/*,video/*' : UPLOAD_TYPES.join(',')
 
-/** "Oat · M", "One Size", "Navy" — whichever options the variant has. */
-const variantName = (v) => Object.values(v.options || {}).filter((x) => x != null).join(' · ')
+const lowerFirst = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : s)
 
 export default function ProductEditor() {
   const { id } = useParams()
@@ -138,6 +121,8 @@ export default function ProductEditor() {
   // For the manual "You might also like" rail. Drafts included, because a
   // merchant preparing a launch wants to wire the rail before publishing.
   const catalogue = useAsync(() => api.adminListProducts({ perPage: 500 }), [])
+  // Product types, and the option names and values the store already uses.
+  const library = useAsync(() => api.listLibrary(), [])
 
   const [draft, setDraft] = useState(() => (isNew ? readDraft('new')?.draft || BLANK() : null))
   const [tab, setTab] = useState('details')
@@ -145,6 +130,36 @@ export default function ProductEditor() {
   const [dirty, setDirty] = useState(() => isNew && Boolean(readDraft('new')))
   const [restoredAt, setRestoredAt] = useState(() => (isNew ? readDraft('new')?.savedAt : null) || null)
   const [previewing, setPreviewing] = useState(false)
+
+  /*
+   * The product's type decides which tabs and panels exist and what they are
+   * called. With no type to go on (a backend that predates them, a library that
+   * did not load) the editor keeps its old guess: clothing in the demo, on a
+   * store with size charts, or for a product that already has fit or fabric.
+   */
+  const types = useMemo(() => library.data?.productTypes || [], [library.data])
+  const defaultTypeId = library.data?.defaultProductTypeId ?? null
+  const resolved = draft
+    ? resolveProductType({ productTypeId: draft.productTypeId, productType: draft.productType, types, defaultId: defaultTypeId, isNew })
+    : null
+  const legacyApparel = isMock || Boolean(draft?.fit || draft?.fabric || draft?.sizeChartId || charts.data?.items?.length)
+  const type = resolved || fallbackType(legacyApparel)
+  const tabs = editorTabs(type.blocks, type.labels)
+  const visibleTabs = tabs.map(([k]) => k)
+  const activeTab = visibleTabs.includes(tab) ? tab : 'details'
+
+  // A new product takes the store's default type, and starts with empty Colour
+  // and Size only if that type is worn and sized. Not a change of its own, so
+  // it does not mark the draft unsaved.
+  useEffect(() => {
+    if (!isNew || !draft || draft.productTypeId != null || defaultTypeId == null) return
+    const start = resolveProductType({ productTypeId: defaultTypeId, types })
+    setDraft((d) => ({
+      ...d,
+      productTypeId: String(defaultTypeId),
+      ...(!(d.options || []).length && !(d.variants || []).length ? { options: starterOptions(start) } : {}),
+    }))
+  }, [isNew, draft, defaultTypeId, types])
 
   useEffect(() => {
     if (!loaded.data || draft) return
@@ -225,9 +240,13 @@ export default function ProductEditor() {
     }
     const payload = slug === draft.slug ? draft : { ...draft, slug }
     if (payload !== draft) setDraft(payload)
+    // The resolved type is for reading; the backend is sent its id, and a new
+    // product the default type it was shown with.
+    const { productType: _resolvedType, ...body } = payload
+    if (body.productTypeId == null && resolved?.id != null && isNew) body.productTypeId = resolved.id
     setBusy(true)
     try {
-      const saved = await api.adminSaveProduct(payload)
+      const saved = await api.adminSaveProduct(body)
       forgetDraft(id)
       setRestoredAt(null)
       setDirty(false)
@@ -243,7 +262,7 @@ export default function ProductEditor() {
       return true
     } catch (err) {
       push(err.message, { tone: 'error' })
-      const fix = tabForError(err.code)
+      const fix = tabForError(err.code, visibleTabs)
       if (fix) setTab(fix)
       return false
     } finally {
@@ -277,12 +296,38 @@ export default function ProductEditor() {
   if (loaded.error && !draft) return <ErrorState error={loaded.error} onRetry={() => loaded.reload()} />
   if (loaded.loading || !draft) return <Skeleton className="h-96 w-full" />
 
-  // Fit and fabric are for clothing: shown in the demo, and on a live store that has size charts or for a product
-  // that already has them. Specifications come from the category either way (Highlights & specs).
-  const showFit = isMock || Boolean(draft?.fit || draft?.fabric || draft?.sizeChartId || charts.data?.items?.length)
+  /**
+   * Change the product's type. On a saved product this is not cosmetic: the
+   * backend keeps only the specifications the new type defines, so it asks
+   * first and names what would go.
+   */
+  const changeType = (nextId) => {
+    const raw = types.find((t) => String(t.id) === String(nextId))
+    const next = resolveProductType({ productTypeId: nextId, types })
+    if (!raw || !next || String(nextId) === String(resolved?.id ?? '')) return
+    const savedId = loaded.data?.productTypeId
+    if (!isNew && String(savedId ?? '') !== String(nextId)) {
+      const warning = typeChangeWarning({
+        from: resolved,
+        to: next,
+        specs: draft.enrichment?.specs,
+        label: (key) => specLabel(key, draft.enrichment?.specList),
+      })
+      if (!window.confirm(warning)) return
+    }
+    set('productTypeId', next.id)
+    set('productType', raw)
+    // A new product's untouched starting options follow the type: Colour and Size for clothes, nothing for a table.
+    if (isNew && optionsUntouched(draft)) set('options', starterOptions(next))
+  }
+
+  const known = library.data?.options || []
+  const colour = colourOptionOf(draft.options || [], known)
   const props = {
     draft,
     set,
+    type,
+    known,
     charts: charts.data?.items || [],
     cats: cats.data?.items || [],
     catalogue: (catalogue.data?.items || []).filter((p) => p.slug !== draft.slug),
@@ -363,15 +408,15 @@ export default function ProductEditor() {
       )}
 
       <div className="mt-7 flex gap-1 overflow-x-auto border-b border-line" role="tablist">
-        {TABS.filter(([k]) => k !== 'fit' || showFit).map(([k, label]) => (
+        {tabs.map(([k, label]) => (
           <button
             key={k}
             type="button"
             role="tab"
-            aria-selected={tab === k}
+            aria-selected={activeTab === k}
             onClick={() => setTab(k)}
             className={`-mb-px whitespace-nowrap border-b-2 px-4 py-3 text-[13px] transition-colors ${
-              tab === k ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'
+              activeTab === k ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'
             }`}
           >
             {label}
@@ -379,12 +424,21 @@ export default function ProductEditor() {
         ))}
       </div>
 
-      <div className={`mt-8 ${tab === 'enrichment' ? '' : 'max-w-3xl'}`}>
-        {tab === 'details' && <DetailsTab {...props} isNew={isNew} />}
-        {tab === 'media' && <MediaTab {...props} />}
-        {tab === 'variants' && <VariantsTab {...props} />}
-        {tab === 'fit' && <FitTab {...props} />}
-        {tab === 'enrichment' && (
+      <div className={`mt-8 ${activeTab === 'enrichment' ? '' : 'max-w-3xl'}`}>
+        {activeTab === 'details' && (
+          <DetailsTab
+            {...props}
+            isNew={isNew}
+            types={types}
+            resolved={resolved}
+            savedTypeId={loaded.data?.productTypeId ?? null}
+            onChangeType={changeType}
+          />
+        )}
+        {activeTab === 'media' && <MediaTab {...props} colourName={colour?.name || null} />}
+        {activeTab === 'variants' && <VariantsTab {...props} />}
+        {activeTab === 'fit' && <FitTab {...props} />}
+        {activeTab === 'enrichment' && (
           <EnrichmentTab
             draft={draft}
             set={set}
@@ -392,6 +446,9 @@ export default function ProductEditor() {
             icons={vocab.data?.icons || []}
             assuranceTemplates={vocab.data?.assurances || []}
             featurePresets={vocab.data?.features || []}
+            specKeys={resolved?.specKeys || []}
+            typeName={resolved?.name || null}
+            compliance={showCompliance(type.blocks, draft.enrichment)}
             onSaveToLibrary={async (kind, item) => {
               try {
                 await api.saveLibraryItem({ kind, item })
@@ -403,12 +460,13 @@ export default function ProductEditor() {
             }}
           />
         )}
-        {tab === 'organise' && <OrganiseTab {...props} />}
+        {activeTab === 'organise' && <OrganiseTab {...props} />}
       </div>
 
       <ProductPreview
         draft={draft}
         charts={charts.data?.items || []}
+        productType={resolved}
         open={previewing}
         onClose={() => setPreviewing(false)}
       />
@@ -441,10 +499,49 @@ export default function ProductEditor() {
 
 /* ── details ───────────────────────────────────────────────────────────── */
 
-function DetailsTab({ draft, set, isNew }) {
+function DetailsTab({ draft, set, isNew, type, types = [], resolved, savedTypeId, onChangeType }) {
   const currency = draft.price?.currency || 'USD'
+  const { labels } = type
+  const apparel = isApparelType(type)
+  // The product's own type stays choosable even if the library did not list it.
+  const choices = resolved && !types.some((t) => String(t.id) === resolved.id) ? [resolved, ...types] : types
+  const changed = !isNew && resolved && String(savedTypeId ?? '') !== resolved.id
+  const losing = changed ? droppedSpecs(draft.enrichment?.specs, resolved) : []
   return (
     <div className="space-y-8">
+      {choices.length > 0 && (
+        <Panel
+          title="Product type"
+          note={`Decides what this product's page shows: fit, size chart, materials, compliance, and its specifications. ${
+            isMock ? 'On Odoo it is set per category; the demo has three fixed types.' : 'Set per category in Odoo.'
+          }`}
+        >
+          <div>
+            <label htmlFor="f-product-type" className="mb-1.5 block text-[13px] font-medium">Type</label>
+            <select
+              id="f-product-type"
+              className="field"
+              value={resolved?.id ?? ''}
+              onChange={(e) => e.target.value && onChangeType(e.target.value)}
+            >
+              {!resolved && <option value="">Choose a type…</option>}
+              {choices.map((t) => (
+                <option key={t.id} value={String(t.id)}>{typeOptionLabel(t)}</option>
+              ))}
+            </select>
+            {changed && (
+              <p className="mt-1.5 text-[12px] text-accent">
+                Changed — saving applies it.
+                {losing.length > 0 &&
+                  ` These specifications are removed because ${resolved.name} does not define them: ${losing
+                    .map((k) => specLabel(k, draft.enrichment?.specList))
+                    .join(', ')}.`}
+              </p>
+            )}
+          </div>
+        </Panel>
+      )}
+
       <Panel title="Basics">
         <Text
           label="Title"
@@ -466,7 +563,7 @@ function DetailsTab({ draft, set, isNew }) {
           hint="The web address: /product/your-slug. Changing it on a live product breaks existing links and ads."
         />
         <Text label="Subtitle" value={draft.subtitle} onChange={(v) => set('subtitle', v)}
-          hint="One line under the title. The fabric or the cut, not a sales line." />
+          hint="One line under the title: what it is, or what it is made of. Not a sales line." />
         <Area label="Description" rows={5} value={draft.description} onChange={(v) => set('description', v)} />
       </Panel>
 
@@ -497,11 +594,14 @@ function DetailsTab({ draft, set, isNew }) {
         </p>
       </Panel>
 
-      <Panel title="Specification" note="Rendered as the Details and Care tabs on the product page. One line each.">
-        <ListEditor label="Details" items={draft.details} onChange={(v) => set('details', v)}
-          placeholder="140gsm long-staple cotton oxford" />
-        <ListEditor label="Care" items={draft.care} onChange={(v) => set('care', v)}
-          placeholder="Machine wash cold, gentle" />
+      <Panel
+        title={`${labels.details} and ${lowerFirst(labels.care)}`}
+        note={`Shown on the product page under ${labels.details} and ${labels.care}. One line each.`}
+      >
+        <ListEditor label={labels.details} items={draft.details} onChange={(v) => set('details', v)}
+          placeholder={apparel ? '140gsm long-staple cotton oxford' : 'One fact per line'} />
+        <ListEditor label={labels.care} items={draft.care} onChange={(v) => set('care', v)}
+          placeholder={apparel ? 'Machine wash cold, gentle' : 'e.g. Keep out of direct sunlight'} />
       </Panel>
 
       <Panel title="Badges" note="Sale, sold-out and low-stock are worked out from price and stock. These two are yours.">
@@ -531,8 +631,9 @@ function DetailsTab({ draft, set, isNew }) {
 
 /* ── media ─────────────────────────────────────────────────────────────── */
 
-function MediaTab({ draft, set }) {
-  const colors = draft.options?.find((o) => o.name === 'Color')?.values || []
+function MediaTab({ draft, set, colourName }) {
+  // Shots are tagged with a value of the product's colour option, whatever it is called.
+  const colors = (colourName && draft.options?.find((o) => o.name === colourName)?.values) || []
   const images = useMemo(() => draft.images || [], [draft.images])
   const [busy, setBusy] = useState(false)
   // Two separate drags happen in this panel: files arriving from the desktop,
@@ -627,7 +728,7 @@ function MediaTab({ draft, set }) {
     const first = selected[0]
     set(
       'variants',
-      (draft.variants || []).map((v) => (v.options.Color === assignTo ? { ...v, imageId: first } : v)),
+      (draft.variants || []).map((v) => (colourName && v.options?.[colourName] === assignTo ? { ...v, imageId: first } : v)),
     )
     push(`${selected.length} assigned to ${assignTo}`)
     setSelected([])
@@ -638,7 +739,7 @@ function MediaTab({ draft, set }) {
     <div className="space-y-8">
       <Panel
         title="Media"
-        note={`Shot 4:5 (900 × 1125). The first is the card image; the second is what the grid swaps to on hover — a fabric detail works well.${isMock ? ' Video is supported and plays with controls on the product page.' : ''}`}
+        note={`Shot 4:5 (900 × 1125). The first is the card image; the second is what the grid swaps to on hover — a close-up or the product in use works well.${isMock ? ' Video is supported and plays with controls on the product page.' : ''}`}
       >
         {/* Drop zone. Also the upload button, because a drop target nobody can
             click is a drop target half the people who need it will miss. */}
@@ -767,7 +868,7 @@ function MediaTab({ draft, set }) {
                   <div className="space-y-2 p-3">
                     <input
                       className="field h-8 text-[12px]"
-                      placeholder="Alt text — describe the garment"
+                      placeholder="Alt text — describe the product"
                       value={img.alt || ''}
                       onChange={(e) => patch(i, 'alt', e.target.value)}
                     />
@@ -863,90 +964,128 @@ function TileBtn({ label, icon, onClick, tone }) {
 
 /* ── variants ──────────────────────────────────────────────────────────── */
 
-function VariantsTab({ draft, set }) {
-  const colorOpt = draft.options?.find((o) => o.name === 'Color') || { name: 'Color', values: [] }
-  const sizeOpt = draft.options?.find((o) => o.name === 'Size') || { name: 'Size', values: [] }
+function VariantsTab({ draft, set, type, known = [] }) {
+  const options = useMemo(() => draft.options || [], [draft.options])
   const variants = useMemo(() => draft.variants || [], [draft.variants])
   const images = useMemo(() => draft.images || [], [draft.images])
+  const names = options.map((o) => o.name)
+  const axes = optionAxes(options)
+  const colour = colourOptionOf(options, known)
+  const apparel = isApparelType(type)
   const [picked, setPicked] = useState([])
-  const [bulk, setBulk] = useState({ mode: 'set-stock', value: '', scopeKey: 'all', scopeValue: '' })
+  const [bulk, setBulk] = useState({ mode: 'set-stock', value: '', scope: 'all' })
   const { push } = useToast()
+
+  const label = (v) => variantLabel(v, names)
+
+  const removeVariants = (ids) => {
+    const drop = new Set(ids)
+    set('variants', variants.filter((v) => !drop.has(v.id)))
+    setPicked((sel) => sel.filter((id) => !drop.has(id)))
+  }
+
+  const dropped = (removed) => {
+    if (!removed.length) return
+    setPicked((sel) => sel.filter((id) => !removed.some((v) => v.id === id)))
+    push(`${removed.length} variant${removed.length === 1 ? '' : 's'} removed with it`)
+  }
 
   /**
    * Change one option's values.
    *
-   * Only that option is touched: a third option such as Length is not on this
-   * screen, and rebuilding the list from Color and Size alone deleted it and
-   * its variants on save. Rows for a value that is gone go with it — a row
-   * pointing at a colour the product no longer has cannot be saved.
+   * Only that option is touched — every other option and its rows stay as they
+   * are. Rows for a value that is gone go with it: a row pointing at a value the
+   * product no longer has cannot be saved.
    */
-  const setOption = (name, values) => {
-    const current = draft.options || []
-    set(
-      'options',
-      current.some((o) => o.name === name)
-        ? current.map((o) => (o.name === name ? { ...o, values } : o))
-        : [...current, { name, values }],
-    )
-    const orphaned = variants.filter((v) => v.options[name] != null && !values.includes(v.options[name]))
-    if (orphaned.length) {
-      removeVariants(orphaned.map((v) => v.id))
-      push(`${orphaned.length} variant${orphaned.length === 1 ? '' : 's'} removed with it`)
+  const setValues = (name, values, swatches) => {
+    const next = setOptionValues(draft, name, values, swatches || draft.swatches)
+    set('options', next.options)
+    if (swatches) set('swatches', swatches)
+    if (next.removed.length) {
+      set('variants', next.variants)
+      dropped(next.removed)
     }
   }
 
-  /** A row for a colour, a size, or both — a scarf has no size and a belt may have no colour. */
-  const makeVariant = (c, sz) => {
-    const options = { ...(c != null && { Color: c }), ...(sz != null && { Size: sz }) }
+  const addOption = (name) => {
+    const problem = optionNameProblem(name, options)
+    if (problem) {
+      push(problem, { tone: 'error' })
+      return false
+    }
+    set('options', [...options, { name: name.trim(), values: [] }])
+    return true
+  }
+
+  const rename = (from, to) => {
+    if (String(to).trim() === from) return true
+    const problem = optionNameProblem(to, options, from)
+    if (problem) {
+      push(problem, { tone: 'error' })
+      return false
+    }
+    const next = renameOption(draft, from, to)
+    set('options', next.options)
+    set('variants', next.variants)
+    return true
+  }
+
+  /** Removing a whole option says what happens to the rows that use it before doing it. */
+  const dropOption = (name) => {
+    const next = removeOption(draft, name)
+    if (
+      next.removed.length &&
+      !window.confirm(
+        `Remove the option “${name}”? The ${next.removed.length} variant${next.removed.length === 1 ? '' : 's'} using it ${
+          next.removed.length === 1 ? 'is' : 'are'
+        } removed too, with ${next.removed.length === 1 ? 'its' : 'their'} stock and prices. You can add the combinations again afterwards.`,
+      )
+    ) {
+      return
+    }
+    set('options', next.options)
+    if (next.removed.length) {
+      set('variants', next.variants)
+      setPicked((sel) => sel.filter((id) => next.variants.some((v) => v.id === id)))
+    }
+  }
+
+  /** A row for one combination of the product's options. */
+  const makeVariant = (combo, taken) => {
+    const { id, sku } = variantIdentity({ slug: draft.slug, combo, colourName: colour?.name, taken })
+    const shade = colour ? combo[colour.name] : null
     return {
-      id: `var_${draft.slug || 'new'}_${Object.values(options).join('_')}`.toLowerCase().replace(/[^a-z0-9_]+/g, '-'),
-      sku: [(draft.slug || 'SKU').slice(0, 6).toUpperCase(), c?.slice(0, 3).toUpperCase(), sz].filter(Boolean).join('-'),
-      options,
+      id,
+      sku,
+      options: combo,
       price: draft.price,
       compareAtPrice: draft.compareAtPrice,
       inventory: 0,
       available: false,
       // Prefer a shot tagged with this colour, so a store with per-colour
       // photography wires itself up without anyone picking image ids.
-      imageId: images.find((img) => c != null && img.color === c)?.id || images[0]?.id || null,
+      imageId: images.find((img) => shade != null && img.color === shade)?.id || images[0]?.id || null,
     }
   }
-
-  const key = (v) => `${v.options.Color ?? ''}|${v.options.Size ?? ''}`
-  const present = useMemo(() => new Set(variants.map(key)), [variants])
 
   /**
    * Combinations that exist as options but have no row.
    *
-   * Not every colour comes in every size — a white shirt in S and M and nothing
-   * else is ordinary. So the matrix is deliberately allowed to be sparse, and
-   * this is a list of what is missing rather than a warning that something is
-   * wrong. Adding is explicit; nothing is resurrected behind your back.
+   * Not every colour comes in every size, not every grind in every weight. So
+   * the matrix is deliberately allowed to be sparse, and this is a list of what
+   * is missing rather than a warning that something is wrong. Adding is
+   * explicit; nothing is resurrected behind your back.
    */
-  const missing = useMemo(() => {
-    if (!colorOpt.values.length && !sizeOpt.values.length) return []
-    // An option with no values is not an axis, so a size-only product still
-    // lists its sizes instead of nothing.
-    const out = []
-    for (const c of colorOpt.values.length ? colorOpt.values : [null]) {
-      for (const sz of sizeOpt.values.length ? sizeOpt.values : [null]) {
-        if (!present.has(`${c ?? ''}|${sz ?? ''}`)) out.push({ color: c, size: sz })
-      }
-    }
-    return out
-  }, [colorOpt.values, sizeOpt.values, present])
+  const missing = useMemo(() => missingCombinations(options, variants), [options, variants])
 
-  /** Add every missing combination, keeping the rows that already exist. */
-  const addAllMissing = () => {
-    set('variants', [...variants, ...missing.map((m) => makeVariant(m.color, m.size))])
-  }
-
-  const addOne = (c, sz) => set('variants', [...variants, makeVariant(c, sz)])
-
-  const removeVariants = (ids) => {
-    const drop = new Set(ids)
-    set('variants', variants.filter((v) => !drop.has(v.id)))
-    setPicked((sel) => sel.filter((id) => !drop.has(id)))
+  const addCombos = (combos) => {
+    const taken = variants.map((v) => v.id)
+    const rows = combos.map((combo) => {
+      const row = makeVariant(combo, taken)
+      taken.push(row.id)
+      return row
+    })
+    set('variants', [...variants, ...rows])
   }
 
   const patchVariant = (id, key, value) =>
@@ -959,11 +1098,12 @@ function VariantsTab({ draft, set }) {
       ),
     )
 
-  /** Which rows a bulk action applies to: everything, one colour, one size, or a manual pick. */
+  /** Which rows a bulk action applies to: everything, one value of one option, or a manual pick. */
   const inScope = (v) => {
-    if (bulk.scopeKey === 'picked') return picked.includes(v.id)
-    if (bulk.scopeKey === 'all') return true
-    return v.options[bulk.scopeKey] === bulk.scopeValue
+    if (bulk.scope === 'picked') return picked.includes(v.id)
+    if (bulk.scope === 'all') return true
+    const [name, value] = JSON.parse(bulk.scope)
+    return v.options?.[name] === value
   }
   const scoped = variants.filter(inScope)
 
@@ -1003,67 +1143,91 @@ function VariantsTab({ draft, set }) {
   }
 
   const allPicked = picked.length === variants.length && variants.length > 0
+  const nameSuggestions = optionNameSuggestions(known, type?.id ?? null, names, apparel ? ['Color', 'Size'] : [])
 
   return (
     <div className="space-y-8">
-      <Panel title="Colours" note="The swatch colour is what the picker shows. Pick something close to the real cloth.">
-        <SwatchEditor
-          values={colorOpt.values}
-          swatches={draft.swatches || {}}
-          onChange={(values, swatches) => {
-            setOption('Color', values)
-            set('swatches', swatches)
-          }}
-        />
-      </Panel>
+      <Panel
+        title="Options"
+        note={
+          apparel
+            ? 'What a shopper chooses between: a colour, a size, a length. A colour option is picked from swatches — pick something close to the real thing; any other option from its values.'
+            : 'What a shopper chooses between: a weight, a grind, a finish, a size. A colour option is picked from swatches; any other option from its values. A product with no options is sold as it is.'
+        }
+      >
+        <datalist id="option-names">
+          {nameSuggestions.map((n) => <option key={n} value={n} />)}
+        </datalist>
 
-      <Panel title="Sizes">
-        <TokenEditor
-          values={sizeOpt.values}
-          onChange={(v) => setOption('Size', v)}
-          suggestions={['XS', 'S', 'M', 'L', 'XL', 'One Size']}
-        />
+        {options.length > 0 && (
+          <ul className="space-y-3">
+            {options.map((o, i) => (
+              <OptionCard
+                key={o.name}
+                option={o}
+                index={i}
+                count={options.length}
+                colour={colour?.name === o.name || isColourName(o, known)}
+                swatches={draft.swatches || {}}
+                known={known}
+                apparel={apparel}
+                onRename={rename}
+                onValues={setValues}
+                onMove={(from, to) => set('options', moveOption(options, from, to))}
+                onRemove={dropOption}
+              />
+            ))}
+          </ul>
+        )}
+
+        <AddOption suggestions={nameSuggestions} onAdd={addOption} empty={!options.length} />
       </Panel>
 
       <Panel
         title="Variants"
-        note="One row per colour and size. Stock lives here, not on the product — which is what lets the size picker grey out only the sizes that are gone in the colour a shopper has chosen."
+        note="One row per combination you sell. Stock lives here, not on the product — which is what lets the picker grey out only the choices that are gone in what a shopper has already picked."
       >
         {missing.length > 0 && (
           <div className="rounded-xs border border-line bg-sunken/40 p-3.5">
             <div className="flex flex-wrap items-center gap-3">
               <p className="text-[13px] text-muted">
-                {missing.length} combination{missing.length === 1 ? '' : 's'} not created
+                {axes.length
+                  ? `${missing.length} combination${missing.length === 1 ? '' : 's'} not created`
+                  : 'No options, so this product is sold as one variant.'}
               </p>
-              <Button size="sm" variant="quiet" onClick={addAllMissing} className="ml-auto">
-                Add all
+              <Button size="sm" variant="quiet" onClick={() => addCombos(missing)} className="ml-auto">
+                {axes.length ? 'Add all' : 'Add the variant'}
               </Button>
             </div>
-            <ul className="mt-2.5 flex flex-wrap gap-1.5">
-              {missing.slice(0, 24).map((m) => (
-                <li key={`${m.color}|${m.size}`}>
-                  <button
-                    type="button"
-                    onClick={() => addOne(m.color, m.size)}
-                    className="inline-flex items-center gap-1 rounded-xs border border-line px-2 py-1 text-[11px] text-faint transition-colors hover:border-ink hover:text-ink"
-                  >
-                    <Icon name="plus" size={10} />
-                    {variantName({ options: { Color: m.color, Size: m.size } })}
-                  </button>
-                </li>
-              ))}
-              {missing.length > 24 && <li className="self-center text-[11px] text-faint">+{missing.length - 24} more</li>}
-            </ul>
-            <p className="mt-2.5 text-[12px] leading-relaxed text-faint">
-              A sparse matrix is normal — not every colour comes in every size. Nothing is added
-              until you ask for it.
-            </p>
+            {axes.length > 0 && (
+              <>
+                <ul className="mt-2.5 flex flex-wrap gap-1.5">
+                  {missing.slice(0, 24).map((combo) => (
+                    <li key={JSON.stringify(combo)}>
+                      <button
+                        type="button"
+                        onClick={() => addCombos([combo])}
+                        className="inline-flex items-center gap-1 rounded-xs border border-line px-2 py-1 text-[11px] text-faint transition-colors hover:border-ink hover:text-ink"
+                      >
+                        <Icon name="plus" size={10} />
+                        {variantLabel({ options: combo }, names)}
+                      </button>
+                    </li>
+                  ))}
+                  {missing.length > 24 && <li className="self-center text-[11px] text-faint">+{missing.length - 24} more</li>}
+                </ul>
+                <p className="mt-2.5 text-[12px] leading-relaxed text-faint">
+                  A sparse matrix is normal — not every combination is made. Nothing is added until you
+                  ask for it.
+                </p>
+              </>
+            )}
           </div>
         )}
 
         {variants.length === 0 ? (
           <p className="rounded-xs border border-dashed border-line p-6 text-center text-[13px] text-faint">
-            Add colours and sizes above, then rebuild the matrix.
+            {options.length ? 'Give the options their values, then add the combinations you sell.' : 'No variants yet.'}
           </p>
         ) : (
           <>
@@ -1116,20 +1280,18 @@ function VariantsTab({ draft, set }) {
                 <select
                   aria-label="Scope"
                   className="field h-9 w-auto py-0 text-[13px]"
-                  value={bulk.scopeKey === 'all' || bulk.scopeKey === 'picked' ? bulk.scopeKey : `${bulk.scopeKey}:${bulk.scopeValue}`}
-                  onChange={(e) => {
-                    const [key, value] = e.target.value.split(':')
-                    setBulk((b) => ({ ...b, scopeKey: key, scopeValue: value || '' }))
-                  }}
+                  value={bulk.scope}
+                  onChange={(e) => setBulk((b) => ({ ...b, scope: e.target.value }))}
                 >
                   <option value="all">every variant</option>
                   {picked.length > 0 && <option value="picked">the {picked.length} selected</option>}
-                  <optgroup label="Size">
-                    {sizeOpt.values.map((v) => <option key={v} value={`Size:${v}`}>all {v}</option>)}
-                  </optgroup>
-                  <optgroup label="Colour">
-                    {colorOpt.values.map((v) => <option key={v} value={`Color:${v}`}>all {v}</option>)}
-                  </optgroup>
+                  {axes.map((o) => (
+                    <optgroup key={o.name} label={o.name}>
+                      {o.values.map((v) => (
+                        <option key={v} value={JSON.stringify([o.name, v])}>all {v}</option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
 
                 <Button size="sm" onClick={applyBulk} disabled={!scoped.length}>
@@ -1151,8 +1313,8 @@ function VariantsTab({ draft, set }) {
               </div>
               <p className="text-[12px] text-faint">
                 Prices are in major units here — <span className="text-muted">3.00</span> on
-                &ldquo;adjust price by&rdquo; adds three to every row in scope, which is how a size
-                surcharge is normally expressed.
+                &ldquo;adjust price by&rdquo; adds three to every row in scope, which is how a surcharge
+                for a bigger size or weight is normally expressed.
               </p>
             </div>
 
@@ -1178,12 +1340,14 @@ function VariantsTab({ draft, set }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {variants.map((v) => (
+                  {variants.map((v) => {
+                    const shade = colour ? v.options?.[colour.name] : null
+                    return (
                     <tr key={v.id} className={`border-b border-line last:border-0 ${picked.includes(v.id) ? 'bg-accent-soft/30' : ''}`}>
                       <td className="p-2.5">
                         <input
                           type="checkbox"
-                          aria-label={`Select ${variantName(v)}`}
+                          aria-label={`Select ${label(v)}`}
                           checked={picked.includes(v.id)}
                           onChange={() =>
                             setPicked((sel) => (sel.includes(v.id) ? sel.filter((x) => x !== v.id) : [...sel, v.id]))
@@ -1193,25 +1357,31 @@ function VariantsTab({ draft, set }) {
                       </td>
                       <td className="p-2.5">
                         <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                          <span
-                            className="h-3 w-3 shrink-0 rounded-full ring-1 ring-inset ring-ink/15"
-                            style={{ background: draft.swatches?.[v.options.Color] || '#ddd' }}
-                          />
-                          {variantName(v)}
+                          {/* A dot only where there is a colour to show. */}
+                          {colour && (
+                            <span
+                              className="h-3 w-3 shrink-0 rounded-full ring-1 ring-inset ring-ink/15"
+                              style={{ background: draft.swatches?.[shade] || '#ddd' }}
+                            />
+                          )}
+                          {label(v)}
                         </span>
                       </td>
                       <td className="p-2.5">
                         <input className="field h-8 font-mono text-[12px]" value={v.sku}
+                          aria-label={`SKU for ${label(v)}`}
                           onChange={(e) => patchVariant(v.id, 'sku', e.target.value)} />
                       </td>
                       <td className="p-2.5">
                         <input type="number" min="0" className="field h-8 w-20 tabular-nums" value={v.inventory}
+                          aria-label={`Stock for ${label(v)}`}
                           onChange={(e) => patchVariant(v.id, 'inventory', Math.max(0, Number(e.target.value)))} />
                       </td>
                       <td className="p-2.5">
                         <input
                           type="number"
                           step="0.01"
+                          aria-label={`Price for ${label(v)}`}
                           className={`field h-8 w-28 tabular-nums ${v.price?.amount !== draft.price?.amount ? 'border-accent' : ''}`}
                           value={toMajor(v.price || draft.price)}
                           onChange={(e) =>
@@ -1225,6 +1395,7 @@ function VariantsTab({ draft, set }) {
                       <td className="p-2.5">
                         <VariantImagePicker
                           variant={v}
+                          label={label(v)}
                           images={images}
                           onPick={(id) => patchVariant(v.id, 'imageId', id)}
                           onUpload={async (file) => {
@@ -1233,8 +1404,8 @@ function VariantsTab({ draft, set }) {
                               id: m.id,
                               url: m.url,
                               type: m.type,
-                              alt: v.options.Color ? `${draft.title} in ${v.options.Color}` : draft.title,
-                              color: v.options.Color,
+                              alt: shade ? `${draft.title} in ${shade}` : draft.title,
+                              color: shade || undefined,
                               width: m.width,
                               height: m.height,
                             }
@@ -1251,15 +1422,16 @@ function VariantsTab({ draft, set }) {
                         <button
                           type="button"
                           onClick={() => removeVariants([v.id])}
-                          aria-label={`Remove ${variantName(v)}`}
-                          title={`Remove ${variantName(v)}`}
+                          aria-label={`Remove ${label(v)}`}
+                          title={`Remove ${label(v)}`}
                           className="grid h-8 w-8 place-items-center rounded-xs text-faint transition-colors hover:bg-sale/10 hover:text-sale"
                         >
                           <Icon name="trash" size={14} />
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1274,6 +1446,117 @@ function VariantsTab({ draft, set }) {
   )
 }
 
+const isColourName = (option, known) => colourOptionOf([option], known) != null
+
+/**
+ * One option: its name, its place in the order, and its values.
+ *
+ * The name is committed when the field is left, not on every keystroke: the
+ * variants store their values under it, and renaming them through "S", "Si",
+ * "Siz" would briefly collide with anything else called that.
+ */
+function OptionCard({ option, index, count, colour, swatches, known, apparel, onRename, onValues, onMove, onRemove }) {
+  const [name, setName] = useState(option.name)
+  const commit = () => {
+    if (!onRename(option.name, name)) setName(option.name)
+  }
+  const fallback = apparel && /^sizes?$/i.test(option.name) ? SIZE_SUGGESTIONS : []
+  const suggestions = valueSuggestions(known, option.name, option.values || [], fallback)
+  const fieldId = `option-name-${index}`
+
+  return (
+    <li className="rounded-xs border border-line p-4">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-[10rem] flex-1">
+          <label htmlFor={fieldId} className="mb-1.5 block text-[12px] font-medium">Option name</label>
+          <input
+            id={fieldId}
+            list="option-names"
+            className="field h-9"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                e.currentTarget.blur()
+              }
+            }}
+          />
+        </div>
+        <span className="pb-2.5 text-[11px] text-faint">
+          {colour ? 'Swatches' : `${option.values?.length || 0} value${option.values?.length === 1 ? '' : 's'}`}
+        </span>
+        {index > 0 && <IconBtn label={`Move ${option.name} up`} icon="chevron-left" rotate onClick={() => onMove(index, index - 1)} />}
+        {index < count - 1 && <IconBtn label={`Move ${option.name} down`} icon="chevron-right" rotate onClick={() => onMove(index, index + 1)} />}
+        <IconBtn label={`Remove ${option.name}`} icon="trash" tone="sale" onClick={() => onRemove(option.name)} />
+      </div>
+
+      <div className="mt-3">
+        {colour ? (
+          <SwatchEditor
+            values={option.values || []}
+            swatches={swatches}
+            known={knownSwatches(known, option.name)}
+            suggestions={suggestions}
+            onChange={(values, next) => onValues(option.name, values, next)}
+          />
+        ) : (
+          <TokenEditor
+            values={option.values || []}
+            onChange={(values) => onValues(option.name, values)}
+            suggestions={suggestions}
+          />
+        )}
+      </div>
+    </li>
+  )
+}
+
+/** Add an option by name, with the names this store already uses one click away. */
+function AddOption({ suggestions, onAdd, empty }) {
+  const [name, setName] = useState('')
+  const add = (value) => {
+    if (onAdd(value)) setName('')
+  }
+  return (
+    <div>
+      {empty && (
+        <p className="mb-2.5 text-[13px] text-faint">No options. Add one, or leave it and sell the product as it is.</p>
+      )}
+      <div className="flex gap-2">
+        <input
+          list="option-names"
+          aria-label="New option name"
+          className="field h-9"
+          value={name}
+          placeholder="Option name, e.g. Weight"
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              add(name)
+            }
+          }}
+        />
+        <Button size="sm" variant="quiet" icon="plus" onClick={() => add(name)}>Add option</Button>
+      </div>
+      {suggestions.length > 0 && (
+        <ul className="mt-2.5 flex flex-wrap gap-1.5">
+          {suggestions.slice(0, 8).map((s) => (
+            <li key={s}>
+              <button type="button" onClick={() => add(s)}
+                className="rounded-xs border border-line px-2 py-1 text-[11px] text-faint hover:border-ink hover:text-ink">
+                + {s}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 /**
  * The image for one variant.
  *
@@ -1283,7 +1566,7 @@ function VariantsTab({ draft, set }) {
  * a colourway that arrives late does not mean scrolling back up to the Media
  * tab and tagging it by hand.
  */
-function VariantImagePicker({ variant, images, onPick, onUpload }) {
+function VariantImagePicker({ variant, label, images, onPick, onUpload }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const fileRef = useRef(null)
@@ -1306,7 +1589,7 @@ function VariantImagePicker({ variant, images, onPick, onUpload }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label={`Image for ${variantName(variant)}`}
+        aria-label={`Image for ${label}`}
         className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xs border border-line transition-colors hover:border-ink"
       >
         {current ? (
@@ -1321,7 +1604,7 @@ function VariantImagePicker({ variant, images, onPick, onUpload }) {
           <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} role="presentation" />
           <div className="absolute right-0 z-30 mt-1 w-64 rounded-xs border border-line bg-surface p-3 shadow-card">
             <p className="text-[11px] uppercase tracking-[0.14em] text-faint">
-              {variantName(variant)}
+              {label}
             </p>
             {images.length > 0 && (
               <ul className="mt-2.5 grid grid-cols-4 gap-1.5">
@@ -1354,7 +1637,7 @@ function VariantImagePicker({ variant, images, onPick, onUpload }) {
                 className="inline-flex items-center gap-1.5 text-[12px] text-accent link-underline disabled:opacity-50"
               >
                 <Icon name="plus" size={12} />
-                {busy ? 'Uploading…' : 'Upload for this colour'}
+                {busy ? 'Uploading…' : 'Upload for this variant'}
               </button>
               {variant.imageId && (
                 <button
@@ -1388,13 +1671,18 @@ function VariantImagePicker({ variant, images, onPick, onUpload }) {
 
 /* ── fit and fabric ────────────────────────────────────────────────────── */
 
-function FitTab({ draft, set, charts }) {
+function FitTab({ draft, set, charts, type }) {
+  const { blocks, labels } = type
+  // The clothing wording (drape, see-through, garment measurements) only where the product is worn.
+  const worn = blocks.fit
   const fit = draft.fit || {}
   const fabric = draft.fabric || {}
   const fb = fit.feedback || { small: 0, true: 100, large: 0 }
+  const unit = labels.weightUnit
 
   return (
     <div className="space-y-8">
+      {blocks.fit && (
       <Panel
         title="Fit"
         note="Size and fit cause roughly two thirds of fashion returns. This block is the cheapest thing on the page that reduces them."
@@ -1458,8 +1746,17 @@ function FitTab({ draft, set, charts }) {
           <Text label="Size worn" value={fit.model?.size ?? ''} onChange={(v) => set('fit.model.size', v)} />
         </div>
       </Panel>
+      )}
 
-      <Panel title="Size chart" note="Garment measurements laid flat. A letter size does not transfer between brands; a chest measurement does.">
+      {blocks.sizeChart && (
+      <Panel
+        title="Size chart"
+        note={
+          worn
+            ? 'Garment measurements laid flat. A letter size does not transfer between brands; a chest measurement does.'
+            : 'Measurements of the product itself, shown beside its size option. A letter or a name does not tell a shopper whether it fits; a measurement does.'
+        }
+      >
         <div>
           <label className="mb-1.5 block text-[13px] font-medium">Use chart</label>
           <select className="field" value={draft.sizeChartId || ''} onChange={(e) => set('sizeChartId', e.target.value || null)}>
@@ -1473,29 +1770,50 @@ function FitTab({ draft, set, charts }) {
           </p>
         </div>
       </Panel>
+      )}
 
-      <Panel title="Fabric" note="Weight decides drape, warmth and whether a thing is see-through. 190gsm linen and 110gsm linen are different products.">
-        <CompositionEditor value={fabric.composition || []} onChange={(v) => set('fabric.composition', v)} />
+      {blocks.composition && (
+      <Panel
+        title={labels.composition}
+        note={
+          worn
+            ? 'Weight decides drape, warmth and whether a thing is see-through. 190gsm linen and 110gsm linen are different products.'
+            : `What it is made of, as a share of the whole, and where it is made.${unit ? ` Weight is in ${unit}.` : ''}`
+        }
+      >
+        <CompositionEditor
+          value={fabric.composition || []}
+          onChange={(v) => set('fabric.composition', v)}
+          placeholder={worn ? 'Extra-fine merino wool' : labels.composition === 'Ingredients' ? 'e.g. Arabica coffee' : 'e.g. Solid oak'}
+          addLabel={worn ? 'Add material' : 'Add a line'}
+        />
         <div className="grid gap-4 sm:grid-cols-3">
-          <Text label="Weight (gsm)" type="number" value={fabric.weight ?? ''} onChange={(v) => set('fabric.weight', v ? Number(v) : null)} />
-          <Text label="Construction" value={fabric.weave || ''} onChange={(v) => set('fabric.weave', v)} placeholder="Oxford" />
-          <Text label="Made in" value={fabric.origin || ''} onChange={(v) => set('fabric.origin', v)} placeholder="Guimarães, Portugal" />
+          <Text label={unit ? `Weight (${unit})` : 'Weight'} type="number" step="any" value={fabric.weight ?? ''}
+            onChange={(v) => set('fabric.weight', v ? Number(v) : null)} />
+          <Text label={worn ? 'Construction' : 'Construction or process'} value={fabric.weave || ''}
+            onChange={(v) => set('fabric.weave', v)} placeholder={worn ? 'Oxford' : 'e.g. Hand-finished'} />
+          <Text label="Made in" value={fabric.origin || ''} onChange={(v) => set('fabric.origin', v)}
+            placeholder={worn ? 'Guimarães, Portugal' : 'City, country'} />
         </div>
         <ListEditor
           label="Certifications"
           items={fabric.certifications || []}
           onChange={(v) => set('fabric.certifications', v)}
-          placeholder="OEKO-TEX Standard 100"
+          placeholder={worn ? 'OEKO-TEX Standard 100' : 'e.g. FSC, Fairtrade'}
           hint="Third-party marks only. A self-declared claim reads as greenwashing; an audited one is checkable."
         />
       </Panel>
+      )}
     </div>
   )
 }
 
 /* ── organise ──────────────────────────────────────────────────────────── */
 
-function OrganiseTab({ draft, set, cats, catalogue = [] }) {
+function OrganiseTab({ draft, set, cats, type, catalogue = [] }) {
+  // The tags this store uses most, on products of the same type when the list says; clothing words only for clothing.
+  const common = frequentTags(catalogue, { typeId: type?.id ?? null })
+  const tagSuggestions = common.length ? common : isApparelType(type) ? APPAREL_TAGS : []
   const parentOf = useMemo(() => {
     const map = {}
     cats.forEach((root) => (root.children || []).forEach((c) => { map[c.slug] = root.slug }))
@@ -1530,7 +1848,7 @@ function OrganiseTab({ draft, set, cats, catalogue = [] }) {
     <div className="space-y-8">
       <Panel
         title="Categories"
-        note="Tick the specific one — its parent is ticked with it, so a linen shirt filed under Linen also appears under Shirts. Unticking a parent releases its children."
+        note="Tick the specific one — its parent is ticked with it, so a product filed under a sub-category also appears under its parent. Unticking a parent releases its children."
       >
         <ul className="space-y-3">
           {cats.map((root) => (
@@ -1550,9 +1868,8 @@ function OrganiseTab({ draft, set, cats, catalogue = [] }) {
         </ul>
       </Panel>
 
-      <Panel title="Tags" note="Used by filters and by the automatic recommendation strategy. Fabric and use, not adjectives.">
-        <TokenEditor values={draft.tags || []} onChange={(v) => set('tags', v)}
-          suggestions={['cotton', 'linen', 'merino', 'cashmere', 'wool', 'silk', 'denim', 'leather', 'everyday', 'summer', 'winter', 'organic', 'recycled']} />
+      <Panel title="Tags" note="Used by filters and recommendations: material, style and use, not adjectives.">
+        <TokenEditor values={draft.tags || []} onChange={(v) => set('tags', v)} suggestions={tagSuggestions} />
       </Panel>
 
       {!isMock && (
@@ -1800,7 +2117,7 @@ function TokenEditor({ values, onChange, suggestions = [] }) {
       </div>
       {unused.length > 0 && (
         <ul className="mt-2.5 flex flex-wrap gap-1.5">
-          {unused.map((s) => (
+          {unused.slice(0, 16).map((s) => (
             <li key={s}>
               <button type="button" onClick={() => add(s)}
                 className="rounded-xs border border-line px-2 py-1 text-[11px] text-faint hover:border-ink hover:text-ink">
@@ -1814,14 +2131,14 @@ function TokenEditor({ values, onChange, suggestions = [] }) {
   )
 }
 
-function SwatchEditor({ values, swatches, onChange }) {
+function SwatchEditor({ values, swatches, known = {}, suggestions = [], onChange }) {
   const [name, setName] = useState('')
   const [hex, setHex] = useState('#cccccc')
 
-  const add = () => {
-    const t = name.trim()
+  const add = (value = name, colour = hex) => {
+    const t = value.trim()
     if (!t || values.includes(t)) return
-    onChange([...values, t], { ...swatches, [t]: hex })
+    onChange([...values, t], { ...swatches, [t]: colour })
     setName('')
   }
 
@@ -1844,15 +2161,31 @@ function SwatchEditor({ values, swatches, onChange }) {
         <input type="color" value={hex} onChange={(e) => setHex(e.target.value)} aria-label="New swatch colour"
           className="h-9 w-12 cursor-pointer rounded-xs border border-line bg-surface p-1" />
         <input className="field h-9" value={name} placeholder="Colour name, e.g. Ecru"
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value)
+            if (known[e.target.value.trim()]) setHex(known[e.target.value.trim()])
+          }}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }} />
-        <Button size="sm" variant="quiet" onClick={add}>Add</Button>
+        <Button size="sm" variant="quiet" onClick={() => add()}>Add</Button>
       </div>
+      {suggestions.length > 0 && (
+        <ul className="mt-2.5 flex flex-wrap gap-1.5">
+          {suggestions.slice(0, 16).map((s) => (
+            <li key={s}>
+              <button type="button" onClick={() => add(s, known[s] || '#cccccc')}
+                className="inline-flex items-center gap-1.5 rounded-xs border border-line px-2 py-1 text-[11px] text-faint hover:border-ink hover:text-ink">
+                {known[s] && <span className="h-2.5 w-2.5 rounded-full ring-1 ring-inset ring-ink/15" style={{ background: known[s] }} />}
+                + {s}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
 
-function CompositionEditor({ value, onChange }) {
+function CompositionEditor({ value, onChange, placeholder = 'Material', addLabel = 'Add material' }) {
   const total = value.reduce((a, [, pct]) => a + Number(pct || 0), 0)
   return (
     <div>
@@ -1860,7 +2193,7 @@ function CompositionEditor({ value, onChange }) {
       <ul className="space-y-2">
         {value.map(([material, pct], i) => (
           <li key={i} className="flex gap-2">
-            <input className="field" value={material} placeholder="Extra-fine merino wool"
+            <input className="field" value={material} placeholder={placeholder}
               onChange={(e) => onChange(value.map((row, k) => (k === i ? [e.target.value, row[1]] : row)))} />
             <input type="number" min="0" max="100" className="field w-24 tabular-nums" value={pct}
               onChange={(e) => onChange(value.map((row, k) => (k === i ? [row[0], Number(e.target.value)] : row)))} />
@@ -1869,7 +2202,7 @@ function CompositionEditor({ value, onChange }) {
         ))}
       </ul>
       <div className="mt-2.5 flex items-center gap-3">
-        <Button size="sm" variant="quiet" icon="plus" onClick={() => onChange([...value, ['', 0]])}>Add material</Button>
+        <Button size="sm" variant="quiet" icon="plus" onClick={() => onChange([...value, ['', 0]])}>{addLabel}</Button>
         {/* A running total, not a gate: rows are filled in one at a time, and a
             blank row just added is not a mistake yet. */}
         {value.length > 0 && (

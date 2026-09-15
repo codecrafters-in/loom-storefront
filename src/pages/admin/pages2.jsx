@@ -7,6 +7,7 @@ import RecordRow, { RowAction } from '../../components/admin/RecordRow.jsx'
 import ListToolbar, { matches } from '../../components/admin/ListToolbar.jsx'
 import { formatMoney, toMajor, toMinor } from '../../lib/money.js'
 import { LiveData, LiveSettings } from './backoffice.jsx'
+import { usesSizeCharts } from '../../lib/product-types.js'
 
 /* ── categories ────────────────────────────────────────────────────────── */
 
@@ -126,6 +127,10 @@ export function Categories() {
 
 export function SizeCharts() {
   const { data, error, loading, reload } = useAsync(() => api.listSizeCharts(), [])
+  // A store whose product types have no size chart (furniture, coffee) gets a
+  // sentence saying where charts come from, not an empty editor.
+  const library = useAsync(() => api.listLibrary(), [], { skip: isMock })
+  const unused = !isMock && usesSizeCharts(library.data) === false
   const [editing, setEditing] = useState(null)
   const [q, setQ] = useState('')
   const { push } = useToast()
@@ -154,7 +159,20 @@ export function SizeCharts() {
     }))
 
   if (error && !data) return <ErrorState error={error} onRetry={() => reload()} />
-  if (loading) return <Skeleton className="h-64 w-full" />
+  if (loading || library.loading) return <Skeleton className="h-64 w-full" />
+
+  if (unused && !data?.items?.length) {
+    return (
+      <>
+        <h1 className="text-display-md">Size charts</h1>
+        <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-muted">
+          None of this store&rsquo;s product types uses a size chart. Charts are for product types
+          with <strong className="font-medium text-ink">Size / measurement chart</strong> switched on in
+          Odoo, under Product category › LOOM Storefront.
+        </p>
+      </>
+    )
+  }
 
   if (editing) {
     return (
@@ -164,7 +182,7 @@ export function SizeCharts() {
         </button>
         <h1 className="text-display-md">{editing.id}</h1>
         <p className="mt-2 text-[13px] text-muted">
-          Garment measurements laid flat, not body measurements. Shared — every product pointing at
+          Measurements of the product itself, not of the body. Shared — every product pointing at
           this chart shows the change.
         </p>
 
@@ -240,6 +258,7 @@ export function SizeCharts() {
       <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-muted">
         Shared across products. Editing one here fixes it everywhere it is used, rather than nine
         copies of the same table drifting apart.
+        {unused && ' No product type in this store uses a size chart now, so these are not shown on any product page.'}
       </p>
 
       <ListToolbar

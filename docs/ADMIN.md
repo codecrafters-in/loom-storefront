@@ -59,7 +59,7 @@ anything else.
 | --- | --- |
 | Overview | Counts, low and out-of-stock, orders, revenue |
 | Products | Search; click a row to open the full record |
-| Product record | Six tabs: details, media, variants, fit and fabric, highlights and specs, organise. Create and delete |
+| Product record | Details, media, variants, a fit, size and composition tab when the product type has those blocks, highlights and specs, organise. Create and delete |
 | Inventory | Every variant, filterable to low or out, adjust by delta |
 | Categories | Tree with parents and children, create and re-parent |
 | Size charts | Shared measurement tables |
@@ -113,13 +113,47 @@ It stays local on purpose: nothing reaches the backend or a shopper until
   placeholder, and a warning under a value with no digits in it.
 - **Media.** Against a real backend only uploads are offered — JPEG, PNG, WebP or
   GIF; there is no paste-a-URL box and no video.
-- **Variants.** Editing colours or sizes leaves any other option (a Length, say)
-  alone; removing a value removes its variant rows; size-only and colour-only
-  products can add rows.
-- **A failed save opens the tab to fix** — slug on Details; specifications,
-  features and assurances on Highlights & specs; composition, country and size
-  chart on Fit & fabric; variants, variant prices and stock on Variants; images on
+- **Variants.** Editing one option's values leaves every other option alone;
+  removing a value removes its variant rows; removing a whole option asks first
+  and removes the rows that used it. Missing combinations are listed for any
+  number of options and are never added until asked for.
+- **Product type.** Changing the type of a saved product asks first and names the
+  specifications the new type does not define, because the backend drops them.
+- **A failed save opens the tab to fix** — slug and product type on Details;
+  specifications, features and assurances on Highlights & specs; composition,
+  country and size chart on the fit and composition tab (Details when the type
+  has no such tab); variants, variant prices and stock on Variants; images on
   Media — with the server's message in a toast. The draft is kept.
+
+### Products and their type
+
+The editor follows the product's **type** (`productTypeId`, resolved as
+`productType`). On Odoo a type is the product's internal category; the demo has
+three fixed ones (Clothing, Goods, Food & drink). `GET /admin/library` lists every
+type in the store with `defaultProductTypeId`, and the type's `blocks` decide the
+editor:
+
+| Block | When on | When off |
+| --- | --- | --- |
+| `fit` | Fit panel: verdict, note, model | No fit panel |
+| `sizeChart` | Size chart panel; *Size charts* in the admin menu | No size chart panel; the menu item is hidden when no type has one |
+| `composition` | A panel titled with `labels.composition` (Fabric, Materials, Ingredients, Contents), weight in `labels.weightUnit` | No composition panel |
+| `compliance` | Manufacturer rows under Highlights & specs | Hidden, unless the product already has some |
+
+The tab holding the first three is named for what it holds — *Fit, size & fabric*,
+*Materials*, *Ingredients* — and is absent when the type has none of them. The
+Details tab's lists use `labels.details` and `labels.care`. The preview leaves out
+the blocks the type switches off. A hidden block is not edited, and since
+`fit: null` and `fabric: null` mean "unchanged", its stored data is kept.
+
+A new product starts with the default type; with no options at all, or with empty
+Colour and Size for a type that has fit or a size chart. Options are any names
+(`options: [{ name, values }]`, `variants[].options: { name: value }`); a colour
+option — one the library shows as swatches, or one called Colour — is edited with
+swatches, every other option with words. Option names and values are suggested
+from `GET /admin/library` → `options`, the product type's own first, and
+specification keys from `productType.specKeys` first. Without a type (a backend
+that predates them) the editor falls back to its old behaviour.
 
 ---
 

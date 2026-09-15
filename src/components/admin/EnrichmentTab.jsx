@@ -9,6 +9,7 @@ import {
 } from '../product/Enrichment.jsx'
 import { attributeByKey, attributeGroups } from '../../data/attributes.js'
 import { highlightsFromSpecs, specsFromHighlights } from '../../lib/spec-sync.js'
+import { preferSpecKeys } from '../../lib/product-types.js'
 
 const NUMERIC = new Set(['integer', 'float'])
 const isNumeric = (attribute) => NUMERIC.has(attribute?.type)
@@ -59,9 +60,16 @@ export default function EnrichmentTab({
   assuranceTemplates = [],
   featurePresets = [],
   onSaveToLibrary,
+  // The product type's own specification keys, suggested first, and its name for the label.
+  specKeys = [],
+  typeName = null,
+  // Manufacturer rows: when the type asks for compliance, or the product already has some.
+  compliance = true,
 }) {
   const e = useMemo(() => draft.enrichment || {}, [draft.enrichment])
-  const [section, setSection] = useState('highlights')
+  const [chosen, setSection] = useState('highlights')
+  const section = chosen === 'manufacturer' && !compliance ? 'highlights' : chosen
+  const vocabulary = useMemo(() => preferSpecKeys(attributes, specKeys), [attributes, specKeys])
 
   const setE = (key, value) => set(`enrichment.${key}`, value)
   const setMaker = (key, value) => setE('maker', { ...(e.maker || {}), [key]: value })
@@ -97,7 +105,7 @@ export default function EnrichmentTab({
             ['features', 'Features'],
             ['comes-with', 'Comes with'],
             ['specs', 'Specifications'],
-            ['manufacturer', 'Manufacturer info'],
+            ...(compliance ? [['manufacturer', 'Manufacturer info']] : []),
           ].map(([id, label]) => (
             <button
               key={id}
@@ -119,8 +127,10 @@ export default function EnrichmentTab({
           >
             <PairEditor
               rows={e.highlights || []}
-              attributes={attributes.filter((a) => a.highlight)}
-              allAttributes={attributes}
+              attributes={vocabulary.filter((a) => a.highlight)}
+              allAttributes={vocabulary}
+              specKeys={specKeys}
+              typeName={typeName}
               onChange={setHighlights}
               warnAfter={6}
             />
@@ -130,7 +140,7 @@ export default function EnrichmentTab({
         {section === 'features' && (
           <Panel
             title="Features"
-            note="The two or three things that make this piece different, in your own words. An icon, a short title, and a sentence that says something a competitor could not copy-paste."
+            note="The two or three things that make this product different, in your own words. An icon, a short title, and a sentence that says something a competitor could not copy-paste."
           >
             <FeatureEditor
               items={e.features || []}
@@ -145,7 +155,7 @@ export default function EnrichmentTab({
         {section === 'comes-with' && (
           <Panel
             title="Comes with"
-            note="What happens after the sale — returns, exchange, repair, payment. It sits under the buy button because that is where the doubt arrives. Leave it empty and the product falls back to the store-wide rows in Settings, which is usually what you want; add rows here only where this piece differs."
+            note="What happens after the sale — returns, exchange, repair, payment. It sits under the buy button because that is where the doubt arrives. Leave it empty and the product falls back to the store-wide rows in Settings, which is usually what you want; add rows here only where this product differs."
           >
             <AssuranceEditor
               rows={e.assurances || []}
@@ -161,7 +171,7 @@ export default function EnrichmentTab({
             title="Specifications"
             note="The full table, below the fold, grouped automatically by attribute. Nobody reads it end to end; everybody uses it to check one thing."
           >
-            <SpecEditor specs={e.specs} attributes={attributes} onChange={setSpecs} />
+            <SpecEditor specs={e.specs} attributes={vocabulary} specKeys={specKeys} typeName={typeName} onChange={setSpecs} />
           </Panel>
         )}
 
@@ -173,20 +183,20 @@ export default function EnrichmentTab({
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
-                  label="Woven by"
-                  placeholder="Veshti Mills"
+                  label="Made by"
+                  placeholder="Workshop, factory or brand"
                   value={e.maker?.name || ''}
                   onChange={(v) => setMaker('name', v)}
                 />
                 <Field
-                  label="Mill location"
-                  placeholder="Erode, Tamil Nadu"
+                  label="Location"
+                  placeholder="City, region"
                   value={e.maker?.location || ''}
                   onChange={(v) => setMaker('location', v)}
                 />
               </div>
               {[
-                ['genericName', 'Generic name', 'T-shirts'],
+                ['genericName', 'Generic name', 'What it is, in plain words'],
                 ['countryOfOrigin', 'Country of origin', 'India'],
                 ['manufacturer', 'Manufacturer name and address', ''],
                 ['packer', 'Packer name and address', ''],
@@ -267,13 +277,14 @@ export default function EnrichmentTab({
 
 /* ── editors ───────────────────────────────────────────────────────────── */
 
-function PairEditor({ rows, attributes, allAttributes, onChange, warnAfter }) {
+function PairEditor({ rows, attributes, allAttributes, specKeys = [], typeName, onChange, warnAfter }) {
   const patch = (i, key, value) => onChange(rows.map((r, k) => (k === i ? { ...r, [key]: value } : r)))
   const used = new Set(rows.map((r) => r.key))
   const lookup = useAttributeLookup(allAttributes)
 
   // The starred ones first: they are the handful worth putting above the fold,
   // and a merchant filling in highlights wants those before the long tail.
+  // Within that, the product type's own specifications lead (see SuggestionPickers).
   const suggestions = [
     ...attributes.filter((a) => !used.has(a.key)),
     ...allAttributes.filter((a) => !used.has(a.key) && !attributes.some((x) => x.key === a.key)),
@@ -281,9 +292,11 @@ function PairEditor({ rows, attributes, allAttributes, onChange, warnAfter }) {
 
   return (
     <div className="space-y-3">
-      <ChipPicker
-        label="Common for apparel"
+      <SuggestionPickers
+        label="Common attributes"
         items={suggestions}
+        specKeys={specKeys}
+        typeName={typeName}
         onPick={(key) => onChange([...rows, { key, value: '' }])}
       />
 
@@ -297,7 +310,7 @@ function PairEditor({ rows, attributes, allAttributes, onChange, warnAfter }) {
             <input
               list="attr-keys"
               className="field h-9 text-[13px]"
-              placeholder="Key, e.g. fabric"
+              placeholder="Key, e.g. material"
               value={row.key || ''}
               onChange={(ev) => patch(i, 'key', ev.target.value)}
             />
@@ -461,7 +474,7 @@ function FeatureEditor({ items, icons, presets = [], onChange, onSave }) {
           <div className="mt-3 space-y-3">
             <Field
               label="Title"
-              placeholder="Washed twice before it is cut"
+              placeholder="Made to be repaired, not replaced"
               value={f.title || ''}
               onChange={(v) => patch(i, 'title', v)}
             />
@@ -511,7 +524,7 @@ function AssuranceEditor({ rows, icons, templates, onChange, onSave }) {
           a list found only after you have given up and typed something is a
           list for the merchant who least needed it. */}
       <ChipPicker
-        label="Common for apparel"
+        label="Common rows"
         items={unused.map((t) => ({ key: t.label, label: t.label, icon: t.icon }))}
         onPick={(label) => onChange([...rows, { ...templates.find((t) => t.label === label) }])}
         limit={6}
@@ -591,7 +604,7 @@ function AssuranceEditor({ rows, icons, templates, onChange, onSave }) {
  * outside change (switching product, loading a draft) is adopted, our own write
  * coming back is not.
  */
-function SpecEditor({ specs, attributes, onChange }) {
+function SpecEditor({ specs, attributes, specKeys = [], typeName, onChange }) {
   const committed = useMemo(() => Object.entries(specs || {}), [specs])
   const [rows, setRows] = useState(committed)
   const mine = useRef(JSON.stringify(committed))
@@ -625,9 +638,11 @@ function SpecEditor({ specs, attributes, onChange }) {
           add a blank row, guess that the field is a combobox, and then discover
           the list — the list is the fastest path and belongs above the work. */}
       {suggestions.length > 0 && (
-        <ChipPicker
+        <SuggestionPickers
           label="Add a common attribute"
           items={suggestions.map((a) => ({ key: a.key, label: a.label, group: a.group }))}
+          specKeys={specKeys}
+          typeName={typeName}
           onPick={(key) => push([...rows, [key, '']])}
         />
       )}
@@ -708,6 +723,26 @@ function SpecEditor({ specs, attributes, onChange }) {
  * truncate, because a hard cut at ten is how an attribute nobody can find gets
  * retyped as a near-duplicate.
  */
+/**
+ * Suggestions with the product type's own specifications first.
+ *
+ * A picker groups its chips by attribute group, so ordering alone would not put
+ * a table's "Wood" ahead of a shirt's "Sleeve". Two pickers do: what this type
+ * defines, then everything else the store knows, collapsed. Typing a new key is
+ * still allowed in both editors.
+ */
+function SuggestionPickers({ label, items, specKeys = [], typeName, onPick }) {
+  const want = new Set(specKeys)
+  const mine = items.filter((i) => want.has(i.key))
+  if (!mine.length) return <ChipPicker label={label} items={items} onPick={onPick} />
+  return (
+    <>
+      <ChipPicker label={typeName ? `Defined for ${typeName}` : 'Defined for this type'} items={mine} onPick={onPick} />
+      <ChipPicker label="Other attributes" items={items.filter((i) => !want.has(i.key))} onPick={onPick} limit={4} />
+    </>
+  )
+}
+
 function ChipPicker({ label, items, onPick, groups = attributeGroups, limit = 8 }) {
   const [expanded, setExpanded] = useState(false)
   if (!items.length) return null

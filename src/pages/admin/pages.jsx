@@ -101,7 +101,7 @@ export function Overview() {
       <div className="mt-10 rounded-xs border border-line bg-surface p-5">
         <h2 className="text-[14px] font-medium">Try it</h2>
         <p className="mt-2 text-[13px] leading-relaxed text-muted">
-          Change a price or set a size to zero, then open the storefront in another tab. The change
+          Change a price or set a variant&rsquo;s stock to zero, then open the storefront in another tab. The change
           is there — the admin panel and the shop read the same data through the same API, so there
           is no publish step and nothing to sync.
         </p>
@@ -276,7 +276,7 @@ export function Inventory() {
 
   const rows = useMemo(() => {
     let items = all.filter((r) =>
-      matches(q, r.product.title, r.variant.sku, r.variant.options.Color, r.variant.options.Size),
+      matches(q, r.product.title, r.variant.sku, ...Object.values(r.variant.options || {})),
     )
     if (filter === 'out') items = items.filter((r) => !r.variant.available)
     if (filter === 'low') items = items.filter((r) => r.variant.available && r.variant.inventory <= 2)
@@ -314,7 +314,7 @@ export function Inventory() {
         className="mt-6"
         query={q}
         onQuery={setQ}
-        placeholder="Search product, SKU, colour or size"
+        placeholder="Search product, SKU or option"
         filters={[
           {
             label: 'Availability',

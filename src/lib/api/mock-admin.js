@@ -9,6 +9,7 @@
 import * as db from '../db.js'
 import * as mediaStore from '../media.js'
 import { attributes } from '../../data/attributes.js'
+import { isColourOption } from '../product-types.js'
 import { ApiError } from './contracts.js'
 import {
   products,
@@ -524,13 +525,118 @@ export async function adminListProducts({ q = '', page = 1, perPage = 25 } = {})
 
 const BUILT_IN_KEYS = new Set(attributes.map((a) => a.key))
 
+/* ── product types ─────────────────────────────────────────────────────── */
+
+/**
+ * The demo's product types.
+ *
+ * On Odoo a product's type is its internal product category, and the category
+ * decides which blocks its page has. The demo has no Odoo, so it has three
+ * fixed types and files each product by its storefront categories — clothes are
+ * Clothing, the pantry is Food & drink, the rest of Goods is Goods — unless the
+ * editor has chosen one.
+ */
+const DEMO_TYPES = [
+  {
+    id: 'clothing',
+    name: 'Clothing',
+    blocks: { fit: true, sizeChart: true, composition: true, compliance: true, fitInReviews: true },
+    labels: { composition: 'Fabric', care: 'Care', details: 'Details', weightUnit: 'gsm' },
+  },
+  {
+    id: 'goods',
+    name: 'Goods',
+    blocks: { fit: false, sizeChart: false, composition: true, compliance: true, fitInReviews: false },
+    labels: { composition: 'Materials', care: 'Care', details: 'Details', weightUnit: 'g' },
+  },
+  {
+    id: 'food',
+    name: 'Food & drink',
+    blocks: { fit: false, sizeChart: false, composition: true, compliance: true, fitInReviews: false },
+    labels: { composition: 'Ingredients', care: 'Storage', details: 'Details', weightUnit: 'g' },
+  },
+]
+const DEFAULT_TYPE = 'clothing'
+
+function typeIdOf(p) {
+  if (p?.productTypeId != null && DEMO_TYPES.some((t) => t.id === String(p.productTypeId))) return String(p.productTypeId)
+  const cats = p?.categories || []
+  if (cats.includes('goods-pantry')) return 'food'
+  if (cats.some((c) => c === 'goods' || c.startsWith('goods-'))) return 'goods'
+  return DEFAULT_TYPE
+}
+
+/** The specification keys a type defines: the ones its products use, and for clothing the built-in vocabulary. */
+function specKeysOf(typeId, except = null) {
+  const keys = new Set(typeId === 'clothing' ? BUILT_IN_KEYS : [])
+  for (const p of products) {
+    if (p === except || p.id === except?.id || typeIdOf(p) !== typeId) continue
+    for (const k of Object.keys(p.enrichment?.specs || {})) keys.add(k)
+    for (const s of p.enrichment?.specList || []) keys.add(s.key)
+  }
+  return [...keys]
+}
+
+const productTypes = () =>
+  DEMO_TYPES.map((t) => ({
+    ...t,
+    specKeys: specKeysOf(t.id),
+    productCount: products.filter((p) => typeIdOf(p) === t.id).length,
+  }))
+
+const withType = (p) => {
+  const id = typeIdOf(p)
+  return { ...p, productTypeId: id, productType: productTypes().find((t) => t.id === id) || null }
+}
+
+/** Option names and values the catalogue already uses, offered back in the editor. */
+function optionLibrary() {
+  const byName = new Map()
+  for (const p of products) {
+    const typeId = typeIdOf(p)
+    for (const o of p.options || []) {
+      if (!o?.name) continue
+      const colour = isColourOption(o)
+      const entry = byName.get(o.name) || {
+        name: o.name,
+        displayType: o.displayType || (colour ? 'color' : 'pills'),
+        values: [],
+        swatches: {},
+        productTypeIds: [],
+      }
+      for (const v of o.values || (o.choices || []).map((c) => c.name)) {
+        if (!entry.values.includes(v)) entry.values.push(v)
+        if (colour && p.swatches?.[v]) entry.swatches[v] = p.swatches[v]
+      }
+      if (colour) for (const c of o.choices || []) if (c.color) entry.swatches[c.name] = c.color
+      if (!entry.productTypeIds.includes(typeId)) entry.productTypeIds.push(typeId)
+      byName.set(o.name, entry)
+    }
+  }
+  return [...byName.values()]
+}
+
 export async function adminSaveProduct(patch) {
   await latency()
-  const saved = db.upsertProduct(patch)
+  // The resolved type is for reading; what is saved is the id.
+  const { productType: _resolved, ...body } = patch
+  if (body.productTypeId != null && !DEMO_TYPES.some((t) => t.id === String(body.productTypeId))) {
+    throw new ApiError('That product type does not exist in this store.', { status: 422, code: 'unknown_product_type' })
+  }
+  const previous = body.id ? products.find((p) => p.id === body.id) : null
+  const typeId = body.productTypeId != null ? String(body.productTypeId) : typeIdOf(previous || body)
+  let next = { ...body, productTypeId: typeId }
+  // As on Odoo: a product that changes type keeps only the specifications its new type defines.
+  if (previous && typeIdOf(previous) !== typeId && body.enrichment?.specs) {
+    const keep = new Set(specKeysOf(typeId, previous))
+    const specs = Object.fromEntries(Object.entries(body.enrichment.specs).filter(([k]) => keep.has(k)))
+    next = { ...next, enrichment: { ...body.enrichment, specs } }
+  }
+  const saved = db.upsertProduct(next)
   // Anything described here that the built-in vocabulary does not know is
   // offered on the next product. Reuse should not require deciding to save.
   db.learnFrom(saved, BUILT_IN_KEYS)
-  return storedProduct(saved)
+  return withType(storedProduct(saved))
 }
 
 export async function adminDeleteProduct(idOrSlug) {
@@ -677,7 +783,12 @@ export async function deleteMedia(id) {
 
 export async function listLibrary() {
   await latency()
-  return db.getLibrary()
+  return {
+    ...db.getLibrary(),
+    productTypes: productTypes(),
+    defaultProductTypeId: DEFAULT_TYPE,
+    options: optionLibrary(),
+  }
 }
 
 export async function saveLibraryItem({ kind, item }) {
@@ -710,7 +821,7 @@ export async function adminGetProduct(idOrSlug) {
   // Admin sees the raw record, including the chart reference rather than the
   // resolved copy — you edit the link, not the snapshot.
   const { _imageQuery, _altQuery, ...rest } = p
-  return rest
+  return withType(rest)
 }
 
 export async function adminReset() {

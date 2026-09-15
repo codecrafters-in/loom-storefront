@@ -178,6 +178,7 @@ GET /collections                → { items: Collection[], total }
   ],
 
   "categories": ["knitwear", "knitwear-cashmere"],
+  "productTypeId": "12",
   "tags": ["merino", "layering"],
   "rating": { "average": 4.8, "count": 302 },
   "badges": ["bestseller"],
@@ -310,12 +311,34 @@ over them — a closed list produces a merchandiser who cannot describe what the
 are selling, and no list at all produces "Fabric", "fabric", "Material" and
 "Composition" as four separate attributes nobody can filter on.
 
-The `fit`, `fabric`, `sizeChart` and `social` blocks are optional but they are
-the highest-value fields in an apparel catalogue. Size and fit cause roughly two
-thirds of fashion returns and apparel return rates run 20–40%, the highest of
-any category. If my system holds this data anywhere — a product attribute, a
-spec sheet, a supplier field — surface it. If it does not, tell me, and suggest
-where it could live.
+**The product type decides which blocks exist.** Every product has a type —
+in most systems its category (in Odoo, the internal product category) — sent as
+`productTypeId` on the admin read and write, with `productType` resolved on the
+admin read. The type says which enrichment blocks the product has and what they
+are called: `blocks: { fit, sizeChart, composition, compliance, fitInReviews }`,
+`labels: { composition, care, details, weightUnit }` ("Fabric" in gsm for
+clothing, "Materials" in kg for furniture, "Ingredients" in g for coffee) and
+`specKeys`, the specification keys the type defines. **Do not treat `fit`,
+`sizeChart` and `fabric` as universal**: a table has no fit and no size chart,
+and its composition is its materials. Serve a block only for a type that has it
+and omit it everywhere else; the storefront hides what is absent.
+`GET /admin/library` lists every type (`productTypes`, `defaultProductTypeId`)
+and the option names and values the store already uses (`options`). A write
+with an unknown type is `422 unknown_product_type`; a POST without one gets the
+type most similar products use; changing a product's type drops the
+specifications the new type does not define.
+
+**Options are any names.** `options` are the product's own option names —
+Color and Size, Weight and Grind, Finish, Storage — and `variants[].options`
+maps each name to a value. `swatches` holds hex colours for a colour option only;
+never invent swatches for a Grind.
+
+For a type that is worn and sized, `fit`, `fabric` and `sizeChart` are the
+highest-value fields in the catalogue: size and fit cause roughly two thirds of
+fashion returns, and apparel return rates run 20–40%, the highest of any
+category. If my system holds this data anywhere — a product attribute, a spec
+sheet, a supplier field — surface it. If it does not, tell me, and suggest where
+it could live. `social` is optional for every type.
 
 `fit.feedback` percentages come from post-purchase surveys or review metadata,
 not from the merchant's opinion of their own cut. If you have no source, omit
@@ -636,7 +659,8 @@ POST   /admin/auth/token  { grant_type: "authorization_code", code, code_verifie
 POST   /admin/auth/logout { refresh_token }               (Authorization: Bearer)
 POST   /admin/auth/login  { login, apiKey }               → { token }   (scripts only; passwords refused)
 GET    /admin/products?q=&page=&per_page=                → { items, total, page, perPage }
-GET    /admin/products/:id                               → Product (raw, sizeChartId unresolved)
+GET    /admin/products/:id                               → Product (raw, sizeChartId unresolved, productTypeId and productType)
+GET    /admin/library                                    → { attributes, features, assurances, productTypes, defaultProductTypeId, options }
 POST   /admin/products                                   → Product
 PATCH  /admin/products/:id                               → Product
 DELETE /admin/products/:id

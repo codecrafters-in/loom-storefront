@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import ProductView from '../product/ProductView.jsx'
 import ProductCard from '../product/ProductCard.jsx'
 import { Icon } from '../ui/index.jsx'
+import { previewProduct } from '../../lib/product-types.js'
 
 /**
  * What this product will look like, from the draft in front of you.
@@ -18,7 +19,7 @@ import { Icon } from '../ui/index.jsx'
  * The card is included because that is where most shoppers meet a product, and
  * a shot that works in the gallery can still be wrong at 240px.
  */
-export default function ProductPreview({ draft, charts = [], open, onClose }) {
+export default function ProductPreview({ draft, charts = [], productType = null, open, onClose }) {
   useEffect(() => {
     if (!open) return undefined
     const onKey = (e) => e.key === 'Escape' && onClose()
@@ -33,20 +34,10 @@ export default function ProductPreview({ draft, charts = [], open, onClose }) {
   /**
    * The editor holds a chart *reference*; the storefront receives it resolved.
    * Resolving here is what the API does on read, so the preview sees exactly
-   * what a shopper would.
+   * what a shopper would — and, like the product page, it leaves out the blocks
+   * the product's type switches off (a table has no fit block, whatever is stored).
    */
-  const product = useMemo(() => {
-    if (!draft) return null
-    return {
-      ...draft,
-      slug: draft.slug || 'preview',
-      images: draft.images?.length ? draft.images : [{ id: 'none', url: '', alt: '' }],
-      options: draft.options || [],
-      variants: draft.variants || [],
-      rating: draft.rating || { average: 0, count: 0 },
-      sizeChart: draft.sizeChartId ? charts.find((c) => c.id === draft.sizeChartId) || null : null,
-    }
-  }, [draft, charts])
+  const product = useMemo(() => previewProduct(draft, { type: productType, charts }), [draft, charts, productType])
 
   if (!open || !product) return null
 
