@@ -411,6 +411,10 @@ names a merchant typed and a comma in one would split it. The theme renders
 }
 ```
 
+`returns: { returnable, days }` is the product's own returns policy, or `null` when the store takes no returns. Under
+the buy button a product with `returnable: false` says **Final sale — this item cannot be returned**, and one with
+`returnable: true` promises its own `days`; without the field the store's `commerce.returnsWindowDays` applies.
+
 ### Enrichment
 
 Three blocks, deliberately not one:
@@ -1440,16 +1444,37 @@ text-message code and provider buttons when the store has them.
 | Method | Route | Returns |
 | --- | --- | --- |
 | `GET` | `/orders/:id/invoices/:invoiceId` | The invoice PDF — `order.invoices: [{ id, number, kind, date, total, paymentState, url }]`, saved with `downloadFile` |
-| `POST` | `/orders/:id/cancel` `{ reason }` | `Order` — `order.cancellation: { mode: cancel, refund or request, requestedAt }` says what the button does (`cancelOrder`) |
+| `POST` | `/orders/:id/cancel` `{ reason }` | `Order` — `order.cancellation: { mode: cancel, refund or request, requestedAt }` says what the button does, or is `null` when the order can no longer be cancelled from the storefront (`cancelOrder`) |
+| `POST` | `/orders/:id/messages` `{ body }` | `Order` — a message to the store about the order, up to 2000 characters, while `order.messages.canReply` (`sendOrderMessage`). `403 messages_closed`, `422 empty_message`, `429 rate_limited` |
 | `POST` | `/orders/:id/reorder` `{ cart_id }` | `Cart` with `notices` — the order's items in the bag (`reorder`) |
-| `GET` | `/orders/:id/returns` | `{ options: { days, until, methods, reasons, lines }, items: Return[] }` (`getOrderReturns`) |
+| `GET` | `/orders/:id/returns` | `{ options: { days, until, methods, reasons, lines, unavailable, approval, refundTiming }, items: Return[] }` (`getOrderReturns`) |
 | `POST` | `/orders/:id/returns` `{ method, note, lines: [{ lineId, quantity, reasonId, comment }], photos }` | `Return` (`createReturn`); `POST /orders/:id/returns/:returnId/cancel` (`cancelReturn`) |
 | `GET` | `/returns` | `{ items: Return[], total }` — **Account › Returns** (`listReturns`) |
 
 The Order adds `timeline: [{ kind, at }]` (placed, paid, shipped, delivered, refunded, cancelled), `invoices`,
-`cancellation`, `canReorder` and `canReturn`. A Return is `{ id, number, status, method, createdAt, orderId,
-orderNumber, lines, instructions, rejectReason, value, canCancel }`; `status` is `requested`, `approved`, `received`,
-`refunded`, `exchanged`, `credited`, `rejected` or `cancelled`.
+`cancellation`, `cancelRequest`, `messages`, `returnCount`, `canReorder` and `canReturn`:
+
+- `cancelRequest`: `{ status: pending | declined | accepted, requestedAt, reason, answeredAt, answer }` or `null`. The
+  order page says a request is waiting, shows the team's `answer` when it is declined (no cancel button then:
+  `cancellation` is `null`), and the answer, if any, once accepted and the order is cancelled.
+- `messages`: `{ canReply, items: [{ id, from: customer | store, author, body, at, returnNumber }] }`, oldest first,
+  or `null` when the store keeps order messages off — the order page then shows no **Messages**. `body` is plain text
+  and may hold line breaks; `returnNumber` is `''` or the return a message is about.
+- `returnCount`: the order's returns. The order page shows **Returns** when it is above 0 or `canReturn` is true, and
+  only then asks for `GET /orders/:id/returns`.
+
+Return `options` also carry how the store handles returns: `approval` (`automatic`, `team`, `mixed`, or `null` when
+nothing can go back), `refundTiming` (`manual`: the team refunds; `received`: automatically once the items are back;
+`approved`: as soon as the return is approved), `reasons[].needsReview` (a return with that reason always waits for the
+team), `lines[].until` (the last day that line can go back) and `unavailable: [{ lineId, title, options, image, reason:
+final_sale | window_over, until }]`, delivered items shown greyed with the reason. The form says what to expect from
+`approval` and `refundTiming` before it is sent.
+
+A Return is `{ id, number, status, method, createdAt, orderId, orderNumber, lines, instructions, rejectReason, value,
+canCancel, approvedAutomatically, refundTiming, refunded }`; `status` is `requested`, `approved`, `received`,
+`refunded`, `exchanged`, `credited`, `rejected` or `cancelled`, and `refunded` is `{ amount, currency }` once money
+went back. `POST /orders/:id/returns` can answer `approved` (with `instructions`) or `refunded` straight away when the
+store's rules allow it, and the form says so instead of "sent".
 
 A company allowed to pay on invoice gets a payment method with `code: "invoice"` and `flow: "offline"`; choosing it
 sends `payOnInvoice: true` with `createPayment` and the order is placed without a gateway.
@@ -1596,7 +1621,8 @@ along:
 | `orderState` | `quotation` `confirmed` `cancelled` |
 | `paymentStatus` | `paid` `partially_refunded` `refunded` `authorized` `pending` (incl. cash on delivery) `failed` `unpaid` |
 | `delivery.status` | `none` (nothing to deliver) `to_ship` `shipped` `delivered` `cancelled` |
-| `actions` | Allowed right now, in display order: `ship` `update_tracking` `deliver` `record_payment` `cancel` `refund` |
+| `actions` | Allowed right now, in display order: `ship` `update_tracking` `deliver` `record_payment` `cancel` `refund`, and `accept_cancel` `decline_cancel` while the customer's request to cancel waits |
+| `cancelRequest` | The customer `Order.cancelRequest`: `{ status, requestedAt, reason, answeredAt, answer }` with `status` pending, declined or accepted, or `null` |
 | `refundable` | `{ amount, currency }` still refundable; the refund dialog's maximum |
 
 `backendId` and `backendUrl` are `null` in the demo.
@@ -1637,9 +1663,13 @@ over an empty list.
 { "action": "deliver" }
 { "action": "record_payment" }
 { "action": "cancel" }
+{ "action": "accept_cancel", "message": "Cancelled as you asked. The refund is on its way." }
+{ "action": "decline_cancel", "message": "Your parcel has already left our warehouse." }
 ```
 
-Every tracking field is optional, and one left out of `update_tracking` is kept.
+Every tracking field is optional, and one left out of `update_tracking` is kept. `accept_cancel` cancels the order
+(voiding or refunding its payment) and `message` is optional; `decline_cancel` needs a `message`. Either message goes
+to the customer by email and on their order page.
 Shipping an order moves the customer's `Order.status` to `fulfilled` and fills
 `Order.tracking`; delivering moves it to `delivered`.
 
@@ -1650,7 +1680,8 @@ Shipping an order moves the customer's `Order.status` to `fulfilled` and fills
 | 409 | `action_not_allowed` | The action is not in the order's `actions` |
 | 409 | `cannot_ship` | The backend could not complete the delivery, with its reason |
 | 409 | `already_shipped` / `not_shipped` / `nothing_to_record` | The order moved on since it was loaded |
-| 422 | `invalid_action` | Not one of the five actions |
+| 422 | `invalid_action` | Not one of the actions above |
+| 422 | `message_required` | `decline_cancel` without a message |
 | 422 | `invalid_tracking` | The link is not `http(s)://`, or the number is over 128 characters |
 
 **The actions are a state machine, and the backend owns it.**
@@ -1662,6 +1693,8 @@ Shipping an order moves the customer's `Order.status` to `fulfilled` and fills
 | To ship or shipped | `deliver` | Delivered | Ships first if needed, then records the delivery |
 | Awaiting an offline payment | `record_payment` | Paid | Marks the cash or transfer received and confirms the order |
 | Not shipped | `cancel` | Cancelled | Cancels the order and its open deliveries; the stock returns |
+| Customer asked to cancel | `accept_cancel` | Cancelled | Cancels as above, voids or refunds the payment, answers the request |
+| Customer asked to cancel | `decline_cancel` | Unchanged | Answers the request with the message; the customer can no longer ask |
 
 `actions` is recomputed on every answer and checked again inside the write, so a
 second click on **Mark as shipped** answers `409 action_not_allowed` rather than

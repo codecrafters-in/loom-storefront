@@ -22,13 +22,17 @@ const DeliveryCheck = isMock ? null : lazy(() => import('./DeliveryCheck.jsx'))
  * Thursday" is a fact to plan around, "2–4 working days" is arithmetic the
  * shopper has to do, and doing it is a moment to leave.
  */
-export default function TrustRow({ flat = false }) {
+export default function TrustRow({ flat = false, product = null }) {
   const config = useStorefront()
   const trust = config.trust || {}
   const { data: eta } = useAsync(() => api.getDeliveryEstimate({ method: 'standard' }), [])
 
   const free = config.commerce?.freeShippingOver
-  const days = config.commerce?.returnsWindowDays ?? 0
+  // A product's own policy (`product.returns`) wins over the store's window: a final-sale item promises no returns,
+  // and one category can have a longer window than the rest.
+  const policy = product?.returns
+  const finalSale = policy?.returnable === false
+  const days = finalSale ? 0 : policy?.returnable ? policy.days ?? 0 : config.commerce?.returnsWindowDays ?? 0
 
   const rows = [
     eta && {
@@ -52,6 +56,11 @@ export default function TrustRow({ flat = false }) {
       icon: 'refresh',
       strong: isMock ? `Free ${days}-day returns` : plural(days, '{count}-day returns', '{count}-day returns'),
       rest: isMock ? 'prepaid label in every parcel — try it on at home' : '',
+    },
+    finalSale && {
+      icon: 'info',
+      strong: t('Final sale'),
+      rest: t('this item cannot be returned'),
     },
     trust.repairs === true && {
       icon: 'shield',

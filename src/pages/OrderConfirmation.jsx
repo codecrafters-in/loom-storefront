@@ -14,6 +14,8 @@ import { useStorefront } from '../store/StorefrontContext.jsx'
 import { useToast } from '../store/ToastContext.jsx'
 import { nestLines } from '../lib/cart-lines.js'
 import LineDetails from '../components/cart/LineDetails.jsx'
+import { formatDay } from '../lib/returns.js'
+import { COUNTER_FROM, MAX_MESSAGE_LENGTH, messageTime, visibleMessages } from '../lib/order-messages.js'
 import { t, mark } from '../i18n/index.js'
 
 const PayNow = lazy(() => import('../components/checkout/PayNow.jsx'))
@@ -249,9 +251,14 @@ export default function OrderConfirmation() {
           </div>
         )}
 
-        {(order.cancellation || order.canReorder || order.canReturn) && (
+        {(order.cancellation || order.cancelRequest || order.canReorder) && (
           <OrderActions order={order} onChange={setFresh} />
         )}
+
+        {(order.canReturn || order.returnCount > 0) && <OrderReturns order={order} onChange={setFresh} />}
+
+        {/* `null` when the store keeps messages off; older backends leave it out. */}
+        {order.messages && <OrderMessages order={order} onChange={setFresh} />}
 
         <div className="mt-10 flex flex-wrap gap-3">
           <Button to="/shop" size="lg">{t('Keep shopping')}</Button>
@@ -296,6 +303,50 @@ function Timeline({ events }) {
 }
 
 /**
+ * Where a request to cancel stands (`order.cancelRequest`): waiting for the team, declined with their answer, or
+ * accepted (the order is cancelled; the answer shows when they wrote one). Older backends only mark the request on
+ * `order.cancellation.requestedAt`. Null when there is nothing to say.
+ */
+function cancelRequestNote(order, locale) {
+  const request = order.cancelRequest
+  if (request?.status === 'pending' && request.requestedAt) {
+    const date = formatDay(request.requestedAt, locale)
+    return (
+      <p className="text-[14px] text-muted">
+        {order.messages
+          ? t('You asked us to cancel on {date}. We will answer here and by email.', { date })
+          : t('You asked us to cancel on {date}. We will email you our answer.', { date })}
+      </p>
+    )
+  }
+  // Once the parcel has arrived, a declined request is history rather than news.
+  if (request?.status === 'declined' && order.status !== 'delivered') {
+    return (
+      <div className="rounded-xs bg-sunken/60 p-4 text-[14px]">
+        <p className="flex items-start gap-2 font-medium text-ink">
+          <Icon name="info" size={16} className="mt-0.5 shrink-0 text-muted" />
+          {t('We could not cancel this order.')}
+        </p>
+        {request.answer && <p className="mt-2 whitespace-pre-line break-words text-muted">{request.answer}</p>}
+        {order.messages?.canReply && <p className="mt-2 text-[13px] text-muted">{t('Questions? Write to us below.')}</p>}
+      </div>
+    )
+  }
+  if (request?.status === 'accepted' && request.answer) {
+    return (
+      <div className="rounded-xs bg-sunken/60 p-4 text-[14px]">
+        <p className="font-medium text-ink">{t('We cancelled this order as you asked.')}</p>
+        <p className="mt-2 whitespace-pre-line break-words text-muted">{request.answer}</p>
+      </div>
+    )
+  }
+  if (request?.status === 'pending' || (!request && order.cancellation?.requestedAt)) {
+    return <p className="text-[14px] text-muted">{t('You asked us to cancel this order. We will email you our answer.')}</p>
+  }
+  return null
+}
+
+/**
  * Cancel (or ask to), as far as the store's policy allows, and buy the same things again. The cancellation is
  * confirmed in place, with an optional reason, because it cannot be undone.
  */
@@ -303,12 +354,15 @@ function OrderActions({ order, onChange }) {
   const { refresh } = useCart()
   const { push } = useToast()
   const navigate = useNavigate()
+  const locale = useStorefront().pricing?.locale || 'en-US'
   const [reason, setReason] = useState(null)
-  const [returning, setReturning] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const cancellation = order.cancellation
   const asking = cancellation?.mode === 'request'
+  const waiting = order.cancelRequest?.status === 'pending' || Boolean(cancellation?.requestedAt)
+  const canCancel = Boolean(cancellation) && !waiting
+  const note = cancelRequestNote(order, locale)
 
   const cancel = async (e) => {
     e.preventDefault()
@@ -337,11 +391,11 @@ function OrderActions({ order, onChange }) {
     }
   }
 
+  if (!note && !order.canReorder && !canCancel) return null
+
   return (
     <div className="mt-8 rounded-xs border border-line p-5">
-      {cancellation?.requestedAt ? (
-        <p className="text-[14px] text-muted">{t('You asked us to cancel this order. We will email you our answer.')}</p>
-      ) : reason !== null ? (
+      {reason === null ? note : (
         <form onSubmit={cancel} className="space-y-3">
           <p className="text-[14px] text-ink">
             {asking
@@ -359,29 +413,152 @@ function OrderActions({ order, onChange }) {
             <Button size="sm" variant="ghost" onClick={() => setReason(null)} disabled={busy}>{t('Keep order')}</Button>
           </div>
         </form>
-      ) : null}
-      {error && <p className="mt-3 text-[13px] text-sale">{error}</p>}
-      {reason === null && (
-        <div className="flex flex-wrap gap-3">
+      )}
+      {error && <p role="alert" className="mt-3 text-[13px] text-sale">{error}</p>}
+      {reason === null && (order.canReorder || canCancel) && (
+        <div className={`flex flex-wrap gap-3 ${note ? 'mt-4' : ''}`}>
           {order.canReorder && (
             <Button size="sm" variant="quiet" icon="refresh" onClick={buyAgain} disabled={busy}>{t('Buy again')}</Button>
           )}
-          {order.canReturn && !returning && (
-            <Button size="sm" variant="quiet" icon="package" onClick={() => setReturning(true)} disabled={busy}>{t('Return items')}</Button>
-          )}
-          {cancellation && !cancellation.requestedAt && (
+          {canCancel && (
             <Button size="sm" variant="ghost" onClick={() => setReason('')} disabled={busy}>
               {asking ? t('Ask to cancel') : t('Cancel order')}
             </Button>
           )}
         </div>
       )}
-      {returning && (
+    </div>
+  )
+}
+
+/**
+ * The order's returns, and the way to start one. The list loads when the order has returns (`returnCount`) and the
+ * form when the shopper asks for it, so an order nobody sends back costs no extra request.
+ */
+function OrderReturns({ order, onChange }) {
+  const [returning, setReturning] = useState(false)
+  // Stays true once the form has been opened, so the answer to a sent return is still on screen when the form closes.
+  const [opened, setOpened] = useState(false)
+  const listed = order.returnCount > 0
+
+  const open = () => {
+    setOpened(true)
+    setReturning(true)
+  }
+
+  return (
+    <section aria-labelledby="order-returns" className="mt-8 rounded-xs border border-line bg-surface p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="order-returns" className="eyebrow">{t('Returns')}</h2>
+        {order.canReturn && !returning && (
+          <Button size="sm" icon="package" onClick={open}>{t('Return items')}</Button>
+        )}
+      </div>
+      {!listed && !opened && (
+        <p className="mt-3 text-[14px] text-muted">{t('Something not right? You can return items from this order.')}</p>
+      )}
+      {(listed || opened) && (
         <Suspense fallback={<Skeleton className="mt-4 h-40 w-full" />}>
-          <ReturnWizard order={order} onChanged={() => api.getOrder(order.id).then(onChange).catch(() => {})} />
+          <ReturnWizard
+            order={order}
+            showForm={returning}
+            onFormDone={() => setReturning(false)}
+            onFormCancel={() => setReturning(false)}
+            onChanged={() => api.getOrder(order.id).then(onChange).catch(() => {})}
+          />
         </Suspense>
       )}
-    </div>
+    </section>
+  )
+}
+
+/**
+ * The conversation about the order (`order.messages`): what the store wrote and what the shopper asked, oldest first,
+ * and a box to write in while the store takes replies. Sending answers with the whole order, like cancelling does.
+ */
+function OrderMessages({ order, onChange }) {
+  const config = useStorefront()
+  const locale = config.pricing?.locale || 'en-US'
+  const [body, setBody] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const [sent, setSent] = useState(false)
+  const items = visibleMessages(order.messages)
+  const canReply = Boolean(order.messages.canReply)
+
+  const send = async (e) => {
+    e.preventDefault()
+    const text = body.trim()
+    if (!text) return
+    setBusy(true)
+    setError(null)
+    setSent(false)
+    try {
+      onChange(await api.sendOrderMessage(order.id, { body: text }))
+      setBody('')
+      setSent(true)
+    } catch (err) {
+      setError(err.message)
+      // The store stopped taking replies since the page loaded: show the order as it now stands.
+      if (err.code === 'messages_closed') api.getOrder(order.id).then(onChange).catch(() => {})
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section aria-labelledby="order-messages" className="mt-8 rounded-xs border border-line bg-surface p-5">
+      <h2 id="order-messages" className="eyebrow">{t('Messages')}</h2>
+      {items.length ? (
+        <ol className="mt-4 space-y-3">
+          {items.map((message) => {
+            const mine = message.from === 'customer'
+            return (
+              <li key={message.id} className={`max-w-[85%] rounded-xs border border-line p-3.5 ${mine ? 'ms-auto bg-sunken/60' : 'bg-page'}`}>
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted">
+                  <span className="font-medium text-ink">{mine ? t('You') : message.author || config.store?.name}</span>
+                  <time dateTime={message.at}>{messageTime(message.at, locale)}</time>
+                  {message.returnNumber && (
+                    <span className="rounded-xs border border-line px-1.5 py-0.5 text-[11px]">{t('Return {number}', { number: message.returnNumber })}</span>
+                  )}
+                </p>
+                <p className="mt-1.5 whitespace-pre-line break-words text-[14px] leading-relaxed text-ink">{message.body}</p>
+              </li>
+            )
+          })}
+        </ol>
+      ) : (
+        <p className="mt-3 text-[14px] text-muted">
+          {t('No messages yet.')}
+          {canReply && <> {t('Questions about this order? Write to us here.')}</>}
+        </p>
+      )}
+      {canReply && (
+        <form onSubmit={send} className="mt-5 border-t border-line pt-5">
+          <label htmlFor="order-message" className="mb-1.5 block text-[13px] font-medium">{t('Write a message')}</label>
+          <textarea
+            id="order-message"
+            rows={3}
+            maxLength={MAX_MESSAGE_LENGTH}
+            className="field h-auto py-2"
+            value={body}
+            onChange={(e) => {
+              setBody(e.target.value)
+              setSent(false)
+            }}
+            aria-describedby={body.length >= COUNTER_FROM ? 'order-message-count' : undefined}
+          />
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <Button as="button" type="submit" size="sm" disabled={busy || !body.trim()}>{busy ? t('Sending…') : t('Send')}</Button>
+            {body.length >= COUNTER_FROM && (
+              <span id="order-message-count" className="text-[12px] tabular-nums text-muted">{body.length} / {MAX_MESSAGE_LENGTH}</span>
+            )}
+          </div>
+        </form>
+      )}
+      {error && <p role="alert" className="mt-3 text-[13px] text-sale">{error}</p>}
+      <p role="status" className="sr-only">{sent ? t('Message sent.') : ''}</p>
+    </section>
   )
 }
 
@@ -401,7 +578,13 @@ function orderStage(order) {
     return { icon: 'info', tone: 'muted', title: t('Payment due.'), body: t('is waiting for a payment of {amount}.', { amount: formatMoney(order.amountDue) }) }
   }
   if (order.status === 'delivered') {
-    return { icon: 'check', title: t('Delivered.'), body: t('has arrived. Questions about it? Reply to the email we sent to {email}.', { email: order.email }) }
+    return {
+      icon: 'check',
+      title: t('Delivered.'),
+      body: order.messages?.canReply
+        ? t('has arrived. Questions about it? Write to us below.')
+        : t('has arrived. Questions about it? Reply to the email we sent to {email}.', { email: order.email }),
+    }
   }
   if (order.status === 'fulfilled') {
     return { icon: 'truck', title: t('On its way.'), body: t('has shipped. Follow it with the tracking below.') }

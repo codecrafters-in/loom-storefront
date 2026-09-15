@@ -134,6 +134,8 @@ export const createReturn = liveStoreOnly
 export const cancelReturn = liveStoreOnly
 /** Demo orders are for looking at: they cannot be cancelled or bought again. */
 export const cancelOrder = liveStoreOnly
+/** Demo orders carry no messages (`order.messages` is absent), so there is no conversation to write in. */
+export const sendOrderMessage = liveStoreOnly
 export const reorder = liveStoreOnly
 
 /** The demo store does not offer sign-in by text message (`features.phoneLogin` is off). */

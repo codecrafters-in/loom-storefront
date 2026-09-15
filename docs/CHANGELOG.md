@@ -2,6 +2,27 @@
 
 Newest first. Each entry links to the page with the detail.
 
+## What's new — Phase 12: returns by rules, answered cancellations and order messages
+
+For the Odoo backend's rules-based returns, cancellation requests and customer-visible order messages. Details:
+[API.md](API.md#after-the-order), [ADMIN.md](ADMIN.md) and [USER-GUIDE.md](USER-GUIDE.md#answer-a-request-to-cancel).
+
+- **Order page › Returns:** the order's returns (`returnCount`) as cards with their status and what happens next —
+  approved and how to send the items back, a refund on its way, or the amount refunded (`refunded`). **Return items**
+  opens the form.
+- **Return form:** each line's last day when the windows differ (`lines[].until`), items that cannot go back greyed
+  with *Final sale* or the day their window ended (`unavailable`), a hint when a reason is always reviewed
+  (`needsReview`), and a line before sending on approval and refund timing (`approval`, `refundTiming`). A return the
+  store approves or refunds straight away says so.
+- **Cancellation requests:** the order page says a request is waiting (`cancelRequest`), and shows the store's answer
+  when it is declined. **Storefront admin › Orders** answers it with **Accept and cancel** or **Decline**
+  (`accept_cancel`, `decline_cancel`).
+- **Order messages:** the conversation with the store on the order page (`messages`), and replies with
+  `POST /orders/:id/messages` (`sendOrderMessage`). Left out when the store keeps messages off.
+- **Account › Returns:** the same explanation and the refunded amount on every return.
+- **Product pages:** a product's own returns policy (`product.returns`): *Final sale* for an item that cannot be
+  returned, and its own number of days otherwise.
+
 ## What's new — Phase 11: ready for the App Store
 
 For the Odoo backend's version 19.0.2.0.0. Details: [CHECKOUT.md](CHECKOUT.md), [ERRORS.md](ERRORS.md) and

@@ -498,7 +498,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           )}
           {!preview && <CompareToggle slug={product.slug} className="mt-4" />}
 
-          <TrustRow flat />
+          <TrustRow flat product={product} />
           {config.trust?.showSocialProof !== false && <SocialProof product={product} />}
 
           {/* Store-wide promises above (TrustRow), per-product ones here. */}

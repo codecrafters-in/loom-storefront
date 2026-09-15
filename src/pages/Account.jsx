@@ -14,7 +14,7 @@ import { Badge, Button, Empty, ErrorState, Icon, Skeleton } from '../components/
 import { formatMoney } from '../lib/money.js'
 import { isMock } from '../lib/config.js'
 import { t, plural, mark } from '../i18n/index.js'
-import { RETURN_STATUS, RETURN_TONE } from '../lib/returns.js'
+import { RETURN_STATUS, RETURN_TONE, returnNote } from '../lib/returns.js'
 
 const TABS = [
   { to: '/account', end: true, label: mark('Overview'), icon: 'user' },
@@ -1078,22 +1078,27 @@ function Returns() {
     <>
       <PageHeading title={t('Returns')} note={plural(data.total, '{count} return, newest first.', '{count} returns, newest first.')} />
       <ul className="mt-6 space-y-4">
-        {data.items.map((item) => (
-          <li key={item.id} className="rounded-xs border border-line bg-surface p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[15px] font-medium">{t('Return {number}', { number: item.number })}</p>
-                <p className="mt-1 text-[12px] text-faint">
-                  {formatDate(item.createdAt, locale)} · <Link to={`/order/${item.orderId}`} className="link-underline">{t('Order {number}', { number: item.orderNumber })}</Link>
-                </p>
+        {data.items.map((item) => {
+          const note = returnNote(item)
+          return (
+            <li key={item.id} className="rounded-xs border border-line bg-surface p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[15px] font-medium">{t('Return {number}', { number: item.number })}</p>
+                  <p className="mt-1 text-[12px] text-faint">
+                    {formatDate(item.createdAt, locale)} · <Link to={`/order/${item.orderId}`} className="link-underline">{t('Order {number}', { number: item.orderNumber })}</Link>
+                  </p>
+                </div>
+                <Badge kind={RETURN_TONE[item.status] || 'new'}>{t(RETURN_STATUS[item.status] || item.status)}</Badge>
               </div>
-              <Badge kind={RETURN_TONE[item.status] || 'new'}>{t(RETURN_STATUS[item.status] || item.status)}</Badge>
-            </div>
-            <p className="mt-3 text-[14px] text-muted">{item.lines.map((line) => `${line.quantity} × ${line.title}`).join(', ')}</p>
-            {item.instructions && <p className="mt-3 whitespace-pre-line text-[14px] text-ink">{item.instructions}</p>}
-            {item.rejectReason && <p className="mt-3 text-[14px] text-muted">{item.rejectReason}</p>}
-          </li>
-        ))}
+              <p className="mt-3 text-[14px] text-muted">{(item.lines || []).map((line) => `${line.quantity} × ${line.title}`).join(', ')}</p>
+              {/* How to send the items back matters only until they are on their way. */}
+              {item.instructions && item.status === 'approved' && <p className="mt-3 whitespace-pre-line text-[14px] text-ink">{item.instructions}</p>}
+              {item.rejectReason && <p className="mt-3 whitespace-pre-line text-[14px] text-muted">{item.rejectReason}</p>}
+              {note && <p className="mt-3 text-[13px] text-muted">{note}</p>}
+            </li>
+          )
+        })}
       </ul>
     </>
   )

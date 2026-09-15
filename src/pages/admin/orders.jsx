@@ -259,6 +259,7 @@ export function OrderDetail() {
   if (!order) return <Skeleton className="h-96 w-full" />
 
   const can = (action) => (order.actions || []).includes(action)
+  const requested = order.cancelRequest?.status === 'pending'
   const shared = { order, can, busy, run }
   const problemFor = (area) => (problem?.area === area ? problem.message : null)
 
@@ -296,9 +297,11 @@ export function OrderDetail() {
           <ItemsCard order={order} />
         </div>
         <aside className="space-y-6">
+          {requested && <CancelRequestCard {...shared} problem={problemFor('cancel_request')} />}
           <CustomerCard order={order} />
           <PaymentCard {...shared} problem={problemFor('payment')} onRefund={() => setRefunding(true)} />
-          {can('cancel') && <CancelCard {...shared} problem={problemFor('cancel')} />}
+          {/* Accepting the customer's request is the same cancellation, answered; one way to do it is enough. */}
+          {can('cancel') && !(requested && can('accept_cancel')) && <CancelCard {...shared} problem={problemFor('cancel')} />}
         </aside>
       </div>
 
@@ -683,6 +686,111 @@ function PaymentCard({ order, can, busy, run, problem, onRefund }) {
         <Button className="mt-4" size="sm" variant="quiet" onClick={onRefund} disabled={Boolean(busy)}>Refund</Button>
       )}
     </Card>
+  )
+}
+
+/**
+ * The customer asked to cancel (`order.cancelRequest`), and the order waits for an answer. Accepting cancels it and
+ * gives back what was paid; declining needs a message, because the customer is owed a reason. Either answer reaches
+ * the customer's order page and their inbox.
+ */
+function CancelRequestCard({ order, can, busy, run, problem }) {
+  const request = order.cancelRequest
+  const [mode, setMode] = useState(null) // 'accept' | 'decline'
+  const [message, setMessage] = useState('')
+  const [invalid, setInvalid] = useState(null)
+  const paid = ['paid', 'authorized'].includes(order.paymentStatus)
+
+  const open = (next) => {
+    setInvalid(null)
+    setMode(next)
+  }
+  const close = () => {
+    setInvalid(null)
+    setMode(null)
+  }
+
+  const submit = async (e) => {
+    e.preventDefault()
+    const text = message.trim()
+    if (mode === 'decline' && !text) {
+      setInvalid('Write the customer a short reason. It is emailed to them and shown on their order.')
+      return
+    }
+    const ok = mode === 'decline'
+      ? await run('decline_cancel', { message: text }, { area: 'cancel_request', done: 'Request declined' })
+      : await run('accept_cancel', text ? { message: text } : {}, { area: 'cancel_request', done: 'Order cancelled' })
+    if (ok) {
+      setMessage('')
+      setMode(null)
+    }
+  }
+
+  return (
+    <section className="rounded-xs border border-accent/50 bg-surface p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="eyebrow">Cancellation requested</h2>
+        <StatusPill tone="accent">Waiting</StatusPill>
+      </div>
+      <p className="mt-2 text-[13px] text-muted">
+        {request.requestedAt ? `The customer asked on ${dateTime(request.requestedAt)}.` : 'The customer asked to cancel.'}
+      </p>
+      {request.reason ? (
+        <blockquote className="mt-3 whitespace-pre-line break-words border-s-2 border-line ps-3 text-[14px] leading-relaxed text-ink">
+          {request.reason}
+        </blockquote>
+      ) : (
+        <p className="mt-3 text-[13px] text-faint">No reason given.</p>
+      )}
+
+      {mode ? (
+        <form onSubmit={submit} className="mt-5 rounded-xs border border-line bg-sunken/40 p-4" noValidate>
+          <p className="text-[13px] leading-relaxed">
+            {mode === 'accept'
+              ? `Cancel ${order.number}?${paid ? ' The payment goes back the way the customer paid.' : ''} The stock goes back on sale.`
+              : `Decline, and ${order.number} goes ahead as it is. The customer sees your message on their order page and by email.`}
+          </p>
+          <label htmlFor="cancel-request-message" className="mb-1.5 mt-3 block text-[12px] font-medium">
+            Message to the customer{mode === 'accept' && <span className="font-normal text-faint"> — optional</span>}
+          </label>
+          <textarea
+            id="cancel-request-message"
+            rows={3}
+            maxLength={2000}
+            className={`field h-auto py-2 text-[13px] ${invalid ? 'border-sale' : ''}`}
+            aria-invalid={invalid ? true : undefined}
+            value={message}
+            onChange={(e) => {
+              setMessage(e.target.value)
+              setInvalid(null)
+            }}
+          />
+          <Alert>{invalid || problem}</Alert>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {mode === 'accept' ? (
+              <DangerButton type="submit" disabled={Boolean(busy)}>{busy === 'accept_cancel' ? 'Working…' : 'Accept and cancel'}</DangerButton>
+            ) : (
+              <Button as="button" type="submit" size="sm" disabled={Boolean(busy)}>{busy === 'decline_cancel' ? 'Working…' : 'Decline request'}</Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={close} disabled={Boolean(busy)}>Not now</Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <Alert>{problem}</Alert>
+          {(can('accept_cancel') || can('decline_cancel')) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {can('accept_cancel') && (
+                <DangerButton onClick={() => open('accept')} disabled={Boolean(busy)}>Accept and cancel</DangerButton>
+              )}
+              {can('decline_cancel') && (
+                <Button size="sm" variant="quiet" onClick={() => open('decline')} disabled={Boolean(busy)}>Decline</Button>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </section>
   )
 }
 

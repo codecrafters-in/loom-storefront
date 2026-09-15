@@ -394,6 +394,17 @@ only for the one thing being changed, in place, with **Cancel** beside **Save**.
 | **Overview** | The latest order (number, date, status, total, thumbnails), personal details with **Edit**, the default address with **Manage**, and the number of saved items |
 | **Orders** | Every order, newest first. Each card opens the order and its tracking |
 | **Addresses** | One card per address with **Edit**, **Set as default** and **Remove** (which asks first), and an **Add a new address** tile |
+| **Returns** | Live stores: every return, where it stands and what happens next — a refund on its way, or the amount refunded |
+
+**An order's page** also shows, on a live store:
+
+- **Cancel** or **Ask to cancel** while the store allows it. A request says it is waiting; if the store declines, its
+  answer shows in its place.
+- **Returns**: the order's returns with their status, and **Return items**. Items that cannot go back are listed
+  greyed, with *Final sale* or the day their return window ended, and the form says before sending whether returns are
+  approved straight away and when a refund starts.
+- **Messages**: the conversation with the store about the order, and a box to write in when the store takes replies.
+  It is left out when the store has order messages turned off.
 
 **State / region follows the country.** For a country the backend has states for —
 India, the United States, Canada, Australia and many more — it is a list; anywhere
@@ -585,6 +596,19 @@ tabs, so the day's work is one click from the first screen.
 > back automatically. An order that disappears without returning its units is
 > how a shop slowly loses inventory nobody can account for. A paid order still
 > needs its refund.
+
+---
+
+## Answer a request to cancel
+
+**Admin → Orders → open the order → Cancellation requested**
+
+When your store asks customers to request a cancellation rather than cancel on their own, their request waits on
+the order with the date and their reason. Their order page says the request is waiting.
+
+- **Accept and cancel** cancels the order and gives back what was paid. A message is optional.
+- **Decline** keeps the order going. Write a short reason: it is emailed to the customer and shown on their order
+  page, and they cannot ask again.
 
 ---
 

@@ -33,6 +33,8 @@ export const listReturns = ({ page = 1 } = {}) => get('/returns', { page }).then
 
 /** Cancel the order, or ask the store to (`order.cancellation`): the order as it now stands. */
 export const cancelOrder = (orderId, { reason } = {}) => post(`/orders/${encodeURIComponent(orderId)}/cancel`, { reason })
+/** `{body}` (up to 2000 characters) to the store about the order (`order.messages.canReply`): the order as it now stands. */
+export const sendOrderMessage = (orderId, body) => post(`/orders/${encodeURIComponent(orderId)}/messages`, body)
 
 /** The order's items in this browser's bag (or a new one): the bag, with `notices` for what could not be added. */
 export async function reorder(orderId) {

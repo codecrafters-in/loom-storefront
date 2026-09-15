@@ -253,6 +253,12 @@ order's `actions`, so nothing is offered that the backend would refuse:
 | `deliver` | Mark as delivered | Sets the delivered time; ships first if it had not been | Sets **Delivered on** on the sales order |
 | `record_payment` | Record cash received | Marks a cash-on-delivery payment as received | Completes the pending offline transaction, which confirms the order and follows your invoicing settings |
 | `cancel` | Cancel order | Only before it ships. The stock goes back on sale | Cancels the order and its open delivery orders, without Odoo's cancel wizard |
+| `accept_cancel` | Accept and cancel | The customer asked to cancel: cancels it, with an optional message to them | Cancels as above, voids or refunds the payment and answers the request |
+| `decline_cancel` | Decline | The customer asked to cancel: keeps the order, with a message saying why (required) | Answers the request; the message is emailed and shows on the customer's order page |
+
+While a request to cancel waits (`order.cancelRequest.status === "pending"`), a **Cancellation requested** card sits at
+the top of the side column with the date and the customer's reason. It replaces **Cancel order** while accepting is
+possible. `decline_cancel` without a message answers `422 message_required`.
 
 An action the order does not currently allow answers `409 action_not_allowed`; an
 unknown action `422 invalid_action`; a tracking link that is not `http(s)://`
