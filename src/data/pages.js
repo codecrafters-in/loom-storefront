@@ -54,4 +54,22 @@ export const pages = {
       { type: 'text', h: 'About this store', p: 'LOOM is a demo storefront built by CodeCrafters as an open-source theme. Nothing here ships and no payment is taken. The source, including the API contract for wiring it to a real backend, is on GitHub.' },
     ],
   },
+  // Checkout links here (`checkout.termsUrl`). A live store writes its own in the backend.
+  terms: {
+    title: 'Terms of sale',
+    intro: 'The terms that apply when you buy from LOOM. This is a demo store: nothing is sold and no payment is taken.',
+    blocks: [
+      { type: 'text', h: 'Orders', p: 'Placing an order is an offer to buy. We confirm it by email, and the contract is formed when we ship the items.' },
+      { type: 'text', h: 'Prices and payment', p: 'Prices include the taxes that apply; delivery is added at checkout. Payment is taken when you place your order.' },
+      { type: 'text', h: 'Delivery and returns', p: 'Delivery times, costs and how to send something back are on our Shipping & returns page.' },
+    ],
+  },
+  privacy: {
+    title: 'Privacy policy',
+    intro: 'How LOOM uses your personal data.',
+    blocks: [
+      { type: 'text', h: 'What we collect', p: 'Your name, contact details, addresses and orders, and what you send us. In this demo, everything stays in your own browser.' },
+      { type: 'text', h: 'Cookies', p: 'The cookies the shop needs to work. Analytics and marketing cookies only as you choose in the cookie settings.' },
+    ],
+  },
 }

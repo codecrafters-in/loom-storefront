@@ -132,29 +132,29 @@ export const storefront = {
           { label: 'New season', to: '/collections/new-season' },
           { label: 'The linen edit', to: '/collections/the-linen-edit' },
           { label: 'Built to last', to: '/collections/built-to-last' },
-          { label: 'Saved items', to: '/wishlist' },
         ],
       },
-      {
-        title: 'Account',
-        links: [
-          { label: 'Your account', to: '/account' },
-          { label: 'Orders', to: '/account/orders' },
-          // Guest checkout is the default, so most orders have no account
-          // behind them. Without this the only way back to one is the browser
-          // that placed it.
-          { label: 'Find an order', to: '/orders/lookup' },
-          { label: 'Addresses', to: '/account/addresses' },
-          { label: 'Your bag', to: '/cart' },
-        ],
-      },
+      // The account, the bag and saved items already have their icons in the
+      // header, so the footer keeps to the columns every store has: Shop, Help
+      // and Company, with the terms checkout links to.
       {
         title: 'Help',
         links: [
           { label: 'Size guide', to: '/pages/size-guide' },
           { label: 'Shipping & returns', to: '/pages/shipping' },
           { label: 'Fabric & care', to: '/pages/care' },
+          // Guest checkout is the default, so most orders have no account
+          // behind them. Without this the only way back to one is the browser
+          // that placed it.
+          { label: 'Find an order', to: '/orders/lookup' },
+        ],
+      },
+      {
+        title: 'Company',
+        links: [
           { label: 'Contact', to: '/pages/contact' },
+          { label: 'Terms of sale', to: '/pages/terms' },
+          { label: 'Privacy policy', to: '/pages/privacy' },
         ],
       },
     ],

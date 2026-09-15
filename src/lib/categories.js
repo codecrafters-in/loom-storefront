@@ -20,6 +20,16 @@ export function flattenCategories(tree = []) {
   return out
 }
 
+/** The category with this slug at any depth of the tree, or null. */
+export function findCategory(tree = [], slug) {
+  for (const c of tree || []) {
+    if (c.slug === slug) return c
+    const found = findCategory(c.children, slug)
+    if (found) return found
+  }
+  return null
+}
+
 /** `[{ slug, name }]` from the root down to `slug`: the category's own `path` when sent, its parents walked when not. */
 export function categoryTrail(slug, flat = []) {
   const bySlug = new Map(flat.map((c) => [c.slug, c]))

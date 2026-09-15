@@ -8,6 +8,7 @@ import { useAdminAuth } from '../../store/AdminAuthContext.jsx'
 import Logo from '../ui/Logo.jsx'
 import { config as envConfig } from '../../lib/config.js'
 import { docsLinkVisible } from '../../lib/docs-link.js'
+import { footerLayout } from '../../lib/footer.js'
 import { useCaptcha } from '../Captcha.jsx'
 import ContactDetails from '../content/ContactDetails.jsx'
 import { t } from '../../i18n/index.js'
@@ -40,6 +41,8 @@ export default function Footer() {
   }
 
   const cols = config.navigation?.footer || []
+  // Any number of columns, in even rows: see lib/footer.js.
+  const layout = footerLayout(cols.length)
 
   /**
    * The documentation is public, but it is developer furniture: it belongs in
@@ -49,7 +52,7 @@ export default function Footer() {
 
   return (
     <footer className="mt-24 border-t border-line bg-sunken/50">
-      <div className="wrap grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
+      <div className={`wrap grid gap-12 py-16 ${layout.outer}`}>
         <div>
           <Link to="/"><Logo config={config} size={26} /></Link>
           {config.store?.tagline && <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-muted">{config.store.tagline}</p>}
@@ -78,20 +81,24 @@ export default function Footer() {
           )}
         </div>
 
-        {cols.map(({ title, links }) => (
-          <nav key={title} aria-label={title}>
-            <h2 className="eyebrow">{title}</h2>
-            <ul className="mt-5 space-y-3">
-              {links.map((l) => (
-                <li key={l.label}>
-                  <Link to={l.to} className="text-[15px] text-muted transition-colors hover:text-ink">
-                    {l.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        ))}
+        {cols.length > 0 && (
+          <div className={`grid gap-x-8 gap-y-10 ${layout.links}`}>
+            {cols.map(({ title, links }, index) => (
+              <nav key={`${index}-${title}`} aria-label={title}>
+                <h2 className="eyebrow">{title}</h2>
+                <ul className="mt-5 space-y-3">
+                  {links.map((l, i) => (
+                    <li key={`${i}-${l.to}`}>
+                      <Link to={l.to} className="text-[15px] text-muted transition-colors hover:text-ink">
+                        {l.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="border-t border-line">

@@ -2,6 +2,21 @@
 
 Newest first. Each entry links to the page with the detail.
 
+## What's new — A footer with any number of columns
+
+With the Odoo module's 19.0.2.2.0 previews of the home page, menu and footer. Details:
+[CONFIGURATION.md](CONFIGURATION.md#navigation).
+
+- **Footer columns:** any number of columns lays out in even rows — four make two by two on phones, one row on tablets,
+  and sit beside the brand column on a laptop — instead of the brand column plus a fixed three, which left a fourth
+  alone on a second row (`src/lib/footer.js`).
+- **Category strip:** a parent category that is itself a sub-category shows its own sub-categories; it was only looked
+  for among the top-level categories, so the strip was empty.
+- **Demo data:** the footer has the columns every store starts with (Shop, Help, Company); the account, bag and saved
+  items keep their header icons. Demo Terms of sale and Privacy pages, and `checkout.termsUrl` is `/pages/terms`.
+- **From the Odoo backend:** `navigation` leaves out links to switched-off pages, and `checkout.termsUrl` follows the
+  store's Terms page.
+
 ## What's new — Phase 12: returns by rules, answered cancellations and order messages
 
 For the Odoo backend's rules-based returns, cancellation requests and customer-visible order messages. Details:

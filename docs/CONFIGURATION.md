@@ -290,6 +290,10 @@ A submenu entry is either a category, `{ slug, name }`, linked to
 add sub-items by hand sends the second shape — the Odoo module does — and hand-added
 children replace the ones a `categorySlug` would pull in.
 
+`footer` is a list of columns, `{ title, links: [{ label, to }] }`. Any number of
+columns lays out in even rows (`src/lib/footer.js`): beside the brand column on
+a laptop up to four, two per row on phones. Three or four read best.
+
 `announcement: null` removes the strip above the header. Additional messages
 after the first are hidden on small screens.
 
@@ -420,7 +424,7 @@ holds French, Spanish, German, Italian, Portuguese, Dutch, Arabic and Hindi (mac
     "cancelUrl": "/cart",
     "collectPhone": true,
     "requireAccount": false,
-    "termsUrl": "/pages/shipping"
+    "termsUrl": "/pages/terms"
   }
 }
 ```

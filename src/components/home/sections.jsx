@@ -6,6 +6,7 @@ import Promises from '../layout/Promises.jsx'
 import { Button, ErrorState, Icon } from '../ui/index.jsx'
 import { useBootstrap } from '../../store/StorefrontContext.jsx'
 import { railKey } from '../../lib/api/railKey.js'
+import { findCategory } from '../../lib/categories.js'
 import { t } from '../../i18n/index.js'
 
 /**
@@ -81,7 +82,8 @@ function CategoryStrip({ section }) {
   const { data } = useAsync(() => api.listCategories(), [], { skip: !!categories })
   const parent = section.source?.parent
   const all = categories || data?.items || []
-  const items = (parent ? all.find((c) => c.slug === parent)?.children || [] : all).slice(
+  // The parent may be a sub-category itself: look for it at any depth, not only among the top level.
+  const items = (parent ? findCategory(all, parent)?.children || [] : all).slice(
     0,
     section.source?.limit || 6,
   )
