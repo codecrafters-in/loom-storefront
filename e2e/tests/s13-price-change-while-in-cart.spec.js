@@ -75,15 +75,14 @@ test(
   async ({ page, shop, store, odoo }) => {
     const email = uniqueEmail('s13-service')
     try {
-      // The bag is prepared through the API: adding a product without options from the product
-      // page is blocked by gap #1, which is not what this scenario is about.
+      // The bag is prepared through the API so the scenario starts where it is about: the payment step.
       const service = await store.product('e2e-styling-session')
       const cart = await store.ok('POST', '/carts', { body: {} })
       await store.ok('POST', `/carts/${cart.id}/lines`, { body: { variant_id: service.variants[0].id, quantity: 1 } })
       await page.addInitScript((id) => localStorage.setItem('loom.cart_id', id), cart.id)
 
       await page.goto('/checkout')
-      await shop.fillCheckout({ email })
+      await shop.fillCheckout({ email, shipped: false })
       await shop.continueToPayment()
       await odoo.setListPrice('E2E Styling Session', 90)
       const { number } = await payThroughPriceChange(page, shop)

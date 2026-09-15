@@ -238,6 +238,7 @@ Cart {
   discountCode: { code: string, label: string } | null
   freeShippingThreshold?: Money
   freeShippingRemaining?: Money
+  requiresShipping?: boolean   // false: nothing ships, checkout asks for no address
 }
 ```
 

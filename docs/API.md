@@ -1009,6 +1009,7 @@ client that recalculates them will eventually disagree with the invoice.
   "discountCode": { "code": "LOOM10", "label": "10% off" },
   "freeShippingThreshold": { "amount": 15000, "currency": "USD" },
   "freeShippingRemaining": { "amount": 0, "currency": "USD" },
+  "requiresShipping": true,
   "freeShippingProgress": {
     "method": "standard",
     "threshold": { "amount": 15000, "currency": "USD" },
@@ -1028,6 +1029,9 @@ and do not offer checkout. `giftWrap` (optional money) is a gift wrapping charge
 row. `pickupLocation` (optional, `{ id, name, street, city, region, postalCode, country }` or `null`) is the shop chosen
 for a collection method, and `deliverySlot` (optional, `{ id, label, date, from, to, startsAt, endsAt }` or `null`) the
 slot booked at checkout; orders carry both too.
+
+`requiresShipping` is `false` when nothing in the bag is shipped (services, downloads, e-gift cards): checkout then
+asks only for a name and email, and shows no address or delivery step.
 
 A delivery method marked `pickup: true` in `commerce.shippingMethods` makes checkout list shops
 (`getPickupLocations`) and set one (`setPickupLocation`) before the order can be placed; one marked `slots: true` makes
@@ -1425,7 +1429,7 @@ loaded with the first of them) are named in brackets; the backend's detail is th
 | `POST` | `/auth/otp/request` `{ phone }` · `/auth/otp/verify` `{ phone, code }` | `{ ok }` · `{ token, customer }` when `features.phoneLogin` (`requestLoginCode`, `verifyLoginCode`) |
 | `POST` | `/auth/oauth/start` `{ provider }` · `/auth/oauth` `{ state, accessToken }` | `{ url, state }` · `{ token, customer }` for `features.socialLogin: [{ id, name, label }]`; the provider returns to `/login/oauth` (`startOAuth`, `finishOAuth`) |
 | `GET` | `/me/company` | `{ company, role, canManage, members }` (`getCompany`); `POST /me/company/members`, `PATCH`/`DELETE /me/company/members/:id` (`inviteMember`, `updateMember`, `removeMember`) |
-| `POST` | `/carts/recover` `{ order, token }` | The bag from the abandoned-cart email, `/cart?recover=…&order=…` (`recoverCart`) |
+| `POST` | `/carts/recover` `{ order, token }` | The bag from the abandoned-cart email, `/cart?recover=…&order=…` (`recoverCart`). A registered customer's bag answers `401 sign_in_required` until they sign in |
 | `POST` | `/carts/:id/quote` `{ note }` | `{ orderId, number }` when `features.quotes` (`requestQuote`) |
 
 `POST /auth/register` also takes `company`, `vat` and `newsletter` with `newsletterConsent`. The sign-in page offers a

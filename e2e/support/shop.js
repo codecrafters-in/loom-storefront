@@ -104,10 +104,16 @@ export class Shop {
 
   /* ── checkout ─────────────────────────────────────────────────────────── */
 
-  async fillCheckout({ email, address = US_ADDRESS } = {}) {
+  /** `shipped: false` for a bag with nothing to ship: checkout then asks only for the name. */
+  async fillCheckout({ email, address = US_ADDRESS, shipped = true } = {}) {
     const page = this.page
     await expect(page.getByRole('heading', { name: 'Checkout', level: 1 })).toBeVisible()
     if (email !== undefined) await page.locator('#email').fill(email)
+    if (!shipped) {
+      await expect(page.locator('#line1')).toHaveCount(0)
+      await page.locator('#name').fill(address.name)
+      return
+    }
     await page.locator('#country').selectOption(address.country)
     await page.locator('#name').fill(address.name)
     await page.locator('#line1').fill(address.line1)

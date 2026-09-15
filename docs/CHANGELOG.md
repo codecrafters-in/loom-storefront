@@ -2,6 +2,18 @@
 
 Newest first. Each entry links to the page with the detail.
 
+## What's new — Phase 11: ready for the App Store
+
+For the Odoo backend's version 19.0.2.0.0. Details: [CHECKOUT.md](CHECKOUT.md), [ERRORS.md](ERRORS.md) and
+[API.md](API.md).
+
+- **README:** an **Odoo backend** section: where the module comes from, which Odoo it needs and how to connect.
+- **Checkout without an address:** when nothing in the bag ships (`cart.requiresShipping === false`), checkout asks
+  for a name and email only, with no delivery step.
+- **Abandoned-cart links:** a registered customer's bag asks them to sign in first (`sign_in_required`), then comes
+  back; the message is translated in every language the theme ships.
+- **Admin tour:** on a live store the third card points to **Import / export** instead of the demo's note.
+
 ## What's new — Phase 10: the admin on Odoo, cache purge and visit counts
 
 Screens and calls for what the Odoo backend added in its Phase 10. Details: [ADMIN.md](ADMIN.md#the-write-api) and

@@ -28,6 +28,7 @@ the person buying, not for your logs. `code` is what you branch on.
 | Code | Status | Where it surfaces |
 | --- | --- | --- |
 | `not_found` | 404 | Product page shows an empty state, not an error |
+| `sign_in_required` | 401 | `POST /carts/recover` for a registered customer's bag: the cart page sends the shopper to sign in, then back to the link |
 | `variant_not_found` | 404 | Toast |
 | `out_of_stock` | 409 | Toast; size stays disabled |
 | `insufficient_inventory` | 409 | Toast, and inline at checkout |

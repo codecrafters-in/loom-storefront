@@ -271,6 +271,16 @@ palette changes the whole store.
 
 ---
 
+## Odoo backend
+
+A live store runs on **Odoo 19** with the **LOOM Storefront** app from the Odoo App Store (search for "LOOM Storefront"
+on apps.odoo.com). Odoo is the back office: products, prices, stock, orders, payments, customers, content and emails
+stay there, and this storefront is the shop on its own domain. In Odoo, **Storefront › Configuration › Set up a store**
+gives the values to put in `VITE_API_BASE_URL`, `SITE_URL` and `LOOM_WEBHOOK_SECRET`. The app needs Odoo.sh or your own
+Odoo server; it cannot be installed on Odoo Online.
+
+---
+
 ## Deploying
 
 ```bash

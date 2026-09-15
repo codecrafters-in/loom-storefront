@@ -30,6 +30,7 @@ export default function Cart() {
   const [giftCode, setGiftCode] = useState('')
   const [gift, setGift] = useState(null)
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
 
   // A link from the store's "you left something in your bag" email: that bag becomes this browser's bag.
   useEffect(() => {
@@ -37,9 +38,21 @@ export default function Cart() {
     const order = params.get('order')
     if (isMock || !token || !order) return
     api.recoverCart({ order, token })
-      .then(() => refresh())
-      .catch(() => push(t('This bag is no longer available.'), { tone: 'error' }))
-      .finally(() => setParams({}, { replace: true }))
+      .then(() => {
+        setParams({}, { replace: true })
+        return refresh()
+      })
+      .catch((err) => {
+        // A registered customer's bag: they sign in, and come back here to get it. The link stays in `from`, and
+        // the address is not tidied up here: that would navigate back to the cart over the sign-in page.
+        if (err?.code === 'sign_in_required') {
+          push(t('Sign in to get your bag back.'))
+          navigate('/login', { replace: true, state: { from: `/cart?recover=${encodeURIComponent(token)}&order=${encodeURIComponent(order)}` } })
+          return
+        }
+        setParams({}, { replace: true })
+        push(t('This bag is no longer available.'), { tone: 'error' })
+      })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Once per bag opened on this page, not on every quantity change.

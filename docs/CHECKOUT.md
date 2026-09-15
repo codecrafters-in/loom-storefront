@@ -226,6 +226,10 @@ module is one. The backend lists what can pay for this cart; the shopper picks
 one on the checkout page; the backend creates the payment and is the only party
 that can say it was paid. The storefront stores nothing about the payment.
 
+A bag with nothing to ship (`cart.requiresShipping === false`: services, e-gift
+cards) shows no address or delivery section: the page asks for an email and a
+name, and sends `shipping_address: { name }`.
+
 The page runs in two steps. **Continue to payment** posts the address and
 delivery to `POST /carts/:id/payment-options` and lists the methods (re-fetched
 when the country or delivery method changes). **Pay** posts to

@@ -41,6 +41,9 @@ const FIELD_IDS = ['email', 'name', 'line1', 'line2', 'city', 'region', 'postalC
  * methods it can take for this cart, and the gateway's own form (or modal)
  * takes the card. See lib/payments.
  */
+/** A bag with nothing to ship (services, downloads) sends only the customer's name: the backend asks for no address. */
+const addressFor = (cart, address) => (cart?.requiresShipping === false ? { name: address.name } : address)
+
 export default function Checkout() {
   const { cart, refresh } = useCart()
   const { customer } = useAuth()
@@ -233,7 +236,7 @@ export default function Checkout() {
       const { email, ...address } = values
       const next = await api.getPaymentOptions(current?.id, {
         email,
-        shippingAddress: address,
+        shippingAddress: addressFor(current, address),
         shippingMethod: shipping,
         currency: current?.currency,
         ...extra,
@@ -317,7 +320,7 @@ export default function Checkout() {
       addPaymentInfo(cart, chosen.provider || chosen.key)
       const created = await api.createPayment(cart.id, paymentBody({
         email,
-        shippingAddress: address,
+        shippingAddress: addressFor(cart, address),
         shippingMethod: method,
         currency: cart.currency,
         method: chosen,
@@ -371,7 +374,7 @@ export default function Checkout() {
         config,
         cart,
         email,
-        shippingAddress: address,
+        shippingAddress: addressFor(cart, address),
         shippingMethod: method,
         ...billingFields(),
       })
@@ -431,8 +434,12 @@ export default function Checkout() {
             </p>
           )}
           <Field label={t('Email')} id="email" type="email" required value={form.email} onChange={set('email')} autoComplete="email" />
+          {cart?.requiresShipping === false && (
+            <Field label={t('Full name')} id="name" required value={form.name} onChange={set('name')} autoComplete="name" />
+          )}
         </Section>
 
+        {cart?.requiresShipping !== false && (
         <Section title={t('Shipping address')}>
           <Field label={t('Full name')} id="name" required value={form.name} onChange={set('name')} autoComplete="name" />
           <Field label={t('Address')} id="line1" required value={form.line1} onChange={set('line1')} autoComplete="address-line1" />
@@ -466,8 +473,10 @@ export default function Checkout() {
             />
           )}
         </Section>
+        )}
 
         <Section title={t('Billing')}>
+          {cart?.requiresShipping !== false && (
           <label className="flex items-center gap-2.5 text-[13px] text-muted">
             <input
               type="checkbox"
@@ -477,7 +486,8 @@ export default function Checkout() {
             />
             {t('Billing address is the same as the delivery address')}
           </label>
-          {!billingSame && (
+          )}
+          {!billingSame && cart?.requiresShipping !== false && (
             <>
               <Field label={t('Name on the invoice')} id="billing-name" required value={billing.name} onChange={setBillingField('name')} autoComplete="billing name" />
               <Field label={t('Address')} id="billing-line1" required value={billing.line1} onChange={setBillingField('line1')} autoComplete="billing address-line1" />
@@ -537,6 +547,7 @@ export default function Checkout() {
           )}
         </Section>
 
+        {cart?.requiresShipping !== false && (
         <Section title={t('Delivery')}>
           {shippingOptions?.length === 0 && (
             <p role="status" className="rounded-xs border border-line bg-surface p-3.5 text-[13px] text-muted">
@@ -638,6 +649,7 @@ export default function Checkout() {
             </fieldset>
           )}
         </Section>
+        )}
 
         {(config.checkout?.orderNote || config.checkout?.giftMessage || config.checkout?.giftWrap) && (
           <Section title={t('Notes & gifts')}>

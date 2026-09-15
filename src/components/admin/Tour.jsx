@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../ui/index.jsx'
+import { isMock } from '../../lib/api/index.js'
 
 /**
  * First-run orientation.
@@ -28,7 +29,9 @@ const CARDS = [
   {
     icon: 'refresh',
     title: 'Export before you experiment',
-    body: 'Import / export → Download JSON. Reset puts the demo catalogue back if something goes sideways.',
+    body: isMock
+      ? 'Import / export → Download JSON. Reset puts the demo catalogue back if something goes sideways.'
+      : 'Import / export → Download CSV keeps a copy of the catalogue, and a file is checked before anything is imported.',
   },
 ]
 

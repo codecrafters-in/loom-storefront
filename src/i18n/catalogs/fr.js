@@ -3,6 +3,7 @@
  * A plural entry is keyed by the English plural form: { one, few, many, other, … } as Intl.PluralRules names them.
  */
 export default {
+  "Sign in to get your bag back.": "Connectez-vous pour retrouver votre panier.",
   "\"{region}\" is not a state of {country}. Use the state's full name or its code.": "« {region} » n’est pas un État de {country}. Indiquez le nom complet de l’État ou son code.",
   "(optional)": "(facultatif)",
   "A storefront theme by": "Thème de boutique conçu par",

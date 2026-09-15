@@ -3,6 +3,7 @@
  * A plural entry is keyed by the English plural form: { one, few, many, other, … } as Intl.PluralRules names them.
  */
 export default {
+  "Sign in to get your bag back.": "अपना कार्ट वापस पाने के लिए साइन इन करें।",
   "\"{region}\" is not a state of {country}. Use the state's full name or its code.": "\"{region}\" {country} का कोई राज्य नहीं है। राज्य का पूरा नाम या उसका कोड लिखें।",
   "(optional)": "(वैकल्पिक)",
   "A storefront theme by": "स्टोरफ़्रंट थीम — निर्माता:",
