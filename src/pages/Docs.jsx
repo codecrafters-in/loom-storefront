@@ -104,7 +104,7 @@ export default function Docs({ base = '/docs' }) {
     <>
       <Seo
         title={active.slug === 'readme' ? 'Documentation' : active.title}
-        description={`${SUMMARY[active.slug] || active.title} — ${config.store?.name || 'LOOM'} storefront documentation.`}
+        description={`${SUMMARY[active.slug] || active.title} — ${config.store?.name || 'Storefront'} documentation.`}
         path={docPath(active.slug)}
       />
       <div className="wrap wrap-tight py-10 pb-24">

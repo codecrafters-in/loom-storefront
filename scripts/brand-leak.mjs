@@ -46,6 +46,14 @@ export function findLeaks(text, file) {
   return found
 }
 
+/**
+ * Whether a built asset is scanned. Developer documentation (`doc-*` chunks, see vite.config.js) is read by the
+ * store's team at /admin/docs, never offered to shoppers, and describes the theme with its demo on purpose.
+ */
+export function scans(name) {
+  return name.endsWith('.js') && !name.startsWith('doc-')
+}
+
 function main() {
   const env = loadEnv('production', ROOT, 'VITE_')
   if ((env.VITE_DATA_SOURCE || 'mock').toLowerCase() !== 'api') {
@@ -55,7 +63,7 @@ function main() {
   const files = [path.join(ROOT, 'index.html'), path.join(DIST, 'manifest.webmanifest')]
   const assets = path.join(DIST, 'assets')
   if (fs.existsSync(assets)) {
-    for (const name of fs.readdirSync(assets)) if (name.endsWith('.js')) files.push(path.join(assets, name))
+    for (const name of fs.readdirSync(assets)) if (scans(name)) files.push(path.join(assets, name))
   }
   const leaks = files
     .filter((file) => fs.existsSync(file))

@@ -81,7 +81,7 @@ function CategoryStrip({ section }) {
   return (
     <section className="wrap py-16 md:py-20">
       <SectionHead {...section} />
-      <ul className="no-scrollbar mt-8 flex snap-x gap-4 overflow-x-auto pb-2 lg:grid lg:overflow-visible" style={{ gridTemplateColumns: `repeat(${Math.min(items.length || 6, 6)}, minmax(0,1fr))` }}>
+      <ul className="no-scrollbar relative mt-8 flex snap-x gap-4 overflow-x-auto pb-2 lg:grid lg:overflow-visible" style={{ gridTemplateColumns: `repeat(${Math.min(items.length || 6, 6)}, minmax(0,1fr))` }}>
         {items.map((c) => (
           <li key={c.slug} className="w-40 shrink-0 snap-start lg:w-auto">
             <Link to={`/shop/${c.slug}`} className="group block">

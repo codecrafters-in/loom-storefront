@@ -58,6 +58,13 @@ export default defineConfig(({ command, isSsrBuild, mode }) => {
           ...(isSsrBuild
             ? {}
             : { manualChunks: { vendor: ['react', 'react-dom', 'react-router-dom'] } }),
+          /**
+           * Each developer document (docs/*.md, opened at /admin/docs) is a
+           * `doc-` chunk, so scripts/brand-leak.mjs can tell the store team's
+           * reading from what shoppers download.
+           */
+          chunkFileNames: (chunk) =>
+            /\/docs\/[^/]+\.md(\?|$)/.test(chunk.facadeModuleId || '') ? 'assets/doc-[name]-[hash].js' : 'assets/[name]-[hash].js',
         },
       },
     },

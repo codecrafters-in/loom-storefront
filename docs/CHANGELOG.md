@@ -28,6 +28,11 @@ Nine new home section types, with the fields each takes in [CONFIGURATION.md](CO
   server-rendered page already has them in its HTML. An item missing what it needs is left out instead of breaking the
   section.
 - **Demo home page:** features, customer quotes, a newsletter band and questions.
+- **Sideways rows on phones** (testimonials, logo bar, category strip) clip what sits inside them, so a row never makes
+  the whole page scroll sideways.
+- **Live build check:** the developer documents opened at `/admin/docs` are `doc-*` chunks, which the demo-copy check
+  (`scripts/brand-leak.mjs`) leaves out: they describe the theme and its demo on purpose and shoppers are never
+  offered them. The docs page no longer falls back to the demo's name.
 
 - **Footer columns:** any number of columns lays out in even rows — four make two by two on phones, one row on tablets,
   and sit beside the brand column on a laptop — instead of the brand column plus a fixed three, which left a fourth

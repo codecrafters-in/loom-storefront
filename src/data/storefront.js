@@ -205,7 +205,7 @@ export const storefront = {
       eyebrow: 'Why LOOM',
       title: 'Fewer things, made properly.',
       items: [
-        { icon: 'leaf', title: 'Named mills', body: 'Linen, merino and cotton, with the mill and fabric weight on every product.' },
+        { icon: 'leaf', title: 'Named mills', body: 'The mill and fabric weight on every product.' },
         { icon: 'ruler', title: 'Measured, not guessed', body: 'Garment measurements for every size, and fit notes from buyers.', label: 'Size guide', to: '/pages/size-guide' },
         { icon: 'recycle', title: 'Cut in small runs', body: 'We restock what sells instead of overproducing.' },
       ],
@@ -234,11 +234,11 @@ export const storefront = {
       title: 'Worn in, not worn out.',
       items: [
         { quote: 'Two winters in and the merino crew has not pilled once.', author: 'Maya R.', detail: 'Brooklyn', rating: 5, product: { slug: 'merino-crew-knit', title: 'Fine Merino Crew' } },
-        { quote: 'The measurements were exact. The overcoat fits over a jacket, as promised.', author: 'Daniel K.', detail: 'Toronto', rating: 5, product: { slug: 'wool-overcoat', title: 'Double-Faced Wool Overcoat' } },
+        { quote: 'The overcoat fits over a jacket, as promised.', author: 'Daniel K.', detail: 'Toronto', rating: 5, product: { slug: 'wool-overcoat', title: 'Double-Faced Wool Overcoat' } },
         { quote: 'Softer with every wash, and the size exchange was painless.', author: 'Priya S.', detail: 'London', rating: 4, product: { slug: 'linen-camp-shirt', title: 'Linen Camp Collar Shirt' } },
       ],
     },
-    { type: 'newsletter', title: 'Letters from the workroom', body: 'New pieces, restocks and the odd fabric story, once a month.' },
+    { type: 'newsletter', title: 'Letters from the workroom', body: 'New pieces and fabric stories, once a month.' },
     {
       type: 'faq',
       title: 'Questions, answered',
@@ -246,7 +246,7 @@ export const storefront = {
       ctaTo: '/pages/contact',
       items: [
         { question: 'How do I find my size?', answer: 'Every product lists garment measurements, with a fit note when a piece runs small or large.' },
-        { question: 'How long does delivery take?', answer: 'Two to four working days, free over $150. Express arrives the next working day.' },
+        { question: 'How long does delivery take?', answer: 'Two to four working days, free over $150.' },
         { question: 'Can I return something?', answer: 'Within 30 days, unworn with tags attached. A return label is in every parcel.' },
         { question: 'What if something wears out?', answer: 'We repair anything we made, and quote before doing the work.' },
       ],

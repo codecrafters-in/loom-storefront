@@ -1,9 +1,10 @@
 # End-to-end scenarios
 
 The storefront in a real browser (Chromium, via Playwright) against a real Odoo 19 running the
-`loom_storefront` addon. One spec per business scenario from the audit checklist (S-1 … S-18):
+`loom_storefront` addon. One spec per business scenario from the audit checklist (S-1 … S-20):
 a guest paying by card, a customer paying cash on delivery, a failed payment retried, stock
-running out mid-checkout, two stores on one Odoo, and so on. Each test checks the business outcome
+running out mid-checkout, two stores on one Odoo, a merchant reading every store tab's preview in
+Odoo (S-19), the newer home sections on a computer and a phone (S-20), and so on. Each test checks the business outcome
 where it lands — the storefront page, the store API, and the order, delivery, invoice and email in
 Odoo — not just that a button was clicked.
 
@@ -109,7 +110,19 @@ because the confirmation email fails to render. CI installs `wkhtmltopdf` and ke
 
 Odoo only answers the storefront origins the seed configured. If you change a port or host, re-run
 the seed with the same `LOOM_E2E_STOREFRONT_URL` / `LOOM_E2E_STOREFRONT2_URL` (and
-`LOOM_E2E_ODOO_URL`) in the environment.
+`LOOM_E2E_ODOO_URL`) in the environment, or add the new origins to each store's **Extra origins**
+(Advanced tab).
+
+When 5174 and 5175 are busy with other storefronts, start store `e2e` yourself on a free port and
+point the suite at it:
+
+```sh
+cd ~/Work/loom-storefront
+VITE_DATA_SOURCE=api VITE_API_BASE_URL=http://localhost:8074/loom/api/v1/e2e VITE_API_CACHE=off \
+  node node_modules/vite/bin/vite.js --config e2e/support/vite.config.mjs --port 5177 --strictPort &
+cd e2e
+LOOM_E2E_SKIP_WEBSERVER=1 LOOM_E2E_PORT=5177 LOOM_E2E_PORT2=5178 npx playwright test --grep @S-20
+```
 
 ## Layout
 
@@ -125,7 +138,7 @@ e2e/
     html.js              what a crawler reads from raw HTML
     global-setup.js      fails fast when Odoo or the seed is missing
     vite.config.mjs      the storefront's Vite config with a per-server cache
-  tests/s01-…s16-*.spec.js
+  tests/s01-…s20-*.spec.js
 ```
 
 Merchant actions go through Odoo's JSON-RPC (`/web/session/authenticate`, then

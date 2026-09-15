@@ -220,12 +220,14 @@ export function Testimonials({ section }) {
   return (
     <section data-home-section="testimonials" className="wrap py-16 md:py-20">
       <Intro section={section} />
-      {/* Focusable, so the row scrolls from the keyboard too; the cards themselves may have nothing to focus. */}
+      {/* Focusable, so the row scrolls from the keyboard too; the cards themselves may have nothing to focus.
+          Relative, so what is positioned inside a card (the rating's screen-reader text) is clipped by the row
+          instead of widening the page on a phone. */}
       <div
         role="region"
         aria-label={section.title || t('Reviews')}
         tabIndex={0}
-        className="no-scrollbar -mx-5 snap-x snap-mandatory scroll-px-5 overflow-x-auto px-5 pb-2 md:-mx-8 md:scroll-px-8 md:px-8 lg:mx-0 lg:overflow-visible lg:px-0 lg:pb-0"
+        className="no-scrollbar relative -mx-5 snap-x snap-mandatory scroll-px-5 overflow-x-auto px-5 pb-2 md:-mx-8 md:scroll-px-8 md:px-8 lg:mx-0 lg:overflow-visible lg:px-0 lg:pb-0"
       >
         <ul className={`flex gap-4 lg:grid lg:gap-5 ${testimonialsGrid(items.length)}`}>
           {items.map((item, i) => (
@@ -287,7 +289,7 @@ export function LogoBar({ section }) {
         role="region"
         aria-label={section.title || t('Brands')}
         tabIndex={0}
-        className="no-scrollbar -mx-5 overflow-x-auto px-5 md:mx-0 md:overflow-visible md:px-0"
+        className="no-scrollbar relative -mx-5 overflow-x-auto px-5 md:mx-0 md:overflow-visible md:px-0"
       >
         <ul className="flex items-center gap-10 md:flex-wrap md:justify-center md:gap-x-0 md:gap-y-8">
           {items.map((item, i) => {
