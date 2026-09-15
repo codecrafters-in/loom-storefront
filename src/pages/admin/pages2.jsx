@@ -5,26 +5,8 @@ import { Button, ErrorState, Icon, Skeleton, Badge } from '../../components/ui/i
 import { useToast } from '../../store/ToastContext.jsx'
 import RecordRow, { RowAction } from '../../components/admin/RecordRow.jsx'
 import ListToolbar, { matches } from '../../components/admin/ListToolbar.jsx'
-import { formatMoney } from '../../lib/money.js'
-
-/**
- * A screen the store's own API does not serve.
- *
- * Against a real backend the write API covers the catalogue. Orders, discounts,
- * settings and bulk import stay in the back office (Odoo, for a LOOM Storefront
- * store), and saying so beats an empty list that looks like a shop with no orders.
- */
-function ManagedInBackOffice({ title, body }) {
-  return (
-    <>
-      <h1 className="text-display-md">{title}</h1>
-      <div className="mt-8 max-w-xl rounded-xs border border-line bg-surface p-5">
-        <h2 className="text-[14px] font-medium">Managed in your back office</h2>
-        <p className="mt-2 text-[13px] leading-relaxed text-muted">{body}</p>
-      </div>
-    </>
-  )
-}
+import { formatMoney, toMajor, toMinor } from '../../lib/money.js'
+import { LiveData, LiveSettings } from './backoffice.jsx'
 
 /* ── categories ────────────────────────────────────────────────────────── */
 
@@ -288,14 +270,7 @@ export function SizeCharts() {
 /* ── discounts ─────────────────────────────────────────────────────────── */
 
 export function Discounts() {
-  return isMock ? (
-    <DiscountsScreen />
-  ) : (
-    <ManagedInBackOffice
-      title="Discounts"
-      body="Discount codes are created in your back office (in Odoo: Website › eCommerce › Discounts & Loyalty). Codes made there work at checkout straight away."
-    />
-  )
+  return <DiscountsScreen />
 }
 
 function DiscountsScreen() {
@@ -324,10 +299,14 @@ function DiscountsScreen() {
     }
   }
 
-  const remove = async (code) => {
-    await api.adminDeleteDiscount(code)
-    push('Code removed')
-    reload()
+  const remove = async (discount) => {
+    try {
+      await api.adminDeleteDiscount(isMock ? discount.code : discount.id)
+      push(isMock ? 'Code removed' : 'Discount archived')
+      reload()
+    } catch (err) {
+      push(err.message, { tone: 'error' })
+    }
   }
 
   if (loading) return <Skeleton className="h-64 w-full" />
@@ -346,8 +325,10 @@ function DiscountsScreen() {
 
       {editing ? (
         <form onSubmit={save} className="mt-8 max-w-md space-y-4">
-          <Row label="Code" mono required value={editing.code}
-            onChange={(e) => setEditing((d) => ({ ...d, code: e.target.value.toUpperCase() }))} />
+          {!editing.automatic && (
+            <Row label="Code" mono required value={editing.code}
+              onChange={(e) => setEditing((d) => ({ ...d, code: e.target.value.toUpperCase() }))} />
+          )}
           <Row label="Label shown to the shopper" value={editing.label}
             onChange={(e) => setEditing((d) => ({ ...d, label: e.target.value }))} />
           <div>
@@ -370,6 +351,7 @@ function DiscountsScreen() {
               className="h-4 w-4 accent-[rgb(var(--accent))]" />
             Active
           </label>
+          {!isMock && <LiveDiscountFields editing={editing} setEditing={setEditing} />}
           <div className="flex gap-3 pt-2">
             <Button as="button" type="submit">Save</Button>
             <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
@@ -399,14 +381,16 @@ function DiscountsScreen() {
         />
         <ul className="mt-6 space-y-2">
           {rows.map((d) => (
-            <li key={d.code}>
+            <li key={d.id || d.code}>
               <RecordRow
-                onOpen={() => setEditing({ ...d })}
-                label={`Edit ${d.code}`}
-                actions={<RowAction label={`Delete ${d.code}`} onClick={() => remove(d.code)} />}
+                onOpen={() => (d.editable === false ? window.open(d.backendUrl, '_blank', 'noopener') : setEditing({ ...d }))}
+                label={d.editable === false ? `Open ${d.label || d.code} in Odoo` : `Edit ${d.code || d.label}`}
+                actions={isMock || d.active !== false
+                  ? <RowAction label={`${isMock ? 'Delete' : 'Archive'} ${d.code || d.label}`} onClick={() => remove(d)} />
+                  : null}
               >
                 <div className="flex flex-wrap items-center gap-3">
-                  <code className="font-mono text-[14px] text-ink">{d.code}</code>
+                  <code className="font-mono text-[14px] text-ink">{d.code || (d.automatic ? 'automatic' : '—')}</code>
                   <Badge kind={d.active === false ? 'sold-out' : 'bestseller'}>
                     {d.active === false
                       ? 'inactive'
@@ -414,7 +398,9 @@ function DiscountsScreen() {
                         ? `${d.value}% off`
                         : d.kind === 'fixed'
                           ? 'fixed amount'
-                          : 'free shipping'}
+                          : d.kind === 'shipping'
+                            ? 'free shipping'
+                            : 'set in Odoo'}
                   </Badge>
                 </div>
                 <p className="mt-1 text-[13px] text-muted">{d.label}</p>
@@ -424,6 +410,30 @@ function DiscountsScreen() {
         </ul>
         </>
       )}
+    </>
+  )
+}
+
+/** What Odoo's discount programs add: applying without a code, a minimum order, dates and a usage limit. */
+function LiveDiscountFields({ editing, setEditing }) {
+  const set = (key, value) => setEditing((d) => ({ ...d, [key]: value }))
+  const { currency } = editing
+  return (
+    <>
+      <label className="flex cursor-pointer items-center gap-2.5 text-[13px]">
+        <input type="checkbox" checked={Boolean(editing.automatic)} onChange={(e) => set('automatic', e.target.checked)}
+          className="h-4 w-4 accent-[rgb(var(--accent))]" />
+        Applies by itself, without a code
+      </label>
+      <Row label="Minimum order" type="number" min="0" step="any"
+        value={toMajor({ amount: editing.minimumAmount || 0, currency })}
+        onChange={(e) => set('minimumAmount', toMinor(Number(e.target.value || 0), currency))} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Row label="Starts on" type="date" value={editing.startsOn || ''} onChange={(e) => set('startsOn', e.target.value || null)} />
+        <Row label="Ends on" type="date" value={editing.endsOn || ''} onChange={(e) => set('endsOn', e.target.value || null)} />
+      </div>
+      <Row label="Times it can be used" type="number" min="1" placeholder="No limit"
+        value={editing.usageLimit ?? ''} onChange={(e) => set('usageLimit', e.target.value ? Number(e.target.value) : null)} />
     </>
   )
 }
@@ -439,14 +449,7 @@ const TRISTATE = {
 }
 
 export function Storefront() {
-  return isMock ? (
-    <StorefrontScreen />
-  ) : (
-    <ManagedInBackOffice
-      title="Storefront"
-      body="Branding, navigation, the home page, pages and features are edited in your back office (in Odoo: Website › LOOM Storefront › Stores). The shop picks changes up on its next load."
-    />
-  )
+  return isMock ? <StorefrontScreen /> : <LiveSettings />
 }
 
 function StorefrontScreen() {
@@ -650,14 +653,7 @@ function StorefrontScreen() {
 /* ── data ──────────────────────────────────────────────────────────────── */
 
 export function Data() {
-  return isMock ? (
-    <DataScreen />
-  ) : (
-    <ManagedInBackOffice
-      title="Import and export"
-      body="Bulk import, export and reset work on the local demo data only. For a live catalogue use your back office's import tools (in Odoo: the Import action on any product list)."
-    />
-  )
+  return isMock ? <DataScreen /> : <LiveData />
 }
 
 function DataScreen() {

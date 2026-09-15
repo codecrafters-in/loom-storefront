@@ -1846,6 +1846,10 @@ export const deleteLibraryItem = later('deleteLibraryItem')
 export const adminSaveSizeChart = later('adminSaveSizeChart')
 export const adminGetProduct = later('adminGetProduct')
 export const adminReset = later('adminReset')
+export const adminGetSettings = later('adminGetSettings')
+export const adminListQueue = later('adminListQueue')
+export const adminUpdateQueueItem = later('adminUpdateQueueItem')
+export const adminGetDashboard = later('adminGetDashboard')
 
 /* ── attribution and search ───────────────────────────────────────────── */
 

@@ -534,6 +534,7 @@ rewriting every one.
 | --- | --- |
 | `enabled` | Off by default, so a theme cloned for a demo does not start collecting |
 | `respectDoNotTrack` | Honours the header. One line, and it is what the header is for |
+| `countVisits` | `false` stops the anonymous day totals (visits, product views, adds to the bag, checkouts) sent to the backend's dashboard with `POST /events`. On by default in api mode; never sent with Do Not Track |
 | `debug` | Logs every event to the console without sending it. For wiring things up |
 
 Consent, if you gather it, goes through `setConsent(false)` until you have it.

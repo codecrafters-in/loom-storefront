@@ -1540,9 +1540,16 @@ storefront token**. Full guide, including the reference implementation at
 | `GET` | `/admin/orders?q=&status=&payment=&delivery=&page=&per_page=` | `{ items: AdminOrder[], total, page, perPage, counts }` |
 | `GET` | `/admin/orders/:id` | `AdminOrder` — id, order number or backend id |
 | `PATCH` | `/admin/orders/:id` | `{ action, tracking? }` → `AdminOrder` — ship, update_tracking, deliver, record_payment, cancel |
-| `PATCH` | `/admin/storefront` | Deep-merged; arrays replace |
-| `POST` | `/admin/import` | `{ mode, products, categories, collections, settings }` |
-| `GET` | `/admin/export` | The same shape |
+| `GET` | `/admin/storefront` | The storefront document plus `admin: { editable, canEdit, backendUrl }` |
+| `PATCH` | `/admin/storefront` | Deep-merged; arrays replace. A backend may accept only `admin.editable` paths (`422 unsupported_setting`) |
+| `POST` | `/admin/import` | `{ mode, products, categories, collections, settings }`, or `{ csv }`; `dry_run: true` checks without saving |
+| `GET` | `/admin/export` | The same shape, a page at a time; `?format=csv` one row per variant |
+| `POST` | `/admin/orders` | A paid webhook's `{ cart_id, email, payment, idempotency_key }`, or a phone order's `{ email, lines, shipping_address, shipping_method, payment: link, record or quote }` → AdminOrder with `created`, `paymentUrl` |
+| `GET` `POST` | `/admin/discounts` | `{ items, total }`; save `{ id?, code, label, kind, value, active, automatic, minimumAmount, startsOn, endsOn, usageLimit }` |
+| `DELETE` | `/admin/discounts/:code` | Removed (archived on Odoo) |
+| `POST` | `/admin/notifications/test` | `{ to? }` → `{ delivered, message, preview }` |
+| `GET` `PATCH` | `/admin/returns`, `/admin/reviews`, `/admin/questions` and `/:id` | `{ items, total, page, perPage, counts }`; `{ action, reason, reply or answer }` |
+| `GET` | `/admin/dashboard?days=30` | Orders, revenue, visits, conversion, abandoned carts, per day |
 
 Three things that are easy to get wrong:
 
@@ -1669,18 +1676,32 @@ rate limit you will hit.
 
 ## Webhooks out
 
-Push changes to the storefront so it can purge rather than wait for a TTL:
+Push changes to the storefront so it can purge rather than wait for a TTL. The
+render handler answers `POST /__loom/revalidate`:
 
 ```
-POST https://your-store.example/api/revalidate
-{ "type": "product.updated", "slug": "merino-crew-knit", "at": "2026-09-09T…" }
+POST https://shop.example.com/__loom/revalidate
+X-Loom-Signature: t=1789441234,v1=<hex HMAC-SHA256 of "t.body" with LOOM_WEBHOOK_SECRET>
+{ "id": "…", "event": "content.changed", "store": "shop", "data": { "paths": ["/product/merino-crew", "/shop"], "all": false } }
 ```
 
-`product.updated` · `product.deleted` · `inventory.updated` · `category.updated`
-· `settings.updated` · `order.paid` · `order.fulfilled`.
+`content.changed` purges `data.paths` (or everything with `all: true`);
+`product.changed` with `{ slug }` purges that product and `/shop`. A signature
+older than five minutes, missing or wrong answers `401`; without
+`LOOM_WEBHOOK_SECRET` the endpoint answers `404`. The Odoo module sends exactly
+this (**Connect cache purge** on the store), and its webhooks also carry
+`order.*`, `return.*` and `customer.created` for other systems.
 
 Sign the payload and verify it — an unauthenticated revalidation endpoint is a
 free cache-flush attack.
+
+### `POST /events`
+
+`{ events: ["visit" | "product_view" | "add_to_cart" | "checkout"] }` → `204`.
+Day totals for the backend's dashboard, sent with `navigator.sendBeacon` as
+`text/plain`: a visit once per browser session, and the other three as they
+happen. Nothing identifies the visitor. Optional: a backend without it answers
+404 and nothing changes for the shopper.
 
 ---
 

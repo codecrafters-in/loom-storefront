@@ -91,7 +91,10 @@ export function Orders() {
 
   return (
     <>
-      <h1 className="text-display-md">Orders</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-display-md">Orders</h1>
+        {!isMock && <Button size="sm" icon="plus" to="/admin/orders/new">New order</Button>}
+      </div>
       <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
         Pack what is waiting to ship, add tracking as it leaves, and mark it delivered when it
         arrives. The customer&rsquo;s order page follows every step.

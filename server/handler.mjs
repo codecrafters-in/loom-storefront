@@ -22,6 +22,31 @@ import { etagFetch } from './etag-fetch.mjs'
 import { clearStorage, installBrowserGlobals, setLocation } from './globals.mjs'
 import { envelope, parseDsn } from '../src/lib/sentry-envelope.js'
 
+/** `/__loom/revalidate` accepts a signature at most this old, so a captured request cannot be replayed later. */
+const SIGNATURE_TOLERANCE_SECONDS = 300
+const PURGE_EVENTS = ['content.changed', 'product.changed']
+
+const hex = (buffer) => Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, '0')).join('')
+
+/**
+ * Whether `header` (`t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<body>">`, as Odoo's webhooks sign) signs `body`
+ * with `secret`, and recently. Compared in constant time.
+ */
+export async function verifySignature(secret, header, body, now = Date.now()) {
+  const parts = Object.fromEntries(String(header || '').split(',').map((part) => part.trim().split('=')))
+  const timestamp = Number(parts.t)
+  if (!secret || !parts.v1 || !Number.isFinite(timestamp) || Math.abs(now / 1000 - timestamp) > SIGNATURE_TOLERANCE_SECONDS) {
+    return false
+  }
+  const encoder = new TextEncoder()
+  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const expected = hex(await crypto.subtle.sign('HMAC', key, encoder.encode(`${parts.t}.${body}`)))
+  if (expected.length !== parts.v1.length) return false
+  let diff = 0
+  for (let i = 0; i < expected.length; i += 1) diff |= expected.charCodeAt(i) ^ parts.v1.charCodeAt(i)
+  return diff === 0
+}
+
 /** Odoo's robots.txt and sitemaps, answered on the storefront's own domain. */
 export const PASS_THROUGH = /^\/(?:robots\.txt|sitemap\.xml|sitemaps\/[a-z]+-\d+\.xml)$/
 
@@ -172,6 +197,72 @@ export function createHandler({ loadBundle, template, env = {}, fetch: fetchImpl
     Promise.resolve(upstream(target.url, { method: 'POST', body, headers: { 'content-type': 'text/plain;charset=UTF-8' } })).catch(() => {})
   }
 
+  /**
+   * `POST /__loom/revalidate`: Odoo's `content.changed` and `product.changed` webhooks ("Connect cache purge" on the
+   * store in Odoo), signed with LOOM_WEBHOOK_SECRET. Clears this instance's API cache; with CLOUDFLARE_ZONE_ID and
+   * CLOUDFLARE_API_TOKEN it purges the addresses from Cloudflare, and LOOM_PURGE_URL receives the same signed request
+   * for any other CDN. Without a CDN purge, pages refresh within LOOM_CDN_SECONDS. A failed purge answers 502, so Odoo
+   * tries again.
+   */
+  async function revalidate(request) {
+    const json = (status, body) =>
+      new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } })
+    if (!env.LOOM_WEBHOOK_SECRET) return json(404, { code: 'not_configured', message: 'Set LOOM_WEBHOOK_SECRET to accept cache purges.' })
+    const body = await request.text()
+    const signature = request.headers.get('x-loom-signature')
+    if (!(await verifySignature(env.LOOM_WEBHOOK_SECRET, signature, body))) return json(401, { code: 'invalid_signature' })
+    let message
+    try {
+      message = JSON.parse(body)
+    } catch {
+      return json(400, { code: 'bad_json' })
+    }
+    if (!PURGE_EVENTS.includes(message?.event)) return json(200, { ok: true, event: message?.event || null, purged: 0 })
+
+    const data = message.data || {}
+    const paths = (message.event === 'product.changed' ? [data.slug && `/product/${data.slug}`, '/shop'] : data.paths || [])
+      .filter((path) => typeof path === 'string' && path.startsWith('/'))
+    const all = message.event === 'content.changed' && data.all === true
+    try {
+      const { bundle } = await load()
+      bundle.purge?.()
+    } catch {
+      // Not loaded yet: nothing is cached.
+    }
+    globalThis.fetch.etagCache?.clear?.()
+    try {
+      const cdn = await purgeCdn(paths, all, body, signature)
+      return json(200, { ok: true, event: message.event, purged: all ? 'all' : paths.length, cdn })
+    } catch (err) {
+      return json(502, { code: 'purge_failed', message: String(err?.message || err).slice(0, 200) })
+    }
+  }
+
+  async function purgeCdn(paths, all, body, signature) {
+    if (env.CLOUDFLARE_ZONE_ID && env.CLOUDFLARE_API_TOKEN) {
+      const send = async (payload) => {
+        const response = await upstream(`https://api.cloudflare.com/client/v4/zones/${env.CLOUDFLARE_ZONE_ID}/purge_cache`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`, 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (!response.ok) throw new Error(`Cloudflare answered ${response.status}`)
+      }
+      // Cloudflare purges at most 30 addresses a call; a sitewide change, or no SITE_URL to build them from, purges all.
+      if (all || !settings.siteUrl) await send({ purge_everything: true })
+      else for (let i = 0; i < paths.length; i += 30) await send({ files: paths.slice(i, i + 30).map((path) => settings.siteUrl + path) })
+      return 'cloudflare'
+    }
+    if (env.LOOM_PURGE_URL) {
+      const response = await upstream(env.LOOM_PURGE_URL, {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-loom-signature': signature }, body,
+      })
+      if (!response.ok) throw new Error(`${env.LOOM_PURGE_URL} answered ${response.status}`)
+      return 'forwarded'
+    }
+    return 'none'
+  }
+
   /** `/__loom/health`: the handler runs, its bundle loads, and the store's API answers (and how fast). */
   async function health(head) {
     const started = Date.now()
@@ -193,6 +284,11 @@ export function createHandler({ loadBundle, template, env = {}, fetch: fetchImpl
   return async function handle(request) {
     const url = new URL(request.url)
     if (url.pathname === '/__loom/health') return health(request.method === 'HEAD')
+    if (url.pathname === '/__loom/revalidate') {
+      return request.method === 'POST'
+        ? revalidate(request)
+        : new Response('Method not allowed', { status: 405, headers: { ...SECURITY_HEADERS, allow: 'POST' } })
+    }
     const head = request.method === 'HEAD'
     if (request.method !== 'GET' && !head) {
       return new Response('Method not allowed', { status: 405, headers: { ...SECURITY_HEADERS, allow: 'GET, HEAD' } })

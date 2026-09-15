@@ -2,6 +2,29 @@
 
 Newest first. Each entry links to the page with the detail.
 
+## What's new — Phase 10: the admin on Odoo, cache purge and visit counts
+
+Screens and calls for what the Odoo backend added in its Phase 10. Details: [ADMIN.md](ADMIN.md#the-write-api) and
+[DEPLOY.md](DEPLOY.md#settings).
+
+- **The storefront admin against Odoo:** **Discounts** (codes and automatic promotions with a minimum, dates and a
+  usage limit; programs it cannot edit open in Odoo), **Storefront** (the settings Odoo lets it change, with a link
+  for the rest, a test email and where keys are kept), **Import / export** (a CSV with one row per variant, or JSON,
+  checked before anything is saved), **Orders › New order** (phone and email orders with a payment link, already
+  paid, or a quotation), **Returns** and **Reviews & questions**, and Overview cards for the last 30 days and what is
+  waiting.
+- The back office's API calls load with its first use (`src/lib/api/http-admin.js`), which also leaves room in the
+  first download.
+- **Product editor:** the Fit & fabric tab shows for clothing only (the demo, stores with size charts, products that
+  have fit or fabric); specifications come from the category.
+- **Render handler:** `POST /__loom/revalidate` takes Odoo's signed `content.changed` and `product.changed` webhooks,
+  clears its cache and purges Cloudflare (`CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN`) or forwards to
+  `LOOM_PURGE_URL`. Set `LOOM_WEBHOOK_SECRET`.
+- **Visit counts:** a visit per browser session, product views, adds to the bag and checkouts started go to
+  `POST /events` for Odoo's dashboard, with no cookie and nothing identifying the visitor. Do Not Track and
+  `analytics.countVisits: false` switch it off.
+- e2e **S-18**: the storefront admin runs on Odoo.
+
 ## What's new — Phase 9: accounts, after the order, reviews and more
 
 Pages and calls for what the Odoo backend added in its Phase 9. Details: [API.md](API.md#accounts-and-sign-in).

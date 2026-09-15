@@ -42,6 +42,9 @@ Read at **run** time by the render handler (all optional):
 | `PORT` | `3000` | Node server only |
 | `SENTRY_DSN` | — | A Sentry project's DSN for pages that fail to render on the server |
 | `SENTRY_ENVIRONMENT` | `production` | The environment those reports are filed under |
+| `LOOM_WEBHOOK_SECRET` | — | The secret of the store's cache purge webhook in Odoo (**Connect cache purge** on the store, or the setup wizard's Deploy step). Turns on `POST /__loom/revalidate` |
+| `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN` | — | With a revalidation: purge those addresses from Cloudflare's cache (a token with *Cache Purge* permission) |
+| `LOOM_PURGE_URL` | — | With a revalidation and another CDN: the same signed request is posted here, for a function that purges your CDN |
 
 In Odoo, the store's **Storefront URL** must be the deployed origin: Odoo allows the storefront's calls from it (CORS),
 sends shoppers back to it from payment, and writes it into the sitemap.
@@ -50,6 +53,12 @@ sends shoppers back to it from payment, and writes it into the sitemap.
 CDN has a fresh copy. The CDN keeps a page for `LOOM_CDN_SECONDS` (2 minutes by default) and then renders it again in
 the background. Lower it for a store that changes by the minute; raise it for a very busy one. Your host's "purge
 cache" button refreshes everything at once.
+
+**Straight away instead.** Click **Connect cache purge** on the store in Odoo and set the secret it shows as
+`LOOM_WEBHOOK_SECRET`. Odoo then posts what changed to `/__loom/revalidate`: the handler forgets its cached answers at
+once, and purges the pages from Cloudflare with `CLOUDFLARE_ZONE_ID` and `CLOUDFLARE_API_TOKEN`, or hands the request
+to `LOOM_PURGE_URL` for another CDN. Vercel and Netlify keep a page for `LOOM_CDN_SECONDS` at most, so keep it short
+there. A purge that fails answers 502 and Odoo tries again.
 
 ## Vercel
 

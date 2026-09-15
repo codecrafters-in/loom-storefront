@@ -11,11 +11,24 @@ import ListToolbar, { matches } from '../../components/admin/ListToolbar.jsx'
 
 /* ── overview ──────────────────────────────────────────────────────────── */
 
+// What shoppers sent that waits for someone, on a live store. A user without the rights for one gets no card.
+const QUEUE_CARDS = [
+  { kind: 'returns', count: 'open', label: 'Returns to handle', to: '/admin/returns' },
+  { kind: 'reviews', count: 'pending', label: 'Reviews to approve', to: '/admin/reviews' },
+  { kind: 'questions', count: 'pending', label: 'Questions to answer', to: '/admin/reviews?view=questions' },
+]
+
 export function Overview() {
   const products = useAsync(() => api.adminListProducts({ perPage: 500 }), [])
   // Every order the store has taken, not the signed-in shopper's. Against a real
   // backend only the tab counts are wanted, so one row is enough.
   const orders = useAsync(() => api.adminListOrders({ perPage: isMock ? 100 : 1 }), [])
+  const numbers = useAsync(() => (isMock ? Promise.resolve(null) : api.adminGetDashboard({ days: 30 }).catch(() => null)), [])
+  const queues = useAsync(
+    () => (isMock ? Promise.resolve([]) : Promise.all(QUEUE_CARDS.map((card) =>
+      api.adminListQueue(card.kind, { perPage: 1 }).then((r) => ({ ...card, value: r.counts?.[card.count] ?? 0 }), () => null)))),
+    [],
+  )
 
   const stats = useMemo(() => {
     const items = products.data?.items || []
@@ -47,6 +60,16 @@ export function Overview() {
       ? [
         { label: 'To ship', value: orders.data.counts.toShip, to: '/admin/orders?view=to_ship', tone: orders.data.counts.toShip ? 'accent' : null },
         { label: 'Awaiting payment', value: orders.data.counts.awaitingPayment, to: '/admin/orders?view=awaiting' },
+      ]
+      : []),
+    ...(queues.data || []).filter(Boolean).map(({ label, value, to }) => ({ label, value, to, tone: value ? 'accent' : null })),
+    // A live store's last 30 days, from Odoo: confirmed orders, visits counted without cookies, abandoned carts.
+    ...(numbers.data
+      ? [
+        { label: 'Orders, 30 days', value: numbers.data.orders, to: '/admin/orders' },
+        { label: 'Revenue, 30 days', value: formatMoney({ amount: numbers.data.revenue, currency: numbers.data.currency }), to: '/admin/orders' },
+        { label: 'Conversion', value: numbers.data.conversionRate == null ? '—' : `${(numbers.data.conversionRate * 100).toFixed(1)}%`, to: '/admin' },
+        { label: 'Abandoned carts', value: `${numbers.data.abandonedCarts.count} · ${numbers.data.abandonedCarts.recovered} recovered`, to: '/admin/orders' },
       ]
       : []),
     // Totals the demo can add up from everything it holds; a real backend reports revenue elsewhere.

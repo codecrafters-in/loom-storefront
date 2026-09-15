@@ -101,6 +101,11 @@ export async function routes() {
 
 /** The API the render handler asks about redirects and passes robots.txt and sitemaps from; '' on the demo data. */
 export const apiBaseUrl = isMock ? '' : config.api.baseUrl
+
+/** Forget every cached API answer: Odoo said the catalogue changed (`POST /__loom/revalidate`). */
+export function purge() {
+  clearAll()
+}
 /** Where the browser sends error reports, for the page's Content-Security-Policy. */
 export const sentryDsn = config.monitoring.sentryDsn
 

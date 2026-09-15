@@ -260,17 +260,82 @@ unknown action `422 invalid_action`; a tracking link that is not `http(s)://`
 server's message. The old `{ "status": "fulfilled" | "delivered" | "cancelled" }`
 body still works and maps to ship, deliver and cancel.
 
-**Refunds** are issued from the Payment card in the demo. Against Odoo they are
-issued in Odoo — the card links to the order there (`backendUrl`).
+**Refunds** are issued from the Payment card: the demo records them; Odoo refunds
+through the payment provider when it can, or with a credit note for a full refund
+(`POST /admin/orders/:id/refunds`).
+
+### New orders by phone or email
+
+```
+POST /admin/orders
+{ "email", "lines": [{ "variantId", "quantity" }], "shipping_address", "shipping_method",
+  "payment": "link" | "record" | "quote", "notify", "idempotency_key" }
+→ AdminOrder + { created, paymentUrl }
+```
+
+**Orders › New order** (live store only) finds products by name or SKU, takes the
+customer's email and address, and places the order the way checkout would: Odoo
+prices it, adds delivery and taxes and checks the stock. **Send a payment link**
+gives a link to the storefront's order page, where the customer pays (and emails
+it when asked); **Already paid** books cash or a bank transfer and confirms the
+order; **Quotation only** leaves a quotation. A customer who already has an
+account gets the order on it. The page keeps one `idempotency_key` per attempt,
+so a double click places one order.
+
+### Discounts
+
+```
+GET    /admin/discounts            → { items, total }
+POST   /admin/discounts            → Discount   (creates, or changes the one with that id or code)
+DELETE /admin/discounts/:code      → { ok }     (Odoo archives it)
+```
+
+A discount is `{ id, code, label, kind: percent | fixed | shipping, value, active }`;
+Odoo adds `automatic`, `minimumAmount`, `startsOn`, `endsOn`, `usageLimit`, `used`,
+`editable` and `backendUrl`. The screen edits what it can express (one rule, one
+reward on the whole order) and opens anything else in Odoo.
+
+### Returns, reviews and questions
+
+```
+GET   /admin/returns?status=open     → { items, total, page, perPage, counts }
+PATCH /admin/returns/:id   { action: approve | receive | refund | exchange | credit | reject, reason }
+GET   /admin/reviews?status=pending  ·  PATCH /admin/reviews/:id    { action: approve | reject | reply, reply }
+GET   /admin/questions?status=pending · PATCH /admin/questions/:id  { action: publish | reject, answer }
+```
+
+Live store only: the demo has no shoppers to send them. Each button is the step
+the backend offers now (`actions`), with the same email to the customer as in
+Odoo.
+
+### Overview numbers
+
+```
+GET /admin/dashboard?days=30 → { orders, revenue, averageOrder, visits, conversionRate, abandonedCarts, compare, daily }
+```
+
+A live store's Overview adds the last 30 days (orders, revenue, conversion,
+abandoned carts and how many came back) and what is waiting: returns to handle,
+reviews to approve, questions to answer.
 
 ### Settings
 
 ```
+GET   /admin/storefront   → the storefront document + { admin: { editable, canEdit, backendUrl } }
 PATCH /admin/storefront   → the storefront document
 ```
 
 Deep-merged, except arrays which replace wholesale — see
 [CONFIGURATION.md](CONFIGURATION.md#where-settings-come-from).
+
+Against Odoo the **Storefront** screen shows only the settings in `admin.editable`
+(name, tagline, description, contact email, locale, tax note, returns window,
+stock display and the feature switches), sends only what changed, and links to
+the store in Odoo for everything else. A setting Odoo does not let it change is
+refused by name (`422 unsupported_setting`), never dropped. Only storefront
+managers may save (`admin.canEdit`). The screen also sends a test email through
+Odoo's mail server, and says where payment keys and mail passwords are kept:
+`/admin/credentials` answers `404 use_odoo_backend` with links.
 
 ### Media
 
@@ -336,6 +401,14 @@ will hit. One payload is one transaction and one purge.
 
 For very large catalogues, chunk it — a few thousand products per request — and
 make each chunk idempotent so a partial failure can be retried safely.
+
+**Against Odoo** the screen works with a spreadsheet: `GET /admin/export?format=csv`
+is the catalogue with one row per variant (slug, title, prices, options, SKU,
+inventory, images, specs), and `POST /admin/import` takes `{ csv }` as well as
+the JSON shape. A file is sent first with `dry_run: true`, and the screen shows
+what would be created and updated and every row with a problem before
+**Import now**. Only `mode: "merge"` is accepted: Odoo never deletes products
+from an import. JSON exports come a page at a time (`page`, `per_page` ≤ 200).
 
 ---
 
@@ -453,7 +526,10 @@ know an admin panel exists.
 ## Webhooks out
 
 When something changes, tell the storefront so it can purge rather than wait for
-a TTL:
+a TTL. Odoo does this with signed webhooks: **Connect cache purge** on the store
+sends `content.changed` and `product.changed` to the render handler's
+`POST /__loom/revalidate` ([DEPLOY.md](DEPLOY.md#settings)). For another backend,
+the shape below works the same way:
 
 ```
 POST https://your-store.example/api/revalidate

@@ -135,6 +135,11 @@ Caps that matter:
 
 Do not poll. Push.
 
+With Odoo this is built in: **Connect cache purge** on the store sends signed
+`content.changed` and `product.changed` webhooks to the render handler's
+`POST /__loom/revalidate` ([DEPLOY.md](DEPLOY.md#settings)). The shape below is
+for other backends.
+
 ```
 POST https://your-store.example/api/revalidate
 { "type": "product.updated", "slug": "merino-crew-knit" }

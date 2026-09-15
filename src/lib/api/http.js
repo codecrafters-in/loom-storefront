@@ -837,101 +837,53 @@ export const getBootstrap = () => get('/bootstrap')
 
 /* ── admin (write API) ─────────────────────────────────────────────────── */
 
-/** The most products one admin page may return. */
-const ADMIN_PAGE_LIMIT = 100
-
-/**
- * Admin product list.
- *
- * The API caps a page at 100, so a screen that wants everything at once (the
- * inventory table, the related-products picker) asks for more and gets it one
- * page at a time, up to what it asked for, instead of silently seeing the
- * first hundred.
+/*
+ * The back office loads with its first call (http-admin.js): a shopper never opens it, and its calls would otherwise
+ * add to every page's first download. Uploads stay here, next to the request helpers they bypass.
  */
-export async function adminListProducts({ q = '', page = 1, perPage = 25 } = {}) {
-  if (perPage <= ADMIN_PAGE_LIMIT) return get('/admin/products', { q, page, per_page: perPage })
-  const offset = (page - 1) * perPage
-  const items = []
-  let next = Math.floor(offset / ADMIN_PAGE_LIMIT) + 1
-  let total = 0
-  do {
-    const chunk = await get('/admin/products', { q, page: next, per_page: ADMIN_PAGE_LIMIT })
-    total = chunk.total
-    items.push(...chunk.items)
-    next += 1
-    if (!chunk.items.length) break
-  } while (items.length < offset % ADMIN_PAGE_LIMIT + perPage && (next - 1) * ADMIN_PAGE_LIMIT < total)
-  const start = offset % ADMIN_PAGE_LIMIT
-  return { items: items.slice(start, start + perPage), total, page, perPage }
-}
-export const adminSaveProduct = (patch) =>
-  patch.id ? patch_(`/admin/products/${patch.id}`, patch) : post('/admin/products', patch)
-export const adminDeleteProduct = (id) => del(`/admin/products/${encodeURIComponent(id)}`)
-export const adminSetInventory = (variantId, quantity) =>
-  patch_(`/admin/variants/${encodeURIComponent(variantId)}/inventory`, { quantity })
-export const adminAdjustInventory = (variantId, delta) =>
-  post(`/admin/variants/${encodeURIComponent(variantId)}/inventory`, { delta })
-export const adminSaveCategory = (body) => post('/admin/categories', body)
-export const adminDeleteCategory = (slug) => del(`/admin/categories/${encodeURIComponent(slug)}`)
-// Every category, including empty ones and ones holding only drafts — the
-// public list leaves those out, and they are exactly what an admin needs to see.
-export const adminListCategories = () =>
-  get('/admin/categories').then((r) => assertList(r, 'GET /admin/categories'))
-export const adminUpdateSettings = (body) => patch_('/admin/storefront', body)
-export const adminImport = (body) => post('/admin/import', body)
-export const adminExport = () => get('/admin/export')
+const laterAdmin = (name) => async (...args) => (await import('./http-admin.js'))[name](...args)
+export const adminListProducts = laterAdmin('adminListProducts')
+export const adminSaveProduct = laterAdmin('adminSaveProduct')
+export const adminDeleteProduct = laterAdmin('adminDeleteProduct')
+export const adminSetInventory = laterAdmin('adminSetInventory')
+export const adminAdjustInventory = laterAdmin('adminAdjustInventory')
+export const adminSaveCategory = laterAdmin('adminSaveCategory')
+export const adminDeleteCategory = laterAdmin('adminDeleteCategory')
+export const adminListCategories = laterAdmin('adminListCategories')
+export const adminUpdateSettings = laterAdmin('adminUpdateSettings')
+export const adminImport = laterAdmin('adminImport')
+export const adminExport = laterAdmin('adminExport')
+export const adminSaveSizeChart = laterAdmin('adminSaveSizeChart')
+export const listLibrary = laterAdmin('listLibrary')
+export const saveLibraryItem = laterAdmin('saveLibraryItem')
+export const deleteLibraryItem = laterAdmin('deleteLibraryItem')
+export const adminGetProduct = laterAdmin('adminGetProduct')
+export const adminPlaceOrder = laterAdmin('adminPlaceOrder')
+export const adminGetOrder = laterAdmin('adminGetOrder')
+export const adminListOrders = laterAdmin('adminListOrders')
+export const adminRefundOrder = laterAdmin('adminRefundOrder')
+export const adminGetCredentials = laterAdmin('adminGetCredentials')
+export const adminSaveCredentials = laterAdmin('adminSaveCredentials')
+export const adminSendTestNotification = laterAdmin('adminSendTestNotification')
+export const adminUpdateOrder = laterAdmin('adminUpdateOrder')
+export const adminListDiscounts = laterAdmin('adminListDiscounts')
+export const adminSaveDiscount = laterAdmin('adminSaveDiscount')
+export const adminDeleteDiscount = laterAdmin('adminDeleteDiscount')
+export const adminReset = laterAdmin('adminReset')
+export const adminGetSettings = laterAdmin('adminGetSettings')
+export const adminListQueue = laterAdmin('adminListQueue')
+export const adminUpdateQueueItem = laterAdmin('adminUpdateQueueItem')
+export const adminGetDashboard = laterAdmin('adminGetDashboard')
+
 export const listSizeCharts = () => get('/size-charts').then((r) => assertList(r, 'GET /size-charts'))
 export const listAttributes = () => get('/attributes').then((r) => assertList(r, 'GET /attributes'))
-export const adminSaveSizeChart = (chart) => post('/admin/size-charts', chart)
 
-/**
- * The reuse library — the store's own attributes, feature cards and service
- * rows, kept so the sixtieth product does not start from a blank vocabulary.
- * `GET /attributes` already folds the attribute half into its response; these
- * are for managing it.
- */
-/**
- * Money and mail.
- *
- * `adminSaveCredentials` is the only write in this file whose response
- * deliberately carries less than it was given: a secret that can be read back
- * is a secret in every log, cache and browser history between here and the
- * server. The read returns whether each one is set and when.
- */
 /**
  * Both fields, or nothing. And rate-limit this on the server: order numbers are
  * sequential in most shops, so an unthrottled lookup is a way to enumerate them
  * against a list of leaked emails.
  */
 export const lookupOrder = (body) => post('/orders/lookup', body)
-
-/**
- * Place an order for money that has already been taken, and read one back.
- *
- * The body keys are snake_case because that is what the reference payments
- * server sends and what a backend built from the docs will expect. `created` in
- * the response is what tells a webhook handler whether this was the first
- * delivery or a retry — without it, every retry sends another confirmation.
- */
-export const adminPlaceOrder = ({ cartId, email, payment, idempotencyKey }) =>
-  post('/admin/orders', { cart_id: cartId, email, payment, idempotency_key: idempotencyKey })
-export const adminGetOrder = (id) => get(`/admin/orders/${encodeURIComponent(id)}`)
-/** Every order the store has taken, for the back office — `{ items, total, page, perPage, counts }`. */
-export const adminListOrders = ({ q, status, payment, delivery, page = 1, perPage = 25 } = {}) =>
-  get('/admin/orders', { q, status, payment, delivery, page, per_page: perPage })
-    .then((r) => assertList(r, 'GET /admin/orders'))
-
-export const adminRefundOrder = (orderId, body) =>
-  post(`/admin/orders/${encodeURIComponent(orderId)}/refunds`, body)
-export const adminGetCredentials = () => get('/admin/credentials')
-export const adminSaveCredentials = (body) => post('/admin/credentials', body)
-export const adminSendTestNotification = (body) => post('/admin/notifications/test', body)
-
-export const listLibrary = () => get('/admin/library')
-export const saveLibraryItem = ({ kind, item }) => post(`/admin/library/${encodeURIComponent(kind)}`, item)
-export const deleteLibraryItem = ({ kind, id }) =>
-  del(`/admin/library/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`)
-export const adminGetProduct = (id) => get(`/admin/products/${encodeURIComponent(id)}`)
 
 /**
  * Multipart, not JSON — a base64 body is a third larger and holds the whole
@@ -964,11 +916,6 @@ export async function uploadMedia(file) {
 
 export const listMedia = () => get('/admin/media').then((r) => assertList(r, 'GET /admin/media'))
 export const deleteMedia = (id) => del(`/admin/media/${encodeURIComponent(id)}`)
-export const adminUpdateOrder = (id, body) => patch_(`/admin/orders/${encodeURIComponent(id)}`, body)
-export const adminListDiscounts = () => get('/admin/discounts').then((r) => assertList(r, 'GET /admin/discounts'))
-export const adminSaveDiscount = (body) => post('/admin/discounts', body)
-export const adminDeleteDiscount = (code) => del(`/admin/discounts/${encodeURIComponent(code)}`)
-export const adminReset = () => post('/admin/reset', {})
 
 // For http-account.js, which shares this adapter's session, bag and request helpers.
 export { get, post, request, send, customerToken, storeSession, mergeGuestWishlist, SESSION_KEY, CART_KEY, FRESH_CART_KEY }

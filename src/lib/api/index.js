@@ -54,6 +54,7 @@ const SURFACE = [
   'listSizeCharts', 'listAttributes', 'adminSaveSizeChart', 'adminGetProduct',
   'adminUpdateOrder', 'adminListDiscounts', 'adminSaveDiscount', 'adminDeleteDiscount',
   'uploadMedia', 'listMedia', 'deleteMedia',
+  'adminGetSettings', 'adminListQueue', 'adminUpdateQueueItem', 'adminGetDashboard',
 ]
 
 // A developer's check, left out of built bundles (test/adapters.test.mjs runs it for both adapters instead).
@@ -149,7 +150,9 @@ const PURGES = {
   adminAdjustInventory: ['listProducts', 'getProduct', 'getBootstrap', 'adminListProducts'],
   adminSaveCategory: ['listCategories', 'adminListCategories', 'listProducts', 'getBootstrap'],
   adminDeleteCategory: ['listCategories', 'adminListCategories', 'listProducts', 'getBootstrap'],
-  adminUpdateSettings: ['getStorefront', 'getBootstrap'],
+  adminUpdateSettings: ['getStorefront', 'getBootstrap', 'adminGetSettings'],
+  // A published review or answer shows on the product page; a return's step shows on the customer's order.
+  adminUpdateQueueItem: ['adminListQueue', 'getReviews', 'getQuestions', 'getOrderReturns', 'listReturns', 'getOrder'],
   adminImport: null,   // null = purge everything
   adminReset: null,
 }

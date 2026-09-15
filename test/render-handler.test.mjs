@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { createHash } from 'node:crypto'
-import { assemble, cacheHeaders, createHandler } from '../server/handler.mjs'
+import { createHash, createHmac } from 'node:crypto'
+import { assemble, cacheHeaders, createHandler, verifySignature } from '../server/handler.mjs'
 import { etagFetch } from '../server/etag-fetch.mjs'
 import { createNodeServer, findFile } from '../server/node.mjs'
 import { onRequest as cloudflare } from '../functions/[[path]].js'
@@ -329,3 +329,79 @@ describe('Cloudflare Pages function', () => {
     assert.equal(passed, 1)
   })
 })
+
+describe('cache purge from Odoo', () => {
+  const SECRET = 'webhook-secret'
+  const signed = (body, timestamp = Math.floor(Date.now() / 1000)) =>
+    `t=${timestamp},v1=${createHmac('sha256', SECRET).update(`${timestamp}.${body}`).digest('hex')}`
+  const post = (handle, body, signature) =>
+    handle(new Request('https://shop.test/__loom/revalidate', { method: 'POST', body, headers: signature ? { 'x-loom-signature': signature } : {} }))
+
+  function setup(env = {}) {
+    const purges = []
+    let cleared = 0
+    const serverBundle = { ...bundle({}), purge: () => { cleared += 1 } }
+    const fetchImpl = async (url, init = {}) => {
+      purges.push([String(url), init.body ? JSON.parse(init.body) : null, init.headers || {}])
+      return new Response('{"success":true}')
+    }
+    const handle = createHandler({
+      loadBundle: async () => serverBundle, template: TEMPLATE, fetch: fetchImpl,
+      env: { LOOM_WEBHOOK_SECRET: SECRET, SITE_URL: 'https://shop.test', LOOM_API_ETAGS: 'off', ...env },
+    })
+    return { handle, purges, cleared: () => cleared }
+  }
+
+  test('a signed content.changed clears the cache and purges those addresses at Cloudflare', async () => {
+    const { handle, purges, cleared } = setup({ CLOUDFLARE_ZONE_ID: 'zone', CLOUDFLARE_API_TOKEN: 'token' })
+    const body = JSON.stringify({ event: 'content.changed', data: { paths: ['/product/merino-crew', '/shop'], all: false } })
+    const response = await post(handle, body, signed(body))
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), { ok: true, event: 'content.changed', purged: 2, cdn: 'cloudflare' })
+    assert.equal(cleared(), 1)
+    assert.deepEqual(purges.map(([url, payload]) => [url, payload]), [
+      ['https://api.cloudflare.com/client/v4/zones/zone/purge_cache', { files: ['https://shop.test/product/merino-crew', 'https://shop.test/shop'] }],
+    ])
+  })
+
+  test('a sitewide change purges everything; another CDN gets the same signed request', async () => {
+    const cloudflare = setup({ CLOUDFLARE_ZONE_ID: 'zone', CLOUDFLARE_API_TOKEN: 'token' })
+    const body = JSON.stringify({ event: 'content.changed', data: { paths: [], all: true } })
+    assert.equal((await post(cloudflare.handle, body, signed(body))).status, 200)
+    assert.deepEqual(cloudflare.purges[0][1], { purge_everything: true })
+
+    const forwarded = setup({ LOOM_PURGE_URL: 'https://cdn.test/purge' })
+    const product = JSON.stringify({ event: 'product.changed', data: { slug: 'merino-crew', action: 'updated' } })
+    const signature = signed(product)
+    const response = await post(forwarded.handle, product, signature)
+    assert.equal((await response.json()).cdn, 'forwarded')
+    assert.equal(forwarded.purges[0][0], 'https://cdn.test/purge')
+    assert.equal(forwarded.purges[0][2]['x-loom-signature'], signature)
+  })
+
+  test('an unsigned, wrongly signed or replayed request is refused, and without a secret there is no endpoint', async () => {
+    const { handle, cleared } = setup()
+    const body = JSON.stringify({ event: 'content.changed', data: { paths: ['/shop'] } })
+    assert.equal((await post(handle, body)).status, 401)
+    assert.equal((await post(handle, body, signed(`${body} `))).status, 401)
+    assert.equal((await post(handle, body, signed(body, Math.floor(Date.now() / 1000) - 3600))).status, 401)
+    assert.equal(cleared(), 0)
+    assert.equal((await handle(new Request('https://shop.test/__loom/revalidate'))).status, 405)
+    assert.equal((await post(setup({ LOOM_WEBHOOK_SECRET: '' }).handle, body, signed(body))).status, 404)
+  })
+
+  test('a ping answers without purging', async () => {
+    const { handle, purges, cleared } = setup({ LOOM_PURGE_URL: 'https://cdn.test/purge' })
+    const body = JSON.stringify({ event: 'ping', data: {} })
+    assert.deepEqual(await (await post(handle, body, signed(body))).json(), { ok: true, event: 'ping', purged: 0 })
+    assert.equal(purges.length + cleared(), 0)
+  })
+
+  test('verifySignature', async () => {
+    const body = '{"a":1}'
+    assert.equal(await verifySignature(SECRET, signed(body), body), true)
+    assert.equal(await verifySignature('other', signed(body), body), false)
+    assert.equal(await verifySignature(SECRET, 'nonsense', body), false)
+  })
+})
+

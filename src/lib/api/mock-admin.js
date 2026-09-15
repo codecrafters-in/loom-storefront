@@ -578,9 +578,42 @@ export async function adminImport(payload) {
   return db.importCatalog(payload)
 }
 
-export async function adminExport() {
+export async function adminExport({ format = 'json' } = {}) {
   await latency()
+  if (format === 'csv') {
+    throw new ApiError('The CSV export comes from a live store. The demo exports JSON.', { status: 422, code: 'invalid_format' })
+  }
   return db.exportCatalog()
+}
+
+/** The storefront document, and what this admin may change on it: in the demo, everything (`editable: null`). */
+export async function adminGetSettings() {
+  await latency()
+  return { ...storefront, admin: { editable: null, canEdit: true, backendUrl: null } }
+}
+
+const QUEUES = ['returns', 'reviews', 'questions']
+
+/** Returns, reviews and questions come from shoppers on a live store: the demo has none waiting. */
+export async function adminListQueue(kind, { page = 1, perPage = 25 } = {}) {
+  await latency()
+  if (!QUEUES.includes(kind)) throw new ApiError(`Unknown admin list "${kind}".`, { status: 400, code: 'invalid_queue' })
+  return { items: [], total: 0, page, perPage, counts: {} }
+}
+
+/** A live store's numbers come from its orders and visits; the demo's Overview adds up its own orders instead. */
+export async function adminGetDashboard({ days = 30 } = {}) {
+  await latency()
+  return {
+    period: { days }, currency: CURRENCY, orders: 0, revenue: 0, averageOrder: null, visits: 0, conversionRate: null,
+    abandonedCarts: { count: 0, recoveryEmailsSent: 0, recovered: 0, recoveredRevenue: 0 },
+    compare: { orders: 0, revenue: 0, visits: 0 }, daily: [],
+  }
+}
+
+export async function adminUpdateQueueItem(kind) {
+  await latency()
+  throw new ApiError(`The demo has no ${kind} to act on.`, { status: 404, code: 'not_found' })
 }
 
 export async function adminListDiscounts() {

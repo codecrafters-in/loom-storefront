@@ -16,7 +16,8 @@ async function payThroughPriceChange(page, shop) {
   const refused = page.getByRole('alert')
   const confirmed = page.getByRole('heading', { name: 'Thank you.', level: 1 })
   await expect(refused.or(confirmed).first()).toBeVisible({ timeout: 60_000 })
-  if (await refused.isVisible()) await shop.payByDemoCard('done')
+  // The refusal can show in more than one alert at once (the payment step and a toast): any of them counts.
+  if (await refused.first().isVisible()) await shop.payByDemoCard('done')
   return shop.expectOrderConfirmed()
 }
 

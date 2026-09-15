@@ -60,6 +60,9 @@ const AdminData = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ d
 const AdminProductEditor = lazy(() => import('./pages/admin/ProductEditor.jsx'))
 const AdminSizeCharts = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.SizeCharts })))
 const AdminDiscounts = lazy(() => import('./pages/admin/pages2.jsx').then((m) => ({ default: m.Discounts })))
+const AdminReturns = lazy(() => import('./pages/admin/moderation.jsx').then((m) => ({ default: m.Returns })))
+const AdminReviews = lazy(() => import('./pages/admin/moderation.jsx').then((m) => ({ default: m.Reviews })))
+const AdminNewOrder = lazy(() => import('./pages/admin/PhoneOrder.jsx'))
 const AdminLogin = lazy(() => import('./pages/admin/Login.jsx'))
 const AdminCallback = lazy(() => import('./pages/admin/Callback.jsx'))
 
@@ -151,7 +154,10 @@ export default function App() {
                   <Route path="categories" element={<AdminCategories />} />
                   <Route path="size-charts" element={<AdminSizeCharts />} />
                   <Route path="orders" element={<AdminOrders />} />
+                  <Route path="orders/new" element={<AdminNewOrder />} />
                   <Route path="orders/:id" element={<AdminOrderDetail />} />
+                  <Route path="returns" element={<AdminReturns />} />
+                  <Route path="reviews" element={<AdminReviews />} />
                   <Route path="discounts" element={<AdminDiscounts />} />
                   <Route path="storefront" element={<AdminStorefront />} />
                   <Route path="data" element={<AdminData />} />

@@ -1,7 +1,7 @@
 # End-to-end scenarios
 
 The storefront in a real browser (Chromium, via Playwright) against a real Odoo 19 running the
-`loom_storefront` addon. One spec per business scenario from the audit checklist (S-1 … S-16):
+`loom_storefront` addon. One spec per business scenario from the audit checklist (S-1 … S-18):
 a guest paying by card, a customer paying cash on delivery, a failed payment retried, stock
 running out mid-checkout, two stores on one Odoo, and so on. Each test checks the business outcome
 where it lands — the storefront page, the store API, and the order, delivery, invoice and email in

@@ -14,7 +14,9 @@ import { useAdminAuth } from '../../store/AdminAuthContext.jsx'
  *
  * It talks to the same `api` surface the storefront uses. In mock mode that is
  * the local database, so an edit here is visible on the shop immediately; in
- * api mode it is your `/admin/*` endpoints, unchanged.
+ * api mode it is your `/admin/*` endpoints, unchanged. Against Odoo, Odoo stays
+ * the source of truth: every screen here reads and writes its records, and links
+ * to them for what it does not cover.
  */
 const NAV = [
   { to: '/admin', end: true, label: 'Overview', icon: 'sparkle' },
@@ -23,16 +25,17 @@ const NAV = [
   { to: '/admin/categories', label: 'Categories', icon: 'map-pin' },
   { to: '/admin/size-charts', label: 'Size charts', icon: 'filter' },
   { to: '/admin/orders', label: 'Orders', icon: 'truck' },
-  { to: '/admin/discounts', label: 'Discounts', icon: 'sparkle', localOnly: true },
-  { to: '/admin/storefront', label: 'Storefront', icon: 'star', localOnly: true },
-  { to: '/admin/data', label: 'Import / export', icon: 'refresh', localOnly: true },
+  { to: '/admin/returns', label: 'Returns', icon: 'refresh', liveOnly: true },
+  { to: '/admin/reviews', label: 'Reviews & questions', icon: 'star', liveOnly: true },
+  { to: '/admin/discounts', label: 'Discounts', icon: 'sparkle' },
+  { to: '/admin/storefront', label: 'Storefront', icon: 'star' },
+  { to: '/admin/data', label: 'Import / export', icon: 'refresh' },
   { to: '/docs', label: 'Developer docs', icon: 'info' },
 ]
 
-// Against a real backend the write API covers the catalogue and order
-// fulfilment; discounts, settings and bulk import stay in the back office. The
-// routes remain and explain that, but the nav does not offer screens that cannot work.
-const VISIBLE_NAV = NAV.filter((n) => isMock || !n.localOnly)
+// Returns, reviews and questions come from shoppers on a live store; the demo has
+// none, so it does not offer screens that would always be empty.
+const VISIBLE_NAV = NAV.filter((n) => !isMock || !n.liveOnly)
 
 export default function AdminLayout() {
   const config = useStorefront()

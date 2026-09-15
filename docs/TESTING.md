@@ -128,7 +128,7 @@ error.
 
 `e2e/` runs the storefront in Chromium against a real Odoo 19 with the
 `loom_storefront` addon: one Playwright spec per business scenario in the audit
-checklist, from S-1 (a guest pays by card) to S-16 (the merchant uninstalls).
+checklist, from S-1 (a guest pays by card) to S-18 (the storefront admin runs on Odoo).
 Each test checks where the outcome lands — the page, the store API, and the
 order, delivery, invoice and email in Odoo. It has its own `package.json`, so
 none of it is in the theme's install.

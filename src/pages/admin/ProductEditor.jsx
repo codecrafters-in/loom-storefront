@@ -277,6 +277,9 @@ export default function ProductEditor() {
   if (loaded.error && !draft) return <ErrorState error={loaded.error} onRetry={() => loaded.reload()} />
   if (loaded.loading || !draft) return <Skeleton className="h-96 w-full" />
 
+  // Fit and fabric are for clothing: shown in the demo, and on a live store that has size charts or for a product
+  // that already has them. Specifications come from the category either way (Highlights & specs).
+  const showFit = isMock || Boolean(draft?.fit || draft?.fabric || draft?.sizeChartId || charts.data?.items?.length)
   const props = {
     draft,
     set,
@@ -360,7 +363,7 @@ export default function ProductEditor() {
       )}
 
       <div className="mt-7 flex gap-1 overflow-x-auto border-b border-line" role="tablist">
-        {TABS.map(([k, label]) => (
+        {TABS.filter(([k]) => k !== 'fit' || showFit).map(([k, label]) => (
           <button
             key={k}
             type="button"

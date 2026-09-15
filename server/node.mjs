@@ -58,6 +58,24 @@ function staticHeaders(file, dist) {
   }
 }
 
+const MAX_BODY_BYTES = 1024 * 1024
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    let size = 0
+    req.on('data', (chunk) => {
+      size += chunk.length
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error('Request body too large'))
+        req.destroy()
+      } else chunks.push(chunk)
+    })
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
+}
+
 export async function createNodeServer({ dist = path.join(ROOT, 'dist'), build = path.join(ROOT, 'server-build'), env = process.env } = {}) {
   const bundleFile = path.join(build, 'entry-server.js')
   const handle = existsSync(bundleFile)
@@ -87,7 +105,9 @@ export async function createNodeServer({ dist = path.join(ROOT, 'dist'), build =
       }
       const headers = new Headers()
       for (const [name, value] of Object.entries(req.headers)) if (value !== undefined) headers.set(name, Array.isArray(value) ? value.join(', ') : value)
-      const response = await handle(new Request(url, { method: req.method, headers }))
+      // Only the cache purge (`POST /__loom/revalidate`) has a body; it is small, so it is read whole.
+      const body = req.method === 'POST' ? await readBody(req) : undefined
+      const response = await handle(new Request(url, { method: req.method, headers, body }))
       res.writeHead(response.status, Object.fromEntries(response.headers))
       res.end(req.method === 'HEAD' ? undefined : Buffer.from(await response.arrayBuffer()))
     } catch (err) {

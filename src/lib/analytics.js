@@ -1,4 +1,4 @@
-import { config } from './config.js'
+import { config, isMock } from './config.js'
 import { toMajor } from './money.js'
 
 /**
@@ -77,11 +77,33 @@ function doNotTrack() {
   }
 }
 
+/**
+ * Day totals for the store's dashboard in Odoo (`POST /events`): a visit per browser session, product views, adds to
+ * the bag and checkouts started. Nothing identifies the visitor — no cookie, no id, not even the page — so it needs no
+ * consent; Do Not Track and `analytics.countVisits: false` still switch it off.
+ */
+const COUNTED = { page_view: 'visit', view_item: 'product_view', add_to_cart: 'add_to_cart', begin_checkout: 'checkout' }
+
+function count(event) {
+  const name = COUNTED[event]
+  if (!name || isMock || settings.countVisits === false || typeof navigator === 'undefined' || !navigator.sendBeacon || doNotTrack()) return
+  try {
+    if (name === 'visit') {
+      if (sessionStorage.getItem('loom.visit')) return
+      sessionStorage.setItem('loom.visit', '1')
+    }
+    navigator.sendBeacon(`${config.api.baseUrl}/events`, new Blob([JSON.stringify({ events: [name] })], { type: 'text/plain' }))
+  } catch {
+    // Counting must never be the reason a page fails.
+  }
+}
+
 export function track(event, params = {}) {
   if (!configured) {
     if (pending.length < 50) pending.push([event, params])
     return
   }
+  count(event)
   if (settings.debug && typeof console !== 'undefined') {
     console.debug('[analytics]', event, params)
   }
