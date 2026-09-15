@@ -10,6 +10,8 @@ With the Odoo module's 19.0.2.2.0 previews of the home page, menu and footer. De
 - **Footer columns:** any number of columns lays out in even rows — four make two by two on phones, one row on tablets,
   and sit beside the brand column on a laptop — instead of the brand column plus a fixed three, which left a fourth
   alone on a second row (`src/lib/footer.js`).
+- **Promises strip:** any number of promises in even rows — four make two by two on tablets and one row on a laptop —
+  instead of a fixed three per row (`src/lib/rows.js`).
 - **Category strip:** a parent category that is itself a sub-category shows its own sub-categories; it was only looked
   for among the top-level categories, so the strip was empty.
 - **Demo data:** the footer has the columns every store starts with (Shop, Help, Company); the account, bag and saved
