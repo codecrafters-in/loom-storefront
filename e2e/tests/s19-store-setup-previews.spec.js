@@ -29,6 +29,7 @@ const TABS = {
   'Features & accounts': 'The search box in the header',
   'Privacy & access': 'What a visitor sees',
   'SEO & analytics': 'robots.txt',
+  Payments: 'The choices under Payment at checkout',
 }
 
 test('S-19 every store tab shows how it looks on the storefront', { tag: '@S-19' }, async ({ page, odoo }) => {
