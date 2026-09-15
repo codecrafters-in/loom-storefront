@@ -123,6 +123,10 @@ export default function Header() {
       </Suspense>
     ) : null
 
+  // A long menu (a furniture store's "Living room", "Rugs & decor", "Design services") keeps every label on one line:
+  // slightly smaller type on a laptop, and the search box folds into its icon until the screen has room for both.
+  const crowded = primary.length > 5
+
   const iconBtn =
     'relative grid h-10 w-10 place-items-center rounded-xs text-ink transition-colors hover:bg-sunken'
 
@@ -154,7 +158,7 @@ export default function Header() {
             <Logo config={config} />
           </Link>
 
-          <nav className="ms-8 hidden items-center gap-1 lg:flex" aria-label={t('Main')}>
+          <nav className="ms-6 hidden min-w-0 items-center gap-0.5 lg:flex xl:ms-8 xl:gap-1" aria-label={t('Main')}>
             {primary.map((item) => (
               <div
                 key={item.label}
@@ -165,7 +169,7 @@ export default function Header() {
                 <NavLink
                   to={item.to}
                   className={({ isActive }) =>
-                    `flex items-center gap-1 rounded-xs px-3 py-2 text-sm transition-colors hover:text-accent ${isActive ? 'text-accent' : 'text-ink'}`
+                    `flex items-center gap-1 whitespace-nowrap rounded-xs px-2 py-2 text-[13px] transition-colors hover:text-accent xl:px-3 xl:text-sm ${isActive ? 'text-accent' : 'text-ink'}`
                   }
                 >
                   {item.label}
@@ -197,7 +201,7 @@ export default function Header() {
 
           <div className="ms-auto flex items-center gap-0.5">
             {features.search !== false && (
-            <form onSubmit={submit} className="hidden items-center md:flex">
+            <form onSubmit={submit} className={`hidden items-center ${crowded ? 'md:flex lg:hidden xl:flex' : 'md:flex'}`}>
               <label className="sr-only" htmlFor="site-search">{t('Search products')}</label>
               <div className="relative">
                 <Icon name="search" size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-faint" />
@@ -228,7 +232,7 @@ export default function Header() {
             )}
 
             {features.search !== false && (
-              <button type="button" onClick={() => setSearchOpen((v) => !v)} aria-label={t('Search')} className={`${iconBtn} md:hidden`}>
+              <button type="button" onClick={() => setSearchOpen((v) => !v)} aria-label={t('Search')} className={`${iconBtn} ${crowded ? 'md:hidden lg:grid xl:hidden' : 'md:hidden'}`}>
                 <Icon name="search" size={19} />
               </button>
             )}
