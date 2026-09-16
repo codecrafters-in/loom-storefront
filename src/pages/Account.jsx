@@ -379,6 +379,9 @@ function PersonalDetails() {
 
 function Orders() {
   const { locale } = useAccountLocale()
+  // Orders placed as a guest with this email are held back until the email is confirmed: typing an address must
+  // never be enough to read somebody else's orders. Where they would have been, say how to get them.
+  const { customer } = useAuth()
   const { push } = useToast()
   const { data, error, loading, reload } = useAsync(() => api.listOrders(), [])
   // Later pages, added under the first by "Show more orders".
@@ -396,16 +399,21 @@ function Orders() {
     }
   }
 
+  const pending = data?.guestPending || 0
+
   if (loading) return <Skeleton className="h-64 w-full" />
   if (error) return <ErrorState error={error} onRetry={reload} />
   if (!items.length) {
     return (
-      <Empty
-        icon="package"
-        title={t('No orders yet')}
-        body={t('When you place one, it will show up here with tracking.')}
-        action={<Button to="/shop">{t('Shop everything')}</Button>}
-      />
+      <>
+        {pending > 0 && <div className="mb-6"><VerifyBanner email={customer?.email} /></div>}
+        <Empty
+          icon="package"
+          title={t('No orders yet')}
+          body={t('When you place one, it will show up here with tracking.')}
+          action={<Button to="/shop">{t('Shop everything')}</Button>}
+        />
+      </>
     )
   }
 
@@ -415,6 +423,7 @@ function Orders() {
         title={t('Orders')}
         note={plural(total, '{count} order, newest first.', '{count} orders, newest first.')}
       />
+      {pending > 0 && <div className="mt-6"><VerifyBanner email={customer?.email} /></div>}
       <ul className="mt-6 space-y-4">
         {items.map((order) => (
           <li key={order.id}><OrderCard order={order} locale={locale} /></li>
