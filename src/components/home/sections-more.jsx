@@ -107,15 +107,15 @@ export function ImageBanner({ section }) {
         />
         {/* Centred copy sits mid-photo, so the whole photo is darkened; copy at the start sits low, over a gradient. */}
         {center ? (
-          <div className="absolute inset-0 bg-ink/45" />
+          <div className="absolute inset-0 bg-scrim/45" />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/25 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-scrim/70 via-scrim/25 to-transparent" />
         )}
         <div className={`wrap absolute inset-0 flex flex-col py-10 md:py-14 ${center ? 'items-center justify-center text-center' : 'justify-end'}`}>
-          {section.eyebrow && <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-page/80">{section.eyebrow}</p>}
-          {section.title && <h2 className={`max-w-2xl text-display-lg text-page ${section.eyebrow ? 'mt-3' : ''}`}>{section.title}</h2>}
+          {section.eyebrow && <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-on-scrim/80">{section.eyebrow}</p>}
+          {section.title && <h2 className={`max-w-2xl text-display-lg text-on-scrim ${section.eyebrow ? 'mt-3' : ''}`}>{section.title}</h2>}
           {body.map((p, i) => (
-            <p key={i} className="mt-4 max-w-lg text-[15px] leading-relaxed text-page/85">{p}</p>
+            <p key={i} className="mt-4 max-w-lg text-[15px] leading-relaxed text-on-scrim/85">{p}</p>
           ))}
           <Actions actions={actionsOf(section.actions, 2)} dark className={`mt-7 ${center ? 'justify-center' : ''}`} />
         </div>
@@ -149,14 +149,14 @@ export function ImageTiles({ section }) {
                   decoding="async"
                   className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/10 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-scrim/70 via-scrim/10 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6">
-                  <h3 className="font-display text-lg leading-tight text-page sm:text-2xl">{item.title}</h3>
+                  <h3 className="font-display text-lg leading-tight text-on-scrim sm:text-2xl">{item.title}</h3>
                   {item.body && (
-                    <p className={`mt-1.5 max-w-sm text-[14px] leading-relaxed text-page/85 ${layout.compact ? 'hidden sm:block' : ''}`}>{item.body}</p>
+                    <p className={`mt-1.5 max-w-sm text-[14px] leading-relaxed text-on-scrim/85 ${layout.compact ? 'hidden sm:block' : ''}`}>{item.body}</p>
                   )}
                   {item.label && (
-                    <span className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-page underline decoration-page/40 underline-offset-4 transition-colors group-hover:decoration-page">
+                    <span className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-on-scrim underline decoration-on-scrim/40 underline-offset-4 transition-colors group-hover:decoration-on-scrim">
                       {item.label} <Arrow size={14} />
                     </span>
                   )}

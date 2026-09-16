@@ -3,6 +3,7 @@ import api from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
 import { Button, ErrorState, Icon, Skeleton } from '../../components/ui/index.jsx'
 import { useToast } from '../../store/ToastContext.jsx'
+import ThemePresetPicker from '../../components/admin/ThemePresetPicker.jsx'
 
 /*
  * Store settings and bulk import and export against a live store.
@@ -36,6 +37,11 @@ const GROUPS = [
       { path: 'store.description', label: 'Description', type: 'textarea', hint: 'What search engines show when a page has no description of its own.' },
       { path: 'store.email', label: 'Contact email', type: 'email' },
     ],
+  },
+  {
+    title: 'Look',
+    note: 'A ready-made look sets every colour, both fonts and the corners. Each colour and font one by one is set on the store in Odoo.',
+    fields: [{ path: 'theme.preset', label: 'Ready-made look', type: 'themePreset' }],
   },
   {
     title: 'Prices and returns',
@@ -93,8 +99,14 @@ function Section({ title, note, children }) {
   )
 }
 
-function Field({ field, value, onChange, disabled }) {
+function Field({ field, value, onChange, disabled, context = {} }) {
   const id = `setting-${field.path.replace(/\./g, '-')}`
+  if (field.type === 'themePreset') {
+    return (
+      <ThemePresetPicker presets={context.themePresets || []} value={value} changed={value === context.savedPreset && context.presetChanged}
+        onChange={onChange} disabled={disabled} />
+    )
+  }
   if (field.type === 'toggle') {
     return (
       <label className="flex cursor-pointer items-center gap-2.5 text-[14px]">
@@ -198,6 +210,7 @@ export function LiveSettings() {
             <Section key={group.title} title={group.title} note={group.note}>
               {fields.map((field) => (
                 <Field key={field.path} field={field} value={valueOf(field.path)} disabled={!canEdit}
+                  context={{ themePresets: admin.themePresets, savedPreset: data.theme?.preset, presetChanged: data.theme?.presetChanged }}
                   onChange={(value) => change(field.path, value)} />
               ))}
             </Section>

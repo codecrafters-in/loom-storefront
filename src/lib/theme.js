@@ -54,6 +54,9 @@ export function themeVars(theme) {
     '--accent-soft': tri(mix(c.page, accent, 0.12)),
     '--sale': tri(c.sale || accent),
     '--shadow': tri(c.ink),
+    // Photographs are darkened and their text is light in every theme: the darker of ink and page is the wash.
+    '--scrim': tri(luminance(c.ink) <= luminance(c.page) ? c.ink : c.page),
+    '--on-scrim': tri(luminance(c.ink) <= luminance(c.page) ? c.page : c.ink),
     '--font-body': family(theme.fonts?.body, FALLBACK.body),
     '--font-display': family(theme.fonts?.heading, FALLBACK.heading),
   }

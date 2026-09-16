@@ -49,7 +49,7 @@ export default function QuickView({ slug, onClose }) {
       aria-modal="true"
       aria-label={product ? t('Quick view: {title}', { title: product.title }) : t('Quick view')}
     >
-      <button type="button" aria-label={t('Close')} onClick={onClose} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
+      <button type="button" aria-label={t('Close')} onClick={onClose} className="absolute inset-0 bg-scrim/40 backdrop-blur-[2px]" />
       <div className="relative max-h-[90dvh] w-full max-w-3xl overflow-y-auto rounded-xs border border-line bg-page text-start shadow-panel">
         <button
           type="button"

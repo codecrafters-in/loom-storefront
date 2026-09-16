@@ -714,10 +714,17 @@ DELETE /admin/discounts/:code
 POST   /admin/media       multipart, field "file"  → { id, url, type, width, height, duration? }
 GET    /admin/media                                 → { items, total }
 DELETE /admin/media/:id
-PATCH  /admin/storefront
+PATCH  /admin/storefront          { theme: { preset } } applies a ready-made look (see below)
 POST   /admin/import   { mode: "merge"|"replace", products, categories, collections, sizeCharts, settings }
 GET    /admin/export
 ```
+
+**Ready-made looks.** `GET /admin/storefront` adds `admin.themePresets`:
+`[{ id, name, description, industries, dark, colors: { page, surface, ink, muted, accent, accentInk, sale },
+fonts: { heading, body }, radius }]`. `PATCH { theme: { preset } }` copies that look's colours, fonts and radius onto the
+store, and `theme.preset` / `theme.presetChanged` in the storefront document say which look it started from and
+whether it was edited since. Every look must pass 4.5:1 for text, secondary text, text on cards, button text, sale
+prices and the accent on the page.
 
 Media is multipart, not JSON — a base64 body is a third larger and holds the
 file in memory twice. Return `width` and `height`; the storefront puts them on

@@ -299,7 +299,7 @@ export default function Header() {
       <div
         onClick={() => setMenuOpen(false)}
         aria-hidden="true"
-        className={`fixed inset-0 z-40 bg-ink/35 transition-opacity lg:hidden ${menuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        className={`fixed inset-0 z-40 bg-scrim/35 transition-opacity lg:hidden ${menuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
       />
       <nav
         aria-label={t('Mobile')}

@@ -22,6 +22,9 @@ export default {
         'accent-soft': 'rgb(var(--accent-soft) / <alpha-value>)',
         sale: 'rgb(var(--sale) / <alpha-value>)',
         good: 'rgb(var(--good) / <alpha-value>)',
+        // Washes over photographs and behind drawers, and the text on them: dark and light whatever the theme.
+        scrim: 'rgb(var(--scrim) / <alpha-value>)',
+        'on-scrim': 'rgb(var(--on-scrim) / <alpha-value>)',
       },
       fontFamily: {
         // Set by the store's theme at runtime (src/lib/theme.js); defaults in index.css.

@@ -46,6 +46,22 @@ Contrast on the shipped palette: `ink` on `page` is 15.2:1, `muted` 6.4:1,
 `faint` 4.9:1, `accent` 6.1:1 — all clear of WCAG AA for body text, and `faint`
 is only used at 12px and above where it still passes.
 
+## Ready-made looks
+
+Twelve finished looks set every colour, both fonts and the corner radius in one pick: Linen (the shipped palette above),
+Paper, Midnight (dark), Evergreen, Harbour, Blush, Terracotta, Circuit, Noir (dark), Playroom, Sage and Espresso. A
+merchant picks one on the store's **Look** tab in Odoo, in its setup wizard, or in the admin under **Storefront ›
+Look**; each colour can still be changed after.
+
+Every look passes the same checks as a merchant's own colours: text, secondary text, text on cards, button text and
+sale prices at 4.5:1 or better, and the accent on the page too. The in-between shades the theme derives (`--faint`,
+`--sunken`) stay readable as well (`test/theme-presets.test.mjs`). The dark looks need a light logo
+(`theme.logoDarkUrl`).
+
+The list lives in the backend (Odoo: `services/theme.py`) and reaches the admin as `admin.themePresets`; the demo keeps
+the same list in `src/data/theme-presets.js`. The storefront document says which look the store started from:
+`theme.preset` and `theme.presetChanged`.
+
 ## Type
 
 | Role | Family | Where |

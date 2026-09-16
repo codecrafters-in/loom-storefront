@@ -39,7 +39,7 @@ export default function OptionalOffer({ product, busy, onConfirm, onClose }) {
 
   return (
     <div ref={trapRef} tabIndex={-1} className="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="optional-offer-title">
-      <button type="button" aria-label={t('Close')} onClick={onClose} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
+      <button type="button" aria-label={t('Close')} onClick={onClose} className="absolute inset-0 bg-scrim/40 backdrop-blur-[2px]" />
       <div className="relative w-full max-w-md rounded-xs border border-line bg-page p-6 shadow-panel">
         <div className="flex items-start justify-between gap-4">
           <div>

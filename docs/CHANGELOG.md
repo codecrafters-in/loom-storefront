@@ -2,6 +2,17 @@
 
 Newest first. Each entry links to the page with the detail.
 
+## What's new — Ready-made looks
+
+With the Odoo module's 19.0.2.3.0. Details: [THEMING.md](THEMING.md#ready-made-looks), [ADMIN.md](ADMIN.md#settings).
+
+- Twelve looks (Linen, Paper, Midnight, Evergreen, Harbour, Blush, Terracotta, Circuit, Noir, Playroom, Sage,
+  Espresso), light and dark, picked under **Storefront › Look** in the admin, on the store's Look tab in Odoo or in its
+  setup wizard. Each sets every colour, both fonts and the corners, and passes the contrast checks.
+- `theme.preset` and `theme.presetChanged` in the storefront document; `admin.themePresets` and
+  `PATCH /admin/storefront { theme: { preset } }`.
+- The demo keeps the same looks in `src/data/theme-presets.js` and applies them at once.
+
 ## What's new — Specification defaults and values that grow
 
 With the Odoo module's 19.0.2.3.0. Details: [ADMIN.md](ADMIN.md) and [API.md](API.md).

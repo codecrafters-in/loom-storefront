@@ -38,13 +38,13 @@ function Hero({ section }) {
             style={{ objectPosition: section.focal || '50% 40%' }}
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-ink/60 via-ink/15 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-scrim/60 via-scrim/15 to-transparent" />
         <div className="wrap absolute inset-x-0 bottom-0 pb-12 md:pb-16">
           {section.eyebrow && (
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-page/80">{section.eyebrow}</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-on-scrim/80">{section.eyebrow}</p>
           )}
-          <h1 className="mt-4 max-w-2xl text-display-xl text-page">{section.title}</h1>
-          {section.body && <p className="mt-5 max-w-md text-[15px] leading-relaxed text-page/85">{section.body}</p>}
+          <h1 className="mt-4 max-w-2xl text-display-xl text-on-scrim">{section.title}</h1>
+          {section.body && <p className="mt-5 max-w-md text-[15px] leading-relaxed text-on-scrim/85">{section.body}</p>}
           {section.actions?.length > 0 && (
             <div className="mt-8 flex flex-wrap gap-3">
               {section.actions.map((a) => (
@@ -53,7 +53,7 @@ function Hero({ section }) {
                   to={a.to}
                   size="lg"
                   variant={a.variant || 'accent'}
-                  className={a.variant === 'outline' ? 'border-page text-page hover:bg-page hover:text-ink' : ''}
+                  className={a.variant === 'outline' ? 'border-on-scrim text-on-scrim hover:bg-on-scrim hover:text-scrim' : ''}
                 >
                   {a.label}
                 </Button>
@@ -170,10 +170,10 @@ function CollectionGrid({ section }) {
             <Link to={`/collections/${c.slug}`} className="group block">
               <div className="relative aspect-[3/2] overflow-hidden rounded-xs bg-sunken">
                 <img src={c.image.url} alt={c.image.alt} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]" />
-                <div className="absolute inset-0 bg-gradient-to-t from-ink/60 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-scrim/60 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-5">
-                  <h3 className="font-display text-xl text-page">{c.title}</h3>
-                  <p className="mt-1 text-[13px] text-page/80">{c.count} {c.count === 1 ? 'product' : 'products'}</p>
+                  <h3 className="font-display text-xl text-on-scrim">{c.title}</h3>
+                  <p className="mt-1 text-[13px] text-on-scrim/80">{c.count} {c.count === 1 ? 'product' : 'products'}</p>
                 </div>
               </div>
               <p className="mt-3 text-[14px] leading-relaxed text-muted">{c.blurb}</p>

@@ -30,6 +30,10 @@
     --sale: 163 52 31;
     --good: 63 107 74;
     --shadow: 60 50 38;
+    /* Over photographs and behind drawers: the darker and the lighter of ink and page, so a dark theme keeps light
+       text on a dark wash. src/lib/theme.js sets them for a store's theme. */
+    --scrim: 26 24 21;
+    --on-scrim: 250 248 245;
 
     /* The store's theme (src/lib/theme.js) overrides these at runtime. */
     --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;

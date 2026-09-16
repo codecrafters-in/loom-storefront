@@ -160,6 +160,11 @@ colour (the header, the phone menu, the footer and the closed-store screen) when
 relative luminance below 0.35. Without it the usual logo shows. `logo.height` is the header's height; the footer
 shows the logo at 1.2 times that (72 px at most) and the phone menu at 0.9 times (40 px at most).
 
+`theme.preset` names the ready-made look the store started from (`linen`, `paper`, `midnight`, `evergreen`, `harbour`,
+`blush`, `terracotta`, `circuit`, `noir`, `playroom`, `sage`, `espresso`) or is `null`; `theme.presetChanged` is `true`
+once a colour, font or corner was changed after picking it. The theme applies `colors`, `fonts` and `radius` either way;
+the two fields are for the admin. See [THEMING.md](THEMING.md#ready-made-looks).
+
 `theme.faviconUrl` is written into every server-rendered page as the favicon (`image/png`) and the home-screen icon,
 and `theme.colors.page` as the browser's `theme-color`, in place of the template's.
 
