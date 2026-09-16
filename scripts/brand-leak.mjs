@@ -47,6 +47,22 @@ export function findLeaks(text, file) {
 }
 
 /**
+ * The store's own settings end up in the bundle (the API address, the site address, a store name). They are the
+ * merchant's words, not demo copy: an Odoo on `shop.codecrafters.in` must not read as the theme vendor's name.
+ */
+export function configuredValues(env) {
+  const values = Object.entries(env)
+    .filter(([key, value]) => (key.startsWith('VITE_') || key === 'SITE_URL') && typeof value === 'string' && value.length >= 4)
+    .map(([, value]) => value)
+  return [...new Set(values)].sort((a, b) => b.length - a.length)
+}
+
+/** `text` without the configured values, longest first, so a leak next to one is still found. */
+export function withoutConfigured(text, values) {
+  return values.reduce((out, value) => out.split(value).join(''), text)
+}
+
+/**
  * Whether a built asset is scanned. Developer documentation (`doc-*` chunks, see vite.config.js) is read by the
  * store's team at /admin/docs, never offered to shoppers, and describes the theme with its demo on purpose.
  */
@@ -65,9 +81,10 @@ function main() {
   if (fs.existsSync(assets)) {
     for (const name of fs.readdirSync(assets)) if (scans(name)) files.push(path.join(assets, name))
   }
+  const configured = configuredValues({ ...env, SITE_URL: process.env.SITE_URL })
   const leaks = files
     .filter((file) => fs.existsSync(file))
-    .flatMap((file) => findLeaks(fs.readFileSync(file, 'utf8'), path.relative(ROOT, file)))
+    .flatMap((file) => findLeaks(withoutConfigured(fs.readFileSync(file, 'utf8'), configured), path.relative(ROOT, file)))
   if (!leaks.length) {
     console.log(`[brand-leak] ${files.length} files, no demo brand or copy`)
     return
