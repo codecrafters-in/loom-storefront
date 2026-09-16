@@ -8,7 +8,12 @@
  */
 const env = import.meta.env ?? {}
 
-const num = (v, fallback) => {
+/**
+ * A number setting. Blank means "not set": a host's settings screen keeps a variable copied from .env.example with an
+ * empty value, and `Number('')` is 0, which as VITE_API_TIMEOUT cancelled every call to the backend at once.
+ */
+export const num = (v, fallback) => {
+  if (v === undefined || v === null || String(v).trim() === '') return fallback
   const n = Number(v)
   return Number.isFinite(n) ? n : fallback
 }
