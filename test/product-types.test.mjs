@@ -274,3 +274,16 @@ test('a demo product carries its type, refuses an unknown one, and saves back un
   assert.deepEqual(saved.variants.map((v) => [v.id, v.options]), coffeeProduct.variants.map((v) => [v.id, v.options]))
   assert.equal(saved.productTypeId, 'food')
 })
+
+test("a new product starts with its type's defaults, and what the merchant typed is kept", () => {
+  const shirts = T.normaliseType({ id: 1, name: 'Shirts', specDefaults: { fabric: 'Cotton', fit: 'Regular' } })
+  const tables = T.normaliseType({ id: 2, name: 'Tables', specDefaults: { wood: 'Oak' } })
+  assert.deepEqual(T.specsWithDefaults({}, shirts), { fabric: 'Cotton', fit: 'Regular' })
+  assert.deepEqual(T.specsWithDefaults({ fabric: 'Linen' }, shirts), { fabric: 'Linen', fit: 'Regular' })
+  // Changing type: untouched defaults of the old type go, typed values stay, the new defaults come.
+  assert.deepEqual(T.specsWithDefaults({ fabric: 'Cotton', fit: 'Slim', legs: '4' }, tables, shirts),
+    { fit: 'Slim', legs: '4', wood: 'Oak' })
+  const same = { wood: 'Walnut' }
+  assert.equal(T.specsWithDefaults(same, tables), same, 'nothing to change keeps the same object')
+  assert.deepEqual(T.normaliseType({ id: 3 }).specDefaults, {})
+})

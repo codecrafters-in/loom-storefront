@@ -109,9 +109,13 @@ Match these to the storefront's shapes.
   references it (in most systems a type *is* the category). The type decides
   what a product's page is made of, so fit, size charts and composition are not
   universal: a table has no fit and its composition is its materials
-- `product_type_attributes` — product_type_id, attribute_key: the
-  specification keys a type defines. Changing a product's type drops the values
-  its new type does not define
+- `product_type_attributes` — product_type_id, attribute_key, default_value
+  (nullable): the specification keys a type defines and what a new product of the
+  type starts with (served as `specDefaults`). Changing a product's type drops the
+  values its new type does not define and fills its empty ones with the defaults
+- `attribute_values` — attribute_key, value, position: the values a multi-value
+  attribute (`type: "tags"`) offers; a value saved on a product that is not listed
+  is added
 - `product_options` — product_id, name (any name: "Color", "Size", "Weight",
   "Grind", "Finish"), display_type, position
 - `option_values` — option_id, value, swatch_hex (only for a colour option),

@@ -2,6 +2,16 @@
 
 Newest first. Each entry links to the page with the detail.
 
+## What's new — Specification defaults and values that grow
+
+With the Odoo module's 19.0.2.3.0. Details: [ADMIN.md](ADMIN.md) and [API.md](API.md).
+
+- A new product starts with its type's defaults (`productTypes[].specDefaults`); changing type swaps defaults
+  nobody touched and keeps what was typed.
+- Specifications with several values (`type: "tags"`): comma-separated, with the store's values as chips to click.
+  A new value is added to the list for the next product.
+- The empty value box shows the default as its placeholder.
+
 ## What's new — A footer with any number of columns
 
 With the Odoo module's 19.0.2.2.0 previews of the home page, menu and footer. Details:

@@ -699,7 +699,7 @@ function SpecEditor({ specs, attributes, specKeys = [], typeName, onChange }) {
             <input
               list={`spec-vals-${key}`}
               className="field h-9 text-[13px]"
-              placeholder={valuePlaceholder(lookup(key))}
+              placeholder={lookup(key)?.default ? `Default: ${lookup(key).default}` : valuePlaceholder(lookup(key))}
               inputMode={isNumeric(lookup(key)) ? 'decimal' : undefined}
               value={value}
               onChange={(ev) => patch(i, 1, ev.target.value)}

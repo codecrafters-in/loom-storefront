@@ -1,10 +1,10 @@
 # End-to-end scenarios
 
 The storefront in a real browser (Chromium, via Playwright) against a real Odoo 19 running the
-`loom_storefront` addon. One spec per business scenario from the audit checklist (S-1 … S-20):
+`loom_storefront` addon. One spec per business scenario from the audit checklist (S-1 … S-21):
 a guest paying by card, a customer paying cash on delivery, a failed payment retried, stock
 running out mid-checkout, two stores on one Odoo, a merchant reading every store tab's preview in
-Odoo (S-19), the newer home sections on a computer and a phone (S-20), and so on. Each test checks the business outcome
+Odoo (S-19), the newer home sections on a computer and a phone (S-20), specifications with category defaults and new values from the storefront admin (S-21), and so on. Each test checks the business outcome
 where it lands — the storefront page, the store API, and the order, delivery, invoice and email in
 Odoo — not just that a button was clicked.
 
@@ -138,7 +138,7 @@ e2e/
     html.js              what a crawler reads from raw HTML
     global-setup.js      fails fast when Odoo or the seed is missing
     vite.config.mjs      the storefront's Vite config with a per-server cache
-  tests/s01-…s20-*.spec.js
+  tests/s01-…s21-*.spec.js
 ```
 
 Merchant actions go through Odoo's JSON-RPC (`/web/session/authenticate`, then

@@ -43,6 +43,7 @@ export function normaliseType(type) {
     blocks,
     labels,
     specKeys: Array.isArray(type.specKeys) ? type.specKeys.map(String) : [],
+    specDefaults: type.specDefaults && typeof type.specDefaults === 'object' ? { ...type.specDefaults } : {},
     productCount: Number(type.productCount) || 0,
   }
 }
@@ -403,6 +404,27 @@ export function droppedSpecs(specs = {}, type = null) {
   if (!type || !Array.isArray(type.specKeys)) return []
   const keep = new Set(type.specKeys)
   return Object.keys(specs || {}).filter((k) => !keep.has(k))
+}
+
+/**
+ * A product's specifications after it takes `to`'s defaults: an empty specification gets the default, a value the
+ * merchant typed stays, and a default of the previous type nobody changed goes when the new type has no such default.
+ * Returns `specs` itself when nothing changes.
+ */
+export function specsWithDefaults(specs = {}, to = null, from = null) {
+  const current = specs || {}
+  const before = from?.specDefaults || {}
+  const after = to?.specDefaults || {}
+  const next = {}
+  for (const [key, value] of Object.entries(current)) {
+    const untouchedOldDefault = before[key] !== undefined && before[key] === value && after[key] === undefined
+    if (!untouchedOldDefault) next[key] = value
+  }
+  for (const [key, value] of Object.entries(after)) {
+    if (next[key] === undefined || next[key] === '' || (before[key] !== undefined && next[key] === before[key])) next[key] = value
+  }
+  const same = Object.keys(next).length === Object.keys(current).length && Object.entries(next).every(([k, v]) => current[k] === v)
+  return same ? specs : next
 }
 
 /** The confirmation shown before an existing product changes type. */

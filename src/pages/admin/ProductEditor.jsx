@@ -15,7 +15,7 @@ import { specLabel } from '../../data/attributes.js'
 import {
   colourOptionOf, droppedSpecs, editorTabs, fallbackType, frequentTags, isApparelType, knownSwatches,
   missingCombinations, moveOption, optionAxes, optionNameProblem, optionNameSuggestions, optionsUntouched,
-  removeOption, renameOption, resolveProductType, setOptionValues, showCompliance, starterOptions, tabForError,
+  removeOption, renameOption, resolveProductType, setOptionValues, showCompliance, specsWithDefaults, starterOptions, tabForError,
   typeChangeWarning, typeOptionLabel, valueSuggestions, variantIdentity, variantLabel,
 } from '../../lib/product-types.js'
 
@@ -158,6 +158,8 @@ export default function ProductEditor() {
       ...d,
       productTypeId: String(defaultTypeId),
       ...(!(d.options || []).length && !(d.variants || []).length ? { options: starterOptions(start) } : {}),
+      // The category's defaults are where a new product starts; every one can be changed or removed.
+      enrichment: { ...(d.enrichment || {}), specs: specsWithDefaults(d.enrichment?.specs, start) },
     }))
   }, [isNew, draft, defaultTypeId, types])
 
@@ -317,6 +319,8 @@ export default function ProductEditor() {
     }
     set('productTypeId', next.id)
     set('productType', raw)
+    const specs = specsWithDefaults(draft.enrichment?.specs, next, resolved)
+    if (specs !== draft.enrichment?.specs) set('enrichment', { ...(draft.enrichment || {}), specs })
     // A new product's untouched starting options follow the type: Colour and Size for clothes, nothing for a table.
     if (isNew && optionsUntouched(draft)) set('options', starterOptions(next))
   }

@@ -79,6 +79,7 @@ picker. `id` is what `Variant.imageId` references as the fallback.
     weightUnit: string              // "gsm", "kg", "g", or "" for none
   }
   specKeys: string[]                // the specification keys this type defines
+  specDefaults: Record<string, string> // what a new product of this type starts with, e.g. { fabric: "Cotton" }
   productCount: number
 }
 ```
@@ -89,6 +90,10 @@ composition is its materials, weighed in kg. A block the type switches off is no
 rendered and not asked for in the admin editor, and its stored data is kept.
 `GET /admin/library` lists every type in the store with `defaultProductTypeId`.
 Changing a product's type drops the specifications the new type does not define.
+A new product starts with its type's `specDefaults`, and so does a product moved to a
+type, for the specifications it leaves empty; each value can be changed on the product.
+A specification with several values (`type: "tags"` in the vocabulary) is one string,
+comma-separated: `"Linen, Hemp blend"`.
 
 **`images[].color` is what makes the gallery follow the picker.** An image tagged
 with a colour shows only when that colour is selected; an untagged one — a fabric

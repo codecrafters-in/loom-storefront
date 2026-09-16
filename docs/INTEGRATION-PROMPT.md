@@ -318,7 +318,11 @@ admin read. The type says which enrichment blocks the product has and what they
 are called: `blocks: { fit, sizeChart, composition, compliance, fitInReviews }`,
 `labels: { composition, care, details, weightUnit }` ("Fabric" in gsm for
 clothing, "Materials" in kg for furniture, "Ingredients" in g for coffee) and
-`specKeys`, the specification keys the type defines. **Do not treat `fit`,
+`specKeys`, the specification keys the type defines, and `specDefaults`
+(`{ key: text }`), what a new product of the type starts with: a POST keeps a
+default for every specification it does not send. An attribute of `type: "tags"`
+holds several values as one comma-separated string and lists the known ones in
+`values`; saving a value that is not listed adds it. **Do not treat `fit`,
 `sizeChart` and `fabric` as universal**: a table has no fit and no size chart,
 and its composition is its materials. Serve a block only for a type that has it
 and omit it everywhere else; the storefront hides what is absent.

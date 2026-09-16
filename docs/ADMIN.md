@@ -111,6 +111,13 @@ It stays local on purpose: nothing reaches the backend or a shopper until
 - **Number attributes.** An attribute the backend types as a number (Recycled
   content in %, Weight in gsm, Length in cm) shows *Number in %* as its
   placeholder, and a warning under a value with no digits in it.
+- **Defaults and several values.** A new product starts with its type's
+  `specDefaults` as specification rows; choosing another type swaps untouched
+  defaults for the new type's and keeps what was typed. An attribute of type
+  `tags` takes several values separated by commas and offers the values the store
+  already uses as chips under the box; a value nobody used yet is simply typed and
+  joins the list when the product is saved. An empty box shows the default as its
+  placeholder.
 - **Media.** Against a real backend only uploads are offered — JPEG, PNG, WebP or
   GIF; there is no paste-a-URL box and no video.
 - **Variants.** Editing one option's values leaves every other option alone;

@@ -353,6 +353,15 @@ anything you would otherwise retype — forty slightly different versions of
 > matters, because three spellings of one attribute is a filter that finds
 > nothing.
 
+> **A new product starts with its type's defaults.** If the category says Fabric is
+> *Cotton* unless told otherwise, a new shirt opens with Fabric: Cotton already in
+> its specifications. Change it, or remove the row, like any other.
+
+> **Several values.** Some specifications take more than one value — *Linen, Hemp
+> blend*. Type them separated by commas, or click the values under the box that
+> other products already use. A value nobody has used yet is added for the next
+> product.
+
 > **Highlights and Specifications share their values.** Change *Fabric* in either
 > and the other follows. A number attribute — Recycled content, Weight, Length —
 > shows **Number in %** (or gsm, cm) in its box and warns if you type words.

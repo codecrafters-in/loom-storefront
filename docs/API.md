@@ -738,8 +738,8 @@ DELETE /admin/library/:kind/:id
 ```json
 {
   "attributes": [
-    { "id": "attribute_x1", "key": "collar_type", "label": "Collar type",
-      "group": "general", "values": ["Button-down", "Spread"], "custom": true }
+    { "id": "attribute_x1", "key": "collar_type", "label": "Collar type", "type": "tags",
+      "group": "general", "values": ["Button-down", "Spread"], "default": "Spread", "custom": true }
   ],
   "features":   [{ "id": "feature_x2", "icon": "leaf", "title": "…", "body": "…" }],
   "assurances": [{ "id": "assurance_x3", "icon": "shield", "label": "Lifetime repairs" }],
@@ -747,7 +747,7 @@ DELETE /admin/library/:kind/:id
     { "id": "7", "name": "Furniture", "productCount": 12,
       "blocks": { "fit": false, "sizeChart": false, "composition": true, "compliance": true, "fitInReviews": false },
       "labels": { "composition": "Materials", "care": "Care", "details": "Details", "weightUnit": "kg" },
-      "specKeys": ["wood", "length", "seat_height"] }
+      "specKeys": ["wood", "length", "seat_height"], "specDefaults": { "wood": "Oak" } }
   ],
   "defaultProductTypeId": "7",
   "options": [
@@ -766,7 +766,10 @@ category trees, including a type with no products yet, and
 `compliance` — and `specKeys` are the specifications the type defines. An unknown
 type is `422 unknown_product_type`; a `POST` without one gets the type most
 neighbouring products use; changing a type drops the specification values the
-new type does not define. `options` are the option names and values products
+new type does not define. `specDefaults` are the values a new product of the type
+starts with (the category's defaults in Odoo): a `POST` keeps them for every
+specification it does not send, and so does a `PATCH` that changes the type; any
+other `PATCH` clears a specification it no longer sends. `options` are the option names and values products
 already use (`displayType` is `color`, `pills`, `radio`, `select` or `multi`),
 offered as suggestions in the editor, the product type's own first.
 
@@ -798,6 +801,12 @@ filtered or compared.
 | `label` | What a shopper sees |
 | `group` | Which section of the specifications table it lands in |
 | `unit` | Appended to the label in brackets |
+| `type` | `char`, `tags` (several values, sent comma-separated), `integer`, `float`, `boolean`… |
+| `values` | For `tags`: the values products already pick from. A value not in the list is added to it when saved |
+| `default` | What a new product of the category starts with, as text |
+
+Saving an attribute that exists again (`POST /admin/library/attributes` with its
+`key`) adds the `values` it did not have.
 | `highlight` | Offered first when editing highlights |
 | `values` | Suggested values for that key |
 
