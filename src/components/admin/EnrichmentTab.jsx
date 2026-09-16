@@ -8,13 +8,41 @@ import {
   ManufacturerRows,
 } from '../product/Enrichment.jsx'
 import { attributeByKey, attributeGroups } from '../../data/attributes.js'
-import { highlightsFromSpecs, specsFromHighlights } from '../../lib/spec-sync.js'
+import { addListValue, highlightsFromSpecs, listValues, specsFromHighlights } from '../../lib/spec-sync.js'
 import { preferSpecKeys } from '../../lib/product-types.js'
 
 const NUMERIC = new Set(['integer', 'float'])
 const isNumeric = (attribute) => NUMERIC.has(attribute?.type)
+const isList = (attribute) => attribute?.type === 'tags'
 const valuePlaceholder = (attribute) =>
-  isNumeric(attribute) ? `Number${attribute.unit ? ` in ${attribute.unit}` : ''}` : 'Value'
+  isNumeric(attribute)
+    ? `Number${attribute.unit ? ` in ${attribute.unit}` : ''}`
+    : isList(attribute) ? 'One or more, separated by commas' : 'Value'
+
+/**
+ * A specification that takes several values offers the ones the store already uses as chips: a datalist can only
+ * suggest the whole text, so after "Linen, " it has nothing to say. A value nobody used yet is simply typed.
+ */
+function ListValueChips({ attribute, value, onChange }) {
+  if (!isList(attribute) || !attribute.values?.length) return null
+  const chosen = new Set(listValues(value).map((v) => v.toLowerCase()))
+  const unused = attribute.values.filter((v) => !chosen.has(v.toLowerCase())).slice(0, 10)
+  if (!unused.length) return null
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-1">
+      {unused.map((v) => (
+        <button
+          key={v}
+          type="button"
+          onClick={() => onChange(addListValue(value, v))}
+          className="rounded-full border border-line px-2 py-0.5 text-[11px] text-muted transition-colors hover:border-ink hover:text-ink"
+        >
+          + {v}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 /** The backend's vocabulary, which knows each attribute's type and unit, over the built-in one. */
 function useAttributeLookup(attributes) {
@@ -676,7 +704,8 @@ function SpecEditor({ specs, attributes, specKeys = [], typeName, onChange }) {
               value={value}
               onChange={(ev) => patch(i, 1, ev.target.value)}
             />
-            {lookup(key)?.values?.length > 0 && (
+            <ListValueChips attribute={lookup(key)} value={value} onChange={(v) => patch(i, 1, v)} />
+            {lookup(key)?.values?.length > 0 && !isList(lookup(key)) && (
               <datalist id={`spec-vals-${key}`}>
                 {lookup(key).values.map((v) => <option key={v} value={v} />)}
               </datalist>
@@ -702,7 +731,8 @@ function SpecEditor({ specs, attributes, specKeys = [], typeName, onChange }) {
       </Button>
       <p className="text-[12px] text-faint">
         Rows are grouped by their attribute, so the order you enter them in does not matter. A row
-        with no key is ignored until you name it.
+        with no key is ignored until you name it. A value the store has not used yet is added to its
+        attribute for the next product.
       </p>
     </div>
   )

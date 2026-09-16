@@ -30,3 +30,13 @@ export function highlightsFromSpecs(highlights = [], specs = {}) {
   })
   return changed ? next : highlights
 }
+
+/** The values of a specification that takes several ("Linen, Hemp blend"), trimmed, empty ones left out. */
+export const listValues = (text) => String(text ?? '').split(',').map((v) => v.trim()).filter(Boolean)
+
+/** `text` with `value` added, unless it is already there (in any case). */
+export function addListValue(text, value) {
+  const values = listValues(text)
+  if (values.some((v) => v.toLowerCase() === String(value).trim().toLowerCase())) return values.join(', ')
+  return [...values, String(value).trim()].join(', ')
+}
