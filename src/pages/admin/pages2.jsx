@@ -514,7 +514,7 @@ function StorefrontScreen() {
       </div>
 
       <div className="mt-8 max-w-2xl space-y-8">
-        <Group title="Look" note="A ready-made look sets every colour, both fonts and the corners. On a live store each one can be changed in Odoo.">
+        <Group title="Look" note="A ready-made look sets every colour, both fonts, the corners and the layout. On a live store each one can be changed in Odoo.">
           <ThemePresetPicker presets={THEME_PRESETS} value={cfg.theme?.preset || null}
             onChange={(id) => patch('theme', presetTheme(THEME_PRESETS.find((p) => p.id === id)))} />
         </Group>

@@ -40,7 +40,7 @@ const GROUPS = [
   },
   {
     title: 'Look',
-    note: 'A ready-made look sets every colour, both fonts and the corners. Each colour and font one by one is set on the store in Odoo.',
+    note: 'A ready-made look sets every colour, both fonts, the corners and the layout. Each colour, font or part of the layout one by one is set on the store in Odoo.',
     fields: [{ path: 'theme.preset', label: 'Ready-made look', type: 'themePreset' }],
   },
   {
