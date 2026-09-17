@@ -57,7 +57,7 @@ export const Button = forwardRef(function Button(
       ref={ref}
       {...props}
       {...rest}
-      className={`inline-flex select-none items-center justify-center gap-2 rounded-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-45 ${VARIANTS[variant]} ${square ? SQUARE[size] : SIZES[size]} ${full ? 'w-full' : ''} ${className}`}
+      className={`btn btn-${variant} inline-flex select-none items-center justify-center gap-2 rounded-xs font-medium transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-45 ${VARIANTS[variant]} ${square ? SQUARE[size] : SIZES[size]} ${full ? 'w-full' : ''} ${className}`}
     >
       {icon && <Icon name={icon} size={size === 'lg' ? 19 : 17} />}
       {children}

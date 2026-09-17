@@ -721,10 +721,15 @@ GET    /admin/export
 
 **Ready-made looks.** `GET /admin/storefront` adds `admin.themePresets`:
 `[{ id, name, description, industries, dark, colors: { page, surface, ink, muted, accent, accentInk, sale },
-fonts: { heading, body }, radius }]`. `PATCH { theme: { preset } }` copies that look's colours, fonts and radius onto the
-store, and `theme.preset` / `theme.presetChanged` in the storefront document say which look it started from and
+fonts: { heading, body }, radius, style }]`. `PATCH { theme: { preset } }` copies that look's colours, fonts, radius and
+style onto the store, and `theme.preset` / `theme.presetChanged` in the storefront document say which look it started from and
 whether it was edited since. Every look must pass 4.5:1 for text, secondary text, text on cards, button text, sale
 prices and the accent on the page.
+
+**Layout style.** The storefront document's `theme.style` is `{ header: classic|centered|minimal|bold, card:
+portrait|square|framed|overlay, buttons: solid|pill|outline, spacing: balanced|airy|compact, headings: normal|uppercase,
+footer: light|dark|accent }`. Store it with the look and let the merchant change each part; send every part, the first
+value when the merchant picked none.
 
 Media is multipart, not JSON — a base64 body is a third larger and holds the
 file in memory twice. Return `width` and `height`; the storefront puts them on

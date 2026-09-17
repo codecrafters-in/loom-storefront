@@ -42,7 +42,7 @@ test('every look is readable, as set and as the storefront derives it', () => {
 test("a preset becomes the storefront document's theme", () => {
   const noir = THEME_PRESETS.find((p) => p.id === 'noir')
   const theme = presetTheme(noir)
-  assert.deepEqual(theme, { preset: 'noir', presetChanged: false, colors: noir.colors, fonts: noir.fonts, radius: 0 })
+  assert.deepEqual(theme, { preset: 'noir', presetChanged: false, colors: noir.colors, fonts: noir.fonts, radius: 0, style: noir.style })
   theme.colors.accent = '#000000'
   assert.equal(noir.colors.accent, '#C9A45C', 'the list is not changed through a theme')
 })

@@ -368,9 +368,10 @@ reviews to approve, questions to answer.
 ### Settings
 
 **Look.** Twelve ready-made looks as cards, each drawn in its own colours with its fonts named. Picking one and saving
-sends `{ theme: { preset } }`: the backend sets every colour, both fonts and the corners, and the storefront shows it on
+sends `{ theme: { preset } }`: the backend sets every colour, both fonts, the corners and the layout style, and the storefront shows it on
 its next load. A card says **In use**, and notes when the look was changed in Odoo since. The demo applies the look from
-`src/data/theme-presets.js` at once.
+`src/data/theme-presets.js` at once. Each part of the layout (header, cards, buttons…) is changed in Odoo, under
+*Customise the layout* on the store's Look tab.
 
 ```
 GET   /admin/storefront   → the storefront document + { admin: { editable, canEdit, backendUrl, themePresets } }

@@ -162,8 +162,15 @@ shows the logo at 1.2 times that (72 px at most) and the phone menu at 0.9 times
 
 `theme.preset` names the ready-made look the store started from (`linen`, `paper`, `midnight`, `evergreen`, `harbour`,
 `blush`, `terracotta`, `circuit`, `noir`, `playroom`, `sage`, `espresso`) or is `null`; `theme.presetChanged` is `true`
-once a colour, font or corner was changed after picking it. The theme applies `colors`, `fonts` and `radius` either way;
+once a colour, font, corner or layout part was changed after picking it. The theme applies `colors`, `fonts`, `radius`
+and `style` either way;
 the two fields are for the admin. See [THEMING.md](THEMING.md#ready-made-looks).
+
+`theme.style: { header, card, buttons, spacing, headings, footer }` is the layout (Odoo: *Customise the layout*):
+`header` `classic` | `centered` | `minimal` | `bold`, `card` `portrait` | `square` | `framed` | `overlay`, `buttons`
+`solid` | `pill` | `outline`, `spacing` `balanced` | `airy` | `compact`, `headings` `normal` | `uppercase`, `footer`
+`light` | `dark` | `accent`. Missing parts use the first value, the storefront's original layout. See
+[THEMING.md](THEMING.md#layout-styles).
 
 `theme.faviconUrl` is written into every server-rendered page as the favicon (`image/png`) and the home-screen icon,
 and `theme.colors.page` as the browser's `theme-color`, in place of the template's.

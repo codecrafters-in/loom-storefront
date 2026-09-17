@@ -8,6 +8,7 @@ import CompareTray from '../product/CompareTray.jsx'
 import { useStorefront, useStorefrontState } from '../../store/StorefrontContext.jsx'
 import { t } from '../../i18n/index.js'
 import { pageView } from '../../lib/analytics.js'
+import { styleAttributes } from '../../lib/style.js'
 
 // Rarely shown, so not in every visitor's first download.
 const StoreGate = lazy(() => import('./StoreGate.jsx'))
@@ -46,7 +47,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] flex-col">
+    <div className="flex min-h-[100dvh] flex-col" {...styleAttributes(state.config.theme)}>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-50 focus:rounded-xs focus:bg-ink focus:px-4 focus:py-2 focus:text-page"

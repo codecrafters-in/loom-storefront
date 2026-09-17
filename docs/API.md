@@ -1553,8 +1553,10 @@ of its own; the demo's live in `src/data/storefront.js` and `src/data/pages.js` 
   password screen. `POST /access { password }` (or `POST /admin/access` for a signed-in admin) →
   `{ token, header, expiresAt }`; the token is sent as `X-Loom-Access` on every call. A `401 store_locked` or
   `503 store_maintenance` answer drops the token and shows the screen again.
-- `storefront.theme: { preset, presetChanged, colors, fonts, radius, faviconUrl, ogImageUrl, logoDarkUrl }` is applied as the CSS custom
-  properties in `src/index.css` (`src/lib/theme.js`), in the prerendered HTML too. `storefront.store.contact` fills
+- `storefront.theme: { preset, presetChanged, colors, fonts, radius, style, faviconUrl, ogImageUrl, logoDarkUrl }` is applied as the CSS custom
+  properties in `src/index.css` (`src/lib/theme.js`), in the prerendered HTML too. `style: { header, card, buttons,
+  spacing, headings, footer }` picks the layout (`src/lib/style.js`, [THEMING.md](THEMING.md#layout-styles)); a missing
+  part keeps the original layout. `storefront.store.contact` fills
   the footer and the contact block; `storefront.store.credit` is an optional credit line.
 - `GET /blog` `{ page, per_page, tag }` → `{ items, total, page, perPage, tags }`; `GET /blog/:slug` → a post with
   `contentHtml`. Shown at `/blog` and `/blog/:slug` when `features.blog` is on.
@@ -1611,8 +1613,8 @@ storefront token**. Full guide, including the reference implementation at
 | `GET` | `/admin/orders?q=&status=&payment=&delivery=&page=&per_page=` | `{ items: AdminOrder[], total, page, perPage, counts }` |
 | `GET` | `/admin/orders/:id` | `AdminOrder` — id, order number or backend id |
 | `PATCH` | `/admin/orders/:id` | `{ action, tracking? }` → `AdminOrder` — ship, update_tracking, deliver, record_payment, cancel |
-| `GET` | `/admin/storefront` | The storefront document plus `admin: { editable, canEdit, backendUrl, themePresets }`; `themePresets` is `[{ id, name, description, industries, dark, colors, fonts, radius }]` |
-| `PATCH` | `/admin/storefront` | Deep-merged; arrays replace. A backend may accept only `admin.editable` paths (`422 unsupported_setting`). `{ theme: { preset } }` applies a ready-made look: every colour, both fonts and the radius |
+| `GET` | `/admin/storefront` | The storefront document plus `admin: { editable, canEdit, backendUrl, themePresets }`; `themePresets` is `[{ id, name, description, industries, dark, colors, fonts, radius, style }]` |
+| `PATCH` | `/admin/storefront` | Deep-merged; arrays replace. A backend may accept only `admin.editable` paths (`422 unsupported_setting`). `{ theme: { preset } }` applies a ready-made look: every colour, both fonts, the radius and the layout style |
 | `POST` | `/admin/import` | `{ mode, products, categories, collections, settings }`, or `{ csv }`; `dry_run: true` checks without saving |
 | `GET` | `/admin/export` | The same shape, a page at a time; `?format=csv` one row per variant |
 | `POST` | `/admin/orders` | A paid webhook's `{ cart_id, email, payment, idempotency_key }`, or a phone order's `{ email, lines, shipping_address, shipping_method, payment: link, record or quote }` → AdminOrder with `created`, `paymentUrl` |

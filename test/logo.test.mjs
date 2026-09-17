@@ -45,3 +45,11 @@ test("the footer and the phone menu scale the store's logo height", () => {
   assert.equal(logoHeight({ height: 'x' }, { scale: -1 }), DEFAULT_LOGO_HEIGHT)
   assert.equal(logoHeight(null, { scale: 1.2 }), 31)
 })
+
+test('a logo on a coloured area uses the version for that colour, not the page', async () => {
+  const { logoImage } = await import('../src/lib/logo.js')
+  const config = { store: { logo: { imageUrl: 'https://shop.test/logo.png' } }, theme: { colors: { page: '#FAF8F5' }, logoDarkUrl: 'https://shop.test/logo-dark.png' } }
+  assert.equal(logoImage(config), 'https://shop.test/logo.png')
+  assert.equal(logoImage(config, '#3538CD'), 'https://shop.test/logo-dark.png', 'a bold header in a deep blue')
+  assert.equal(logoImage(config, '#F4F6F2'), 'https://shop.test/logo.png', 'a pale bar keeps the usual logo')
+})

@@ -184,6 +184,11 @@ export function useStorefront() {
   return ctx.config
 }
 
+/** The store's theme, or null outside the provider (an admin preview, a test), where the theme's own layout applies. */
+export function useStorefrontTheme() {
+  return useContext(StorefrontContext)?.config?.theme || null
+}
+
 /** Bootstrap payload — categories, collections and prefetched home rails. */
 export function useBootstrap() {
   const ctx = useContext(StorefrontContext)

@@ -12,6 +12,11 @@ With the Odoo module's 19.0.2.3.0. Details: [THEMING.md](THEMING.md#ready-made-l
 - `theme.preset` and `theme.presetChanged` in the storefront document; `admin.themePresets` and
   `PATCH /admin/storefront { theme: { preset } }`.
 - The demo keeps the same looks in `src/data/theme-presets.js` and applies them at once.
+- **Layout styles:** `theme.style` picks the header (classic, centred, minimal, bold), product cards (portrait, square,
+  framed, name on the photo), buttons (solid, pill, outline), home-page spacing, heading case and footer tone. Each look
+  sets one; the first value of each is the old layout, so a backend that sends no style changes nothing
+  ([THEMING.md](THEMING.md#layout-styles)).
+- The Odoo setup wizard suggests a look from what the shop sells.
 
 ## What's new — Specification defaults and values that grow
 

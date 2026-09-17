@@ -1,5 +1,5 @@
 /**
- * Ready-made looks: every colour, both fonts and the corners in one pick.
+ * Ready-made looks: every colour, both fonts, the corners and the layout style in one pick.
  *
  * A live store gets this list from its backend (`GET /admin/storefront` → `admin.themePresets`); the demo uses this
  * copy, which matches the Odoo module's `services/theme.py` PRESETS (its tests check the same contrast rules as
@@ -26,7 +26,15 @@ export const THEME_PRESETS = [
       "body": "Inter"
     },
     "radius": 2,
-    "corners": "small"
+    "corners": "small",
+    "style": {
+      "header": "centered",
+      "card": "portrait",
+      "buttons": "solid",
+      "spacing": "airy",
+      "headings": "normal",
+      "footer": "light"
+    }
   },
   {
     "id": "paper",
@@ -48,7 +56,15 @@ export const THEME_PRESETS = [
       "body": "Inter"
     },
     "radius": 0,
-    "corners": "none"
+    "corners": "none",
+    "style": {
+      "header": "minimal",
+      "card": "square",
+      "buttons": "outline",
+      "spacing": "balanced",
+      "headings": "uppercase",
+      "footer": "light"
+    }
   },
   {
     "id": "midnight",
@@ -70,7 +86,15 @@ export const THEME_PRESETS = [
       "body": "Manrope"
     },
     "radius": 8,
-    "corners": "medium"
+    "corners": "medium",
+    "style": {
+      "header": "classic",
+      "card": "framed",
+      "buttons": "pill",
+      "spacing": "balanced",
+      "headings": "normal",
+      "footer": "accent"
+    }
   },
   {
     "id": "evergreen",
@@ -92,7 +116,15 @@ export const THEME_PRESETS = [
       "body": "Work Sans"
     },
     "radius": 2,
-    "corners": "small"
+    "corners": "small",
+    "style": {
+      "header": "classic",
+      "card": "framed",
+      "buttons": "solid",
+      "spacing": "airy",
+      "headings": "normal",
+      "footer": "dark"
+    }
   },
   {
     "id": "harbour",
@@ -114,7 +146,15 @@ export const THEME_PRESETS = [
       "body": "DM Sans"
     },
     "radius": 8,
-    "corners": "medium"
+    "corners": "medium",
+    "style": {
+      "header": "classic",
+      "card": "square",
+      "buttons": "pill",
+      "spacing": "balanced",
+      "headings": "normal",
+      "footer": "accent"
+    }
   },
   {
     "id": "blush",
@@ -136,7 +176,15 @@ export const THEME_PRESETS = [
       "body": "Poppins"
     },
     "radius": 16,
-    "corners": "large"
+    "corners": "large",
+    "style": {
+      "header": "centered",
+      "card": "portrait",
+      "buttons": "pill",
+      "spacing": "airy",
+      "headings": "normal",
+      "footer": "light"
+    }
   },
   {
     "id": "terracotta",
@@ -158,7 +206,15 @@ export const THEME_PRESETS = [
       "body": "Noto Sans"
     },
     "radius": 2,
-    "corners": "small"
+    "corners": "small",
+    "style": {
+      "header": "bold",
+      "card": "framed",
+      "buttons": "solid",
+      "spacing": "balanced",
+      "headings": "normal",
+      "footer": "dark"
+    }
   },
   {
     "id": "circuit",
@@ -180,7 +236,15 @@ export const THEME_PRESETS = [
       "body": "Inter"
     },
     "radius": 8,
-    "corners": "medium"
+    "corners": "medium",
+    "style": {
+      "header": "bold",
+      "card": "square",
+      "buttons": "pill",
+      "spacing": "compact",
+      "headings": "normal",
+      "footer": "dark"
+    }
   },
   {
     "id": "noir",
@@ -202,7 +266,15 @@ export const THEME_PRESETS = [
       "body": "Inter"
     },
     "radius": 0,
-    "corners": "none"
+    "corners": "none",
+    "style": {
+      "header": "centered",
+      "card": "overlay",
+      "buttons": "outline",
+      "spacing": "airy",
+      "headings": "uppercase",
+      "footer": "light"
+    }
   },
   {
     "id": "playroom",
@@ -224,7 +296,15 @@ export const THEME_PRESETS = [
       "body": "Poppins"
     },
     "radius": 16,
-    "corners": "large"
+    "corners": "large",
+    "style": {
+      "header": "bold",
+      "card": "framed",
+      "buttons": "pill",
+      "spacing": "compact",
+      "headings": "normal",
+      "footer": "accent"
+    }
   },
   {
     "id": "sage",
@@ -246,7 +326,15 @@ export const THEME_PRESETS = [
       "body": "Manrope"
     },
     "radius": 8,
-    "corners": "medium"
+    "corners": "medium",
+    "style": {
+      "header": "centered",
+      "card": "portrait",
+      "buttons": "outline",
+      "spacing": "airy",
+      "headings": "normal",
+      "footer": "light"
+    }
   },
   {
     "id": "espresso",
@@ -268,7 +356,15 @@ export const THEME_PRESETS = [
       "body": "DM Sans"
     },
     "radius": 2,
-    "corners": "small"
+    "corners": "small",
+    "style": {
+      "header": "classic",
+      "card": "overlay",
+      "buttons": "solid",
+      "spacing": "balanced",
+      "headings": "uppercase",
+      "footer": "dark"
+    }
   }
 ]
 
@@ -280,5 +376,6 @@ export function presetTheme(preset) {
     colors: { ...preset.colors },
     fonts: { ...preset.fonts },
     radius: preset.radius,
+    style: { ...preset.style },
   }
 }
