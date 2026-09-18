@@ -490,30 +490,6 @@ export const getOrder = (orderId) => get(`/orders/${encodeURIComponent(orderId)}
 
 // Never cached: every answer here is about one shopper's money.
 
-const checkoutFields = (body = {}) => ({
-  email: body.email,
-  shipping_address: body.shippingAddress,
-  shipping_method: body.shippingMethod,
-  currency: body.currency,
-  // Optional: a billing address other than the delivery one, and a business's company name and tax ID.
-  billing_address: body.billingAddress,
-  company_name: body.companyName,
-  vat: body.vat,
-  // Optional, as far as the store's checkout settings allow: delivery instructions, gift message and wrapping, and
-  // the terms checkbox when the store requires it.
-  note: body.note,
-  gift_message: body.giftMessage,
-  gift_wrap: body.giftWrap,
-  accept_terms: body.acceptTerms,
-  // One of `getDeliverySlots`, when the delivery method offers slots.
-  delivery_slot: body.deliverySlot,
-  // Odoo's Extra Info step: `{ name: value }` for the fields in `checkout.extraInfo`.
-  extra_info: body.extraInfo,
-  // Ticked "email me news and offers": a newsletter subscription waiting for its confirmation email.
-  newsletter: body.newsletter || undefined,
-  newsletter_consent: body.newsletter ? body.newsletterConsent : undefined,
-})
-
 function assertPayment(payment, where) {
   if (!payment || typeof payment.id !== 'string' || typeof payment.status !== 'string') {
     throw new ContractError(where, 'a Payment with string "id" and "status"', payment)
@@ -529,31 +505,10 @@ function forgetSpentCart(payment) {
 
 const paymentPath = (paymentId) => `/payments/${encodeURIComponent(paymentId)}`
 
-export async function getPaymentOptions(cartIdArg, body = {}) {
-  const id = cartIdArg || (await ensureCart()).id
-  const options = await post(`/carts/${encodeURIComponent(id)}/payment-options`, checkoutFields(body))
-  if (!options || !Array.isArray(options.methods)) {
-    throw new ContractError('POST /carts/:id/payment-options', 'an object with a "methods" array', options)
-  }
-  return options
-}
-
-export async function createPayment(cartIdArg, body = {}) {
-  const id = cartIdArg || (await ensureCart()).id
-  const payment = await post(`/carts/${encodeURIComponent(id)}/payments`, {
-    ...checkoutFields(body),
-    provider_id: body.providerId,
-    method_id: body.methodId,
-    token_id: body.tokenId,
-    // A company allowed to pay on invoice: the order is confirmed without a payment (method `code: invoice`).
-    pay_on_invoice: body.payOnInvoice || undefined,
-    save_method: Boolean(body.saveMethod),
-    success_url: body.successUrl,
-    cancel_url: body.cancelUrl,
-    expected_total: body.expectedTotal,
-  })
-  return forgetSpentCart(assertPayment(payment, 'POST /carts/:id/payments'))
-}
+// Asking what can pay and starting a payment load with the checkout (http-account.js), not with every page.
+const later = (name) => async (...args) => (await import('./http-account.js'))[name](...args)
+export const getPaymentOptions = later('getPaymentOptions')
+export const createPayment = later('createPayment')
 
 export async function paymentAction(paymentId, action, body = {}) {
   const payment = await post(`${paymentPath(paymentId)}/actions/${encodeURIComponent(action)}`, body)
@@ -681,7 +636,6 @@ export const register = (body) => post('/auth/register', body).then(storeSession
  * Account, after-purchase and community calls load with their first use (http-account.js): a shopper who is only
  * browsing never needs them, and they would otherwise add to every page's first download.
  */
-const later = (name) => async (...args) => (await import('./http-account.js'))[name](...args)
 export const getQuestions = later('getQuestions')
 export const askQuestion = later('askQuestion')
 export const createAlert = later('createAlert')
@@ -925,4 +879,4 @@ export const listMedia = () => get('/admin/media').then((r) => assertList(r, 'GE
 export const deleteMedia = (id) => del(`/admin/media/${encodeURIComponent(id)}`)
 
 // For http-account.js, which shares this adapter's session, bag and request helpers.
-export { get, post, request, send, customerToken, storeSession, mergeGuestWishlist, SESSION_KEY, CART_KEY, FRESH_CART_KEY }
+export { get, post, request, send, customerToken, storeSession, mergeGuestWishlist, SESSION_KEY, CART_KEY, FRESH_CART_KEY, ensureCart, assertPayment, forgetSpentCart }
