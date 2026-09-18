@@ -54,6 +54,9 @@ export default function Checkout() {
   // A guest starts in the store's own country rather than whichever sorts first.
   const localeCountry = (config.pricing?.locale || '').split('-')[1]
   const fallbackCountry = COUNTRIES.find(([code]) => code === localeCountry)?.[0] || COUNTRIES[0]?.[0] || 'US'
+  // A saved address is offered only in a country the store delivers to (see prefillCheckout).
+  const storeCountries = config.commerce?.countries
+  const deliverable = useMemo(() => (storeCountries || [['US']]).map(([code]) => code), [storeCountries])
   const payments = config.checkout?.mode === 'payments'
   const navigate = useNavigate()
   const location = useLocation()
@@ -92,7 +95,7 @@ export default function Checkout() {
 
   const [form, setForm] = useState(() => prefillCheckout({
     email: '', name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country: fallbackCountry, phone: '',
-  }, customer))
+  }, customer, undefined, deliverable))
 
   // Each address in its country's own order and words (Kuwait: no postcode required; India: PIN code).
   const shippingLayout = useAddressLayout(form.country)
@@ -129,8 +132,8 @@ export default function Checkout() {
   useEffect(() => {
     if (!customer || prefilledFor.current === customer.id) return
     prefilledFor.current = customer.id
-    setForm((f) => prefillCheckout(f, customer, touched.current))
-  }, [customer])
+    setForm((f) => prefillCheckout(f, customer, touched.current, deliverable))
+  }, [customer, deliverable])
   // Stable, because the state field settles its value in an effect that depends on it.
   const setRegion = useCallback((e) => {
     const value = e.target.value

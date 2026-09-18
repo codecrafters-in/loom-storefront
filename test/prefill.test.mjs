@@ -41,3 +41,14 @@ test('a guest, or a customer with no saved address, keeps the form as it is', ()
   assert.equal(form.email, 'asha@example.com')
   assert.equal(form.country, 'US')
 })
+
+test('a saved address in a country the store does not deliver to is left out', () => {
+  const indian = { email: 'shopper@example.com', addresses: [{ id: 1, isDefault: true, name: 'Asha', line1: '12 MG Road', city: 'Ahmedabad', region: 'GJ', postalCode: '380054', country: 'IN' }] }
+  const form = prefillCheckout({ ...EMPTY, country: 'GB' }, indian, new Set(), ['GB'])
+  assert.equal(form.country, 'GB', 'the store\'s own country stays')
+  assert.equal(form.region, '', 'no Indian state under the United Kingdom')
+  assert.equal(form.line1, '')
+  assert.equal(form.email, 'shopper@example.com', 'the email is still filled')
+  const both = { ...indian, addresses: [...indian.addresses, { id: 2, name: 'Asha', line1: '1 High St', city: 'London', postalCode: 'E1 6JE', country: 'GB' }] }
+  assert.equal(prefillCheckout({ ...EMPTY, country: 'GB' }, both, new Set(), ['GB']).line1, '1 High St', 'a deliverable saved address is used')
+})
