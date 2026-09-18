@@ -34,7 +34,9 @@ for JPY. The settings document says how many decimals each currency has (`pricin
 **Currency and language** travel as headers on every call when the shopper chose them: `X-Loom-Pricelist: <id>` (the
 currency switcher, one of `pricing.currencies[].pricelistId`) and `X-Loom-Lang: fr` (a language address such as
 `/fr/shop`). Without them the backend answers in the store's default currency and language. Its cached answers vary on
-both headers, and its error `message`s come in the requested language while `code`s never change.
+both headers, and its error `message`s come in the requested language while `code`s never change. Checkout sends the
+language too, including a `redirect` checkout posting to the store's own API, so a guest's contact (and Odoo's order
+emails) speak the language the shopper browsed in, as Odoo's shop does.
 
 **The bag's fiscal position** travels the same way: every cart answer carries `fiscalPositionId` (`"0"` for none), and
 the theme sends it back as `X-Loom-Fiscal-Position` on every later call (`src/lib/pricelist.js`). Once an address makes

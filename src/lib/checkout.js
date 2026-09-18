@@ -1,7 +1,7 @@
 import api from './api/index.js'
 import { ApiError } from './api/contracts.js'
 import { loadScript } from './payments/load-script.js'
-import { addressPrefix } from '../i18n/index.js'
+import { addressPrefix, currentLanguage, languageFromAddress } from '../i18n/index.js'
 
 /**
  * Checkout, in five modes.
@@ -125,7 +125,10 @@ function absolute(path) {
 /** `createUrl` may be a full URL (a payment service) or a path on the store API. */
 async function postAbsolute(url, body) {
   const { config: env } = await import('./config.js')
-  const target = /^https?:\/\//.test(url) ? url : `${env.api.baseUrl}${url}`
+  const own = !/^https?:\/\//.test(url)
+  const target = own ? `${env.api.baseUrl}${url}` : url
+  // The store's API is told the page's language, as every other call does: a guest's contact speaks it.
+  const language = own && languageFromAddress() ? currentLanguage() : ''
 
   let session = ''
   try {
@@ -141,6 +144,7 @@ async function postAbsolute(url, body) {
       'content-type': 'application/json',
       accept: 'application/json',
       ...(session ? { authorization: `Bearer ${session}` } : {}),
+      ...(language ? { 'x-loom-lang': language } : {}),
     },
     body: JSON.stringify(body),
   })

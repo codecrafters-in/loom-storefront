@@ -23,3 +23,22 @@ test('a bag with something to ship always asks the address', () => {
   assert.equal(asksAddress({ requiresShipping: true, requiresBillingAddress: true }), true)
   assert.equal(asksAddress({}), true)
 })
+
+test('checkout tells the store API the language the shopper browsed in', async () => {
+  globalThis.window.location.origin = 'http://localhost'
+  const { startCheckout } = await import('../src/lib/checkout.js')
+  const i18n = await import('../src/i18n/index.js')
+  await i18n.setLanguage('fr', { address: true })
+  const sent = []
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url, headers: init.headers })
+    return new Response(JSON.stringify({ url: 'https://pay.example/x' }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  const config = { checkout: { mode: 'redirect', createUrl: '/carts/:cartId/checkout', successUrl: '/order/:orderId' } }
+  await startCheckout({ config, cart: { id: 'c1' }, email: 'a@example.com', shippingAddress: address })
+  assert.equal(sent[0].headers['x-loom-lang'], 'fr')
+
+  await startCheckout({ config: { checkout: { ...config.checkout, createUrl: 'https://pay.example/session' } }, cart: { id: 'c1' } })
+  assert.equal(sent[1].headers['x-loom-lang'], undefined, 'another service is not sent the header')
+  await i18n.setLanguage('en')
+})
