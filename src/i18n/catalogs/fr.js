@@ -871,4 +871,8 @@ export default {
   "This can’t be changed once orders or invoices have been issued. Contact us to change it.": "Ce champ ne peut plus être modifié une fois que des commandes ou des factures ont été émises. Contactez-nous pour le changer.",
   "Extra info": "Informations supplémentaires",
   "Yes": "Oui",
+  "Contact us": "Nous contacter",
+  "Documents": "Documents",
+  "Name, A to Z": "Nom, de A à Z",
+  "{price} / {unit}": "{price} / {unit}",
 }

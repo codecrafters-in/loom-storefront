@@ -855,4 +855,8 @@ export default {
   "This can’t be changed once orders or invoices have been issued. Contact us to change it.": "Dit kan niet meer worden gewijzigd zodra er bestellingen of facturen zijn uitgegeven. Neem contact met ons op om het te wijzigen.",
   "Extra info": "Extra informatie",
   "Yes": "Ja",
+  "Contact us": "Neem contact op",
+  "Documents": "Documenten",
+  "Name, A to Z": "Naam, A tot Z",
+  "{price} / {unit}": "{price} / {unit}",
 }

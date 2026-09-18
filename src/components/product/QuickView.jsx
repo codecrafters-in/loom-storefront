@@ -9,6 +9,7 @@ import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
 import { ExtraOptions, OptionPicker } from './VariantPicker.jsx'
 import { CompareToggle } from './CompareTray.jsx'
+import { ContactUs } from './ProductView.jsx'
 import useFocusTrap from '../../hooks/useFocusTrap.js'
 import { t } from '../../i18n/index.js'
 
@@ -105,7 +106,7 @@ function Body({ product, onClose }) {
         {product.brand && <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{product.brand.name}</p>}
         <h2 className="mt-1 pe-8 text-display-md">{product.title}</h2>
         {product.subtitle && <p className="mt-1.5 text-[14px] text-muted">{product.subtitle}</p>}
-        <Price price={choice.shown.price} to={choice.shown.to} compareAt={choice.shown.compareAt} className="mt-4" />
+        <Price price={!choice.onRequest && choice.shown.price} to={choice.shown.to} compareAt={choice.shown.compareAt} className="mt-4" />
 
         {product.type === 'combo' ? (
           <p className="mt-6 text-[14px] leading-relaxed text-muted">{t('Choose what goes in the set on its page.')}</p>
@@ -113,12 +114,16 @@ function Body({ product, onClose }) {
           <>
             <OptionPicker choice={choice} />
             <ExtraOptions choice={choice} />
-            <div className="mt-6 flex items-center gap-3">
-              <QuantityStepper value={choice.qty} onChange={choice.setQty} {...choice.stepper} />
-              <Button className="flex-1" disabled={!choice.ready || busy} onClick={buy}>
-                {choice.blocker || (busy ? t('Adding…') : t('Add to bag'))}
-              </Button>
-            </div>
+            {choice.onRequest ? (
+              <ContactUs className="mt-6 w-full" />
+            ) : (
+              <div className="mt-6 flex items-center gap-3">
+                <QuantityStepper value={choice.qty} onChange={choice.setQty} {...choice.stepper} />
+                <Button className="flex-1" disabled={!choice.ready || busy} onClick={buy}>
+                  {choice.blocker || (busy ? t('Adding…') : t('Add to bag'))}
+                </Button>
+              </div>
+            )}
           </>
         )}
 

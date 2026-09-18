@@ -1,10 +1,10 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import Layout from './components/layout/Layout.jsx'
 import { ToastProvider } from './store/ToastContext.jsx'
 import { CartProvider } from './store/CartContext.jsx'
 import { WishlistProvider } from './store/WishlistContext.jsx'
-import { AuthProvider } from './store/AuthContext.jsx'
+import { AuthProvider, useAuth } from './store/AuthContext.jsx'
 import { StorefrontProvider, useStorefrontState } from './store/StorefrontContext.jsx'
 import { blogEnabled } from './lib/blog.js'
 import { AdminAuthProvider } from './store/AdminAuthContext.jsx'
@@ -17,7 +17,7 @@ import Product from './pages/Product.jsx'
 // its Suspense fallback during a server render, so an indexed route that is
 // code-split ships a skeleton to the crawler.
 import StaticPage from './pages/StaticPage.jsx'
-import Docs from './pages/Docs.jsx'
+import { docsPage, loadDocsPage } from './pages/docs-loader.js'
 // Eager too: the render handler answers an unknown address with this page and a 404, and a lazy page renders only
 // its loading fallback on the server, with no title.
 import NotFound from './pages/NotFound.jsx'
@@ -74,6 +74,13 @@ function Boundary({ children }) {
   return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>
 }
 
+/** The documentation, a chunk of its own that is in before a server render or a hydration (pages/docs-loader.js). */
+function Docs(props) {
+  const Page = docsPage()
+  if (!Page) throw loadDocsPage()
+  return <Page {...props} />
+}
+
 const Loading = () => (
   <div className="wrap py-20">
     <Skeleton className="h-96 w-full" />
@@ -88,6 +95,15 @@ function BlogOnly({ children }) {
   const { config, ready } = useStorefrontState()
   if (!ready) return <Loading />
   return blogEnabled(config) ? children : <Navigate to="/404" replace />
+}
+
+/** Odoo's eCommerce access "Logged in users" (`access.shop`): the shop, products, search and bag are for signed-in customers. */
+function ShopOnly() {
+  const { config } = useStorefrontState()
+  const { signedIn, loading } = useAuth()
+  const { pathname, search } = useLocation()
+  if (config.access?.shop !== 'logged_in' || signedIn) return <Outlet />
+  return loading ? <Loading /> : <Navigate to="/login" replace state={{ from: pathname + search }} />
 }
 
 export default function App() {
@@ -109,17 +125,19 @@ export default function App() {
               <Routes>
                 <Route element={<Layout />}>
                   <Route index element={<Home />} />
-                  <Route path="shop" element={<Shop />} />
-                  <Route path="shop/:slug" element={<Shop mode="category" />} />
-                  <Route path="collections/:slug" element={<Shop mode="collection" />} />
-                  <Route path="brands" element={<Brands />} />
-                  <Route path="brands/:slug" element={<Shop mode="brand" />} />
-                  <Route path="compare" element={<Compare />} />
-                  <Route path="product/:slug" element={<Product />} />
-                  <Route path="search" element={<Search />} />
-                  <Route path="cart" element={<Cart />} />
-                  <Route path="wishlist" element={<Wishlist />} />
-                  <Route path="checkout" element={<Checkout />} />
+                  <Route element={<ShopOnly />}>
+                    <Route path="shop" element={<Shop />} />
+                    <Route path="shop/:slug" element={<Shop mode="category" />} />
+                    <Route path="collections/:slug" element={<Shop mode="collection" />} />
+                    <Route path="brands" element={<Brands />} />
+                    <Route path="brands/:slug" element={<Shop mode="brand" />} />
+                    <Route path="compare" element={<Compare />} />
+                    <Route path="product/:slug" element={<Product />} />
+                    <Route path="search" element={<Search />} />
+                    <Route path="cart" element={<Cart />} />
+                    <Route path="wishlist" element={<Wishlist />} />
+                    <Route path="checkout" element={<Checkout />} />
+                  </Route>
                   {/* Where a gateway's hosted page sends the shopper back. Never prerendered. */}
                   <Route path="checkout/return" element={<CheckoutReturn />} />
                   <Route path="order/:id" element={<OrderConfirmation />} />

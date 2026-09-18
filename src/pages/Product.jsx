@@ -4,12 +4,12 @@ import api, { peek } from '../lib/api/index.js'
 import useAsync from '../hooks/useAsync.js'
 import ProductGrid from '../components/product/ProductGrid.jsx'
 import Promises from '../components/layout/Promises.jsx'
-import { Breadcrumbs, Button, Empty, ErrorState, Icon, Rating, Skeleton } from '../components/ui/index.jsx'
+import { Breadcrumbs, Button, Empty, ErrorState, Icon, Rating, Rich, Skeleton } from '../components/ui/index.jsx'
 import Seo from '../components/Seo.jsx'
 import ProductView from '../components/product/ProductView.jsx'
 import { useBootstrap, useStorefront } from '../store/StorefrontContext.jsx'
 import { productTrail } from '../lib/categories.js'
-import { viewItem } from '../lib/analytics.js'
+import { consentState, viewItem, visitorId } from '../lib/analytics.js'
 import { remember } from '../lib/recentlyViewed.js'
 import { useAuth } from '../store/AuthContext.jsx'
 import RecentlyViewed from '../components/product/RecentlyViewed.jsx'
@@ -61,6 +61,11 @@ export default function Product() {
   useEffect(() => {
     if (!product) return
     viewItem(product)
+    // Odoo's visitor tracking (its Visitors report and recently viewed products): the signed-in customer, or this
+    // browser's id once analytics is allowed (or no cookie banner asks).
+    const consent = consentState()
+    const allowed = (!consent || consent.analytics) && globalThis.navigator?.doNotTrack !== '1'
+    api.recordView(product.slug, { visitorId: allowed ? visitorId() : undefined }).catch(() => {})
     // Scoped to the signed-in customer. A shared laptop is the normal case in a
     // household, and a rail showing the last person's browsing is both a
     // privacy problem and a useless recommendation.
@@ -113,6 +118,13 @@ export default function Product() {
       {/* Keyed on the product, so moving from one product to another starts the
           picker afresh rather than carrying one product's choices into the next. */}
       <ProductView key={product.slug} product={product} />
+
+      {/* What the merchant built below the product in Odoo's website editor (`websiteDescription`). */}
+      {product.websiteDescription && (
+        <section className="wrap wrap-tight pb-16">
+          <Rich html={product.websiteDescription} className="max-w-3xl text-[15px] leading-relaxed text-muted" />
+        </section>
+      )}
 
       {/* The store's own "goes with it", when it has chosen some. Without them
           this rail is not shown and the related rail below is what the page

@@ -855,4 +855,8 @@ export default {
   "This can’t be changed once orders or invoices have been issued. Contact us to change it.": "ऑर्डर या इनवॉइस जारी होने के बाद इसे बदला नहीं जा सकता। इसे बदलने के लिए हमसे संपर्क करें।",
   "Extra info": "अतिरिक्त जानकारी",
   "Yes": "हाँ",
+  "Contact us": "हमसे संपर्क करें",
+  "Documents": "दस्तावेज़",
+  "Name, A to Z": "नाम, A से Z",
+  "{price} / {unit}": "{price} / {unit}",
 }

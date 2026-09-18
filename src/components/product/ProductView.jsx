@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  Badge, Button, Icon, Price, QuantityStepper, Rating,
+  Badge, Button, Icon, Price, QuantityStepper, Rating, Rich, Ribbon,
 } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
@@ -179,6 +179,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
   const specList = product.enrichment?.specList
   const isCombo = product.type === 'combo'
   const current = gallery[shot]
+  const ribbon = variant ? variant.ribbon : product.ribbon
   const openChart = () => (onOpenChart ? onOpenChart() : setChartOpen(true))
 
   // Beside the option whose role is size. A product with a chart but no size to
@@ -307,6 +308,8 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                 {/* Only over the first shot — the rest are detail crops, and
                     the crop is the answer somebody opened them for. */}
                 {shot === 0 && current?.type !== 'video' && <ImageSpecs enrichment={product.enrichment} />}
+                {/* The chosen option's Odoo ribbon, else the product's. */}
+                <Ribbon ribbon={ribbon} className={ribbon?.position === 'right' ? 'top-14' : 'top-0'} />
 
                 {current?.type !== 'video' && (
                   <span
@@ -346,11 +349,16 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           <p className="mt-2 text-[15px] leading-snug text-muted">{product.subtitle}</p>
 
           <div className="mt-5 flex flex-wrap items-center gap-4">
-            <Price price={shown.price} to={shown.to} compareAt={shown.compareAt} size="lg" />
+            <Price price={!choice.onRequest && shown.price} to={shown.to} compareAt={shown.compareAt} size="lg" />
             <a href="#reviews" className="shrink-0">
               <Rating value={product.rating.average} count={product.rating.count} />
             </a>
           </div>
+          {choice.unit && !choice.onRequest && (
+            <p className="mt-1 text-[12px] text-faint tabular-nums">
+              {t('{price} / {unit}', { price: formatMoney(choice.unit.price), unit: choice.unit.unit })}
+            </p>
+          )}
           {!isMock && product.priceTiers?.length > 0 && (
             <table className="mt-3 text-[13px]">
               <caption className="sr-only">{t('Price per item by quantity')}</caption>
@@ -367,7 +375,9 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
 
           {/* A lede, not the whole description. The rest lives in Details,
               where someone who wants it will look for it. */}
-          <p className="mt-5 text-[15px] leading-relaxed text-muted">{product.description}</p>
+          {product.descriptionHtml
+            ? <Rich html={product.descriptionHtml} className="mt-5 text-[15px] leading-relaxed text-muted" />
+            : <p className="mt-5 text-[15px] leading-relaxed text-muted">{product.description}</p>}
 
           <ProductHighlights enrichment={product.enrichment} />
 
@@ -458,6 +468,8 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               {note.low && summary ? ` ${t('in {summary}', { summary })}` : ''}.
             </p>
           )}
+          {/* Odoo's Out-of-Stock Message, sanitised by the API. */}
+          {choice.unavailable && <Rich html={product.outOfStockMessage} className="mt-3 text-[13px] text-sale" />}
 
           {/*
             One row on a wide column, two on a narrow one — and the wrap is
@@ -468,15 +480,21 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             ref={buyRef}
             className="mt-8 grid grid-cols-[auto_1fr] items-center gap-3 sm:grid-cols-[auto_1fr_auto]"
           >
-            <QuantityStepper value={choice.qty} onChange={choice.setQty} {...choice.stepper} />
-            <Button
-              size="lg"
-              className="order-last col-span-2 w-full sm:order-none sm:col-span-1"
-              disabled={preview || !choice.ready || busy}
-              onClick={buy}
-            >
-              {choice.blocker || (busy ? t('Adding…') : t('Add to bag'))}
-            </Button>
+            {choice.onRequest ? (
+              <ContactUs size="lg" className="col-span-2" />
+            ) : (
+              <>
+                <QuantityStepper value={choice.qty} onChange={choice.setQty} {...choice.stepper} />
+                <Button
+                  size="lg"
+                  className="order-last col-span-2 w-full sm:order-none sm:col-span-1"
+                  disabled={preview || !choice.ready || busy}
+                  onClick={buy}
+                >
+                  {choice.blocker || (busy ? t('Adding…') : t('Add to bag'))}
+                </Button>
+              </>
+            )}
             {config.features?.wishlist !== false && (
             <Button
               variant="quiet"
@@ -517,6 +535,21 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             {product.sizeChart && !hasSizeOption && (
               <Accordion title={product.sizeChart.name || t('Measurements')}>
                 <ChartTable chart={product.sizeChart} />
+              </Accordion>
+            )}
+
+            {/* Odoo's documents published on the product page: its own downloads. */}
+            {product.documents?.length > 0 && (
+              <Accordion title={t('Documents')}>
+                <ul className="space-y-2 text-[14px]">
+                  {product.documents.map((d) => (
+                    <li key={d.id}>
+                      <a href={d.url} target={d.link ? '_blank' : undefined} rel="noopener noreferrer" className="link-underline text-accent">
+                        {d.name}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
               </Accordion>
             )}
 
@@ -572,15 +605,15 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               </p>
             )}
           </button>
-          <Price price={shown.price} to={shown.to} compareAt={shown.compareAt} size="sm" className="hidden shrink-0 sm:inline-flex" />
-          <Button
+          <Price price={!choice.onRequest && shown.price} to={shown.to} compareAt={shown.compareAt} size="sm" className="hidden shrink-0 sm:inline-flex" />
+          {choice.onRequest ? <ContactUs className="shrink-0" /> : <Button
             size="md"
             className="shrink-0"
             disabled={busy || choice.stuck}
             onClick={() => (choice.ready ? buy() : choice.missing ? setSheetOpen(true) : scrollToBuy())}
           >
             {choice.missing ? t('Choose {option}', { option: choice.missing.name.toLowerCase() }) : choice.blocker || t('Add to bag')}
-          </Button>
+          </Button>}
         </div>
       </div>
       )}
@@ -629,6 +662,12 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
       <SizeChartModal product={product} open={chartOpen} onClose={() => setChartOpen(false)} />
     </>
   )
+}
+
+/** Odoo's Contact us button, in place of the price and the buy button of a product priced on request. */
+export function ContactUs(props) {
+  const to = useStorefront().commerce?.contactUsUrl || '/pages/contact'
+  return <Button {...props} {...(/^([a-z][a-z0-9+.-]*:|\/\/)/i.test(to) ? { href: to } : { to })}>{t('Contact us')}</Button>
 }
 
 /** The gallery frame: a zoom button over a photograph, a plain box over video. */

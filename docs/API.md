@@ -294,8 +294,8 @@ form, and the captcha is reset for another try.
 | `in_brand` | string | A brand page's scope, like `category`: facets describe only that brand's products (the storefront's `/brands/:slug` sends it) |
 | `min_price`, `max_price` | int | Minor units |
 | `in_stock` | `1` | Only products with a buyable variant |
-| `sort` | enum | `featured` `newest` `price-asc` `price-desc` `rating` |
-| `page`, `per_page` | int | |
+| `sort` | enum | `featured` `newest` `price-asc` `price-desc` `rating` `name`. The shop page leaves it out until the shopper picks one, and the backend uses its default (Odoo's shop sort, `commerce.shop.sort`) |
+| `page`, `per_page` | int | The shop page leaves `per_page` out too: the backend's default (Odoo's Products per page, `commerce.shop.perPage`) |
 
 ```json
 {
@@ -569,6 +569,11 @@ the choices settle.
 ```json
 { "exists": false, "variantId": null, "available": true,
   "price": { "amount": 3200, "currency": "USD" }, "compareAtPrice": null, "imageId": null }
+```
+
+It may also say `priceOnRequest` and `unitPrice`, as a variant does.
+
+```json
 ```
 
 `404 not_found` for an unknown product; `422 invalid_combination` for an
@@ -870,6 +875,20 @@ Notes that matter in practice:
 - **`swatches`** maps colour name to hex. Without it the colour picker has to
   guess what "Ecru" looks like.
 - **`badges`** — `new` `sale` `bestseller` `low-stock` `sold-out`.
+- **`ribbon`** (optional, on the product and each variant) — `{ name, textColor, bgColor, position: "left" | "right",
+  style: "ribbon" | "tag" }` or `null`: Odoo's ribbon, drawn instead of the theme's badge on cards (the product's) and
+  over the product photo (the chosen variant's, else the product's). A backend without the key keeps the badges.
+- **`priceOnRequest`** (optional, on the product, variants, summaries, combinations and search suggestions) — no price
+  and no buy button; a **Contact us** button to `commerce.contactUsUrl` instead (Odoo's *Hide 'Add To Cart' when price
+  = 0*). The backend refuses such a product in the bag.
+- **`variants[].unitPrice`** (optional) — `{ price, unit }`, shown under the price: "2.50 / 100 g".
+- **`descriptionHtml`**, **`websiteDescription`**, **`outOfStockMessage`** (optional, detail) — HTML the backend has
+  sanitised: the formatted description (instead of `description`), content shown below the buy box, and a message
+  under the button of a sold-out option. Categories may send `descriptionHtml` too. Rendered as given
+  (`Rich` in `src/components/ui/index.jsx`): send only sanitised HTML.
+- **`documents`** (optional, detail) — `[{ id, name, url, link }]`, listed under **Documents**; `link` opens in a new tab.
+- **`images[].variants`** (optional) — the variant ids a photo belongs to: shown only once one of them is chosen,
+  first; an id starting `var-` takes the place of the main image (`tmpl-…`).
 
 ### `GET /products/:slug/related`
 
@@ -995,7 +1014,7 @@ return products with a similar name and say so with `fuzzy: true`; the search pa
 
 | Route | Answer |
 | --- | --- |
-| `GET /search/suggest?q=swea&limit=5` | `{ query, products: [{ slug, title, price, compareAtPrice, image }], categories: [{ slug, name, path }], brands: [{ slug, name }], fuzzy }` for the header search box. Fewer than two characters: empty lists |
+| `GET /search/suggest?q=swea&limit=5` | `{ query, products: [{ slug, title, price, compareAtPrice, priceOnRequest, image }], categories: [{ slug, name, path }], brands: [{ slug, name }], fuzzy }` for the header search box. Fewer than two characters: empty lists |
 | `GET /search/popular?limit=8` | `{ items: ["merino crew", …] }`: the most searched terms that find something, shown on an empty search page |
 | `POST /search/log` `{ q }` | Counts one search for the merchant's report; the backend counts the results itself. Sent once per results page |
 
@@ -1606,8 +1625,10 @@ of its own; the demo's live in `src/data/storefront.js` and `src/data/pages.js` 
   `storefront.consent.enabled`, the banner (`src/components/consent/ConsentBanner.jsx`) asks once per policy
   version; in opt-in mode `track()` sends nothing until the visitor agrees, and Google Consent Mode v2 defaults
   and updates are pushed to `dataLayer`.
-- `storefront.access: { mode, message }`. When `mode` is not `open`, the shop is replaced by the maintenance or
-  password screen. `POST /access { password }` (or `POST /admin/access` for a signed-in admin) →
+- `storefront.access: { mode, message, shop }`. When `mode` is not `open`, the shop is replaced by the maintenance or
+  password screen. `shop: "logged_in"` (Odoo's eCommerce access) keeps the shop, product, search, bag and checkout
+  pages for signed-in customers: a visitor is sent to `/login` and back, and the backend answers `401 login_required`
+  (the render handler serves the shell for those addresses, and a home rail it refuses is left out). `POST /access { password }` (or `POST /admin/access` for a signed-in admin) →
   `{ token, header, expiresAt }`; the token is sent as `X-Loom-Access` on every call. A `401 store_locked` or
   `503 store_maintenance` answer drops the token and shows the screen again.
 - `storefront.theme: { preset, presetChanged, colors, fonts, radius, style, faviconUrl, ogImageUrl, logoDarkUrl }` is applied as the CSS custom
@@ -1840,6 +1861,13 @@ Day totals for the backend's dashboard, sent with `navigator.sendBeacon` as
 `text/plain`: a visit once per browser session, and the other three as they
 happen. Nothing identifies the visitor. Optional: a backend without it answers
 404 and nothing changes for the shopper.
+
+### `POST /products/:slug/views`
+
+`{ variantId?, visitorId? }` → `204`, sent when a product page opens (`recordView`). The backend records the view
+for its own visitor reports (Odoo's Visitors and recently viewed products): the signed-in customer, or `visitorId`,
+this browser's random id (`loom.visitor`, the one consent records use), sent only once analytics is allowed (or no
+cookie banner asks) and Do Not Track is off. The demo keeps nothing. Optional: a failed call changes nothing.
 
 ---
 

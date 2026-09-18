@@ -855,4 +855,8 @@ export default {
   "This can’t be changed once orders or invoices have been issued. Contact us to change it.": "Dies kann nicht mehr geändert werden, sobald Bestellungen oder Rechnungen ausgestellt wurden. Kontaktieren Sie uns, um es zu ändern.",
   "Extra info": "Zusätzliche Angaben",
   "Yes": "Ja",
+  "Contact us": "Kontakt",
+  "Documents": "Dokumente",
+  "Name, A to Z": "Name, A bis Z",
+  "{price} / {unit}": "{price} / {unit}",
 }

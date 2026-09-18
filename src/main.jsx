@@ -5,6 +5,7 @@ import App from './App.jsx'
 import { languageFromPath, setLanguage } from './i18n/index.js'
 import { config } from './lib/config.js'
 import { loadMoreSections, MARKER } from './components/home/load-more.js'
+import { loadDocsPage } from './pages/docs-loader.js'
 import './index.css'
 
 // `/fr/...` is the storefront in French: its catalog loads before the first render, and the router works below the prefix.
@@ -41,8 +42,10 @@ if (import.meta.env.VITE_PWA === 'on' && 'serviceWorker' in navigator) {
 // A page with one of the newer home sections hydrates with their code already in, so the server's markup for them is
 // adopted as it is (components/home/load-more.js). Hydrating without it still works, only later.
 const sections = root.querySelector(`[${MARKER}]`) ? loadMoreSections().catch(() => {}) : null
+// A documentation page hydrates with its chunk already in, for the same reason (pages/docs-loader.js).
+const docs = /\/docs(\/|$)/.test(window.location.pathname) ? loadDocsPage().catch(() => {}) : null
 
-Promise.all([setLanguage(language || rendered, { address: Boolean(language) }), sections]).finally(() => {
+Promise.all([setLanguage(language || rendered, { address: Boolean(language) }), sections, docs]).finally(() => {
   const app = (
     <StrictMode>
       {/* React Router v7 behaviour, opted into now so the upgrade changes nothing. */}

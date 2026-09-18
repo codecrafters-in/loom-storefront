@@ -259,6 +259,7 @@ const SORTS = {
   'price-asc': (a, b) => amount(a) - amount(b),
   'price-desc': (a, b) => amount(b) - amount(a),
   rating: (a, b) => average(b) - average(a),
+  name: (a, b) => a.title.localeCompare(b.title),
 }
 
 /** `['Color:Ecru', 'Color:Navy', 'Size:M']` → `Map { Color → [Ecru, Navy], Size → [M] }`. A value may hold a colon; a key may not. */
@@ -646,6 +647,9 @@ export async function recordConsent() {
   await latency()
   return { ok: true }
 }
+
+/** The demo keeps no visitors. */
+export const recordView = async () => null
 
 export async function requestAccess() {
   await latency()

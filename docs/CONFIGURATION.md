@@ -239,6 +239,12 @@ below the threshold. A method may also say `"pickup": true` (collected from a sh
 `"slots": true` (checkout asks for a delivery slot); the Odoo backend sets both from the store's delivery methods, and
 the demo never does.
 
+`contactUsUrl` is where the **Contact us** button of a product priced on request goes (`priceOnRequest`; a path of
+the storefront or a full address), and `shop: { perPage, sort }` is the shop page's default page size and sort, which
+the page leaves to the backend unless the shopper picks a sort (Odoo: its Products per page and default sort). Both
+come from the backend and cannot be overridden. `stock: { display, lowThreshold }` is the default for products that do
+not say their own (Odoo: each product does).
+
 `countries` fills the country select at checkout and in the account's address
 book. The states are not in this document: the forms ask `GET /countries/:code`
 when the country changes and show a dropdown if it lists any — a store that ships
@@ -650,7 +656,7 @@ manager reads that array natively and anything else can be pointed at it.
 **No vendor script ships with the theme.** A store already has GTM, or
 Plausible, or a self-hosted Umami; a theme that bundles a competing one is
 something to rip out rather than something to configure. When the backend names
-tags in `providers` (Odoo: the store's analytics IDs), the theme loads those and
+tags in `providers` (Odoo: the store's analytics IDs, and the website's Google Analytics key), the theme loads those and
 nothing else (`src/lib/tags.js`, its own chunk): Google Analytics 4 and Tag
 Manager count as **analytics**, Meta Pixel, TikTok Pixel and Pinterest Tag as
 **marketing**, and with a consent banner each waits for its category. The same
