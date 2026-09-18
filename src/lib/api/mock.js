@@ -855,6 +855,7 @@ export function priceCart(cart) {
     freeShippingRemaining: money(Math.max(0, freeOver - afterDiscount)),
     // Every demo product is shipped; a live bag of services or downloads answers false.
     requiresShipping: true,
+    requiresBillingAddress: true,
   }
 }
 

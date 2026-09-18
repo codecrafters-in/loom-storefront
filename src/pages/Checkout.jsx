@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useState, useEffect, useMemo, useRef } from 'react'
 import Seo from '../components/Seo.jsx'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { startCheckout } from '../lib/checkout.js'
+import { asksAddress, checkoutAddress as addressFor, startCheckout } from '../lib/checkout.js'
 import api from '../lib/api/index.js'
 import { ApiError } from '../lib/api/contracts.js'
 import { driverInput, paymentBody, payableTotal, returnUrls, runPayment, visibleMethods } from '../lib/payments/index.js'
@@ -43,8 +43,6 @@ const FIELD_IDS = ['email', 'name', 'line1', 'line2', 'city', 'region', 'postalC
  * methods it can take for this cart, and the gateway's own form (or modal)
  * takes the card. See lib/payments.
  */
-/** A bag with nothing to ship (services, downloads) sends only the customer's name: the backend asks for no address. */
-const addressFor = (cart, address) => (cart?.requiresShipping === false ? { name: address.name } : address)
 
 export default function Checkout() {
   const { cart, refresh } = useCart()
@@ -75,10 +73,14 @@ export default function Checkout() {
   const [billing, setBilling] = useState({ name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country: fallbackCountry })
   // An invoice can go anywhere: every country, loaded when a billing address is asked for; until then the delivery list.
   const [world, setWorld] = useState(null)
+  // Nothing to ship: the address asked is the billing one (as Odoo does), in any country.
+  const noShipping = cart?.requiresShipping === false
+  const askAddress = asksAddress(cart)
   useEffect(() => {
-    if (!billingSame && !world) import('../lib/countries.js').then((m) => setWorld(m.allCountries(currentLanguage(), COUNTRIES)), () => {})
-  }, [billingSame]) // eslint-disable-line react-hooks/exhaustive-deps
+    if ((!billingSame || noShipping) && !world) import('../lib/countries.js').then((m) => setWorld(m.allCountries(currentLanguage(), COUNTRIES)), () => {})
+  }, [billingSame, noShipping]) // eslint-disable-line react-hooks/exhaustive-deps
   const BILLING_COUNTRIES = world || COUNTRIES
+  const ADDRESS_COUNTRIES = noShipping ? BILLING_COUNTRIES : COUNTRIES
   const [business, setBusiness] = useState({ on: Boolean(customer?.company || customer?.vat), company: customer?.company || '', vat: customer?.vat || '' })
   // Delivery instructions, a gift message and wrapping, and the terms box, as far as the store's settings offer them.
   const [extras, setExtras] = useState({ note: '', giftMessage: '', giftWrap: false, acceptTerms: false, newsletter: false })
@@ -146,9 +148,9 @@ export default function Checkout() {
   // so a country from before the store's settings loaded (the default US) or from elsewhere would look like the
   // store's own while its states, address words and delivery stayed the other country's.
   useEffect(() => {
-    if (!deliverable.includes(form.country)) setForm((f) => ({ ...f, country: fallbackCountry, region: '' }))
+    if (!(noShipping ? ADDRESS_COUNTRIES.map(([code]) => code) : deliverable).includes(form.country)) setForm((f) => ({ ...f, country: fallbackCountry, region: '' }))
     if (!BILLING_COUNTRIES.some(([code]) => code === billing.country)) setBilling((b) => ({ ...b, country: fallbackCountry, region: '' }))
-  }, [deliverable, fallbackCountry, form.country, billing.country, BILLING_COUNTRIES])
+  }, [deliverable, fallbackCountry, form.country, billing.country, BILLING_COUNTRIES, noShipping]) // eslint-disable-line react-hooks/exhaustive-deps
   // Stable, because the state field settles its value in an effect that depends on it.
   const setRegion = useCallback((e) => {
     const value = e.target.value
@@ -453,13 +455,13 @@ export default function Checkout() {
             </p>
           )}
           <Field label={t('Email')} id="email" type="email" required value={form.email} onChange={set('email')} autoComplete="email" />
-          {cart?.requiresShipping === false && (
+          {!askAddress && (
             <Field label={t('Full name')} id="name" required value={form.name} onChange={set('name')} autoComplete="name" />
           )}
         </Section>
 
-        {cart?.requiresShipping !== false && (
-        <Section title={t('Shipping address')}>
+        {askAddress && (
+        <Section title={noShipping ? t('Billing address') : t('Shipping address')}>
           <Field label={t('Full name')} id="name" required value={form.name} onChange={set('name')} autoComplete="name" />
           <Field label={t('Address')} id="line1" required value={form.line1} onChange={set('line1')} autoComplete="address-line1" />
           <Field label={t('Apartment, suite (optional)')} id="line2" value={form.line2} onChange={set('line2')} autoComplete="address-line2" />
@@ -474,7 +476,7 @@ export default function Checkout() {
                 <div key={field}>
                   <label htmlFor="country" className="mb-1.5 block text-[13px] font-medium">{t('Country')}</label>
                   <select id="country" value={form.country} onChange={set('country')} className="field" autoComplete="country">
-                    {COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                    {ADDRESS_COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
                   </select>
                 </div>
               )
@@ -482,7 +484,7 @@ export default function Checkout() {
           </div>
           {config.checkout?.collectPhone !== false && (
             <Field
-              label={config.checkout?.phoneRequired === false ? t('Phone (optional, for delivery updates)') : t('Phone (for delivery updates)')}
+              label={noShipping ? t('Phone') : config.checkout?.phoneRequired === false ? t('Phone (optional, for delivery updates)') : t('Phone (for delivery updates)')}
               id="phone"
               type="tel"
               required={config.checkout?.phoneRequired === true}

@@ -867,4 +867,5 @@ export default {
   "hours": "heures",
   "minutes": "minutes",
   "seconds": "secondes",
+  "Billing address": "Adresse de facturation",
 }

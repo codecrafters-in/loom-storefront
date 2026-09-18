@@ -915,4 +915,5 @@ export default {
   "hours": "ساعات",
   "minutes": "دقائق",
   "seconds": "ثوانٍ",
+  "Billing address": "عنوان الفوترة",
 }

@@ -37,6 +37,15 @@ import { addressPrefix } from '../i18n/index.js'
  * secret this file could read is a secret every visitor could read.
  */
 
+/**
+ * Whether checkout asks an address. A bag with nothing to ship (services, downloads) still has the billing address
+ * Odoo asks for (`requiresBillingAddress`), unless the backend says it asks none.
+ */
+export const asksAddress = (cart) => cart?.requiresShipping !== false || cart?.requiresBillingAddress !== false
+
+/** The address sent with checkout: only the name when none is asked. */
+export const checkoutAddress = (cart, address) => (asksAddress(cart) ? address : { name: address.name })
+
 const template = (str, vars) =>
   String(str || '').replace(/:([a-zA-Z]+)/g, (m, key) => (vars[key] ?? m))
 

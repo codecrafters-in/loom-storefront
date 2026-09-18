@@ -851,4 +851,5 @@ export default {
   "hours": "घंटे",
   "minutes": "मिनट",
   "seconds": "सेकंड",
+  "Billing address": "बिलिंग पता",
 }

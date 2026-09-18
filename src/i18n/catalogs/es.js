@@ -867,4 +867,5 @@ export default {
   "hours": "horas",
   "minutes": "minutos",
   "seconds": "segundos",
+  "Billing address": "Dirección de facturación",
 }

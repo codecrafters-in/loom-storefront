@@ -1064,6 +1064,7 @@ client that recalculates them will eventually disagree with the invoice.
   "freeShippingThreshold": { "amount": 15000, "currency": "USD" },
   "freeShippingRemaining": { "amount": 0, "currency": "USD" },
   "requiresShipping": true,
+  "requiresBillingAddress": true,
   "freeShippingProgress": {
     "method": "standard",
     "threshold": { "amount": 15000, "currency": "USD" },
@@ -1094,7 +1095,10 @@ for a collection method, and `deliverySlot` (optional, `{ id, label, date, from,
 slot booked at checkout; orders carry both too.
 
 `requiresShipping` is `false` when nothing in the bag is shipped (services, downloads, e-gift cards): checkout then
-asks only for a name and email, and shows no address or delivery step.
+shows no delivery step. `requiresBillingAddress` says whether an address is still asked: as Odoo's shop does, a bag
+with nothing to ship asks the customer's billing address (checkout shows it as "Billing address" and sends it as
+`shipping_address`) unless the Odoo system parameter `website_sale.require_billing_details_for_services` is off; then
+checkout asks only for a name and email. A signed-in customer whose own address is complete may send none.
 
 A delivery method marked `pickup: true` in `commerce.shippingMethods` makes checkout list shops
 (`getPickupLocations`) and set one (`setPickupLocation`) before the order can be placed; one marked `slots: true` makes
