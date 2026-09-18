@@ -869,4 +869,6 @@ export default {
   "seconds": "secondes",
   "Billing address": "Adresse de facturation",
   "This can’t be changed once orders or invoices have been issued. Contact us to change it.": "Ce champ ne peut plus être modifié une fois que des commandes ou des factures ont été émises. Contactez-nous pour le changer.",
+  "Extra info": "Informations supplémentaires",
+  "Yes": "Oui",
 }

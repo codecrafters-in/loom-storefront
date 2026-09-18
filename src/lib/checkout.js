@@ -51,7 +51,7 @@ const template = (str, vars) =>
 
 export async function startCheckout({
   config, cart, email, shippingAddress, shippingMethod, billingAddress, companyName, vat, note, giftMessage, giftWrap, acceptTerms,
-  deliverySlot,
+  deliverySlot, extraInfo,
 }) {
   const checkout = config?.checkout || {}
   const mode = checkout.mode || 'demo'
@@ -91,6 +91,7 @@ export async function startCheckout({
     gift_wrap: giftWrap,
     accept_terms: acceptTerms,
     delivery_slot: deliverySlot,
+    extra_info: extraInfo,
     // Absolute, because the payment provider redirects a browser back here from
     // its own domain and a relative path would resolve against theirs.
     success_url: absolute(template(checkout.successUrl, { orderId: '{ORDER_ID}' })),

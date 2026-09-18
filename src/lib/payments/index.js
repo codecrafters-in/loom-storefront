@@ -173,6 +173,7 @@ export async function runPayment(payment, { api, input, deps, poll = {} } = {}) 
 export function paymentBody({
   email, shippingAddress, shippingMethod, currency, method, expectedTotal, successUrl, cancelUrl, saveMethod,
   billingAddress, companyName, vat, note, giftMessage, giftWrap, acceptTerms, deliverySlot, newsletter, newsletterConsent,
+  extraInfo,
 }) {
   return {
     email,
@@ -189,6 +190,7 @@ export function paymentBody({
     deliverySlot,
     newsletter,
     newsletterConsent,
+    extraInfo,
     ...(method?.saved
       ? { tokenId: method.id }
       : method?.code === 'invoice'

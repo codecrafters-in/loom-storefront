@@ -1255,7 +1255,7 @@ checkout page. The storefront never records a payment — it asks.
 
 `payment-options` takes the checkout body (`email`, `shipping_address`,
 `shipping_method`, `currency`, and optionally `billing_address`, `company_name`,
-`vat`, `note`, `gift_message`, `gift_wrap`, `accept_terms` and `delivery_slot`) and applies it to the cart, because what can pay
+`vat`, `note`, `gift_message`, `gift_wrap`, `accept_terms`, `delivery_slot` and `extra_info`) and applies it to the cart, because what can pay
 depends on where the parcel is going and what it costs:
 
 ```json

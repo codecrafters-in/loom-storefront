@@ -917,4 +917,6 @@ export default {
   "seconds": "ثوانٍ",
   "Billing address": "عنوان الفوترة",
   "This can’t be changed once orders or invoices have been issued. Contact us to change it.": "لا يمكن تغيير هذا بعد إصدار طلبات أو فواتير. تواصل معنا لتغييره.",
+  "Extra info": "معلومات إضافية",
+  "Yes": "نعم",
 }

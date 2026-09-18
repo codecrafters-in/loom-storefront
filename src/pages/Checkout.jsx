@@ -10,6 +10,7 @@ import { addPaymentInfo, addShippingInfo, beginCheckout, purchase } from '../lib
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import Media from '../components/ui/Media.jsx'
 import PaymentStep from '../components/checkout/PaymentStep.jsx'
+import ExtraInfo from '../components/checkout/ExtraInfo.jsx'
 import RegionField from '../components/address/RegionField.jsx'
 import useAddressLayout from '../components/address/useAddressLayout.js'
 import { postcodeLabel } from '../lib/addressLayout.js'
@@ -84,6 +85,8 @@ export default function Checkout() {
   const [business, setBusiness] = useState({ on: Boolean(customer?.company || customer?.vat), company: customer?.company || '', vat: customer?.vat || '' })
   // Delivery instructions, a gift message and wrapping, and the terms box, as far as the store's settings offer them.
   const [extras, setExtras] = useState({ note: '', giftMessage: '', giftWrap: false, acceptTerms: false, newsletter: false })
+  // Odoo's Extra Info step, when the website has it on.
+  const [extraInfo, setExtraInfo] = useState({})
   const setExtra = (key) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
     setExtras((x) => ({ ...x, [key]: value }))
@@ -99,6 +102,7 @@ export default function Checkout() {
     ...(extras.acceptTerms ? { acceptTerms: true } : {}),
     ...(extras.newsletter ? { newsletter: true, newsletterConsent: t('Email me news and offers') } : {}),
     ...(chosenShipping?.slots && deliverySlot ? { deliverySlot } : {}),
+    ...(config.checkout?.extraInfo?.length ? { extraInfo } : {}),
   })
 
   const [form, setForm] = useState(() => prefillCheckout({
@@ -696,6 +700,8 @@ export default function Checkout() {
             )}
           </Section>
         )}
+
+        {config.checkout?.extraInfo?.length > 0 && <ExtraInfo fields={config.checkout.extraInfo} values={extraInfo} onChange={setExtraInfo} />}
 
         {config.features?.newsletter !== false && !isMock && (
           <label className="mt-6 flex items-center gap-2.5 text-[13px] text-muted">

@@ -558,6 +558,11 @@ holds French, Spanish, German, Italian, Portuguese, Dutch, Arabic and Hindi (mac
 hides Apple Pay and Google Pay; `termsVersion` is informational. `minimumOrder` (minor units) is the store's minimum;
 the bag's own `minimumOrder.remaining` decides whether checkout is offered. `orderNote` and `giftMessage` show optional
 boxes, and `giftWrap: { price }` a "Gift wrap this order" checkbox. The Odoo backend sends all of them from the store.
+With Odoo, `termsRequired` is Odoo's own Accept Terms & Conditions switch (website editor, checkout page), and
+`extraInfo` is Odoo's Extra Info step: `null` when it is off, otherwise the fields of its form as the merchant set them
+in the website editor, `[{ name, label, type, required, custom, placeholder?, options? }]`. Checkout shows them as an
+"Extra info" section and sends `extraInfo: { name: value }`; Odoo writes order fields (such as `client_order_ref`, "Your
+Reference") and logs the others on the order, as its own step does. File uploads are left to Odoo's own page.
 
 `collectPhone: false` drops the phone field; `phoneRequired: true` makes it
 required (the Odoo backend sends the store's setting), and `false` labels it optional. `requireAccount: true` sends a

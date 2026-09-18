@@ -507,6 +507,8 @@ const checkoutFields = (body = {}) => ({
   accept_terms: body.acceptTerms,
   // One of `getDeliverySlots`, when the delivery method offers slots.
   delivery_slot: body.deliverySlot,
+  // Odoo's Extra Info step: `{ name: value }` for the fields in `checkout.extraInfo`.
+  extra_info: body.extraInfo,
   // Ticked "email me news and offers": a newsletter subscription waiting for its confirmation email.
   newsletter: body.newsletter || undefined,
   newsletter_consent: body.newsletter ? body.newsletterConsent : undefined,
