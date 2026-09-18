@@ -458,6 +458,10 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               {note.low && summary ? ` ${t('in {summary}', { summary })}` : ''}.
             </p>
           )}
+          {/* Odoo's Out-of-Stock Message, sanitised by the API. */}
+          {choice.unavailable && product.outOfStockMessage && (
+            <div className="rich mt-3 text-[13px] text-sale" dangerouslySetInnerHTML={{ __html: product.outOfStockMessage }} />
+          )}
 
           {/*
             One row on a wide column, two on a narrow one — and the wrap is
