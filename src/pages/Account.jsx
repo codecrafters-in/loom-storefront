@@ -471,8 +471,10 @@ function Addresses() {
   // address is refused without its state — so the form asks for both, from the
   // countries the store actually ships to.
   const localeCountry = (config.pricing?.locale || '').split('-')[1]
+  // A new address starts in a country the store delivers to: the default address's, when the store delivers there.
+  const delivers = (code) => countries.some(([c]) => c === code)
   const defaultCountry =
-    customer.addresses.find((a) => a.isDefault)?.country ||
+    customer.addresses.map((a) => a.isDefault && a.country).find(delivers) ||
     countries.find(([code]) => code === localeCountry)?.[0] ||
     countries[0][0]
 
@@ -524,7 +526,8 @@ function Addresses() {
   const set = (k) => (e) => {
     const value = e.target.value
     setProblems((p) => p.filter((field) => field !== k))
-    setEditing((a) => ({ ...a, [k]: value }))
+    // A state belongs to its country: a new country starts without one.
+    setEditing((a) => ({ ...a, [k]: value, ...(k === 'country' && value !== a.country ? { region: '' } : {}) }))
   }
   const invalid = (k) => problems.includes(k)
   // Stable, because the state field settles its value in an effect that depends on it.

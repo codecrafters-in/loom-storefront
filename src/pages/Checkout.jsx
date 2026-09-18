@@ -123,17 +123,26 @@ export default function Checkout() {
   const set = (k) => (e) => {
     const value = e.target.value
     touched.current.add(k)
-    setForm((f) => ({ ...f, [k]: value }))
+    // A state belongs to its country: a new country starts without one.
+    setForm((f) => ({ ...f, [k]: value, ...(k === 'country' && value !== f.country ? { region: '' } : {}) }))
   }
 
-  // A refreshed checkout renders before the account has loaded, so the form
-  // starts empty. Fill it with the default address when the customer arrives.
-  const prefilledFor = useRef(customer?.id || null)
+  // A refreshed checkout renders before the account (and the store's countries) have loaded, so the form
+  // starts empty. Fill it with the default address when the customer arrives, and again when the countries do.
+  const prefilledFor = useRef(customer ? `${customer.id}|${deliverable}` : null)
   useEffect(() => {
-    if (!customer || prefilledFor.current === customer.id) return
-    prefilledFor.current = customer.id
+    const key = customer ? `${customer.id}|${deliverable}` : null
+    if (!customer || prefilledFor.current === key) return
+    prefilledFor.current = key
     setForm((f) => prefillCheckout(f, customer, touched.current, deliverable))
   }, [customer, deliverable])
+  // The country is always one the list offers. A <select> shows its first option for a value it does not have,
+  // so a country from before the store's settings loaded (the default US) or from elsewhere would look like the
+  // store's own while its states, address words and delivery stayed the other country's.
+  useEffect(() => {
+    if (!deliverable.includes(form.country)) setForm((f) => ({ ...f, country: fallbackCountry, region: '' }))
+    if (!deliverable.includes(billing.country)) setBilling((b) => ({ ...b, country: fallbackCountry, region: '' }))
+  }, [deliverable, fallbackCountry, form.country, billing.country])
   // Stable, because the state field settles its value in an effect that depends on it.
   const setRegion = useCallback((e) => {
     const value = e.target.value
@@ -145,7 +154,7 @@ export default function Checkout() {
   }, [])
   const setBillingField = (key) => (e) => {
     const value = e.target.value
-    setBilling((b) => ({ ...b, [key]: value }))
+    setBilling((b) => ({ ...b, [key]: value, ...(key === 'country' && value !== b.country ? { region: '' } : {}) }))
   }
   const methods = useMemo(() => visibleMethods(options), [options])
 
