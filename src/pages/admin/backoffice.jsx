@@ -54,12 +54,14 @@ const GROUPS = [
   },
   {
     title: 'Stock',
+    // Odoo's Show Available Quantity: the default for new products; each product keeps its own (its eCommerce tab).
+    note: 'For new products. Each product has its own setting in Odoo, on its eCommerce tab.',
     fields: [
       {
         path: 'commerce.stock.display',
         label: 'Show stock',
         type: 'select',
-        options: [['exact', 'Exact quantity'], ['low', 'Only when running low'], ['hidden', 'In stock or sold out only']],
+        options: [['low', 'Only when running low'], ['hidden', 'In stock or sold out only']],
       },
       { path: 'commerce.stock.lowThreshold', label: 'Running low at', type: 'number' },
       { path: 'commerce.stock.hideSoldOut', label: 'Leave sold-out products out of listings', type: 'toggle' },
