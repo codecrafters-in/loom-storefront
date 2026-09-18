@@ -14,7 +14,7 @@ import { config } from '../config.js'
 import { adminFetch } from '../admin-session.js'
 import { ApiError, ContractError, assertCart, assertList, assertMoney, assertProduct } from './contracts.js'
 import { ACCESS_HEADER, accessRequired, accessToken } from '../access.js'
-import { chosenPricelist, fiscalPosition } from '../pricelist.js'
+import { bagPricelist, chosenPricelist, fiscalPosition } from '../pricelist.js'
 import { currentLanguage, languageFromAddress } from '../../i18n/index.js'
 
 const SESSION_KEY = 'loom.session'
@@ -66,7 +66,7 @@ async function send(method, path, { query, body, auth }) {
   const timer = setTimeout(() => controller.abort(), config.api.timeout)
   // A store in maintenance or behind a password answers only calls that carry its access token.
   const access = accessToken()
-  const pricelist = chosenPricelist()
+  const pricelist = bagPricelist() || chosenPricelist()
   const fiscal = fiscalPosition()
   // A language in the page address is asked for; without one the backend answers in the store's default.
   const language = languageFromAddress() ? currentLanguage() : ''
@@ -81,7 +81,7 @@ async function send(method, path, { query, body, auth }) {
         ...(body ? { 'content-type': 'application/json' } : {}),
         ...(auth ? { authorization: `Bearer ${auth}` } : {}),
         ...(access ? { [ACCESS_HEADER]: access } : {}),
-        // The currency the shopper picked; the server varies its cached answers on it.
+        // The bag's pricelist, else the currency the shopper picked; the server varies its cached answers on it.
         ...(pricelist ? { 'x-loom-pricelist': pricelist } : {}),
         ...(fiscal ? { 'x-loom-fiscal-position': fiscal } : {}),
         ...(language ? { 'x-loom-lang': language } : {}),
@@ -144,8 +144,9 @@ async function request(method, path, { query, body } = {}) {
       detail: payload,
     })
   }
-  // A bag says its fiscal position; the catalogue follows it (lib/pricelist.js).
+  // A bag says its fiscal position and pricelist; the catalogue follows them (lib/pricelist.js).
   fiscalPosition(payload?.fiscalPositionId)
+  bagPricelist(payload?.pricelistId)
   return payload
 }
 

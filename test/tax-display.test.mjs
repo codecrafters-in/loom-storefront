@@ -66,3 +66,31 @@ test('the bag’s fiscal position travels with every later call', async () => {
   await http.listProducts({})
   assert.equal(seen.at(-1), '12', 'an export address made the bag tax-free: the catalogue follows')
 })
+
+test('the bag’s pricelist prices the catalogue, over the currency picked before it', async () => {
+  globalThis.window.location.origin = 'http://localhost'
+  shared.clear()
+  const http = await import('../src/lib/api/http.js')
+  const { choosePricelist } = await import('../src/lib/pricelist.js')
+  const seen = []
+  globalThis.fetch = async (url, init = {}) => {
+    const { pathname } = new URL(url)
+    seen.push(init.headers?.['x-loom-pricelist'])
+    const answer = pathname === '/carts/bag'
+      ? { id: 'bag', lines: [], subtotal: gbp(0), total: gbp(0), pricelistId: shared.get('next') || null }
+      : { items: [], total: 0 }
+    return new Response(JSON.stringify(answer), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  choosePricelist('3')
+  shared.set('loom.cart_id', 'bag')
+  await http.getCart()
+  await http.listProducts({})
+  assert.equal(seen.at(-1), '3', 'no bag pricelist yet: the switcher’s choice')
+  shared.set('next', '7.5ab1')
+  await http.getCart()
+  await http.listProducts({})
+  assert.equal(seen.at(-1), '7.5ab1', 'a code moved the bag to another pricelist: the catalogue follows')
+  choosePricelist('4')
+  await http.listProducts({})
+  assert.equal(seen.at(-1), '4', 'a new pick counts until the bag answers')
+})

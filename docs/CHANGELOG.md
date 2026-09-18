@@ -2,6 +2,13 @@
 
 Newest first. Each entry links to the page with the detail.
 
+## What's new — Odoo parity: prices
+
+With the Odoo module's 19.0.2.5.0. Details: [API.md](API.md).
+
+- The catalogue is priced with the bag's pricelist (`pricelistId`, sent back as `X-Loom-Pricelist`) once the bag has
+  one, as Odoo's shop is: a code, the customer's own pricelist or a country's shows across the shop, not only in the bag.
+
 ## What's new — Tax shown as Odoo shows it
 
 With the Odoo module's 19.0.2.3.0. Details: [API.md](API.md).

@@ -41,6 +41,12 @@ the theme sends it back as `X-Loom-Fiscal-Position` on every later call (`src/li
 the bag tax-free (an export) or taxed another way, catalogue prices follow it, as Odoo's own shop does. It changes only
 what is shown; a bag is always charged with its own. Cached answers vary on it too.
 
+**The bag's pricelist** likewise: every cart answer carries `pricelistId` (`"<id>.<signature>"`, or `null`), and the
+theme sends it as `X-Loom-Pricelist` in place of the switcher's pick from then on (`src/lib/pricelist.js`), so the
+catalogue is priced with the bag's pricelist, as Odoo prices its whole shop with the cart's (a code, the customer's own,
+a country's). Picking a currency drops it until the bag answers again. A new bag after an order starts from the
+store's defaults and the currency picked in the switcher.
+
 **Errors** use the HTTP status, plus a JSON body the theme will surface verbatim:
 
 ```json
@@ -1060,6 +1066,7 @@ client that recalculates them will eventually disagree with the invoice.
   "untaxed": { "amount": 30240, "currency": "USD" },
   "taxIncluded": false,
   "fiscalPositionId": "0",
+  "pricelistId": "1.5f0c9a1b2d3e4f5a6b7c8d9e",
   "discountCode": { "code": "LOOM10", "label": "10% off" },
   "freeShippingThreshold": { "amount": 15000, "currency": "USD" },
   "freeShippingRemaining": { "amount": 0, "currency": "USD" },

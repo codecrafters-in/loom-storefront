@@ -21,26 +21,32 @@ export function choosePricelist(id) {
   try {
     if (id) localStorage.setItem(KEY, String(id))
     else localStorage.removeItem(KEY)
+    // The bag moves to the choice; until it answers, the choice is what prices the shop.
+    localStorage.removeItem(BAG_KEY)
   } catch {
     /* storage unavailable: the choice lasts until the page reloads */
   }
 }
 
 /**
- * The fiscal position of the shopper's bag, sent as `X-Loom-Fiscal-Position`: once an address makes the bag tax-free
- * (an export) or taxed another way, the catalogue shows prices that way too, as Odoo's own shop does. Called with a
- * cart's `fiscalPositionId`, keeps it and drops the prices cached the old way; without, reads it.
+ * The fiscal position and the pricelist of the shopper's bag, sent as `X-Loom-Fiscal-Position` and `X-Loom-Pricelist`:
+ * once a bag has them (an address that makes it tax-free, a code, a currency), the catalogue is priced with them too,
+ * as Odoo's own shop is. Called with a cart's `fiscalPositionId` or `pricelistId`, keeps it and drops the prices
+ * cached the old way; without, reads it.
  */
-const FISCAL_KEY = 'loom.fiscal'
+const BAG_KEY = 'loom.bag-pricelist'
 
-export function fiscalPosition(id) {
+const follow = (key) => (id) => {
   try {
-    if (id && id !== localStorage.getItem(FISCAL_KEY)) {
-      localStorage.setItem(FISCAL_KEY, id)
+    if (id && id !== localStorage.getItem(key)) {
+      localStorage.setItem(key, id)
       invalidateAndNotify()
     }
-    return localStorage.getItem(FISCAL_KEY) || ''
+    return localStorage.getItem(key) || ''
   } catch {
     return ''
   }
 }
+
+export const fiscalPosition = follow('loom.fiscal')
+export const bagPricelist = follow(BAG_KEY)

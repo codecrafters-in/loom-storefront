@@ -151,6 +151,7 @@
  * @property {Money} total
  * @property {boolean} [taxIncluded]   Every amount above is with tax (Odoo's Display Product Prices); absent reads as false.
  * @property {string} [fiscalPositionId] Sent back as `X-Loom-Fiscal-Position` ("0" for none).
+ * @property {string|null} [pricelistId] The bag's pricelist, signed; sent back as `X-Loom-Pricelist`.
  * @property {{code:string, label:string}|null} discountCode
  * @property {string} currency
  *
