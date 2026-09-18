@@ -355,7 +355,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             <table className="mt-3 text-[13px]">
               <caption className="sr-only">{t('Price per item by quantity')}</caption>
               <tbody>
-                {product.priceTiers.map((tier) => (
+                {(variant?.priceTiers || product.priceTiers).map((tier) => (
                   <tr key={tier.minQuantity}>
                     <td className="pe-4 text-muted">{plural(tier.minQuantity, '{count}+ items', '{count}+ items')}</td>
                     <td className="tabular-nums">{t('{price} each', { price: formatMoney(tier.price) })}</td>
@@ -445,7 +445,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
 
           {isCombo ? (
             <Suspense fallback={<div className="skeleton mt-8 h-40 rounded-xs" />}>
-              <ComboPicker groups={product.combo || []} picks={choice.combo} onPick={choice.pickCombo} total={shown.price} />
+              <ComboPicker groups={product.combo || []} picks={choice.combo} onPick={choice.pickCombo} total={shown.price} note={product.taxDisclaimer} />
             </Suspense>
           ) : (
             <OptionPicker choice={choice} aside={(o) => sizeAside(o)} />

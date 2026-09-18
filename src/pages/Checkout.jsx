@@ -602,7 +602,7 @@ export default function Checkout() {
                   <span className="block text-[13px] text-faint">{s.note}</span>
                 </span>
                 <span className="text-sm tabular-nums">
-                  {(shippingOptions ? s.price === 0 : cart.shipping.amount === 0 && s.id === 'standard')
+                  {(shippingOptions ? s.price === 0 : cart.shipping.amount === 0 && cart.shippingMethod !== null && s.id === 'standard')
                     ? t('Free')
                     : formatMoney({ amount: s.price, currency: cart.currency })}
                 </span>
@@ -811,7 +811,10 @@ export default function Checkout() {
                   <p className="text-[13px] font-medium leading-snug">{l.title}</p>
                   <LineDetails line={l} />
                 </div>
-                <span className="text-[13px] tabular-nums">{formatMoney(l.lineTotal)}</span>
+                <span className="text-[13px] tabular-nums">
+                  {l.compareAtTotal && <del className="me-1.5 text-faint">{formatMoney(l.compareAtTotal)}</del>}
+                  {formatMoney(l.lineTotal)}
+                </span>
               </li>
             ))}
           </ul>

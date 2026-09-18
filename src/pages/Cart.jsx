@@ -140,7 +140,11 @@ export default function Cart() {
                     </Link>
                     <LineDetails line={line} className="text-[13px] text-faint" />
                   </div>
-                  <span className="shrink-0 text-[15px] tabular-nums">{formatMoney(line.lineTotal)}</span>
+                  <span className="shrink-0 text-[15px] tabular-nums">
+                    {/* Odoo strikes through the price before a discount the pricelist shows on the line. */}
+                    {line.compareAtTotal && <del className="me-2 text-faint">{formatMoney(line.compareAtTotal)}</del>}
+                    {formatMoney(line.lineTotal)}
+                  </span>
                 </div>
                 <div className="mt-auto flex items-center justify-between pt-4">
                   {line.isReward ? (
@@ -319,7 +323,11 @@ function RewardChoice({ reward, disabled, onClaim }) {
   const many = (reward.products?.length || 0) > 1
   return (
     <li className="flex flex-wrap items-center gap-2 text-[13px]">
-      <span className="min-w-0 flex-1">{reward.description}</span>
+      <span className="min-w-0 flex-1">
+        {reward.description}
+        {/* One of the customer's own coupons: the end of its code, as Odoo's cart shows it. */}
+        {reward.codeHint && <span className="block text-[12px] text-faint">{t('Code')}: ⋆⋆⋆⋆{reward.codeHint}</span>}
+      </span>
       {many && (
         <select aria-label={t('Choose for {reward}', { reward: reward.description })} className="field h-9 w-auto text-[13px]" value={variantId} onChange={(e) => setVariantId(e.target.value)}>
           {reward.products.map((p) => <option key={p.variantId} value={p.variantId}>{p.title}</option>)}

@@ -43,6 +43,12 @@ the theme sends it back as `X-Loom-Fiscal-Position` on every later call (`src/li
 the bag tax-free (an export) or taxed another way, catalogue prices follow it, as Odoo's own shop does. It changes only
 what is shown; a bag is always charged with its own. Cached answers vary on it too.
 
+**The bag's pricelist** likewise: every cart answer carries `pricelistId` (`"<id>.<signature>"`, or `null`), and the
+theme sends it as `X-Loom-Pricelist` in place of the switcher's pick from then on (`src/lib/pricelist.js`), so the
+catalogue is priced with the bag's pricelist, as Odoo prices its whole shop with the cart's (a code, the customer's own,
+a country's). Picking a currency drops it until the bag answers again. A new bag after an order starts from the
+store's defaults and the currency picked in the switcher.
+
 **Errors** use the HTTP status, plus a JSON body the theme will surface verbatim:
 
 ```json
@@ -503,7 +509,7 @@ option ids from the names and adds to the bag with `variant_id`.
 | `options[].role` | list, detail | `color` · `size` · `null`. Size shows the size chart link and the fit block; colour gives the card its swatches |
 | `options[].imagesFollow` | list, detail | The gallery shows images whose `color` is the chosen value of this option, plus untagged ones |
 | `options[].mode` | list, detail | `variant`, or `dynamic`: a combination may be missing from `variants[]` and is priced by `POST /products/:slug/combination` |
-| `options[].choices[]` | list, detail | `{ id, name, color, image, priceExtra, custom }`. `custom: true` asks the shopper for text |
+| `options[].choices[]` | list, detail | `{ id, name, color, image, priceExtra, custom }`. `custom: true` asks the shopper for text. `priceExtra` is `null` when a fixed price takes no extras (Odoo shows none then) |
 | `extraOptions[]` | detail | No-variant attributes: `{ id, name, displayType, multiple, required, choices }`. Checkboxes when `multiple`; a "None" row when not `required` |
 | `variants[].optionIds` | list, detail | `{ optionId: choiceId }`. Its presence is what tells the theme to add by choices |
 | `variants[].inventory` | list, detail | A number, or `null` when the store does not show stock |
@@ -512,7 +518,8 @@ option ids from the names and adds to the bag with `variant_id`.
 | `brand` | list, detail | `{ slug, name, logo }` or `null`. Shown on the card and the product page, linked to `/brands/:slug`, and used as the JSON-LD brand |
 | `breadcrumbs` | detail | `[{ slug, name }]`, root to leaf. Without it the theme walks the category tree |
 | `images[]` video | detail | `{ type: "video", provider, embedUrl, url, alt }`. `youtube` and `vimeo` show `url` as a poster and load `embedUrl` only when pressed; `file` plays `url` in a video element |
-| `combo` | detail, combo only | `[{ id, name, items: [{ id, variantId, productSlug, title, image, options, extraPrice, available }] }]`. One item per group |
+| `combo` | detail, combo only | `[{ id, name, items: [{ id, variantId, productSlug, title, image, options, extraPrice, available }] }]`. One item per group. `extraPrice` is untaxed, as Odoo's combo chooser shows it |
+| `taxDisclaimer` | detail, combo only | Odoo's note under a combo's total when its items' extras are shown before tax, or `null` |
 | `optionalProducts` | detail | `ProductSummary[]`, offered in a dialog when the product is added |
 | `accessories` | detail | `ProductSummary[]`, the "Frequently bought together" rail on the page and in the bag drawer |
 | `alternatives` | detail | `ProductSummary[]`, used for "You might also like" instead of `GET /products/:slug/related` |
@@ -549,11 +556,14 @@ options before it, so the first option is always fully open.
 
 ### `POST /products/:slug/combination`
 
-Prices what `variants[]` cannot: a dynamic combination nobody has bought, or
-extras on top of a variant. The theme calls it 250 ms after the choices settle.
+Prices what `variants[]` cannot: a dynamic combination nobody has bought,
+extras on top of a variant, or a quantity past a price break (`quantity`, sent
+when it is above 1 and the product has `priceTiers`; the price is per item for
+that quantity, as Odoo prices its product page). The theme calls it 250 ms after
+the choices settle.
 
 ```json
-{ "choiceIds": ["grind-espresso"] }
+{ "choiceIds": ["grind-espresso"], "quantity": 5 }
 ```
 
 ```json
@@ -1051,7 +1061,8 @@ client that recalculates them will eventually disagree with the invoice.
       "image": { "url": "…", "alt": "…" },
       "quantity": 2,
       "unitPrice": { "amount": 16800, "currency": "USD" },
-      "lineTotal": { "amount": 33600, "currency": "USD" }
+      "lineTotal": { "amount": 33600, "currency": "USD" },
+      "compareAtTotal": null
     }
   ],
   "subtotal": { "amount": 33600, "currency": "USD" },
@@ -1062,6 +1073,7 @@ client that recalculates them will eventually disagree with the invoice.
   "untaxed": { "amount": 30240, "currency": "USD" },
   "taxIncluded": false,
   "fiscalPositionId": "0",
+  "pricelistId": "1.5f0c9a1b2d3e4f5a6b7c8d9e",
   "discountCode": { "code": "LOOM10", "label": "10% off" },
   "freeShippingThreshold": { "amount": 15000, "currency": "USD" },
   "freeShippingRemaining": { "amount": 0, "currency": "USD" },
@@ -1086,6 +1098,11 @@ modes: Delivery (`shipping`), Subtotal (`untaxed`: the untaxed amount, delivery 
 discounts, gift wrapping and the cash-on-delivery fee, which are lines in Odoo's cart, come first. As in Odoo, a line
 can read a cent off its unit price (a £30.99 price with 20% tax included, rounded globally, reads £31.00) and the rows
 are not a sum: `untaxed + tax = total` is. An older backend without `untaxed` shows `total − tax`.
+
+**No delivery before the delivery step.** As in Odoo's cart, a bag has no delivery line until checkout prices the
+methods for an address: `shippingMethod` is `null`, `shipping` zero and the total the products'. The bag, the drawer
+and the checkout summary print Delivery as "-" then; the checkout's delivery options choose a method, and from then on
+the bag reprices it as it changes. An older backend always sends a method, and its amount is shown.
 
 `freeShippingRemaining` drives the "away from free shipping" line in the cart and drawer; return zero when it does not
 apply. `freeShippingProgress` (optional, `null` when nothing ships free) fills the cart's bar with `percent`, measured
@@ -1140,13 +1157,20 @@ express checkout does the same).
 
 **Codes, promotions and rewards.** A cart may carry `codes: [{ code, label, amount }]`
 (each code with what it takes off), `promotions: [{ name, amount }]` (automatic
-discounts), `claimableRewards: [{ id, couponId, rewardId, type, description, products: [{ variantId, title }] }]`
-(shown as **Choose your reward**) and free-product lines with `isReward: true`
+discounts), `claimableRewards: [{ id, couponId, rewardId, type, description, products: [{ variantId, title }], codeHint }]`
+(shown as **Choose your reward**; the customer's own coupons and gift cards are among them, with the last four
+characters of their code in `codeHint`, as Odoo's cart shows them) and free-product lines with `isReward: true`
 and `rewardLabel`, which the bag shows without a quantity stepper. "Code
-applied" is said only when the cart changed.
+applied" is said only when the cart changed. A pricelist's code is listed in `codes` with a zero amount: it changes
+the prices, not a discount line.
+
+**Discounted lines.** A line may carry `compareAtTotal`: the price before a discount the pricelist shows on the line
+(Odoo's "Discounts" setting), for the quantity. The bag, the drawer and the checkout summary strike it through before
+`lineTotal`, as Odoo's cart does.
 
 **Quantity prices.** A product detail may carry `priceTiers: [{ minQuantity, price }]`,
-shown under the price as "5+ items · $80.00 each".
+shown under the price as "5+ items · $80.00 each", and each variant its own (`variants[].priceTiers`), shown for the
+chosen variant. With tiers, a quantity above 1 re-prices the page through `POST /products/:slug/combination`.
 
 ### Adding any product
 
