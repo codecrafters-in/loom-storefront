@@ -1476,10 +1476,12 @@ country are fixed once orders or invoices were issued: the Customer says `vatLoc
 (both optional, `false` when missing); the account and checkout show them read-only, and the backend refuses a change
 with `422 vat_locked` or `422 country_locked` (`detail.fields`).
 
-A paid order with digital products adds `downloads: [{ id, name, url }]`, listed
-on the order page. `url` is `GET /orders/:orderId/downloads/:documentId`; a bare
-path is resolved against the API base URL. It streams the file to the order's
-owner, or to the holder of the order link, and answers `404` before payment.
+An order with digital products adds `downloads: [{ id, name, url }]`, listed
+on the order page. As on Odoo's order page, files shared on the order come from
+confirmation, paid or not, and files shared on the quotation from the start.
+`url` is `GET /orders/:orderId/downloads/:documentId`; a bare path is resolved
+against the API base URL. It streams the file to the order's owner, or to the
+holder of the order link, and answers `404` for anything else.
 
 `payment` is `null` until the order has a payment. Its `status` is `pending`,
 `authorized`, `captured`, `cancelled` or `failed`. **`captured` is what
@@ -1519,7 +1521,7 @@ text-message code and provider buttons when the store has them.
 | `GET` | `/orders/:id/invoices/:invoiceId` | The invoice PDF — `order.invoices: [{ id, number, kind, date, total, paymentState, url }]`, saved with `downloadFile` |
 | `POST` | `/orders/:id/cancel` `{ reason }` | `Order` — `order.cancellation: { mode: cancel, refund or request, requestedAt }` says what the button does, or is `null` when the order can no longer be cancelled from the storefront (`cancelOrder`) |
 | `POST` | `/orders/:id/messages` `{ body }` | `Order` — a message to the store about the order, up to 2000 characters, while `order.messages.canReply` (`sendOrderMessage`). `403 messages_closed`, `422 empty_message`, `429 rate_limited` |
-| `POST` | `/orders/:id/reorder` `{ cart_id }` | `Cart` with `notices` — the order's items in the bag (`reorder`) |
+| `POST` | `/orders/:id/reorder` `{ cart_id }` | `Cart` with `notices` — the order's items in the bag (`reorder`), as Odoo's Order Again: a confirmed order only (`canReorder`; else `409 cannot_reorder`), combos and custom text included, capped to the stock left |
 | `GET` | `/orders/:id/returns` | `{ options: { days, until, methods, reasons, lines, unavailable, approval, refundTiming }, items: Return[] }` (`getOrderReturns`) |
 | `POST` | `/orders/:id/returns` `{ method, note, lines: [{ lineId, quantity, reasonId, comment }], photos }` | `Return` (`createReturn`); `POST /orders/:id/returns/:returnId/cancel` (`cancelReturn`) |
 | `GET` | `/returns` | `{ items: Return[], total }` — **Account › Returns** (`listReturns`) |
