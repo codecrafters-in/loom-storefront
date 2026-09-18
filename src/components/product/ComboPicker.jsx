@@ -16,7 +16,7 @@ import { t } from '../../i18n/index.js'
  * Its own chunk: most product pages are not sets, and a shopper on one of those
  * should not download this.
  */
-export default function ComboPicker({ groups = [], picks = {}, onPick, total }) {
+export default function ComboPicker({ groups = [], picks = {}, onPick, total, note }) {
   const uid = useId()
   return (
     <>
@@ -66,6 +66,8 @@ export default function ComboPicker({ groups = [], picks = {}, onPick, total }) 
           <span className="tabular-nums">{formatMoney(total)}</span>
         </p>
       )}
+      {/* Odoo's note when items' extras are shown before their tax (`taxDisclaimer`). */}
+      {note && <p className="mt-1.5 text-[12px] text-faint">{note}</p>}
     </>
   )
 }

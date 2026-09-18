@@ -37,20 +37,23 @@ export default function useProductChoice(product, { live = true } = {}) {
 
   /**
    * What only the server can price: a dynamic combination nobody has bought
-   * yet, or extras on top of a variant (a pricelist can change what they add).
-   * Keyed on the choices, so an answer to an earlier question never prices the
-   * current one, and debounced, so ticking three add-ons asks once.
+   * yet, extras on top of a variant (a pricelist can change what they add), or
+   * a quantity past a price break (Odoo prices the page for the quantity).
+   * Keyed on the quantity and the choices, so an answer to an earlier question
+   * never prices the current one, and debounced, so ticking three add-ons asks once.
    */
-  const quoteKey = live && complete && ((!variant && model.dynamic) || extraAmount > 0)
-    ? [...chosenIds, ...picked.map((x) => x.choice.id)].join('|')
+  const tiered = qty > 1 && product?.priceTiers?.length > 0
+  const quoteKey = live && complete && ((!variant && model.dynamic) || extraAmount > 0 || tiered)
+    ? [tiered ? qty : 1, ...chosenIds, ...picked.map((x) => x.choice.id)].join('|')
     : ''
   const [quote, setQuote] = useState(null)
   useEffect(() => {
     if (!quoteKey) return undefined
     let alive = true
+    const [quantity, ...ids] = quoteKey.split('|')
     const timer = setTimeout(() => {
       api
-        .getCombination(product.slug, quoteKey.split('|').filter(Boolean))
+        .getCombination(product.slug, ids.filter(Boolean), +quantity)
         .then((data) => alive && setQuote({ key: quoteKey, data }))
         .catch((error) => alive && setQuote({ key: quoteKey, error }))
     }, 250)

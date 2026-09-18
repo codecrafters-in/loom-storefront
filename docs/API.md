@@ -507,7 +507,7 @@ option ids from the names and adds to the bag with `variant_id`.
 | `options[].role` | list, detail | `color` · `size` · `null`. Size shows the size chart link and the fit block; colour gives the card its swatches |
 | `options[].imagesFollow` | list, detail | The gallery shows images whose `color` is the chosen value of this option, plus untagged ones |
 | `options[].mode` | list, detail | `variant`, or `dynamic`: a combination may be missing from `variants[]` and is priced by `POST /products/:slug/combination` |
-| `options[].choices[]` | list, detail | `{ id, name, color, image, priceExtra, custom }`. `custom: true` asks the shopper for text |
+| `options[].choices[]` | list, detail | `{ id, name, color, image, priceExtra, custom }`. `custom: true` asks the shopper for text. `priceExtra` is `null` when a fixed price takes no extras (Odoo shows none then) |
 | `extraOptions[]` | detail | No-variant attributes: `{ id, name, displayType, multiple, required, choices }`. Checkboxes when `multiple`; a "None" row when not `required` |
 | `variants[].optionIds` | list, detail | `{ optionId: choiceId }`. Its presence is what tells the theme to add by choices |
 | `variants[].inventory` | list, detail | A number, or `null` when the store does not show stock |
@@ -516,7 +516,8 @@ option ids from the names and adds to the bag with `variant_id`.
 | `brand` | list, detail | `{ slug, name, logo }` or `null`. Shown on the card and the product page, linked to `/brands/:slug`, and used as the JSON-LD brand |
 | `breadcrumbs` | detail | `[{ slug, name }]`, root to leaf. Without it the theme walks the category tree |
 | `images[]` video | detail | `{ type: "video", provider, embedUrl, url, alt }`. `youtube` and `vimeo` show `url` as a poster and load `embedUrl` only when pressed; `file` plays `url` in a video element |
-| `combo` | detail, combo only | `[{ id, name, items: [{ id, variantId, productSlug, title, image, options, extraPrice, available }] }]`. One item per group |
+| `combo` | detail, combo only | `[{ id, name, items: [{ id, variantId, productSlug, title, image, options, extraPrice, available }] }]`. One item per group. `extraPrice` is untaxed, as Odoo's combo chooser shows it |
+| `taxDisclaimer` | detail, combo only | Odoo's note under a combo's total when its items' extras are shown before tax, or `null` |
 | `optionalProducts` | detail | `ProductSummary[]`, offered in a dialog when the product is added |
 | `accessories` | detail | `ProductSummary[]`, the "Frequently bought together" rail on the page and in the bag drawer |
 | `alternatives` | detail | `ProductSummary[]`, used for "You might also like" instead of `GET /products/:slug/related` |
@@ -553,11 +554,14 @@ options before it, so the first option is always fully open.
 
 ### `POST /products/:slug/combination`
 
-Prices what `variants[]` cannot: a dynamic combination nobody has bought, or
-extras on top of a variant. The theme calls it 250 ms after the choices settle.
+Prices what `variants[]` cannot: a dynamic combination nobody has bought,
+extras on top of a variant, or a quantity past a price break (`quantity`, sent
+when it is above 1 and the product has `priceTiers`; the price is per item for
+that quantity, as Odoo prices its product page). The theme calls it 250 ms after
+the choices settle.
 
 ```json
-{ "choiceIds": ["grind-espresso"] }
+{ "choiceIds": ["grind-espresso"], "quantity": 5 }
 ```
 
 ```json
@@ -1157,7 +1161,8 @@ the prices, not a discount line.
 `lineTotal`, as Odoo's cart does.
 
 **Quantity prices.** A product detail may carry `priceTiers: [{ minQuantity, price }]`,
-shown under the price as "5+ items · $80.00 each".
+shown under the price as "5+ items · $80.00 each", and each variant its own (`variants[].priceTiers`), shown for the
+chosen variant. With tiers, a quantity above 1 re-prices the page through `POST /products/:slug/combination`.
 
 ### Adding any product
 

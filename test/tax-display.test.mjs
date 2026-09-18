@@ -101,3 +101,18 @@ test('before a delivery method is chosen, Delivery has no amount yet, as Odoo’
   assert.equal(delivery({ ...uk, shipping: gbp(299), shippingMethod: 'standard' }).money.amount, 299)
   assert.equal(delivery({ ...uk, shipping: gbp(299) }).money.amount, 299, 'an older answer without shippingMethod')
 })
+
+test('a combination is priced for the quantity picked, as Odoo prices its product page', async () => {
+  globalThis.window.location.origin = 'http://localhost'
+  shared.clear()
+  const http = await import('../src/lib/api/http.js')
+  const bodies = []
+  globalThis.fetch = async (url, init = {}) => {
+    bodies.push(JSON.parse(init.body || '{}'))
+    const answer = { exists: true, variantId: '1', available: true, price: gbp(3600), compareAtPrice: null }
+    return new Response(JSON.stringify(answer), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  await http.getCombination('scarf', ['7'])
+  await http.getCombination('scarf', ['7'], 5)
+  assert.deepEqual(bodies, [{ choiceIds: ['7'] }, { choiceIds: ['7'], quantity: 5 }])
+})

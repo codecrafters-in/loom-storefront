@@ -13,6 +13,9 @@ With the Odoo module's 19.0.2.5.0. Details: [API.md](API.md).
   with the end of their code.
 - No delivery in the bag before the delivery step (`shippingMethod: null`): the bag, the drawer and the checkout
   summary print Delivery as "-", as Odoo's cart does, and the total is the products'.
+- The product page is priced for the quantity picked past a price break (`quantity` on the combination call), shows the
+  chosen variant's quantity prices, and a combo shows Odoo's tax note (`taxDisclaimer`) under its total. Options priced
+  by a fixed-price rule no longer show "+x".
 
 ## What's new — Tax shown as Odoo shows it
 

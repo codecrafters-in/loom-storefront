@@ -190,9 +190,10 @@ export async function getProduct(slug) {
  * Price and stock for choices `variants[]` cannot answer: a dynamic option's
  * combination nobody has bought yet, or no-variant extras on top.
  */
-export async function getCombination(slug, choiceIds = []) {
+export async function getCombination(slug, choiceIds = [], quantity = 1) {
   const where = `POST /products/${slug}/combination`
-  const res = await post(`/products/${encodeURIComponent(slug)}/combination`, { choiceIds })
+  // Priced per item for the quantity picked, as Odoo's product page is.
+  const res = await post(`/products/${encodeURIComponent(slug)}/combination`, { choiceIds, ...(quantity > 1 && { quantity }) })
   if (!res || typeof res.available !== 'boolean') throw new ContractError(where, '{ exists, variantId, available, price }', res)
   assertMoney(res.price, `${where} price`)
   return res
