@@ -9,7 +9,7 @@ import Seo from '../components/Seo.jsx'
 import ProductView from '../components/product/ProductView.jsx'
 import { useBootstrap, useStorefront } from '../store/StorefrontContext.jsx'
 import { productTrail } from '../lib/categories.js'
-import { viewItem } from '../lib/analytics.js'
+import { consentState, viewItem, visitorId } from '../lib/analytics.js'
 import { remember } from '../lib/recentlyViewed.js'
 import { useAuth } from '../store/AuthContext.jsx'
 import RecentlyViewed from '../components/product/RecentlyViewed.jsx'
@@ -61,6 +61,11 @@ export default function Product() {
   useEffect(() => {
     if (!product) return
     viewItem(product)
+    // Odoo's visitor tracking (its Visitors report and recently viewed products): the signed-in customer, or this
+    // browser's id once analytics is allowed (or no cookie banner asks).
+    const consent = consentState()
+    const allowed = (!consent || consent.analytics) && globalThis.navigator?.doNotTrack !== '1'
+    api.recordView(product.slug, { visitorId: allowed ? visitorId() : undefined }).catch(() => {})
     // Scoped to the signed-in customer. A shared laptop is the normal case in a
     // household, and a rail showing the last person's browsing is both a
     // privacy problem and a useless recommendation.

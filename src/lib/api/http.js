@@ -216,6 +216,8 @@ export const sendContact = (message) => post('/contact', message)
 
 /** `{ anonymousId, choices: { analytics, marketing }, policyVersion }`, kept by the backend as proof of consent. */
 export const recordConsent = (consent) => post('/consents', consent)
+/** A product page seen, for Odoo's visitor tracking: `{ variantId?, visitorId? }`. */
+export const recordView = (slug, body) => post(`/products/${encodeURIComponent(slug)}/views`, body)
 
 /** A password-protected store's password → `{ token, header, expiresAt }`. */
 export const requestAccess = (password) => post('/access', { password })

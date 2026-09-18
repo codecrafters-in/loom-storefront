@@ -648,6 +648,9 @@ export async function recordConsent() {
   return { ok: true }
 }
 
+/** The demo keeps no visitors. */
+export const recordView = async () => null
+
 export async function requestAccess() {
   await latency()
   return { token: 'demo', header: 'X-Loom-Access', expiresAt: new Date(Date.now() + 12 * 3600 * 1000).toISOString() }

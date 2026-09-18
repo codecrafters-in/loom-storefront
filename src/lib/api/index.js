@@ -29,7 +29,7 @@ const SURFACE = [
   'getStorefront', 'getBootstrap',
   'listProducts', 'getProduct', 'getRelated', 'listCategories', 'listCollections', 'getReviews', 'createReview', 'getQuestions', 'askQuestion', 'confirmNewsletter', 'unsubscribeNewsletter', 'createAlert', 'stopAlerts',
   'getCombination', 'listBrands', 'getBrand',
-  'listPages', 'getPage', 'sendContact', 'recordConsent', 'requestAccess', 'adminAccess', 'listBlogPosts', 'getBlogPost',
+  'listPages', 'getPage', 'sendContact', 'recordConsent', 'recordView', 'requestAccess', 'adminAccess', 'listBlogPosts', 'getBlogPost',
   'getCart', 'addToCart', 'updateCartLine', 'removeCartLine', 'applyDiscount', 'clearCart',
   'checkout', 'listOrders', 'getOrder', 'lookupOrder', 'downloadFile',
   'getPaymentOptions', 'createPayment', 'paymentAction', 'getPayment',

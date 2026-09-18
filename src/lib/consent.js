@@ -7,10 +7,9 @@
  * answer, so a tag manager on the page follows it too.
  */
 import api from './api/index.js'
-import { setConsent } from './analytics.js'
+import { setConsent, visitorId } from './analytics.js'
 
 const KEY = 'loom.consent'
-const VISITOR = 'loom.visitor'
 export const CONSENT_OPEN_EVENT = 'loom:consent-open'
 
 function gtag() {
@@ -40,19 +39,6 @@ export function savedConsent(policyVersion) {
     return saved && saved.policyVersion === policyVersion ? saved.choices : null
   } catch {
     return null
-  }
-}
-
-function visitorId() {
-  try {
-    let id = localStorage.getItem(VISITOR)
-    if (!id) {
-      id = (crypto.randomUUID?.() || `${Date.now()}${Math.random()}`).replace(/[^A-Za-z0-9]/g, '').slice(0, 32)
-      localStorage.setItem(VISITOR, id)
-    }
-    return id
-  } catch {
-    return `anon${Date.now()}`
   }
 }
 
