@@ -1092,6 +1092,11 @@ discounts, gift wrapping and the cash-on-delivery fee, which are lines in Odoo's
 can read a cent off its unit price (a £30.99 price with 20% tax included, rounded globally, reads £31.00) and the rows
 are not a sum: `untaxed + tax = total` is. An older backend without `untaxed` shows `total − tax`.
 
+**No delivery before the delivery step.** As in Odoo's cart, a bag has no delivery line until checkout prices the
+methods for an address: `shippingMethod` is `null`, `shipping` zero and the total the products'. The bag, the drawer
+and the checkout summary print Delivery as "-" then; the checkout's delivery options choose a method, and from then on
+the bag reprices it as it changes. An older backend always sends a method, and its amount is shown.
+
 `freeShippingRemaining` drives the "away from free shipping" line in the cart and drawer; return zero when it does not
 apply. `freeShippingProgress` (optional, `null` when nothing ships free) fills the cart's bar with `percent`, measured
 by the backend; without it the bar falls back to `subtotal / freeShippingThreshold`. `minimumOrder` (optional,

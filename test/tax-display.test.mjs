@@ -94,3 +94,10 @@ test('the bag’s pricelist prices the catalogue, over the currency picked befor
   await http.listProducts({})
   assert.equal(seen.at(-1), '4', 'a new pick counts until the bag answers')
 })
+
+test('before a delivery method is chosen, Delivery has no amount yet, as Odoo’s cart prints "-"', () => {
+  const delivery = (bag) => totalRows(bag).find((row) => row.label === 'Delivery')
+  assert.equal(delivery({ ...uk, shipping: gbp(0), shippingMethod: null }).money, null)
+  assert.equal(delivery({ ...uk, shipping: gbp(299), shippingMethod: 'standard' }).money.amount, 299)
+  assert.equal(delivery({ ...uk, shipping: gbp(299) }).money.amount, 299, 'an older answer without shippingMethod')
+})

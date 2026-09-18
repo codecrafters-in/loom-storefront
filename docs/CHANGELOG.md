@@ -11,6 +11,8 @@ With the Odoo module's 19.0.2.5.0. Details: [API.md](API.md).
 - A line the pricelist discounts shows its price before the discount struck through (`compareAtTotal`) in the bag, the
   drawer and the checkout summary. The customer's own coupons and gift cards are offered under **Choose your reward**
   with the end of their code.
+- No delivery in the bag before the delivery step (`shippingMethod: null`): the bag, the drawer and the checkout
+  summary print Delivery as "-", as Odoo's cart does, and the total is the products'.
 
 ## What's new — Tax shown as Odoo shows it
 

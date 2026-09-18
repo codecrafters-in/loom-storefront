@@ -7,7 +7,7 @@ export default function TotalRows({ bag, fee }) {
   return totalRows(bag, fee).map((row, i) => (
     <div key={i} className={`flex justify-between ${row.off ? 'text-sale' : ''}`}>
       <dt className={row.off ? '' : 'text-muted'}>{t(row.label)}</dt>
-      <dd className="tabular-nums">{row.off && '−'}{formatMoney(row.money)}</dd>
+      <dd className="tabular-nums">{row.off && '−'}{row.money ? formatMoney(row.money) : '-'}</dd>
     </div>
   ))
 }

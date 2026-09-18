@@ -595,7 +595,7 @@ export default function Checkout() {
                   <span className="block text-[13px] text-faint">{s.note}</span>
                 </span>
                 <span className="text-sm tabular-nums">
-                  {(shippingOptions ? s.price === 0 : cart.shipping.amount === 0 && s.id === 'standard')
+                  {(shippingOptions ? s.price === 0 : cart.shipping.amount === 0 && cart.shippingMethod !== null && s.id === 'standard')
                     ? t('Free')
                     : formatMoney({ amount: s.price, currency: cart.currency })}
                 </span>
