@@ -1,10 +1,10 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import Layout from './components/layout/Layout.jsx'
 import { ToastProvider } from './store/ToastContext.jsx'
 import { CartProvider } from './store/CartContext.jsx'
 import { WishlistProvider } from './store/WishlistContext.jsx'
-import { AuthProvider } from './store/AuthContext.jsx'
+import { AuthProvider, useAuth } from './store/AuthContext.jsx'
 import { StorefrontProvider, useStorefrontState } from './store/StorefrontContext.jsx'
 import { blogEnabled } from './lib/blog.js'
 import { AdminAuthProvider } from './store/AdminAuthContext.jsx'
@@ -90,6 +90,15 @@ function BlogOnly({ children }) {
   return blogEnabled(config) ? children : <Navigate to="/404" replace />
 }
 
+/** Odoo's eCommerce access "Logged in users" (`access.shop`): the shop, products, search and bag are for signed-in customers. */
+function ShopOnly() {
+  const { config } = useStorefrontState()
+  const { signedIn, loading } = useAuth()
+  const { pathname, search } = useLocation()
+  if (config.access?.shop !== 'logged_in' || signedIn) return <Outlet />
+  return loading ? <Loading /> : <Navigate to="/login" replace state={{ from: pathname + search }} />
+}
+
 export default function App() {
   // Everything below the settings starts again in a new language, so every piece of text is in it.
   const language = useLanguage()
@@ -109,17 +118,19 @@ export default function App() {
               <Routes>
                 <Route element={<Layout />}>
                   <Route index element={<Home />} />
-                  <Route path="shop" element={<Shop />} />
-                  <Route path="shop/:slug" element={<Shop mode="category" />} />
-                  <Route path="collections/:slug" element={<Shop mode="collection" />} />
-                  <Route path="brands" element={<Brands />} />
-                  <Route path="brands/:slug" element={<Shop mode="brand" />} />
-                  <Route path="compare" element={<Compare />} />
-                  <Route path="product/:slug" element={<Product />} />
-                  <Route path="search" element={<Search />} />
-                  <Route path="cart" element={<Cart />} />
-                  <Route path="wishlist" element={<Wishlist />} />
-                  <Route path="checkout" element={<Checkout />} />
+                  <Route element={<ShopOnly />}>
+                    <Route path="shop" element={<Shop />} />
+                    <Route path="shop/:slug" element={<Shop mode="category" />} />
+                    <Route path="collections/:slug" element={<Shop mode="collection" />} />
+                    <Route path="brands" element={<Brands />} />
+                    <Route path="brands/:slug" element={<Shop mode="brand" />} />
+                    <Route path="compare" element={<Compare />} />
+                    <Route path="product/:slug" element={<Product />} />
+                    <Route path="search" element={<Search />} />
+                    <Route path="cart" element={<Cart />} />
+                    <Route path="wishlist" element={<Wishlist />} />
+                    <Route path="checkout" element={<Checkout />} />
+                  </Route>
                   {/* Where a gateway's hosted page sends the shopper back. Never prerendered. */}
                   <Route path="checkout/return" element={<CheckoutReturn />} />
                   <Route path="order/:id" element={<OrderConfirmation />} />

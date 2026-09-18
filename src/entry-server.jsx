@@ -204,6 +204,8 @@ export async function page(target) {
   try {
     reads = await readsFor(path, url.searchParams, boot)
   } catch (err) {
+    // A shop for signed-in customers only: the shell, as for a private page.
+    if (err.code === 'login_required') return { kind: 'private', ...about() }
     if (err.status !== 404) throw err
     reads = null
   }

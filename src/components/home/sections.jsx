@@ -117,6 +117,8 @@ function ProductRail({ section }) {
   )
 
   const items = prefetched || data?.items || []
+  // A shop for signed-in customers only shows a visitor no products.
+  if (error?.code === 'login_required') return null
 
   return (
     <section className="wrap pb-16 md:pb-20">
