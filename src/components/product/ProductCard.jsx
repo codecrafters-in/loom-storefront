@@ -67,7 +67,7 @@ export default function ProductCard({ product, priority = false, className = '' 
         </Link>
       </h3>
       {product.subtitle && !overlay && <p className="mt-1 text-[13px] text-faint">{product.subtitle}</p>}
-      <Price price={span.price} to={span.to} compareAt={span.compareAt} size="sm" className={`${overlay ? 'mt-1' : 'mt-2'} flex-wrap`} />
+      <Price price={!product.priceOnRequest && span.price} to={span.to} compareAt={span.compareAt} size="sm" className={`${overlay ? 'mt-1' : 'mt-2'} flex-wrap`} />
     </>
   )
 

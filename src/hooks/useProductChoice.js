@@ -76,6 +76,8 @@ export default function useProductChoice(product, { live = true } = {}) {
   // that was never made, reached by restoring a stale link.
   const invalid = answer?.error?.code === 'invalid_combination' || (complete && !variant && !model.dynamic && model.options.length > 0)
   const unavailable = answer?.data ? !answer.data.available : Boolean(variant && !variant.available)
+  // Odoo's "Hide 'Add To Cart' when price = 0": no price and no button, a Contact us link instead.
+  const onRequest = Boolean((answer?.data || variant || product)?.priceOnRequest)
 
   // The first thing standing between the shopper and the bag names the button.
   const blocker = missing
@@ -116,11 +118,12 @@ export default function useProductChoice(product, { live = true } = {}) {
     variant,
     gallery,
     shown,
+    onRequest,
     missing,
     blocker,
     // The chosen option exists but is sold out ("Notify me" instead of "Add to bag").
     unavailable: !missing && !invalid && unavailable,
-    ready: !blocker,
+    ready: !blocker && !onRequest,
     // Nothing the shopper can choose will fix these; the sticky bar disables rather than scrolls.
     stuck: !missing && !set.missing.length && !needsText.length && Boolean(blocker),
     extras,

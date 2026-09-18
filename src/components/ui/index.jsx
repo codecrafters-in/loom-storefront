@@ -81,6 +81,8 @@ export const Button = forwardRef(function Button(
  * two numbers is not a claim anybody can check.
  */
 export function Price({ price, to, compareAt, size = 'md', className = '' }) {
+  // No price: a product whose price is on request (`priceOnRequest`).
+  if (!price) return null
   const pct = to ? 0 : discountPercent(price, compareAt)
   const scale = size === 'lg' ? 'text-xl' : size === 'sm' ? 'text-[13px]' : 'text-[15px]'
   return (

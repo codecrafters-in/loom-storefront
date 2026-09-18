@@ -346,7 +346,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
           <p className="mt-2 text-[15px] leading-snug text-muted">{product.subtitle}</p>
 
           <div className="mt-5 flex flex-wrap items-center gap-4">
-            <Price price={shown.price} to={shown.to} compareAt={shown.compareAt} size="lg" />
+            <Price price={!choice.onRequest && shown.price} to={shown.to} compareAt={shown.compareAt} size="lg" />
             <a href="#reviews" className="shrink-0">
               <Rating value={product.rating.average} count={product.rating.count} />
             </a>
@@ -468,15 +468,21 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             ref={buyRef}
             className="mt-8 grid grid-cols-[auto_1fr] items-center gap-3 sm:grid-cols-[auto_1fr_auto]"
           >
-            <QuantityStepper value={choice.qty} onChange={choice.setQty} {...choice.stepper} />
-            <Button
-              size="lg"
-              className="order-last col-span-2 w-full sm:order-none sm:col-span-1"
-              disabled={preview || !choice.ready || busy}
-              onClick={buy}
-            >
-              {choice.blocker || (busy ? t('Adding…') : t('Add to bag'))}
-            </Button>
+            {choice.onRequest ? (
+              <ContactUs size="lg" className="col-span-2" />
+            ) : (
+              <>
+                <QuantityStepper value={choice.qty} onChange={choice.setQty} {...choice.stepper} />
+                <Button
+                  size="lg"
+                  className="order-last col-span-2 w-full sm:order-none sm:col-span-1"
+                  disabled={preview || !choice.ready || busy}
+                  onClick={buy}
+                >
+                  {choice.blocker || (busy ? t('Adding…') : t('Add to bag'))}
+                </Button>
+              </>
+            )}
             {config.features?.wishlist !== false && (
             <Button
               variant="quiet"
@@ -572,15 +578,15 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               </p>
             )}
           </button>
-          <Price price={shown.price} to={shown.to} compareAt={shown.compareAt} size="sm" className="hidden shrink-0 sm:inline-flex" />
-          <Button
+          <Price price={!choice.onRequest && shown.price} to={shown.to} compareAt={shown.compareAt} size="sm" className="hidden shrink-0 sm:inline-flex" />
+          {choice.onRequest ? <ContactUs className="shrink-0" /> : <Button
             size="md"
             className="shrink-0"
             disabled={busy || choice.stuck}
             onClick={() => (choice.ready ? buy() : choice.missing ? setSheetOpen(true) : scrollToBuy())}
           >
             {choice.missing ? t('Choose {option}', { option: choice.missing.name.toLowerCase() }) : choice.blocker || t('Add to bag')}
-          </Button>
+          </Button>}
         </div>
       </div>
       )}
@@ -629,6 +635,12 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
       <SizeChartModal product={product} open={chartOpen} onClose={() => setChartOpen(false)} />
     </>
   )
+}
+
+/** Odoo's Contact us button, in place of the price and the buy button of a product priced on request. */
+export function ContactUs(props) {
+  const to = useStorefront().commerce?.contactUsUrl || '/pages/contact'
+  return <Button {...props} {...(/^([a-z][a-z0-9+.-]*:|\/\/)/i.test(to) ? { href: to } : { to })}>{t('Contact us')}</Button>
 }
 
 /** The gallery frame: a zoom button over a photograph, a plain box over video. */
