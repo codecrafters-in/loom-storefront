@@ -7,6 +7,7 @@ import { clearAll, keyOf } from './lib/api/cache.js'
 import { startCollecting, stopCollecting, renderHead } from './lib/head.js'
 import { filtersFromParams, listingQuery } from './pages/Shop.jsx'
 import { loadDoc } from './pages/Docs.jsx'
+import { loadDocsPage } from './pages/docs-loader.js'
 import { docPages, docPath } from './data/docs.js'
 import { flattenCategories } from './lib/categories.js'
 import { config, isMock } from './lib/config.js'
@@ -28,7 +29,7 @@ import { loadMoreSections } from './components/home/load-more.js'
 /** Resolve what a route reads, and hand back the payload to inline in the page. */
 export async function prime(reads = []) {
   // The newer home section types are a chunk of their own, and `renderToString` writes nothing for code still loading.
-  await Promise.all([api.getBootstrap(), loadMoreSections()])
+  await Promise.all([api.getBootstrap(), loadMoreSections(), loadDocsPage()])
   // A read that fails still renders — a product page whose reviews are down is
   // a product page, and refusing to prerender it helps nobody.
   await Promise.all(reads.map(([name, args]) => api[name](...args).catch(() => null)))

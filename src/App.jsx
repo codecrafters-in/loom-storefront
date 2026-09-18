@@ -17,7 +17,7 @@ import Product from './pages/Product.jsx'
 // its Suspense fallback during a server render, so an indexed route that is
 // code-split ships a skeleton to the crawler.
 import StaticPage from './pages/StaticPage.jsx'
-import Docs from './pages/Docs.jsx'
+import { docsPage, loadDocsPage } from './pages/docs-loader.js'
 // Eager too: the render handler answers an unknown address with this page and a 404, and a lazy page renders only
 // its loading fallback on the server, with no title.
 import NotFound from './pages/NotFound.jsx'
@@ -72,6 +72,13 @@ const AdminCallback = lazy(() => import('./pages/admin/Callback.jsx'))
 function Boundary({ children }) {
   const { pathname } = useLocation()
   return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>
+}
+
+/** The documentation, a chunk of its own that is in before a server render or a hydration (pages/docs-loader.js). */
+function Docs(props) {
+  const Page = docsPage()
+  if (!Page) throw loadDocsPage()
+  return <Page {...props} />
 }
 
 const Loading = () => (
