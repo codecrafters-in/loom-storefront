@@ -1469,7 +1469,10 @@ its code the next time the form opens. The demo adapter answers from
 `amountDue`, `canPay` and `refundedTotal` are optional: an order without them
 shows neither. `billingAddress` (when it is not the delivery address), `company`
 and `vat` show a Billing block on the order page. The Customer carries `company`
-and `vat`, and each address a `type` (`shipping` or `billing`).
+and `vat`, and each address a `type` (`shipping` or `billing`). As in Odoo's portal, the tax ID and an address's
+country are fixed once orders or invoices were issued: the Customer says `vatLocked` and each address `countryLocked`
+(both optional, `false` when missing); the account and checkout show them read-only, and the backend refuses a change
+with `422 vat_locked` or `422 country_locked` (`detail.fields`).
 
 A paid order with digital products adds `downloads: [{ id, name, url }]`, listed
 on the order page. `url` is `GET /orders/:orderId/downloads/:documentId`; a bare

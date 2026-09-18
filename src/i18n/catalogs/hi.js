@@ -852,4 +852,5 @@ export default {
   "minutes": "मिनट",
   "seconds": "सेकंड",
   "Billing address": "बिलिंग पता",
+  "This can’t be changed once orders or invoices have been issued. Contact us to change it.": "ऑर्डर या इनवॉइस जारी होने के बाद इसे बदला नहीं जा सकता। इसे बदलने के लिए हमसे संपर्क करें।",
 }

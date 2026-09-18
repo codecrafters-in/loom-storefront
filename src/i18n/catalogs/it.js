@@ -868,4 +868,5 @@ export default {
   "minutes": "minuti",
   "seconds": "secondi",
   "Billing address": "Indirizzo di fatturazione",
+  "This can’t be changed once orders or invoices have been issued. Contact us to change it.": "Non può essere modificato dopo l’emissione di ordini o fatture. Contattaci per cambiarlo.",
 }

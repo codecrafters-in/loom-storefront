@@ -852,4 +852,5 @@ export default {
   "minutes": "minuten",
   "seconds": "seconden",
   "Billing address": "Factuuradres",
+  "This can’t be changed once orders or invoices have been issued. Contact us to change it.": "Dit kan niet meer worden gewijzigd zodra er bestellingen of facturen zijn uitgegeven. Neem contact met ons op om het te wijzigen.",
 }

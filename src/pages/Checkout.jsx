@@ -559,6 +559,7 @@ export default function Checkout() {
                 label={t('Tax ID (VAT, GSTIN…)')}
                 id="vat"
                 value={business.vat}
+                readOnly={customer?.vatLocked}
                 onChange={(e) => {
                   const vat = e.target.value
                   setBusiness((b) => ({ ...b, vat }))

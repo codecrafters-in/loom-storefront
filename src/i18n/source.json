@@ -608,6 +608,7 @@
     "The products being compared, one column each",
     "The two passwords are not the same.",
     "This bag is no longer available.",
+    "This can’t be changed once orders or invoices have been issued. Contact us to change it.",
     "This is a demo. No payment is taken and no card details are collected — a real build hands off to a payment provider at this point, so card data never touches the storefront.",
     "This link did not work",
     "This link is incomplete.",

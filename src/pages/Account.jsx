@@ -355,8 +355,10 @@ function PersonalDetails() {
           <AddressField id="ph" label={t('Phone')} type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" />
           <div className="grid gap-4 sm:grid-cols-2">
             <AddressField id="co" label={t('Company (optional)')} value={form.company} onChange={set('company')} autoComplete="organization" />
-            <AddressField id="vat" label={t('Tax ID (optional)')} value={form.vat} onChange={set('vat')} />
+            {/* As Odoo's portal: fixed once orders or invoices were issued. */}
+            <AddressField id="vat" label={t('Tax ID (optional)')} value={form.vat} onChange={set('vat')} readOnly={customer.vatLocked} aria-describedby={customer.vatLocked ? 'vat-locked' : undefined} />
           </div>
+          {customer.vatLocked && <p id="vat-locked" className="text-[12px] text-faint">{t('This can’t be changed once orders or invoices have been issued. Contact us to change it.')}</p>}
           <p className="text-[12px] text-faint">{t('Your email, {email}, is how you sign in. Change it under Sign-in & privacy.', { email: customer.email })}</p>
           <div className="flex gap-3">
             <Button as="button" type="submit" size="sm" disabled={busy}>{busy ? t('Saving…') : t('Save')}</Button>
@@ -566,6 +568,8 @@ function Addresses() {
                     value={editing.country || defaultCountry}
                     onChange={set('country')}
                     autoComplete="country"
+                    disabled={editing.countryLocked}
+                    aria-describedby={editing.countryLocked ? 'country-locked' : undefined}
                   >
                     {/* An address saved for a country the store no longer ships to stays selectable. */}
                     {editing.country && !countries.some(([code]) => code === editing.country) && (
@@ -573,6 +577,7 @@ function Addresses() {
                     )}
                     {countries.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
                   </select>
+                  {editing.countryLocked && <p id="country-locked" className="mt-1 text-[12px] text-faint">{t('This can’t be changed once orders or invoices have been issued. Contact us to change it.')}</p>}
                 </div>
               )
             })}
