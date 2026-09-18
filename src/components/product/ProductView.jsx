@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  Badge, Button, Icon, Price, QuantityStepper, Rating,
+  Badge, Button, Icon, Price, QuantityStepper, Rating, Ribbon,
 } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
@@ -179,6 +179,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
   const specList = product.enrichment?.specList
   const isCombo = product.type === 'combo'
   const current = gallery[shot]
+  const ribbon = variant ? variant.ribbon : product.ribbon
   const openChart = () => (onOpenChart ? onOpenChart() : setChartOpen(true))
 
   // Beside the option whose role is size. A product with a chart but no size to
@@ -307,6 +308,8 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
                 {/* Only over the first shot — the rest are detail crops, and
                     the crop is the answer somebody opened them for. */}
                 {shot === 0 && current?.type !== 'video' && <ImageSpecs enrichment={product.enrichment} />}
+                {/* The chosen option's Odoo ribbon, else the product's. */}
+                <Ribbon ribbon={ribbon} className={ribbon?.position === 'right' ? 'top-14' : 'top-0'} />
 
                 {current?.type !== 'video' && (
                   <span

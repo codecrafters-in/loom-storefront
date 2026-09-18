@@ -155,6 +155,22 @@ export function Badge({ kind, children, className = '' }) {
   )
 }
 
+/**
+ * An Odoo ribbon (`ribbon`: its name, colours, corner and style) over a product photograph. `tag` is Odoo's badge; a
+ * `ribbon` runs to the edge of the photograph.
+ */
+export function Ribbon({ ribbon, className = '' }) {
+  if (!ribbon?.name) return null
+  return (
+    <span
+      className={`absolute px-2 py-1 font-mono text-[9px] uppercase tracking-[0.14em] ${ribbon.position === 'right' ? 'end-0' : 'start-0'} ${ribbon.style === 'tag' ? 'm-3 rounded-xs' : ''} ${className}`}
+      style={{ background: ribbon.bgColor, color: ribbon.textColor }}
+    >
+      {ribbon.name}
+    </span>
+  )
+}
+
 /* ── quantity ──────────────────────────────────────────────────────────── */
 
 /**

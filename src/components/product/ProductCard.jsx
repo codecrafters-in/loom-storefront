@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Badge, Icon, Price } from '../ui/index.jsx'
+import { Badge, Icon, Price, Ribbon } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
 import { optionsOf } from '../../lib/variants.js'
@@ -110,7 +110,10 @@ export default function ProductCard({ product, priority = false, className = '' 
                 className="absolute inset-0 h-full w-full scale-[1.02] object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
               />
             )}
-            {badge && <Badge kind={badge} className="absolute start-3 top-3" />}
+            {/* Odoo's ribbon where the API sends one; the theme's own badge on data without ribbons. */}
+            {'ribbon' in product
+              ? <Ribbon ribbon={product.ribbon} className={product.ribbon?.position === 'right' ? 'top-12' : 'top-0'} />
+              : badge && <Badge kind={badge} className="absolute start-3 top-3" />}
             {soldOut && (
               <span className={`absolute inset-x-0 ${overlay ? 'top-12' : 'bottom-0'} bg-ink/75 py-2 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-page`}>
                 {t('Sold out')}
