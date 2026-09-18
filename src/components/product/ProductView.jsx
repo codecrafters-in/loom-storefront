@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  Badge, Button, Icon, Price, QuantityStepper, Rating, Ribbon,
+  Badge, Button, Icon, Price, QuantityStepper, Rating, Rich, Ribbon,
 } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
@@ -370,7 +370,9 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
 
           {/* A lede, not the whole description. The rest lives in Details,
               where someone who wants it will look for it. */}
-          <p className="mt-5 text-[15px] leading-relaxed text-muted">{product.description}</p>
+          {product.descriptionHtml
+            ? <Rich html={product.descriptionHtml} className="mt-5 text-[15px] leading-relaxed text-muted" />
+            : <p className="mt-5 text-[15px] leading-relaxed text-muted">{product.description}</p>}
 
           <ProductHighlights enrichment={product.enrichment} />
 
@@ -462,9 +464,7 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             </p>
           )}
           {/* Odoo's Out-of-Stock Message, sanitised by the API. */}
-          {choice.unavailable && product.outOfStockMessage && (
-            <div className="rich mt-3 text-[13px] text-sale" dangerouslySetInnerHTML={{ __html: product.outOfStockMessage }} />
-          )}
+          {choice.unavailable && <Rich html={product.outOfStockMessage} className="mt-3 text-[13px] text-sale" />}
 
           {/*
             One row on a wide column, two on a narrow one — and the wrap is

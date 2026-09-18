@@ -8,7 +8,7 @@ import Promises from '../components/layout/Promises.jsx'
 import Seo from '../components/Seo.jsx'
 import { useBootstrap, useStorefront } from '../store/StorefrontContext.jsx'
 import { categoryTrail, flattenCategories } from '../lib/categories.js'
-import { Breadcrumbs, Button, Empty, ErrorState, Icon, Pagination } from '../components/ui/index.jsx'
+import { Breadcrumbs, Button, Empty, ErrorState, Icon, Pagination, Rich } from '../components/ui/index.jsx'
 import { t, plural, mark } from '../i18n/index.js'
 import { viewItemList } from '../lib/analytics.js'
 
@@ -214,7 +214,9 @@ export default function Shop({ mode = 'category' }) {
               <span aria-hidden="true" className="skeleton inline-block h-[0.9em] w-64 max-w-full rounded-xs align-middle" />
             </h1>
           )}
-          {blurb && <p className="mt-4 text-[15px] leading-relaxed text-muted">{blurb}</p>}
+          {!brand && !col && meta?.descriptionHtml
+            ? <Rich html={meta.descriptionHtml} className="mt-4 text-[15px] leading-relaxed text-muted" />
+            : blurb && <p className="mt-4 text-[15px] leading-relaxed text-muted">{blurb}</p>}
         </header>
       </div>
 

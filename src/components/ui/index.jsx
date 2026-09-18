@@ -155,6 +155,11 @@ export function Badge({ kind, children, className = '' }) {
   )
 }
 
+/** Formatted text from Odoo (a description, a message), sanitised by the API before it is sent. Nothing when empty. */
+export function Rich({ html, className = '' }) {
+  return html ? <div className={`rich ${className}`} dangerouslySetInnerHTML={{ __html: html }} /> : null
+}
+
 /**
  * An Odoo ribbon (`ribbon`: its name, colours, corner and style) over a product photograph. `tag` is Odoo's badge; a
  * `ribbon` runs to the edge of the photograph.
