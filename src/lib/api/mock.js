@@ -864,7 +864,7 @@ export function loadCart() {
   return stored && Array.isArray(stored.lines) ? stored : emptyCart()
 }
 /** A line as the API returns it, without this adapter's bookkeeping. */
-const publicLine = ({ _components, _untracked, ...line }) => line
+const publicLine = ({ _components, _untracked, _warning, ...line }) => line
 const publicCart = (cart) => ({ ...cart, lines: cart.lines.map(publicLine) })
 
 export function saveCart(cart) {
@@ -972,7 +972,7 @@ function checkQuantity(p, quantity) {
  * case it was chosen with.
  */
 function buildLine(body = {}) {
-  const quantity = Number(body.quantity ?? 1)
+  let quantity = Number(body.quantity ?? 1)
   let p
   let variant
   let quote = null
@@ -1028,8 +1028,12 @@ function buildLine(body = {}) {
   }
 
   const tracked = !variant.dynamic
+  // As Odoo: more than is left adds what is left, with a warning.
+  let warning = ''
   if (tracked && quantity > variant.inventory) {
-    throw new ApiError(shortage(p, variant.inventory), { status: 409, code: 'insufficient_inventory' })
+    if (variant.inventory <= 0) throw new ApiError(shortage(p, variant.inventory), { status: 409, code: 'out_of_stock' })
+    warning = `You ask for ${quantity} products but only ${variant.inventory} is available.`
+    quantity = variant.inventory
   }
   const extraOptions = {}
   for (const { option, choice } of quote?.extras || []) {
@@ -1054,6 +1058,7 @@ function buildLine(body = {}) {
     // takes out of stock, and whether the variant is counted at all.
     _components: components,
     _untracked: !tracked,
+    _warning: warning,
   }
 }
 
@@ -1067,12 +1072,14 @@ function placeLine(cart, line) {
     cart.lines.push(placed)
     return placed
   }
-  const wanted = Math.round((existing.quantity + line.quantity) * 1000) / 1000
+  let wanted = Math.round((existing.quantity + line.quantity) * 1000) / 1000
   const p = products.find((x) => x.slug === existing.productSlug)
   checkQuantity(p, wanted)
   const variant = p?.variants.find((v) => v.id === existing.variantId)
+  existing._warning = line._warning
   if (!existing._untracked && variant && wanted > variant.inventory) {
-    throw new ApiError(shortage(p, variant.inventory), { status: 409, code: 'insufficient_inventory' })
+    existing._warning = `You ask for ${wanted} ${p.title} but only ${variant.inventory} is available`
+    wanted = variant.inventory
   }
   existing.quantity = wanted
   if (existing.comboItems?.length) existing.comboItems = existing.comboItems.map((i) => ({ ...i, quantity: wanted }))
@@ -1105,8 +1112,10 @@ export async function addToCart(body = {}) {
   const main = buildLine(body)
   const optional = (body.optionalProducts || []).map((o) => buildLine({ variantId: o.variantId, quantity: o.quantity ?? 1 }))
   const placed = placeLine(cart, main)
-  for (const line of optional) placeLine(cart, { ...line, linkedTo: placed.id })
-  return saveCart(cart)
+  const warnings = [placed._warning]
+  for (const line of optional) warnings.push(placeLine(cart, { ...line, linkedTo: placed.id })._warning)
+  for (const line of cart.lines) delete line._warning
+  return { ...saveCart(cart), warning: warnings.filter(Boolean).join(' ') }
 }
 
 export async function updateCartLine(lineId, quantity) {
@@ -1118,13 +1127,16 @@ export async function updateCartLine(lineId, quantity) {
   const p = products.find((x) => x.slug === line.productSlug)
   if (p) checkQuantity(p, quantity)
   const variant = products.flatMap((x) => x.variants).find((v) => v.id === line.variantId)
+  let warning = ''
   if (!line._untracked && variant && quantity > variant.inventory) {
-    throw new ApiError(shortage(p, variant.inventory), { status: 409, code: 'insufficient_inventory' })
+    if (variant.inventory <= 0) return { ...(await removeLines(cart, lineId)), warning: 'Some products became unavailable and your cart has been updated. We\'re sorry for the inconvenience.' }
+    warning = `You ask for ${quantity} ${p.title} but only ${variant.inventory} is available`
+    quantity = variant.inventory
   }
   line.quantity = quantity
   // A set's contents follow its quantity.
   if (line.comboItems?.length) line.comboItems = line.comboItems.map((i) => ({ ...i, quantity }))
-  return saveCart(cart)
+  return { ...saveCart(cart), warning }
 }
 
 export async function removeCartLine(lineId) {

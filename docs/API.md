@@ -1107,8 +1107,10 @@ A delivery method marked `pickup: true` in `commerce.shippingMethods` makes chec
 it list slots (`getDeliverySlots`) and send the chosen `delivery_slot`. Neither applies to the demo, and wallet buttons
 never offer those methods.
 
-Expected errors: `409 insufficient_inventory`, `409 out_of_stock`,
-`422 invalid_discount`.
+Expected errors: `409 out_of_stock` (nothing of it left), `422 invalid_discount`. Asking for more than is left
+is not an error: as Odoo's shop does, the line gets what is left and the answer's `warning` says so in Odoo's words
+("You ask for 5 products but only 3 is available."); the bag shows it in place of "Added to your bag". `warning` is
+`''` when the change went through as asked. `409 insufficient_inventory` is kept for backends that refuse instead.
 
 **The bag follows the backend.** A backend may reprice a bag and drop products
 that are no longer on sale whenever it is read or changed. It says so in
