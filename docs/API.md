@@ -36,6 +36,11 @@ currency switcher, one of `pricing.currencies[].pricelistId`) and `X-Loom-Lang: 
 `/fr/shop`). Without them the backend answers in the store's default currency and language. Its cached answers vary on
 both headers, and its error `message`s come in the requested language while `code`s never change.
 
+**The bag's fiscal position** travels the same way: every cart answer carries `fiscalPositionId` (`"0"` for none), and
+the theme sends it back as `X-Loom-Fiscal-Position` on every later call (`src/lib/pricelist.js`). Once an address makes
+the bag tax-free (an export) or taxed another way, catalogue prices follow it, as Odoo's own shop does. It changes only
+what is shown; a bag is always charged with its own. Cached answers vary on it too.
+
 **Errors** use the HTTP status, plus a JSON body the theme will surface verbatim:
 
 ```json
@@ -1052,6 +1057,9 @@ client that recalculates them will eventually disagree with the invoice.
   "shipping": { "amount": 0, "currency": "USD" },
   "tax": { "amount": 2419, "currency": "USD" },
   "total": { "amount": 32659, "currency": "USD" },
+  "untaxed": { "amount": 30240, "currency": "USD" },
+  "taxIncluded": false,
+  "fiscalPositionId": "0",
   "discountCode": { "code": "LOOM10", "label": "10% off" },
   "freeShippingThreshold": { "amount": 15000, "currency": "USD" },
   "freeShippingRemaining": { "amount": 0, "currency": "USD" },
@@ -1066,6 +1074,15 @@ client that recalculates them will eventually disagree with the invoice.
   "minimumOrder": null
 }
 ```
+
+**Tax and the rows under a bag** are exactly Odoo's cart (website_sale), in either of its Display Product Prices modes.
+`taxIncluded` (also on orders, and as `pricing.taxIncluded` in the settings) says which. Lines, `subtotal` (the product
+lines added up), discounts (`codes`, `promotions`, `discount`), `shipping`, `fee` and `giftWrap` are Odoo's own line
+amounts: `price_total` with tax included, `price_subtotal` without. The summary is Odoo's `website_sale.total` in both
+modes: Delivery (`shipping`), Subtotal (`untaxed`: the untaxed amount, delivery included), Taxes (`tax`) and Total;
+discounts, gift wrapping and the cash-on-delivery fee, which are lines in Odoo's cart, come first. As in Odoo, a line
+can read a cent off its unit price (a £30.99 price with 20% tax included, rounded globally, reads £31.00) and the rows
+are not a sum: `untaxed + tax = total` is. An older backend without `untaxed` shows `total − tax`.
 
 `freeShippingRemaining` drives the "away from free shipping" line in the cart and drawer; return zero when it does not
 apply. `freeShippingProgress` (optional, `null` when nothing ships free) fills the cart's bar with `percent`, measured
@@ -1108,7 +1125,10 @@ typed with `POST /carts/:id/shipping-options` (`{ address, method? }`), and the
 product page's postcode checker asks
 `GET /serviceability?country=&region=&postal_code=&variant_id=` →
 `{ deliverable, country, region, postalCode, methods: [{ id, label, note, price, arrivesAt, cutoff, shipsToday, guaranteed }] }`
-(`price` is `null` when the method is priced per bag).
+(`price` is `null` when the method is priced per bag). Delivery prices, here and in `commerce.shippingMethods`, carry the
+delivery product's taxes as every other price does: with them on a tax-included store. Each `shipping-options` option
+has `displayAmount`, priced that way for the checkout's list, and `amount`, always with tax, for a wallet sheet (Odoo's
+express checkout does the same).
 
 **Codes, promotions and rewards.** A cart may carry `codes: [{ code, label, amount }]`
 (each code with what it takes off), `promotions: [{ name, amount }]` (automatic
@@ -1425,7 +1445,7 @@ its code the next time the form opens. The demo adapter answers from
   "id": "order_1", "number": "LM-10428", "status": "placed",
   "placedAt": "2026-09-09T10:14:00.000Z",
   "lines": [ /* CartLine */ ],
-  "subtotal": {}, "discount": {}, "shipping": {}, "tax": {}, "total": {},
+  "subtotal": {}, "discount": {}, "shipping": {}, "tax": {}, "total": {}, "untaxed": {}, "taxIncluded": false,
   "shippingAddress": { }, "email": "sam@example.com",
   "tracking": { "carrier": "DHL", "code": "JD014600…", "url": "https://…" },
   "payment": { "provider": "demo", "status": "captured", "method": "Card", "amount": {}, "capturedAt": "2026-09-09T10:15:02.000Z" },

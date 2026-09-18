@@ -14,6 +14,7 @@ import { isMock } from '../lib/config.js'
 import Media from '../components/ui/Media.jsx'
 import { SIZES } from '../lib/images.js'
 import { nestLines } from '../lib/cart-lines.js'
+import TotalRows from '../components/cart/TotalRows.jsx'
 import { stepperProps } from '../lib/quantity.js'
 import LineDetails from '../components/cart/LineDetails.jsx'
 import PaymentLock from '../components/cart/PaymentLock.jsx'
@@ -275,17 +276,7 @@ export default function Cart() {
             )}
 
             <dl className="mt-6 space-y-2.5 border-t border-line pt-5 text-sm">
-              <Row label={t('Subtotal')} value={formatMoney(cart.subtotal)} />
-              {cart.codes || cart.promotions ? (
-                [...(cart.codes || []).map((c) => ({ key: `code-${c.code}`, label: c.label || c.code, amount: c.amount })),
-                  ...(cart.promotions || []).map((p) => ({ key: `promo-${p.name}`, label: p.name, amount: p.amount }))]
-                  .filter((row) => row.amount?.amount > 0)
-                  .map((row) => <Row key={row.key} label={row.label} value={`−${formatMoney(row.amount)}`} tone="sale" />)
-              ) : cart.discount.amount > 0 && (
-                <Row label={cart.discountCode?.label || t('Discount')} value={`−${formatMoney(cart.discount)}`} tone="sale" />
-              )}
-              <Row label={t('Shipping')} value={cart.shipping.amount === 0 ? t('Free') : formatMoney(cart.shipping)} />
-              <Row label={t('Estimated tax')} value={formatMoney(cart.tax)} />
+              <TotalRows bag={cart} />
             </dl>
             {taxNote(config.pricing) && (
               <p className="mt-2 text-[11px] text-faint">{taxNote(config.pricing)}</p>
@@ -319,15 +310,6 @@ export default function Cart() {
 
       <Promises />
     </>
-  )
-}
-
-function Row({ label, value, tone }) {
-  return (
-    <div className="flex justify-between">
-      <dt className={tone === 'sale' ? 'text-sale' : 'text-muted'}>{label}</dt>
-      <dd className={`tabular-nums ${tone === 'sale' ? 'text-sale' : ''}`}>{value}</dd>
-    </div>
   )
 }
 

@@ -143,6 +143,42 @@ test('a declined payment comes back as a failure with the reason', async () => {
   assert.equal(result.message, 'Declined.')
 })
 
+test('a lost answer after the gateway said yes is polled to the order, never offered as Pay again', async () => {
+  const { ApiError } = await import('../src/lib/api/contracts.js')
+  const lost = [
+    new ApiError('Your payment is still being confirmed.', { status: 409, code: 'retry' }),
+    new ApiError('Bad gateway', { status: 502, code: 'api_error' }),
+    new ApiError('Could not reach the API', { code: 'network_error' }),
+  ]
+  const stripeInput = { stripe: { confirmPayment: async () => ({ paymentIntent: { id: 'pi_1' } }) }, elements: {} }
+  for (const err of lost) {
+    for (const [provider, input, deps] of [
+      ['stripe', stripeInput],
+      ['razorpay', undefined, { loadScript: async () => {}, Razorpay: class { on() {} open() { this.opts.handler({ razorpay_payment_id: 'rp_1' }) } constructor(o) { this.opts = o } } }],
+      ['demo', { cardNumber: '4242424242424242', outcome: 'done' }],
+    ]) {
+      let polls = 0
+      const result = await payments.runPayment(pay({ provider, client: { client_secret: 'cs', razorpay_key_id: 'k', razorpay_order_id: 'o' } }), {
+        api: {
+          paymentAction: async () => { throw err },
+          getPayment: async () => (++polls < 2 ? pay({ status: 'pending' }) : pay({ status: 'paid', order })),
+        },
+        input,
+        deps,
+        poll: clock(),
+      })
+      assert.equal(result.kind, 'order', `${provider} after ${err.code}`)
+      assert.equal(polls, 2)
+    }
+  }
+  // A refusal the backend means is still the shopper's to see.
+  const refused = new ApiError('Declined', { status: 422, code: 'payment_failed' })
+  await assert.rejects(payments.runPayment(pay({ provider: 'stripe', client: { client_secret: 'cs' } }), {
+    api: { paymentAction: async () => { throw refused }, getPayment: async () => { throw new Error('not polled') } },
+    input: stripeInput,
+  }), /Declined/)
+})
+
 test('an unknown on-page gateway is refused before anything is sent', async () => {
   await assert.rejects(payments.runPayment(pay({ provider: 'adyen' }), { api: {} }), (err) => err.code === 'payment_unsupported')
   assert.equal(driverFor('adyen'), null)
@@ -557,6 +593,32 @@ test('confirming the wallet creates the payment with its details, confirms with 
   assert.equal(seen.confirm.clientSecret, 'pi_w_secret')
   assert.equal(seen.confirm.redirect, 'if_required')
   assert.deepEqual(calls.find((c) => c[0] === 'action'), ['action', 'pay_1', 'complete', { payment_intent: 'pi_w' }])
+  assert.equal(done.order.id, 'order_1')
+})
+
+test('the wallet opens priced in the store\'s own country and offers only the countries it delivers to', async () => {
+  const { Stripe, seen } = fakeWallet()
+  const calls = []
+  await express.mountExpressCheckout({
+    container: 'box', express: walletExpress, cart: walletCart, api: walletApi(calls), countries: ['GB', 'IE'],
+    deps: { Stripe, loadScript: async () => {}, appearance: {} },
+  })
+  assert.deepEqual(calls[0], ['shipping', 'cart_w', { address: { city: '', region: '', postalCode: '', country: 'GB' } }])
+  assert.deepEqual(seen.created.options.allowedShippingCountries, ['GB', 'IE'])
+})
+
+test('a wallet payment whose confirmation answer is lost is polled to the order, not reported as failed', async () => {
+  const { ApiError } = await import('../src/lib/api/contracts.js')
+  const { Stripe, seen } = fakeWallet()
+  let done = null
+  const api_ = { ...walletApi([]), paymentAction: async () => { throw new ApiError('still being confirmed', { status: 409, code: 'retry' }) } }
+  await express.mountExpressCheckout({
+    container: 'box', express: walletExpress, cart: walletCart, api: api_,
+    deps: { Stripe, loadScript: async () => {}, appearance: {}, poll: clock() },
+    onDone: (payment) => { done = payment },
+    onError: () => assert.fail('not an error'),
+  })
+  await seen.handlers.confirm({ billingDetails: { email: 'a@b.c' }, shippingRate: { id: 'standard' }, paymentFailed: () => assert.fail('not failed') })
   assert.equal(done.order.id, 'order_1')
 })
 

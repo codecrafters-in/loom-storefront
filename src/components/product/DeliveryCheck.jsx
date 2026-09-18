@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import api from '../../lib/api/index.js'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
+import { storeCountry } from '../../lib/prefill.js'
 import { Button, Icon } from '../ui/index.jsx'
 import { t } from '../../i18n/index.js'
 
@@ -12,8 +13,7 @@ export default function DeliveryCheck({ variantId }) {
   const config = useStorefront()
   const countries = config.commerce?.countries || []
   const locale = config.pricing?.locale || 'en-US'
-  const localeCountry = locale.split('-')[1]
-  const [country, setCountry] = useState(countries.find(([code]) => code === localeCountry)?.[0] || countries[0]?.[0] || '')
+  const [country, setCountry] = useState(storeCountry(config))
   const [postalCode, setPostalCode] = useState('')
   const [state, setState] = useState({ busy: false, result: null, error: null, asked: '' })
 

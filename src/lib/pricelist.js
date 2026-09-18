@@ -1,3 +1,5 @@
+import { invalidateAndNotify } from './api/cache.js'
+
 /**
  * The pricelist a shopper picked in the currency switcher (a live store with more than one currency).
  *
@@ -21,5 +23,24 @@ export function choosePricelist(id) {
     else localStorage.removeItem(KEY)
   } catch {
     /* storage unavailable: the choice lasts until the page reloads */
+  }
+}
+
+/**
+ * The fiscal position of the shopper's bag, sent as `X-Loom-Fiscal-Position`: once an address makes the bag tax-free
+ * (an export) or taxed another way, the catalogue shows prices that way too, as Odoo's own shop does. Called with a
+ * cart's `fiscalPositionId`, keeps it and drops the prices cached the old way; without, reads it.
+ */
+const FISCAL_KEY = 'loom.fiscal'
+
+export function fiscalPosition(id) {
+  try {
+    if (id && id !== localStorage.getItem(FISCAL_KEY)) {
+      localStorage.setItem(FISCAL_KEY, id)
+      invalidateAndNotify()
+    }
+    return localStorage.getItem(FISCAL_KEY) || ''
+  } catch {
+    return ''
   }
 }

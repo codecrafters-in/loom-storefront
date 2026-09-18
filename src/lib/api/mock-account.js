@@ -1,9 +1,12 @@
 /**
- * The demo backend's account, after-purchase and community calls, split out of mock.js like mock-admin.js: they load
- * with the first of them and share mock.js's state.
+ * The demo backend's account, after-purchase, community and payment calls, split out of mock.js like mock-admin.js:
+ * they load with the first of them and share mock.js's state.
  */
 import { ApiError } from './contracts.js'
-import { KEY, latency, read, write, login, register, logout, getCart, DEMO_CUSTOMER } from './mock.js'
+import {
+  KEY, latency, read, write, login, register, logout, getCart, DEMO_CUSTOMER,
+  checkStock, emptyCart, loadCart, nowIso, placeOrderFromCart, priceCart, saveCart,
+} from './mock.js'
 
 /** The demo has no questions; asking one is thanked, as if the store will answer. */
 export async function getQuestions() {
@@ -160,4 +163,165 @@ export async function verifyLoginCode() {
 /** The demo keeps its bag in this browser; there is nothing to recover. */
 export async function recoverCart() {
   return getCart()
+}
+
+/* ── on-site payments (checkout.mode "payments") ───────────────────────── */
+
+/**
+ * The two kinds of method a real backend offers, so the payment step can be
+ * previewed without one: a test card taken on the page, and cash on delivery,
+ * which needs nothing from the shopper.
+ */
+const PAYMENT_METHODS = [
+  {
+    id: 'demo-card', providerId: 'demo', methodId: 'card', provider: 'demo', providerName: 'Demo',
+    code: 'card', name: 'Card', image: null, brands: [], flow: 'direct', test: true, canSave: false, note: null,
+  },
+  {
+    id: 'custom-cod', providerId: 'custom', methodId: 'cod', provider: 'custom', providerName: 'Cash on Delivery',
+    code: 'cash_on_delivery', name: 'Cash on delivery', image: null, brands: [], flow: 'offline', test: false,
+    canSave: false, note: 'Pay the courier in cash or by UPI when your parcel arrives.',
+  },
+]
+
+function paymentCart(cartId) {
+  const cart = priceCart(loadCart())
+  if (cartId && cart.id && cart.id !== cartId) {
+    throw new ApiError('That bag has expired. Please review it and try again.', { status: 404, code: 'cart_not_found' })
+  }
+  if (!cart.lines.length) throw new ApiError('Your bag is empty.', { status: 422, code: 'empty_cart' })
+  return cart
+}
+
+const loadPayments = () => read(KEY.payments, {})
+
+function savePayment(payment) {
+  const all = { ...loadPayments(), [payment.id]: payment }
+  // Keep the newest fifty; an abandoned attempt should not live in storage forever.
+  const newest = Object.values(all).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0, 50)
+  write(KEY.payments, Object.fromEntries(newest.map((p) => [p.id, p])))
+}
+
+function findPayment(paymentId) {
+  const payment = loadPayments()[paymentId]
+  if (!payment) throw new ApiError('We could not find that payment.', { status: 404, code: 'not_found' })
+  return payment
+}
+
+/** What the API answers with — never the cart id or the stored request. */
+const paymentView = ({ cartId: _cartId, request: _request, createdAt: _createdAt, ...payment }) => ({
+  message: null, client: {}, redirect: null, order: null, ...payment,
+})
+
+/** The money is taken (or promised, for cash on delivery): place the order exactly as checkout does. */
+function settlePayment(payment, status, message = null) {
+  const { email, shippingAddress, shippingMethod, methodName } = payment.request
+  const order = placeOrderFromCart(priceCart(loadCart()), {
+    email,
+    shippingAddress,
+    shippingMethod,
+    payment: {
+      provider: payment.provider,
+      status: status === 'paid' ? 'captured' : 'pending',
+      reference: payment.reference,
+      method: methodName,
+      capturedAt: status === 'paid' ? nowIso() : null,
+    },
+  })
+  write(KEY.placed, [order.id, ...read(KEY.placed, [])].slice(0, 50))
+  saveCart(emptyCart())
+  Object.assign(payment, { status, message, order: { id: order.id, number: order.number } })
+}
+
+export async function getPaymentOptions(cartId, { email } = {}) {
+  await latency()
+  const cart = paymentCart(cartId)
+  if (!email) throw new ApiError('Please enter your email address.', { status: 422, code: 'email_required' })
+  checkStock(cart)
+  return { amount: cart.total, methods: PAYMENT_METHODS, savedMethods: [], total: PAYMENT_METHODS.length }
+}
+
+export async function createPayment(cartId, body = {}) {
+  await latency()
+  const cart = paymentCart(cartId)
+  const method = PAYMENT_METHODS.find(
+    (m) => m.providerId === String(body.providerId) && m.methodId === String(body.methodId),
+  )
+  if (!method) {
+    throw new ApiError('That payment method is not available for this order.', { status: 422, code: 'invalid_payment_method' })
+  }
+  if (!body.email) throw new ApiError('Please enter your email address.', { status: 422, code: 'email_required' })
+  if (body.expectedTotal != null && body.expectedTotal !== cart.total.amount) {
+    throw new ApiError('Your bag changed while you were paying. Please check the total and try again.', {
+      status: 409,
+      code: 'cart_changed',
+    })
+  }
+  checkStock(cart)
+
+  const reference = `LM-PAY-${Date.now().toString(36).toUpperCase()}`
+  const payment = {
+    id: `pay_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`,
+    reference,
+    provider: method.provider,
+    flow: method.flow,
+    status: 'draft',
+    message: null,
+    client: method.flow === 'direct'
+      ? {
+        reference,
+        amount: cart.total.amount,
+        currency: cart.total.currency,
+        prefill: { name: body.shippingAddress?.name || '', email: body.email, contact: body.shippingAddress?.phone || '' },
+      }
+      : {},
+    redirect: null,
+    order: null,
+    cartId: cart.id,
+    createdAt: nowIso(),
+    request: {
+      email: body.email,
+      shippingAddress: body.shippingAddress,
+      shippingMethod: body.shippingMethod || 'standard',
+      methodName: method.name,
+    },
+  }
+  if (cart.total.amount === 0) settlePayment(payment, 'paid')
+  else if (method.flow === 'offline') settlePayment(payment, 'pending', method.note)
+  savePayment(payment)
+  return paymentView(payment)
+}
+
+export async function paymentAction(paymentId, action, body = {}) {
+  await latency()
+  const payment = findPayment(paymentId)
+  if (payment.provider !== 'demo' || action !== 'simulate') {
+    throw new ApiError(`"${action}" is not a step this payment takes.`, { status: 404, code: 'unsupported_action' })
+  }
+  // A replayed step changes nothing once the payment has an answer.
+  if (payment.status !== 'draft') return paymentView(payment)
+
+  switch (body.outcome) {
+    case 'done':
+      settlePayment(payment, 'paid')
+      break
+    case 'pending':
+      settlePayment(payment, 'pending', 'Your payment is being confirmed.')
+      break
+    case 'cancel':
+      Object.assign(payment, { status: 'cancelled', message: 'The payment was cancelled. Your bag is unchanged.' })
+      break
+    case 'error':
+      Object.assign(payment, { status: 'failed', message: 'The card was declined. This is a test — try another outcome.' })
+      break
+    default:
+      throw new ApiError('Choose what the test payment should do.', { status: 422, code: 'invalid_outcome' })
+  }
+  savePayment(payment)
+  return paymentView(payment)
+}
+
+export async function getPayment(paymentId) {
+  await latency()
+  return paymentView(findPayment(paymentId))
 }

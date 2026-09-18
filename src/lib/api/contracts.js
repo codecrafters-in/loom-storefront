@@ -147,8 +147,10 @@
  * @property {Money} subtotal
  * @property {Money} discount
  * @property {Money} shipping
- * @property {Money} tax
+ * @property {Money} tax              Always the order's tax, included or not.
  * @property {Money} total
+ * @property {boolean} [taxIncluded]   Every amount above is with tax (Odoo's Display Product Prices); absent reads as false.
+ * @property {string} [fiscalPositionId] Sent back as `X-Loom-Fiscal-Position` ("0" for none).
  * @property {{code:string, label:string}|null} discountCode
  * @property {string} currency
  *
@@ -175,6 +177,7 @@
  * @property {Money} shipping
  * @property {Money} tax
  * @property {Money} total
+ * @property {boolean} [taxIncluded]
  * @property {Address} shippingAddress
  * @property {string} shippingMethod
  * @property {string} email

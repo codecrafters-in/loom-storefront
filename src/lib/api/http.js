@@ -14,7 +14,7 @@ import { config } from '../config.js'
 import { adminFetch } from '../admin-session.js'
 import { ApiError, ContractError, assertCart, assertList, assertMoney, assertProduct } from './contracts.js'
 import { ACCESS_HEADER, accessRequired, accessToken } from '../access.js'
-import { chosenPricelist } from '../pricelist.js'
+import { chosenPricelist, fiscalPosition } from '../pricelist.js'
 import { currentLanguage, languageFromAddress } from '../../i18n/index.js'
 
 const SESSION_KEY = 'loom.session'
@@ -67,6 +67,7 @@ async function send(method, path, { query, body, auth }) {
   // A store in maintenance or behind a password answers only calls that carry its access token.
   const access = accessToken()
   const pricelist = chosenPricelist()
+  const fiscal = fiscalPosition()
   // A language in the page address is asked for; without one the backend answers in the store's default.
   const language = languageFromAddress() ? currentLanguage() : ''
   try {
@@ -82,6 +83,7 @@ async function send(method, path, { query, body, auth }) {
         ...(access ? { [ACCESS_HEADER]: access } : {}),
         // The currency the shopper picked; the server varies its cached answers on it.
         ...(pricelist ? { 'x-loom-pricelist': pricelist } : {}),
+        ...(fiscal ? { 'x-loom-fiscal-position': fiscal } : {}),
         ...(language ? { 'x-loom-lang': language } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -142,6 +144,8 @@ async function request(method, path, { query, body } = {}) {
       detail: payload,
     })
   }
+  // A bag says its fiscal position; the catalogue follows it (lib/pricelist.js).
+  fiscalPosition(payload?.fiscalPositionId)
   return payload
 }
 
@@ -819,7 +823,7 @@ export const subscribe = (email, { captchaToken, source, consent } = {}) =>
   post('/newsletter', { email, ...(captchaToken ? { captchaToken } : {}), ...(source ? { source } : {}), ...(consent ? { consent } : {}) })
 
 /** Optional. If the endpoint 404s the caller falls back to the shipping copy. */
-export const getDeliveryEstimate = ({ method = 'standard', country = 'US' } = {}) =>
+export const getDeliveryEstimate = ({ method, country } = {}) =>
   get('/delivery-estimate', { method, country })
 
 /** Whether the store delivers to an address (a postcode is enough), with each method's arrival date. */

@@ -4,6 +4,7 @@ import api from '../../lib/api/index.js'
 import { useCart } from '../../store/CartContext.jsx'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
 import { returnUrls } from '../../lib/payments/index.js'
+import { storeCountry } from '../../lib/prefill.js'
 import { mountExpressCheckout } from '../../lib/payments/express.js'
 import { purchase } from '../../lib/analytics.js'
 import { mark, t, addressPrefix } from '../../i18n/index.js'
@@ -38,6 +39,8 @@ export default function ExpressCheckout({ className = '' }) {
           cart,
           api,
           urls: returnUrls(config.checkout, window.location.origin + addressPrefix()),
+          // The store's own country first, as checkout starts in it: the bag's last address may be one it does not deliver to.
+          countries: [...new Set([storeCountry(config), ...(config.commerce?.countries || []).map(([code]) => code)].filter(Boolean))],
           onAvailable: (ok) => alive && setAvailable(ok),
           onError: (err) => alive && setMessage(err?.message || t('The payment did not go through.')),
           onDone: async (payment) => {

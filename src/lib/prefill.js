@@ -1,3 +1,10 @@
+/** The store's own country: the locale's (en-GB is GB) when the store delivers there, else the first it lists. */
+export function storeCountry(config) {
+  const countries = config?.commerce?.countries || []
+  const own = (config?.pricing?.locale || '').split('-')[1]
+  return countries.find(([code]) => code === own)?.[0] || countries[0]?.[0] || ''
+}
+
 /** The checkout fields a saved address fills in. */
 export const ADDRESS_FIELDS = ['name', 'line1', 'line2', 'city', 'region', 'postalCode', 'country', 'phone']
 

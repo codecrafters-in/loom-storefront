@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { prefillCheckout, defaultAddressOf } from '../src/lib/prefill.js'
+import { prefillCheckout, defaultAddressOf, storeCountry } from '../src/lib/prefill.js'
 
 const EMPTY = { email: '', name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country: 'US', phone: '' }
 
@@ -51,4 +51,20 @@ test('a saved address in a country the store does not deliver to is left out', (
   assert.equal(form.email, 'shopper@example.com', 'the email is still filled')
   const both = { ...indian, addresses: [...indian.addresses, { id: 2, name: 'Asha', line1: '1 High St', city: 'London', postalCode: 'E1 6JE', country: 'GB' }] }
   assert.equal(prefillCheckout({ ...EMPTY, country: 'GB' }, both, new Set(), ['GB']).line1, '1 High St', 'a deliverable saved address is used')
+})
+
+test("the store's own country is its locale's when it delivers there, else the first it lists", () => {
+  const countries = [['IE', 'Ireland'], ['GB', 'United Kingdom']]
+  assert.equal(storeCountry({ pricing: { locale: 'en-GB' }, commerce: { countries } }), 'GB')
+  assert.equal(storeCountry({ pricing: { locale: 'en-US' }, commerce: { countries } }), 'IE', 'never a country it does not list')
+  assert.equal(storeCountry({ pricing: { locale: 'en-GB' } }), '', 'nothing to ask with no countries')
+})
+
+test('every country is offered for billing, the store\'s own names first choice', async () => {
+  const { allCountries } = await import('../src/lib/countries.js')
+  const list = allCountries('en', [['GB', 'Great Britain']])
+  assert.ok(list.length > 240)
+  assert.deepEqual(list.find(([code]) => code === 'GB'), ['GB', 'Great Britain'])
+  assert.deepEqual(list.find(([code]) => code === 'JP'), ['JP', 'Japan'])
+  assert.equal(allCountries(undefined).length, list.length)
 })

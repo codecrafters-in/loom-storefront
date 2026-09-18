@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useCart } from '../../store/CartContext.jsx'
 import { Button, Icon, QuantityStepper, Empty } from '../ui/index.jsx'
@@ -15,6 +15,9 @@ import PaymentLock from './PaymentLock.jsx'
 import useFocusTrap from '../../hooks/useFocusTrap.js'
 import { isMock } from '../../lib/config.js'
 import { t } from '../../i18n/index.js'
+
+// The same rows as the bag page, loaded once the bag has something in it rather than with every page.
+const DrawerTotals = lazy(() => import('./TotalRows.jsx').then((m) => ({ default: m.DrawerTotals })))
 
 /** Slides in after every add. Nothing here is decorative — it is the fastest
  *  path from "added" to "checkout", which is the only job of a cart drawer. */
@@ -191,28 +194,10 @@ export default function CartDrawer() {
             )}
 
             <footer className="border-t border-line px-5 py-4">
-              <dl className="space-y-1 text-[13px]">
-                <div className="flex justify-between">
-                  <dt className="text-muted">{t('Subtotal')}</dt>
-                  <dd className="tabular-nums">{formatMoney(cart.subtotal)}</dd>
-                </div>
-                {cart.discount?.amount > 0 && (
-                  <div className="flex justify-between text-sale">
-                    <dt>{cart.discountCode?.label || t('Discount')}</dt>
-                    <dd className="tabular-nums">−{formatMoney(cart.discount)}</dd>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <dt className="text-muted">{t('Shipping')}</dt>
-                  <dd className="tabular-nums">{cart.shipping.amount === 0 ? t('Free') : formatMoney(cart.shipping)}</dd>
-                </div>
-              </dl>
-              {/* The store's tax note, as on the bag page: the drawer is where most shoppers read the total. */}
-              {taxNote(config.pricing) && <p className="mt-1.5 text-[11px] text-faint">{taxNote(config.pricing)}</p>}
-              <p className="mt-2.5 flex justify-between border-t border-line pt-2.5 text-[15px] font-medium">
-                <span>{t('Total')}</span>
-                <span className="tabular-nums">{formatMoney(cart.total)}</span>
-              </p>
+              {/* The rows, the store's tax note and the total, as on the bag page: the drawer is where most shoppers read the total. */}
+              <Suspense fallback={null}>
+                <DrawerTotals bag={cart} note={taxNote(config.pricing)} />
+              </Suspense>
               <Button to="/checkout" full size="lg" className="mt-3.5" onClick={() => setOpen(false)}>
                 {t('Checkout')}
               </Button>

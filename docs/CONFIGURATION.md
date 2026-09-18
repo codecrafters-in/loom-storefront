@@ -192,7 +192,10 @@ and `theme.colors.page` as the browser's `theme-color`, in place of the template
 }
 ```
 
-`showTaxNote` renders `taxNote` under the totals on the bag page, in the bag drawer and in the checkout summary.
+`showTaxNote` renders `taxNote` under the totals on the bag page, in the bag drawer and in the checkout summary. The
+Odoo backend also sends `taxIncluded` (Odoo's Display Product Prices), and on a tax-included website its stock note
+reads "Prices include tax." instead of "Tax calculated at checkout.". How the totals themselves show tax follows the
+bag's own `taxIncluded` ([API.md](API.md)).
 
 - `currency` is the display default and what `Intl.NumberFormat` formats with.
 - `locale` is how every price and date is written (`de-DE`, or Odoo's `de_DE`): `1.234,50 €` for a German store. It
