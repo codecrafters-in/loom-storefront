@@ -354,6 +354,11 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
               <Rating value={product.rating.average} count={product.rating.count} />
             </a>
           </div>
+          {choice.unit && !choice.onRequest && (
+            <p className="mt-1 text-[12px] text-faint tabular-nums">
+              {t('{price} / {unit}', { price: formatMoney(choice.unit.price), unit: choice.unit.unit })}
+            </p>
+          )}
           {!isMock && product.priceTiers?.length > 0 && (
             <table className="mt-3 text-[13px]">
               <caption className="sr-only">{t('Price per item by quantity')}</caption>
@@ -530,6 +535,21 @@ export default function ProductView({ product, preview = false, onOpenChart }) {
             {product.sizeChart && !hasSizeOption && (
               <Accordion title={product.sizeChart.name || t('Measurements')}>
                 <ChartTable chart={product.sizeChart} />
+              </Accordion>
+            )}
+
+            {/* Odoo's documents published on the product page: its own downloads. */}
+            {product.documents?.length > 0 && (
+              <Accordion title={t('Documents')}>
+                <ul className="space-y-2 text-[14px]">
+                  {product.documents.map((d) => (
+                    <li key={d.id}>
+                      <a href={d.url} target={d.link ? '_blank' : undefined} rel="noopener noreferrer" className="link-underline text-accent">
+                        {d.name}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
               </Accordion>
             )}
 

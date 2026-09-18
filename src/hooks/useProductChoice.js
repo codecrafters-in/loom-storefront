@@ -78,6 +78,8 @@ export default function useProductChoice(product, { live = true } = {}) {
   const unavailable = answer?.data ? !answer.data.available : Boolean(variant && !variant.available)
   // Odoo's "Hide 'Add To Cart' when price = 0": no price and no button, a Contact us link instead.
   const onRequest = Boolean((answer?.data || variant || product)?.priceOnRequest)
+  // Odoo's price per unit (`unitPrice`: 2.50 / 100 g), for the chosen option.
+  const unit = (answer?.data || variant)?.unitPrice
 
   // The first thing standing between the shopper and the bag names the button.
   const blocker = missing
@@ -119,6 +121,7 @@ export default function useProductChoice(product, { live = true } = {}) {
     gallery,
     shown,
     onRequest,
+    unit,
     missing,
     blocker,
     // The chosen option exists but is sold out ("Notify me" instead of "Add to bag").
