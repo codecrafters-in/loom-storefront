@@ -802,7 +802,10 @@ export default function Checkout() {
                   <p className="text-[13px] font-medium leading-snug">{l.title}</p>
                   <LineDetails line={l} />
                 </div>
-                <span className="text-[13px] tabular-nums">{formatMoney(l.lineTotal)}</span>
+                <span className="text-[13px] tabular-nums">
+                  {l.compareAtTotal && <del className="me-1.5 text-faint">{formatMoney(l.compareAtTotal)}</del>}
+                  {formatMoney(l.lineTotal)}
+                </span>
               </li>
             ))}
           </ul>

@@ -1055,7 +1055,8 @@ client that recalculates them will eventually disagree with the invoice.
       "image": { "url": "…", "alt": "…" },
       "quantity": 2,
       "unitPrice": { "amount": 16800, "currency": "USD" },
-      "lineTotal": { "amount": 33600, "currency": "USD" }
+      "lineTotal": { "amount": 33600, "currency": "USD" },
+      "compareAtTotal": null
     }
   ],
   "subtotal": { "amount": 33600, "currency": "USD" },
@@ -1139,10 +1140,16 @@ express checkout does the same).
 
 **Codes, promotions and rewards.** A cart may carry `codes: [{ code, label, amount }]`
 (each code with what it takes off), `promotions: [{ name, amount }]` (automatic
-discounts), `claimableRewards: [{ id, couponId, rewardId, type, description, products: [{ variantId, title }] }]`
-(shown as **Choose your reward**) and free-product lines with `isReward: true`
+discounts), `claimableRewards: [{ id, couponId, rewardId, type, description, products: [{ variantId, title }], codeHint }]`
+(shown as **Choose your reward**; the customer's own coupons and gift cards are among them, with the last four
+characters of their code in `codeHint`, as Odoo's cart shows them) and free-product lines with `isReward: true`
 and `rewardLabel`, which the bag shows without a quantity stepper. "Code
-applied" is said only when the cart changed.
+applied" is said only when the cart changed. A pricelist's code is listed in `codes` with a zero amount: it changes
+the prices, not a discount line.
+
+**Discounted lines.** A line may carry `compareAtTotal`: the price before a discount the pricelist shows on the line
+(Odoo's "Discounts" setting), for the quantity. The bag, the drawer and the checkout summary strike it through before
+`lineTotal`, as Odoo's cart does.
 
 **Quantity prices.** A product detail may carry `priceTiers: [{ minQuantity, price }]`,
 shown under the price as "5+ items · $80.00 each".

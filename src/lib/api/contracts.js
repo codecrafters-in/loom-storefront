@@ -140,6 +140,7 @@
  * @property {number} quantity
  * @property {Money}  unitPrice
  * @property {Money}  lineTotal
+ * @property {Money|null} [compareAtTotal] Struck through before `lineTotal`: the price before a discount the pricelist shows.
  *
  * @typedef  {object} Cart
  * @property {string} id

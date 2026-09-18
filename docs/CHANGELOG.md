@@ -8,6 +8,9 @@ With the Odoo module's 19.0.2.5.0. Details: [API.md](API.md).
 
 - The catalogue is priced with the bag's pricelist (`pricelistId`, sent back as `X-Loom-Pricelist`) once the bag has
   one, as Odoo's shop is: a code, the customer's own pricelist or a country's shows across the shop, not only in the bag.
+- A line the pricelist discounts shows its price before the discount struck through (`compareAtTotal`) in the bag, the
+  drawer and the checkout summary. The customer's own coupons and gift cards are offered under **Choose your reward**
+  with the end of their code.
 
 ## What's new — Tax shown as Odoo shows it
 

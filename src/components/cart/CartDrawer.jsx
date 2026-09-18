@@ -140,7 +140,10 @@ export default function CartDrawer() {
                       {!isMock && line.isReward
                         ? <span className="text-[12px] text-good">{t('Free')}</span>
                         : <QuantityStepper size="sm" value={line.quantity} onChange={(q) => update(line.id, q)} disabled={busy} {...stepperProps(line.quantityRule)} />}
-                      <span className="text-sm tabular-nums">{formatMoney(line.lineTotal)}</span>
+                      <span className="text-sm tabular-nums">
+                        {line.compareAtTotal && <del className="me-1.5 text-faint">{formatMoney(line.compareAtTotal)}</del>}
+                        {formatMoney(line.lineTotal)}
+                      </span>
                     </div>
                   </div>
                 </li>
