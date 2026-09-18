@@ -915,4 +915,8 @@ export default {
   "hours": "ساعات",
   "minutes": "دقائق",
   "seconds": "ثوانٍ",
+  "Contact us": "تواصل معنا",
+  "Documents": "المستندات",
+  "Name, A to Z": "الاسم، من أ إلى ي",
+  "{price} / {unit}": "{price} / {unit}",
 }

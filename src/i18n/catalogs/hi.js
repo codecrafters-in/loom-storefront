@@ -851,4 +851,8 @@ export default {
   "hours": "घंटे",
   "minutes": "मिनट",
   "seconds": "सेकंड",
+  "Contact us": "हमसे संपर्क करें",
+  "Documents": "दस्तावेज़",
+  "Name, A to Z": "नाम, A से Z",
+  "{price} / {unit}": "{price} / {unit}",
 }

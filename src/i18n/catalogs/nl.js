@@ -851,4 +851,8 @@ export default {
   "hours": "uren",
   "minutes": "minuten",
   "seconds": "seconden",
+  "Contact us": "Neem contact op",
+  "Documents": "Documenten",
+  "Name, A to Z": "Naam, A tot Z",
+  "{price} / {unit}": "{price} / {unit}",
 }

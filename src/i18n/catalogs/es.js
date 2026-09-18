@@ -867,4 +867,8 @@ export default {
   "hours": "horas",
   "minutes": "minutos",
   "seconds": "segundos",
+  "Contact us": "Contáctanos",
+  "Documents": "Documentos",
+  "Name, A to Z": "Nombre, de la A a la Z",
+  "{price} / {unit}": "{price} / {unit}",
 }
