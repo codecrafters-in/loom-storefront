@@ -746,16 +746,21 @@ function DataScreen() {
         </Card>
       </div>
 
-      <div className="mt-8 max-w-2xl rounded-xs border border-sale/25 bg-surface p-5">
-        <h2 className="text-[14px] font-medium text-sale">Reset</h2>
-        <p className="mt-2 text-[13px] leading-relaxed text-muted">
-          Discards every change and reseeds the demo catalogue. Local data only — this never touches
-          a real backend.
-        </p>
-        <Button size="sm" variant="quiet" className="mt-4" onClick={reset} disabled={busy}>
-          Reset to demo data
-        </Button>
-      </div>
+      {/* Demo-only: reseeds the bundled mock catalogue. A real backend has no
+          /admin/reset route (it answers use_odoo_backend), so the control is
+          hidden outside mock mode rather than offered as a dead button. */}
+      {isMock && (
+        <div className="mt-8 max-w-2xl rounded-xs border border-sale/25 bg-surface p-5">
+          <h2 className="text-[14px] font-medium text-sale">Reset</h2>
+          <p className="mt-2 text-[13px] leading-relaxed text-muted">
+            Discards every change and reseeds the demo catalogue. Local data only — this never touches
+            a real backend.
+          </p>
+          <Button size="sm" variant="quiet" className="mt-4" onClick={reset} disabled={busy}>
+            Reset to demo data
+          </Button>
+        </div>
+      )}
     </>
   )
 }
