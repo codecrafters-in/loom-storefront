@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCart } from '../../store/CartContext.jsx'
 import { Button, Icon, QuantityStepper, Empty } from '../ui/index.jsx'
@@ -6,8 +6,6 @@ import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
 import { formatMoney, taxNote } from '../../lib/money.js'
 import { useStorefront } from '../../store/StorefrontContext.jsx'
-import api from '../../lib/api/index.js'
-import useAsync from '../../hooks/useAsync.js'
 import { nestLines } from '../../lib/cart-lines.js'
 import { stepperProps } from '../../lib/quantity.js'
 import LineDetails from './LineDetails.jsx'
@@ -15,6 +13,11 @@ import PaymentLock from './PaymentLock.jsx'
 import useFocusTrap from '../../hooks/useFocusTrap.js'
 import { isMock } from '../../lib/config.js'
 import { t } from '../../i18n/index.js'
+
+// The same rows as the bag page, loaded once the bag has something in it rather than with every page.
+const DrawerTotals = lazy(() => import('./TotalRows.jsx').then((m) => ({ default: m.DrawerTotals })))
+// What goes with the bag, only once the drawer is opened: it costs every other page nothing.
+const DrawerSuggestions = lazy(() => import('./DrawerSuggestions.jsx'))
 
 /** Slides in after every add. Nothing here is decorative — it is the fastest
  *  path from "added" to "checkout", which is the only job of a cart drawer. */
@@ -24,26 +27,12 @@ export default function CartDrawer() {
   const rec = config.recommendations?.inCart || {}
   const trapRef = useFocusTrap(open)
 
-  // Keyed on the last line added, so the suggestions follow what the shopper is
-  // actually buying. Skipped entirely when the bag is empty or the feature is
-  // off, so an empty drawer costs no request.
+  // Keyed on the last line added, so the suggestions follow what the shopper is actually buying.
   const anchor = cart?.lines?.at(-1)?.productSlug
-  //
-  // The anchor's accessories come first when the store chose some: "frequently
-  // bought together" is the merchant's answer and a better one than a computed
-  // guess. The product read is cached, and usually already is from the page the
-  // shopper added it on.
-  const suggestions = useAsync(
-    async () => {
-      const limit = rec.limit || 3
-      const product = await api.getProduct(anchor).catch(() => null)
-      const accessories = product?.accessories || []
-      if (accessories.length) return { items: accessories.slice(0, limit), accessories: true }
-      return api.getRelated(anchor, { limit, strategy: rec.strategy || 'same-category' })
-    },
-    [anchor, rec.limit, rec.strategy],
-    { skip: !open || !anchor || rec.enabled === false },
-  )
+  // The suggestions rail loads the first time the drawer opens and stays, so closing it does not empty the rail
+  // while it slides away.
+  const [seen, setSeen] = useState(false)
+  if (open && !seen) setSeen(true)
 
   useEffect(() => {
     if (!open) return undefined
@@ -64,7 +53,7 @@ export default function CartDrawer() {
       <div
         onClick={() => setOpen(false)}
         aria-hidden="true"
-        className={`fixed inset-0 z-40 bg-ink/35 transition-opacity duration-300 ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        className={`fixed inset-0 z-40 bg-scrim/35 transition-opacity duration-300 ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
       />
       <aside
         ref={trapRef}
@@ -137,82 +126,27 @@ export default function CartDrawer() {
                       {!isMock && line.isReward
                         ? <span className="text-[12px] text-good">{t('Free')}</span>
                         : <QuantityStepper size="sm" value={line.quantity} onChange={(q) => update(line.id, q)} disabled={busy} {...stepperProps(line.quantityRule)} />}
-                      <span className="text-sm tabular-nums">{formatMoney(line.lineTotal)}</span>
+                      <span className="text-sm tabular-nums">
+                        {line.compareAtTotal && <del className="me-1.5 text-faint">{formatMoney(line.compareAtTotal)}</del>}
+                        {formatMoney(line.lineTotal)}
+                      </span>
                     </div>
                   </div>
                 </li>
               ))}
             </ul>
 
-            {rec.enabled !== false && suggestions.data?.items?.length > 0 && (
-              <div className="border-t border-line px-5 py-3">
-                <p className="eyebrow">{suggestions.data.accessories ? t('Frequently bought together') : rec.title || t('Goes with this')}</p>
-                {/*
-                  Chips, not cards. Three 4:5 cards with a name and a price
-                  under each is 210px — a third of a phone screen given to
-                  things the shopper has not chosen, directly above the total
-                  they came to check. Laid on their side the same three
-                  suggestions cost about 90px and are no harder to read, because
-                  a 40px thumbnail is plenty to recognise something you were
-                  just looking at.
-                */}
-                <ul className="no-scrollbar -mx-1 mt-2.5 flex gap-2 overflow-x-auto px-1">
-                  {suggestions.data.items.map((p) => (
-                    <li key={p.slug} className="w-[12.5rem] shrink-0">
-                      <Link
-                        to={`/product/${p.slug}`}
-                        onClick={() => setOpen(false)}
-                        className="flex items-center gap-2.5 rounded-xs border border-line p-1.5 transition-colors hover:border-ink"
-                      >
-                        <span className="w-10 shrink-0">
-                          <span className="shot block overflow-hidden rounded-xs bg-sunken">
-                            <Media
-                              src={(p.images?.[0] || p.image)?.url}
-                              type={p.images?.[0]?.type}
-                              alt={(p.images?.[0] || p.image)?.alt || p.title}
-                              loading="lazy"
-                              className="h-full w-full object-cover"
-                            />
-                          </span>
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[12px] leading-snug" title={p.title}>
-                            {p.title}
-                          </span>
-                          <span className="mt-0.5 block text-[12px] tabular-nums text-faint">
-                            {formatMoney(p.price)}
-                          </span>
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            {seen && rec.enabled !== false && anchor && (
+              <Suspense fallback={null}>
+                <DrawerSuggestions open={open} anchor={anchor} rec={rec} close={() => setOpen(false)} />
+              </Suspense>
             )}
 
             <footer className="border-t border-line px-5 py-4">
-              <dl className="space-y-1 text-[13px]">
-                <div className="flex justify-between">
-                  <dt className="text-muted">{t('Subtotal')}</dt>
-                  <dd className="tabular-nums">{formatMoney(cart.subtotal)}</dd>
-                </div>
-                {cart.discount?.amount > 0 && (
-                  <div className="flex justify-between text-sale">
-                    <dt>{cart.discountCode?.label || t('Discount')}</dt>
-                    <dd className="tabular-nums">−{formatMoney(cart.discount)}</dd>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <dt className="text-muted">{t('Shipping')}</dt>
-                  <dd className="tabular-nums">{cart.shipping.amount === 0 ? t('Free') : formatMoney(cart.shipping)}</dd>
-                </div>
-              </dl>
-              {/* The store's tax note, as on the bag page: the drawer is where most shoppers read the total. */}
-              {taxNote(config.pricing) && <p className="mt-1.5 text-[11px] text-faint">{taxNote(config.pricing)}</p>}
-              <p className="mt-2.5 flex justify-between border-t border-line pt-2.5 text-[15px] font-medium">
-                <span>{t('Total')}</span>
-                <span className="tabular-nums">{formatMoney(cart.total)}</span>
-              </p>
+              {/* The rows, the store's tax note and the total, as on the bag page: the drawer is where most shoppers read the total. */}
+              <Suspense fallback={null}>
+                <DrawerTotals bag={cart} note={taxNote(config.pricing)} />
+              </Suspense>
               <Button to="/checkout" full size="lg" className="mt-3.5" onClick={() => setOpen(false)}>
                 {t('Checkout')}
               </Button>

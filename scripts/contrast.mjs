@@ -110,7 +110,8 @@ function themeColours() {
  * Excluded from rule 2 only — rule 1 still checks them wherever a real pairing
  * appears.
  */
-const INVERSE = new Set(['page', 'surface', 'raised', 'sunken', 'accent-ink', 'accent-soft'])
+// `on-scrim` is the text over a photograph's wash (`scrim`), light in every theme: never on the page itself.
+const INVERSE = new Set(['page', 'surface', 'raised', 'sunken', 'accent-ink', 'accent-soft', 'on-scrim'])
 
 const tokens = parseTokens(fs.readFileSync(path.join(ROOT, 'src/index.css'), 'utf8'))
 const COLOURS = themeColours()

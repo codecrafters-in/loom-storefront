@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useState, useEffect, useMemo, useRef } from 'react'
 import Seo from '../components/Seo.jsx'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { startCheckout } from '../lib/checkout.js'
+import { asksAddress, checkoutAddress as addressFor, startCheckout } from '../lib/checkout.js'
 import api from '../lib/api/index.js'
 import { ApiError } from '../lib/api/contracts.js'
 import { driverInput, paymentBody, payableTotal, returnUrls, runPayment, visibleMethods } from '../lib/payments/index.js'
@@ -10,20 +10,22 @@ import { addPaymentInfo, addShippingInfo, beginCheckout, purchase } from '../lib
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import Media from '../components/ui/Media.jsx'
 import PaymentStep from '../components/checkout/PaymentStep.jsx'
+import ExtraInfo from '../components/checkout/ExtraInfo.jsx'
 import RegionField from '../components/address/RegionField.jsx'
 import useAddressLayout from '../components/address/useAddressLayout.js'
 import { postcodeLabel } from '../lib/addressLayout.js'
-import { prefillCheckout } from '../lib/prefill.js'
+import { prefillCheckout, storeCountry } from '../lib/prefill.js'
 import { SIZES } from '../lib/images.js'
 import { useCart } from '../store/CartContext.jsx'
 import { useAuth } from '../store/AuthContext.jsx'
 import { Button, Empty, Icon } from '../components/ui/index.jsx'
 import { formatMoney, taxNote } from '../lib/money.js'
 import { nestLines } from '../lib/cart-lines.js'
+import TotalRows from '../components/cart/TotalRows.jsx'
 import LineDetails from '../components/cart/LineDetails.jsx'
 import DiscountCode from '../components/cart/DiscountCode.jsx'
 import { isMock } from '../lib/config.js'
-import { t, addressPrefix } from '../i18n/index.js'
+import { t, addressPrefix, currentLanguage } from '../i18n/index.js'
 
 const ExpressCheckout = lazy(() => import('../components/checkout/ExpressCheckout.jsx'))
 
@@ -42,8 +44,6 @@ const FIELD_IDS = ['email', 'name', 'line1', 'line2', 'city', 'region', 'postalC
  * methods it can take for this cart, and the gateway's own form (or modal)
  * takes the card. See lib/payments.
  */
-/** A bag with nothing to ship (services, downloads) sends only the customer's name: the backend asks for no address. */
-const addressFor = (cart, address) => (cart?.requiresShipping === false ? { name: address.name } : address)
 
 export default function Checkout() {
   const { cart, refresh } = useCart()
@@ -52,8 +52,10 @@ export default function Checkout() {
   const COUNTRIES = config.commerce?.countries || [['US', t('United States')]]
   const SHIPPING = config.commerce?.shippingMethods || []
   // A guest starts in the store's own country rather than whichever sorts first.
-  const localeCountry = (config.pricing?.locale || '').split('-')[1]
-  const fallbackCountry = COUNTRIES.find(([code]) => code === localeCountry)?.[0] || COUNTRIES[0]?.[0] || 'US'
+  const fallbackCountry = storeCountry(config) || 'US'
+  // A saved address is offered only in a country the store delivers to (see prefillCheckout).
+  const storeCountries = config.commerce?.countries
+  const deliverable = useMemo(() => (storeCountries || [['US']]).map(([code]) => code), [storeCountries])
   const payments = config.checkout?.mode === 'payments'
   const navigate = useNavigate()
   const location = useLocation()
@@ -70,9 +72,21 @@ export default function Checkout() {
   // Billing: the delivery address unless the shopper gives another; a business adds its company name and tax ID.
   const [billingSame, setBillingSame] = useState(true)
   const [billing, setBilling] = useState({ name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country: fallbackCountry })
+  // An invoice can go anywhere: every country, loaded when a billing address is asked for; until then the delivery list.
+  const [world, setWorld] = useState(null)
+  // Nothing to ship: the address asked is the billing one (as Odoo does), in any country.
+  const noShipping = cart?.requiresShipping === false
+  const askAddress = asksAddress(cart)
+  useEffect(() => {
+    if ((!billingSame || noShipping) && !world) import('../lib/countries.js').then((m) => setWorld(m.allCountries(currentLanguage(), COUNTRIES)), () => {})
+  }, [billingSame, noShipping]) // eslint-disable-line react-hooks/exhaustive-deps
+  const BILLING_COUNTRIES = world || COUNTRIES
+  const ADDRESS_COUNTRIES = noShipping ? BILLING_COUNTRIES : COUNTRIES
   const [business, setBusiness] = useState({ on: Boolean(customer?.company || customer?.vat), company: customer?.company || '', vat: customer?.vat || '' })
   // Delivery instructions, a gift message and wrapping, and the terms box, as far as the store's settings offer them.
   const [extras, setExtras] = useState({ note: '', giftMessage: '', giftWrap: false, acceptTerms: false, newsletter: false })
+  // Odoo's Extra Info step, when the website has it on.
+  const [extraInfo, setExtraInfo] = useState({})
   const setExtra = (key) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
     setExtras((x) => ({ ...x, [key]: value }))
@@ -88,11 +102,12 @@ export default function Checkout() {
     ...(extras.acceptTerms ? { acceptTerms: true } : {}),
     ...(extras.newsletter ? { newsletter: true, newsletterConsent: t('Email me news and offers') } : {}),
     ...(chosenShipping?.slots && deliverySlot ? { deliverySlot } : {}),
+    ...(config.checkout?.extraInfo?.length ? { extraInfo } : {}),
   })
 
   const [form, setForm] = useState(() => prefillCheckout({
     email: '', name: '', line1: '', line2: '', city: '', region: '', postalCode: '', country: fallbackCountry, phone: '',
-  }, customer))
+  }, customer, undefined, deliverable))
 
   // Each address in its country's own order and words (Kuwait: no postcode required; India: PIN code).
   const shippingLayout = useAddressLayout(form.country)
@@ -120,17 +135,26 @@ export default function Checkout() {
   const set = (k) => (e) => {
     const value = e.target.value
     touched.current.add(k)
-    setForm((f) => ({ ...f, [k]: value }))
+    // A state belongs to its country: a new country starts without one.
+    setForm((f) => ({ ...f, [k]: value, ...(k === 'country' && value !== f.country ? { region: '' } : {}) }))
   }
 
-  // A refreshed checkout renders before the account has loaded, so the form
-  // starts empty. Fill it with the default address when the customer arrives.
-  const prefilledFor = useRef(customer?.id || null)
+  // A refreshed checkout renders before the account (and the store's countries) have loaded, so the form
+  // starts empty. Fill it with the default address when the customer arrives, and again when the countries do.
+  const prefilledFor = useRef(customer ? `${customer.id}|${deliverable}` : null)
   useEffect(() => {
-    if (!customer || prefilledFor.current === customer.id) return
-    prefilledFor.current = customer.id
-    setForm((f) => prefillCheckout(f, customer, touched.current))
-  }, [customer])
+    const key = customer ? `${customer.id}|${deliverable}` : null
+    if (!customer || prefilledFor.current === key) return
+    prefilledFor.current = key
+    setForm((f) => prefillCheckout(f, customer, touched.current, deliverable))
+  }, [customer, deliverable])
+  // The country is always one the list offers. A <select> shows its first option for a value it does not have,
+  // so a country from before the store's settings loaded (the default US) or from elsewhere would look like the
+  // store's own while its states, address words and delivery stayed the other country's.
+  useEffect(() => {
+    if (!(noShipping ? ADDRESS_COUNTRIES.map(([code]) => code) : deliverable).includes(form.country)) setForm((f) => ({ ...f, country: fallbackCountry, region: '' }))
+    if (!BILLING_COUNTRIES.some(([code]) => code === billing.country)) setBilling((b) => ({ ...b, country: fallbackCountry, region: '' }))
+  }, [deliverable, fallbackCountry, form.country, billing.country, BILLING_COUNTRIES, noShipping]) // eslint-disable-line react-hooks/exhaustive-deps
   // Stable, because the state field settles its value in an effect that depends on it.
   const setRegion = useCallback((e) => {
     const value = e.target.value
@@ -142,7 +166,7 @@ export default function Checkout() {
   }, [])
   const setBillingField = (key) => (e) => {
     const value = e.target.value
-    setBilling((b) => ({ ...b, [key]: value }))
+    setBilling((b) => ({ ...b, [key]: value, ...(key === 'country' && value !== b.country ? { region: '' } : {}) }))
   }
   const methods = useMemo(() => visibleMethods(options), [options])
 
@@ -435,13 +459,13 @@ export default function Checkout() {
             </p>
           )}
           <Field label={t('Email')} id="email" type="email" required value={form.email} onChange={set('email')} autoComplete="email" />
-          {cart?.requiresShipping === false && (
+          {!askAddress && (
             <Field label={t('Full name')} id="name" required value={form.name} onChange={set('name')} autoComplete="name" />
           )}
         </Section>
 
-        {cart?.requiresShipping !== false && (
-        <Section title={t('Shipping address')}>
+        {askAddress && (
+        <Section title={noShipping ? t('Billing address') : t('Shipping address')}>
           <Field label={t('Full name')} id="name" required value={form.name} onChange={set('name')} autoComplete="name" />
           <Field label={t('Address')} id="line1" required value={form.line1} onChange={set('line1')} autoComplete="address-line1" />
           <Field label={t('Apartment, suite (optional)')} id="line2" value={form.line2} onChange={set('line2')} autoComplete="address-line2" />
@@ -456,7 +480,7 @@ export default function Checkout() {
                 <div key={field}>
                   <label htmlFor="country" className="mb-1.5 block text-[13px] font-medium">{t('Country')}</label>
                   <select id="country" value={form.country} onChange={set('country')} className="field" autoComplete="country">
-                    {COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                    {ADDRESS_COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
                   </select>
                 </div>
               )
@@ -464,7 +488,7 @@ export default function Checkout() {
           </div>
           {config.checkout?.collectPhone !== false && (
             <Field
-              label={config.checkout?.phoneRequired === false ? t('Phone (optional, for delivery updates)') : t('Phone (for delivery updates)')}
+              label={noShipping ? t('Phone') : config.checkout?.phoneRequired === false ? t('Phone (optional, for delivery updates)') : t('Phone (for delivery updates)')}
               id="phone"
               type="tel"
               required={config.checkout?.phoneRequired === true}
@@ -503,7 +527,7 @@ export default function Checkout() {
                     <div key={field}>
                       <label htmlFor="billing-country" className="mb-1.5 block text-[13px] font-medium">{t('Country')}</label>
                       <select id="billing-country" value={billing.country} onChange={setBillingField('country')} className="field" autoComplete="billing country">
-                        {COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                        {BILLING_COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
                       </select>
                     </div>
                   )
@@ -539,6 +563,7 @@ export default function Checkout() {
                 label={t('Tax ID (VAT, GSTIN…)')}
                 id="vat"
                 value={business.vat}
+                readOnly={customer?.vatLocked}
                 onChange={(e) => {
                   const vat = e.target.value
                   setBusiness((b) => ({ ...b, vat }))
@@ -556,7 +581,7 @@ export default function Checkout() {
             </p>
           )}
           <div className="space-y-2.5">
-            {(shippingOptions ? shippingOptions.map((o) => ({ id: o.id, label: o.label, note: o.note, price: o.amount })) : SHIPPING).map((s) => (
+            {(shippingOptions ? shippingOptions.map((o) => ({ id: o.id, label: o.label, note: o.note, price: o.displayAmount ?? o.amount })) : SHIPPING).map((s) => (
               <label
                 key={s.id}
                 className={`flex cursor-pointer items-center gap-3.5 rounded-xs border p-4 transition-colors ${method === s.id ? 'border-ink' : 'border-line hover:border-muted'}`}
@@ -577,7 +602,7 @@ export default function Checkout() {
                   <span className="block text-[13px] text-faint">{s.note}</span>
                 </span>
                 <span className="text-sm tabular-nums">
-                  {(shippingOptions ? s.price === 0 : cart.shipping.amount === 0 && s.id === 'standard')
+                  {(shippingOptions ? s.price === 0 : cart.shipping.amount === 0 && cart.shippingMethod !== null && s.id === 'standard')
                     ? t('Free')
                     : formatMoney({ amount: s.price, currency: cart.currency })}
                 </span>
@@ -676,6 +701,8 @@ export default function Checkout() {
           </Section>
         )}
 
+        {config.checkout?.extraInfo?.length > 0 && <ExtraInfo fields={config.checkout.extraInfo} values={extraInfo} onChange={setExtraInfo} />}
+
         {config.features?.newsletter !== false && !isMock && (
           <label className="mt-6 flex items-center gap-2.5 text-[13px] text-muted">
             <input type="checkbox" checked={extras.newsletter} onChange={setExtra('newsletter')} className="h-4 w-4 accent-[rgb(var(--accent))]" />
@@ -750,7 +777,8 @@ export default function Checkout() {
           size="lg"
           full
           className="mt-8"
-          disabled={busy || short || (payments && stage === 'payment' && (optionsLoading || !selected))}
+          // Waiting on a payment that may have gone through: paying again could charge twice.
+          disabled={busy || !!waiting || short || (payments && stage === 'payment' && (optionsLoading || !selected))}
         >
           {buttonLabel}
         </Button>
@@ -783,7 +811,10 @@ export default function Checkout() {
                   <p className="text-[13px] font-medium leading-snug">{l.title}</p>
                   <LineDetails line={l} />
                 </div>
-                <span className="text-[13px] tabular-nums">{formatMoney(l.lineTotal)}</span>
+                <span className="text-[13px] tabular-nums">
+                  {l.compareAtTotal && <del className="me-1.5 text-faint">{formatMoney(l.compareAtTotal)}</del>}
+                  {formatMoney(l.lineTotal)}
+                </span>
               </li>
             ))}
           </ul>
@@ -796,25 +827,7 @@ export default function Checkout() {
             />
           )}
           <dl className="mt-6 space-y-2.5 border-t border-line pt-5 text-sm">
-            <div className="flex justify-between"><dt className="text-muted">{t('Subtotal')}</dt><dd className="tabular-nums">{formatMoney(cart.subtotal)}</dd></div>
-            {cart.codes || cart.promotions ? (
-              [...(cart.codes || []).map((c) => ({ key: `code-${c.code}`, label: c.label || c.code, amount: c.amount })),
-                ...(cart.promotions || []).map((p) => ({ key: `promo-${p.name}`, label: p.name, amount: p.amount }))]
-                .filter((row) => row.amount?.amount > 0)
-                .map((row) => (
-                  <div key={row.key} className="flex justify-between text-sale"><dt>{row.label}</dt><dd className="tabular-nums">−{formatMoney(row.amount)}</dd></div>
-                ))
-            ) : cart.discount.amount > 0 && (
-              <div className="flex justify-between text-sale"><dt>{cart.discountCode?.label}</dt><dd className="tabular-nums">−{formatMoney(cart.discount)}</dd></div>
-            )}
-            <div className="flex justify-between"><dt className="text-muted">{t('Shipping')}</dt><dd className="tabular-nums">{cart.shipping.amount === 0 ? t('Free') : formatMoney(cart.shipping)}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted">{t('Tax')}</dt><dd className="tabular-nums">{formatMoney(cart.tax)}</dd></div>
-            {chosenMethod?.fee?.amount > 0 && (
-              <div className="flex justify-between"><dt className="text-muted">{t('Cash on delivery fee')}</dt><dd className="tabular-nums">{formatMoney(chosenMethod.fee)}</dd></div>
-            )}
-            {cart.giftWrap?.amount > 0 && (
-              <div className="flex justify-between"><dt className="text-muted">{t('Gift wrapping')}</dt><dd className="tabular-nums">{formatMoney(cart.giftWrap)}</dd></div>
-            )}
+            <TotalRows bag={cart} fee={chosenMethod?.fee} />
           </dl>
           {taxNote(config.pricing) && <p className="mt-2 text-[11px] text-faint">{taxNote(config.pricing)}</p>}
           <p className="mt-4 flex justify-between border-t border-line pt-4 text-lg">

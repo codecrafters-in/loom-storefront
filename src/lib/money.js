@@ -18,16 +18,20 @@ const THREE_DECIMAL = new Set(['BHD', 'IQD', 'JOD', 'KWD', 'LYD', 'OMR', 'TND'])
 
 /**
  * What the backend says about its currencies (`pricing.currency` and `pricing.currencies[].decimals` in the settings
- * document). It wins over the lists above, which only cover the demo and a backend that does not say.
+ * document). It wins over the lists above, which only cover the demo and a backend that does not say. So does its
+ * `symbol`: Odoo's ¥ rather than the browser's CN¥, wherever the store's locale puts it.
  */
 const reported = new Map()
+const symbols = new Map()
 let storeCurrency = ''
 
 export function registerCurrencies(pricing) {
   if (!pricing) return
   if (pricing.currency) storeCurrency = String(pricing.currency).toUpperCase()
   for (const entry of pricing.currencies || []) {
-    if (entry?.code && Number.isInteger(entry.decimals)) reported.set(String(entry.code).toUpperCase(), entry.decimals)
+    const code = String(entry?.code || '').toUpperCase()
+    if (Number.isInteger(entry?.decimals)) reported.set(code, entry.decimals)
+    if (entry?.symbol) symbols.set(code, entry.symbol)
   }
 }
 
@@ -79,13 +83,19 @@ export const taxNote = (pricing) => (pricing?.showTaxNote && typeof pricing.taxN
 export function formatMoney(m, { locale = displayLocale() } = {}) {
   if (!m || typeof m.amount !== 'number') return ''
   const digits = minorUnits(m.currency)
+  const symbol = symbols.get(String(m.currency).toUpperCase())
   try {
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: m.currency,
+      // ¥ and ₹ rather than CN¥ and ₹ spelled out for a store abroad; the backend's own symbol wins over both.
+      currencyDisplay: 'narrowSymbol',
       minimumFractionDigits: digits,
       maximumFractionDigits: digits,
-    }).format(toMajor(m))
+    })
+      .formatToParts(toMajor(m))
+      .map((part) => (part.type === 'currency' && symbol ? symbol : part.value))
+      .join('')
   } catch {
     // An unknown currency code should not blank out a price.
     return `${m.currency} ${toMajor(m).toFixed(digits)}`

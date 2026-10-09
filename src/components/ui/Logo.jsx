@@ -67,12 +67,12 @@ export function LoomMark({ size = 24, variant = 'tile', className = '' }) {
  * `size` fixes the height. Without it the height is the store's `store.logo.height` times `scale`, at most `max`, so
  * the footer and the phone menu follow the height the store chose.
  */
-export default function Logo({ config, className = '', size, scale = 1, max, variant = 'tile' }) {
+export default function Logo({ config, className = '', size, scale = 1, max, variant = 'tile', ground = null }) {
   const logo = config?.store?.logo || {}
   const height = size || logoHeight(logo, { scale, max })
 
   // The dark-background artwork on a dark theme, when the store has one (lib/logo.js).
-  const image = logoImage(config)
+  const image = logoImage(config, ground)
   if (image) {
     return (
       <img

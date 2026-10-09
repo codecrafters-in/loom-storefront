@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react'
 import api from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
 import { Icon } from '../ui/index.jsx'
-import { useStorefront } from '../../store/StorefrontContext.jsx'
+import { useStorefront, useStorefrontState } from '../../store/StorefrontContext.jsx'
 import { formatMoney } from '../../lib/money.js'
 import { isMock } from '../../lib/config.js'
 import { t, plural } from '../../i18n/index.js'
@@ -24,9 +24,12 @@ const DeliveryCheck = isMock ? null : lazy(() => import('./DeliveryCheck.jsx'))
  * shopper has to do, and doing it is a moment to leave.
  */
 export default function TrustRow({ flat = false, product = null }) {
-  const config = useStorefront()
+  const { config, usingDefaults } = useStorefrontState()
   const trust = config.trust || {}
-  const { data: eta } = useAsync(() => api.getDeliveryEstimate({ method: 'standard' }), [])
+  // The store's own first delivery method, once its settings are in: the bundled defaults' "standard" to the US gets a
+  // UK store's 404. No country: the backend then answers for wherever the method delivers.
+  const method = config.commerce?.shippingMethods?.[0]?.id
+  const { data: eta } = useAsync(() => api.getDeliveryEstimate({ method }), [method], { skip: usingDefaults || !method })
 
   const free = config.commerce?.freeShippingOver
   // A product's own policy (`product.returns`) wins over the store's window: a final-sale item promises no returns,

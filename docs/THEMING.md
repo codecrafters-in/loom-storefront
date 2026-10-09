@@ -46,6 +46,46 @@ Contrast on the shipped palette: `ink` on `page` is 15.2:1, `muted` 6.4:1,
 `faint` 4.9:1, `accent` 6.1:1 — all clear of WCAG AA for body text, and `faint`
 is only used at 12px and above where it still passes.
 
+## Ready-made looks
+
+Twelve finished looks set every colour, both fonts, the corner radius and the [layout style](#layout-styles) in one pick: Linen (the shipped palette above),
+Paper, Midnight (dark), Evergreen, Harbour, Blush, Terracotta, Circuit, Noir (dark), Playroom, Sage and Espresso. A
+merchant picks one on the store's **Look** tab in Odoo, in its setup wizard, or in the admin under **Storefront ›
+Look**; each colour can still be changed after.
+
+Every look passes the same checks as a merchant's own colours: text, secondary text, text on cards, button text and
+sale prices at 4.5:1 or better, and the accent on the page too. The in-between shades the theme derives (`--faint`,
+`--sunken`) stay readable as well (`test/theme-presets.test.mjs`). The dark looks need a light logo
+(`theme.logoDarkUrl`).
+
+The list lives in the backend (Odoo: `services/theme.py`) and reaches the admin as `admin.themePresets`; the demo keeps
+the same list in `src/data/theme-presets.js`. The storefront document says which look the store started from:
+`theme.preset` and `theme.presetChanged`.
+
+## Layout styles
+
+A look also picks the layout, so two stores differ in more than colour. `theme.style` carries six parts; the first
+value of each is the layout the storefront always had, and a document without `style` (or with an unknown value) gets
+it, so an older backend changes nothing.
+
+| Part | Values | Drawn by |
+| --- | --- | --- |
+| `header` | `classic` · `centered` (logo centred on large screens, menu on a row below) · `minimal` (logo and a menu button at every width) · `bold` (the bar in the accent colour) | `Header.jsx` |
+| `card` | `portrait` · `square` · `framed` (border, padding, shadow) · `overlay` (name and price on the photo, no Quick view) | `ProductCard.jsx` |
+| `buttons` | `solid` · `pill` · `outline` (primary buttons outlined) | `data-buttons` on the layout root, `.btn` rules in `src/index.css` |
+| `spacing` | `balanced` · `airy` · `compact` | `data-spacing`, room around each `[data-home-block]` on the home page |
+| `headings` | `normal` · `uppercase` | `data-headings` |
+| `footer` | `light` · `dark` · `accent` | `Footer.jsx` |
+
+`src/lib/style.js` reads the style (`themeStyle`), writes the data attributes (`styleAttributes`) and repaints the bold
+header and a dark or accent footer (`toneVars`): text, secondary text and links there take the accent's text colour or
+the light side of the palette, and the logo picks its light or dark version from that ground. `test/style.test.mjs`
+checks that the defaults are today's layout, that the twelve looks do not collapse into a few layouts, and that text on
+each tone reads at 4.5:1 for every look.
+
+The CSS rules live outside Tailwind's layers so they win over utility classes; they only match when the attribute is
+set to a non-default value.
+
 ## Type
 
 | Role | Family | Where |

@@ -160,6 +160,18 @@ colour (the header, the phone menu, the footer and the closed-store screen) when
 relative luminance below 0.35. Without it the usual logo shows. `logo.height` is the header's height; the footer
 shows the logo at 1.2 times that (72 px at most) and the phone menu at 0.9 times (40 px at most).
 
+`theme.preset` names the ready-made look the store started from (`linen`, `paper`, `midnight`, `evergreen`, `harbour`,
+`blush`, `terracotta`, `circuit`, `noir`, `playroom`, `sage`, `espresso`) or is `null`; `theme.presetChanged` is `true`
+once a colour, font, corner or layout part was changed after picking it. The theme applies `colors`, `fonts`, `radius`
+and `style` either way;
+the two fields are for the admin. See [THEMING.md](THEMING.md#ready-made-looks).
+
+`theme.style: { header, card, buttons, spacing, headings, footer }` is the layout (Odoo: *Customise the layout*):
+`header` `classic` | `centered` | `minimal` | `bold`, `card` `portrait` | `square` | `framed` | `overlay`, `buttons`
+`solid` | `pill` | `outline`, `spacing` `balanced` | `airy` | `compact`, `headings` `normal` | `uppercase`, `footer`
+`light` | `dark` | `accent`. Missing parts use the first value, the storefront's original layout. See
+[THEMING.md](THEMING.md#layout-styles).
+
 `theme.faviconUrl` is written into every server-rendered page as the favicon (`image/png`) and the home-screen icon,
 and `theme.colors.page` as the browser's `theme-color`, in place of the template's.
 
@@ -180,7 +192,10 @@ and `theme.colors.page` as the browser's `theme-color`, in place of the template
 }
 ```
 
-`showTaxNote` renders `taxNote` under the totals on the bag page, in the bag drawer and in the checkout summary.
+`showTaxNote` renders `taxNote` under the totals on the bag page, in the bag drawer and in the checkout summary. The
+Odoo backend also sends `taxIncluded` (Odoo's Display Product Prices), and on a tax-included website its stock note
+reads "Prices include tax." instead of "Tax calculated at checkout.". How the totals themselves show tax follows the
+bag's own `taxIncluded` ([API.md](API.md)).
 
 - `currency` is the display default and what `Intl.NumberFormat` formats with.
 - `locale` is how every price and date is written (`de-DE`, or Odoo's `de_DE`): `1.234,50 €` for a German store. It
@@ -223,6 +238,12 @@ Shipping tab. `shippingMethods[0].price` is the standard rate the cart charges
 below the threshold. A method may also say `"pickup": true` (collected from a shop: checkout lists the shops) or
 `"slots": true` (checkout asks for a delivery slot); the Odoo backend sets both from the store's delivery methods, and
 the demo never does.
+
+`contactUsUrl` is where the **Contact us** button of a product priced on request goes (`priceOnRequest`; a path of
+the storefront or a full address), and `shop: { perPage, sort }` is the shop page's default page size and sort, which
+the page leaves to the backend unless the shopper picks a sort (Odoo: its Products per page and default sort). Both
+come from the backend and cannot be overridden. `stock: { display, lowThreshold }` is the default for products that do
+not say their own (Odoo: each product does).
 
 `countries` fills the country select at checkout and in the account's address
 book. The states are not in this document: the forms ask `GET /countries/:code`
@@ -543,6 +564,11 @@ holds French, Spanish, German, Italian, Portuguese, Dutch, Arabic and Hindi (mac
 hides Apple Pay and Google Pay; `termsVersion` is informational. `minimumOrder` (minor units) is the store's minimum;
 the bag's own `minimumOrder.remaining` decides whether checkout is offered. `orderNote` and `giftMessage` show optional
 boxes, and `giftWrap: { price }` a "Gift wrap this order" checkbox. The Odoo backend sends all of them from the store.
+With Odoo, `termsRequired` is Odoo's own Accept Terms & Conditions switch (website editor, checkout page), and
+`extraInfo` is Odoo's Extra Info step: `null` when it is off, otherwise the fields of its form as the merchant set them
+in the website editor, `[{ name, label, type, required, custom, placeholder?, options? }]`. Checkout shows them as an
+"Extra info" section and sends `extraInfo: { name: value }`; Odoo writes order fields (such as `client_order_ref`, "Your
+Reference") and logs the others on the order, as its own step does. File uploads are left to Odoo's own page.
 
 `collectPhone: false` drops the phone field; `phoneRequired: true` makes it
 required (the Odoo backend sends the store's setting), and `false` labels it optional. `requireAccount: true` sends a
@@ -630,7 +656,7 @@ manager reads that array natively and anything else can be pointed at it.
 **No vendor script ships with the theme.** A store already has GTM, or
 Plausible, or a self-hosted Umami; a theme that bundles a competing one is
 something to rip out rather than something to configure. When the backend names
-tags in `providers` (Odoo: the store's analytics IDs), the theme loads those and
+tags in `providers` (Odoo: the store's analytics IDs, and the website's Google Analytics key), the theme loads those and
 nothing else (`src/lib/tags.js`, its own chunk): Google Analytics 4 and Tag
 Manager count as **analytics**, Meta Pixel, TikTok Pixel and Pinterest Tag as
 **marketing**, and with a consent banner each waits for its category. The same

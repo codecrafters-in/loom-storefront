@@ -52,7 +52,7 @@ export function actionsOf(actions, max = 2) {
 export function onDark(variant) {
   if (variant === 'accent') return { variant: 'accent', className: '' }
   if (variant === 'outline' || variant === 'ghost') {
-    return { variant: 'outline', className: '!border-page !text-page hover:!bg-page hover:!text-ink' }
+    return { variant: 'outline', className: '!border-on-scrim !text-on-scrim hover:!bg-on-scrim hover:!text-scrim' }
   }
   return { variant: 'quiet', className: '' }
 }

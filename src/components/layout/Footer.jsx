@@ -11,6 +11,7 @@ import { footerLayout } from '../../lib/footer.js'
 import { withoutBlogLinks } from '../../lib/blog.js'
 import ContactDetails from '../content/ContactDetails.jsx'
 import { t } from '../../i18n/index.js'
+import { themeStyle, toneGround, toneVars } from '../../lib/style.js'
 
 export default function Footer() {
   const config = useStorefront()
@@ -29,12 +30,20 @@ export default function Footer() {
    */
   const showDocs = docsLinkVisible(config)
 
+  // light: the page's own colours; dark and accent repaint every colour inside the footer (src/lib/style.js).
+  const tone = themeStyle(config.theme).footer
+  const toneStyle = toneVars(config.theme, tone)
+
   return (
-    <footer className="mt-24 border-t border-line bg-sunken/50">
+    <footer
+      data-footer={tone}
+      style={toneStyle || undefined}
+      className={`mt-24 border-t ${toneStyle ? 'border-transparent bg-page' : 'border-line bg-sunken/50'}`}
+    >
       <div className={`wrap grid gap-12 py-16 ${layout.outer}`}>
         <div>
           {/* A little larger than in the header, from the store's own logo height. */}
-          <Link to="/"><Logo config={config} scale={1.2} max={72} /></Link>
+          <Link to="/"><Logo config={config} scale={1.2} max={72} ground={toneGround(config.theme, tone)} /></Link>
           {config.store?.tagline && <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-muted">{config.store.tagline}</p>}
           <ContactDetails contact={config.store?.contact} compact className="mt-5" />
 

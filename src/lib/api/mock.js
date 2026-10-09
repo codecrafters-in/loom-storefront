@@ -259,6 +259,7 @@ const SORTS = {
   'price-asc': (a, b) => amount(a) - amount(b),
   'price-desc': (a, b) => amount(b) - amount(a),
   rating: (a, b) => average(b) - average(a),
+  name: (a, b) => a.title.localeCompare(b.title),
 }
 
 /** `['Color:Ecru', 'Color:Navy', 'Size:M']` → `Map { Color → [Ecru, Navy], Size → [M] }`. A value may hold a colon; a key may not. */
@@ -647,6 +648,9 @@ export async function recordConsent() {
   return { ok: true }
 }
 
+/** The demo keeps no visitors. */
+export const recordView = async () => null
+
 export async function requestAccess() {
   await latency()
   return { token: 'demo', header: 'X-Loom-Access', expiresAt: new Date(Date.now() + 12 * 3600 * 1000).toISOString() }
@@ -855,6 +859,7 @@ export function priceCart(cart) {
     freeShippingRemaining: money(Math.max(0, freeOver - afterDiscount)),
     // Every demo product is shipped; a live bag of services or downloads answers false.
     requiresShipping: true,
+    requiresBillingAddress: true,
   }
 }
 
@@ -863,7 +868,7 @@ export function loadCart() {
   return stored && Array.isArray(stored.lines) ? stored : emptyCart()
 }
 /** A line as the API returns it, without this adapter's bookkeeping. */
-const publicLine = ({ _components, _untracked, ...line }) => line
+const publicLine = ({ _components, _untracked, _warning, ...line }) => line
 const publicCart = (cart) => ({ ...cart, lines: cart.lines.map(publicLine) })
 
 export function saveCart(cart) {
@@ -971,7 +976,7 @@ function checkQuantity(p, quantity) {
  * case it was chosen with.
  */
 function buildLine(body = {}) {
-  const quantity = Number(body.quantity ?? 1)
+  let quantity = Number(body.quantity ?? 1)
   let p
   let variant
   let quote = null
@@ -1027,8 +1032,12 @@ function buildLine(body = {}) {
   }
 
   const tracked = !variant.dynamic
+  // As Odoo: more than is left adds what is left, with a warning.
+  let warning = ''
   if (tracked && quantity > variant.inventory) {
-    throw new ApiError(shortage(p, variant.inventory), { status: 409, code: 'insufficient_inventory' })
+    if (variant.inventory <= 0) throw new ApiError(shortage(p, variant.inventory), { status: 409, code: 'out_of_stock' })
+    warning = `You ask for ${quantity} products but only ${variant.inventory} is available.`
+    quantity = variant.inventory
   }
   const extraOptions = {}
   for (const { option, choice } of quote?.extras || []) {
@@ -1053,6 +1062,7 @@ function buildLine(body = {}) {
     // takes out of stock, and whether the variant is counted at all.
     _components: components,
     _untracked: !tracked,
+    _warning: warning,
   }
 }
 
@@ -1066,12 +1076,14 @@ function placeLine(cart, line) {
     cart.lines.push(placed)
     return placed
   }
-  const wanted = Math.round((existing.quantity + line.quantity) * 1000) / 1000
+  let wanted = Math.round((existing.quantity + line.quantity) * 1000) / 1000
   const p = products.find((x) => x.slug === existing.productSlug)
   checkQuantity(p, wanted)
   const variant = p?.variants.find((v) => v.id === existing.variantId)
+  existing._warning = line._warning
   if (!existing._untracked && variant && wanted > variant.inventory) {
-    throw new ApiError(shortage(p, variant.inventory), { status: 409, code: 'insufficient_inventory' })
+    existing._warning = `You ask for ${wanted} ${p.title} but only ${variant.inventory} is available`
+    wanted = variant.inventory
   }
   existing.quantity = wanted
   if (existing.comboItems?.length) existing.comboItems = existing.comboItems.map((i) => ({ ...i, quantity: wanted }))
@@ -1104,8 +1116,10 @@ export async function addToCart(body = {}) {
   const main = buildLine(body)
   const optional = (body.optionalProducts || []).map((o) => buildLine({ variantId: o.variantId, quantity: o.quantity ?? 1 }))
   const placed = placeLine(cart, main)
-  for (const line of optional) placeLine(cart, { ...line, linkedTo: placed.id })
-  return saveCart(cart)
+  const warnings = [placed._warning]
+  for (const line of optional) warnings.push(placeLine(cart, { ...line, linkedTo: placed.id })._warning)
+  for (const line of cart.lines) delete line._warning
+  return { ...saveCart(cart), warning: warnings.filter(Boolean).join(' ') }
 }
 
 export async function updateCartLine(lineId, quantity) {
@@ -1117,13 +1131,16 @@ export async function updateCartLine(lineId, quantity) {
   const p = products.find((x) => x.slug === line.productSlug)
   if (p) checkQuantity(p, quantity)
   const variant = products.flatMap((x) => x.variants).find((v) => v.id === line.variantId)
+  let warning = ''
   if (!line._untracked && variant && quantity > variant.inventory) {
-    throw new ApiError(shortage(p, variant.inventory), { status: 409, code: 'insufficient_inventory' })
+    if (variant.inventory <= 0) return { ...(await removeLines(cart, lineId)), warning: 'Some products became unavailable and your cart has been updated. We\'re sorry for the inconvenience.' }
+    warning = `You ask for ${quantity} ${p.title} but only ${variant.inventory} is available`
+    quantity = variant.inventory
   }
   line.quantity = quantity
   // A set's contents follow its quantity.
   if (line.comboItems?.length) line.comboItems = line.comboItems.map((i) => ({ ...i, quantity }))
-  return saveCart(cart)
+  return { ...saveCart(cart), warning }
 }
 
 export async function removeCartLine(lineId) {
@@ -1170,7 +1187,7 @@ export async function clearCart() {
  * because the decrement in `placeOrderFromCart` clamps at zero, nothing
  * anywhere records that it happened.
  */
-function checkStock(cart) {
+export function checkStock(cart) {
   const short = []
   const every = products.flatMap((p) => p.variants)
   for (const line of cart.lines) {
@@ -1261,167 +1278,6 @@ export async function checkout({ email, shippingAddress, shippingMethod = 'stand
   write(KEY.placed, [order.id, ...read(KEY.placed, [])].slice(0, 50))
   saveCart(emptyCart())
   return withDownloads(order)
-}
-
-/* ── on-site payments (checkout.mode "payments") ───────────────────────── */
-
-/**
- * The two kinds of method a real backend offers, so the payment step can be
- * previewed without one: a test card taken on the page, and cash on delivery,
- * which needs nothing from the shopper.
- */
-const PAYMENT_METHODS = [
-  {
-    id: 'demo-card', providerId: 'demo', methodId: 'card', provider: 'demo', providerName: 'Demo',
-    code: 'card', name: 'Card', image: null, brands: [], flow: 'direct', test: true, canSave: false, note: null,
-  },
-  {
-    id: 'custom-cod', providerId: 'custom', methodId: 'cod', provider: 'custom', providerName: 'Cash on Delivery',
-    code: 'cash_on_delivery', name: 'Cash on delivery', image: null, brands: [], flow: 'offline', test: false,
-    canSave: false, note: 'Pay the courier in cash or by UPI when your parcel arrives.',
-  },
-]
-
-function paymentCart(cartId) {
-  const cart = priceCart(loadCart())
-  if (cartId && cart.id && cart.id !== cartId) {
-    throw new ApiError('That bag has expired. Please review it and try again.', { status: 404, code: 'cart_not_found' })
-  }
-  if (!cart.lines.length) throw new ApiError('Your bag is empty.', { status: 422, code: 'empty_cart' })
-  return cart
-}
-
-const loadPayments = () => read(KEY.payments, {})
-
-function savePayment(payment) {
-  const all = { ...loadPayments(), [payment.id]: payment }
-  // Keep the newest fifty; an abandoned attempt should not live in storage forever.
-  const newest = Object.values(all).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0, 50)
-  write(KEY.payments, Object.fromEntries(newest.map((p) => [p.id, p])))
-}
-
-function findPayment(paymentId) {
-  const payment = loadPayments()[paymentId]
-  if (!payment) throw new ApiError('We could not find that payment.', { status: 404, code: 'not_found' })
-  return payment
-}
-
-/** What the API answers with — never the cart id or the stored request. */
-const paymentView = ({ cartId: _cartId, request: _request, createdAt: _createdAt, ...payment }) => ({
-  message: null, client: {}, redirect: null, order: null, ...payment,
-})
-
-/** The money is taken (or promised, for cash on delivery): place the order exactly as checkout does. */
-function settlePayment(payment, status, message = null) {
-  const { email, shippingAddress, shippingMethod, methodName } = payment.request
-  const order = placeOrderFromCart(priceCart(loadCart()), {
-    email,
-    shippingAddress,
-    shippingMethod,
-    payment: {
-      provider: payment.provider,
-      status: status === 'paid' ? 'captured' : 'pending',
-      reference: payment.reference,
-      method: methodName,
-      capturedAt: status === 'paid' ? nowIso() : null,
-    },
-  })
-  write(KEY.placed, [order.id, ...read(KEY.placed, [])].slice(0, 50))
-  saveCart(emptyCart())
-  Object.assign(payment, { status, message, order: { id: order.id, number: order.number } })
-}
-
-export async function getPaymentOptions(cartId, { email } = {}) {
-  await latency()
-  const cart = paymentCart(cartId)
-  if (!email) throw new ApiError('Please enter your email address.', { status: 422, code: 'email_required' })
-  checkStock(cart)
-  return { amount: cart.total, methods: PAYMENT_METHODS, savedMethods: [], total: PAYMENT_METHODS.length }
-}
-
-export async function createPayment(cartId, body = {}) {
-  await latency()
-  const cart = paymentCart(cartId)
-  const method = PAYMENT_METHODS.find(
-    (m) => m.providerId === String(body.providerId) && m.methodId === String(body.methodId),
-  )
-  if (!method) {
-    throw new ApiError('That payment method is not available for this order.', { status: 422, code: 'invalid_payment_method' })
-  }
-  if (!body.email) throw new ApiError('Please enter your email address.', { status: 422, code: 'email_required' })
-  if (body.expectedTotal != null && body.expectedTotal !== cart.total.amount) {
-    throw new ApiError('Your bag changed while you were paying. Please check the total and try again.', {
-      status: 409,
-      code: 'cart_changed',
-    })
-  }
-  checkStock(cart)
-
-  const reference = `LM-PAY-${Date.now().toString(36).toUpperCase()}`
-  const payment = {
-    id: `pay_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`,
-    reference,
-    provider: method.provider,
-    flow: method.flow,
-    status: 'draft',
-    message: null,
-    client: method.flow === 'direct'
-      ? {
-        reference,
-        amount: cart.total.amount,
-        currency: cart.total.currency,
-        prefill: { name: body.shippingAddress?.name || '', email: body.email, contact: body.shippingAddress?.phone || '' },
-      }
-      : {},
-    redirect: null,
-    order: null,
-    cartId: cart.id,
-    createdAt: nowIso(),
-    request: {
-      email: body.email,
-      shippingAddress: body.shippingAddress,
-      shippingMethod: body.shippingMethod || 'standard',
-      methodName: method.name,
-    },
-  }
-  if (cart.total.amount === 0) settlePayment(payment, 'paid')
-  else if (method.flow === 'offline') settlePayment(payment, 'pending', method.note)
-  savePayment(payment)
-  return paymentView(payment)
-}
-
-export async function paymentAction(paymentId, action, body = {}) {
-  await latency()
-  const payment = findPayment(paymentId)
-  if (payment.provider !== 'demo' || action !== 'simulate') {
-    throw new ApiError(`"${action}" is not a step this payment takes.`, { status: 404, code: 'unsupported_action' })
-  }
-  // A replayed step changes nothing once the payment has an answer.
-  if (payment.status !== 'draft') return paymentView(payment)
-
-  switch (body.outcome) {
-    case 'done':
-      settlePayment(payment, 'paid')
-      break
-    case 'pending':
-      settlePayment(payment, 'pending', 'Your payment is being confirmed.')
-      break
-    case 'cancel':
-      Object.assign(payment, { status: 'cancelled', message: 'The payment was cancelled. Your bag is unchanged.' })
-      break
-    case 'error':
-      Object.assign(payment, { status: 'failed', message: 'The card was declined. This is a test — try another outcome.' })
-      break
-    default:
-      throw new ApiError('Choose what the test payment should do.', { status: 422, code: 'invalid_outcome' })
-  }
-  savePayment(payment)
-  return paymentView(payment)
-}
-
-export async function getPayment(paymentId) {
-  await latency()
-  return paymentView(findPayment(paymentId))
 }
 
 /**
@@ -1892,6 +1748,11 @@ export async function logSearch(q) {
 
 // The demo's account, after-purchase and community calls (mock-account.js), loaded with the first of them.
 const laterAccount = (name) => async (...args) => (await import('./mock-account.js'))[name](...args)
+// On-site payments (checkout.mode "payments"): the payment step, never the first page.
+export const getPaymentOptions = laterAccount('getPaymentOptions')
+export const createPayment = laterAccount('createPayment')
+export const paymentAction = laterAccount('paymentAction')
+export const getPayment = laterAccount('getPayment')
 export const getQuestions = laterAccount('getQuestions')
 export const askQuestion = laterAccount('askQuestion')
 export const createAlert = laterAccount('createAlert')

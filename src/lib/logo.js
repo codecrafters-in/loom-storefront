@@ -1,4 +1,4 @@
-import { isDarkTheme } from './colour.js'
+import { DARK_BELOW, hexRgb, isDarkTheme, luminance } from './colour.js'
 
 /**
  * Which logo artwork to show, and how tall. Pure, so Logo.jsx stays a drawing and the choice is tested.
@@ -12,10 +12,12 @@ export const DEFAULT_LOGO_HEIGHT = 26
  * uploaded one. The header, the phone menu, the footer and the closed-store screen all sit on the page colour, so the
  * page colour decides. A dark logo on a dark page is invisible; without a dark version the usual one is still shown.
  */
-export function logoImage(config) {
+export function logoImage(config, ground = null) {
   const usual = config?.store?.logo?.imageUrl || null
   const dark = config?.theme?.logoDarkUrl || null
-  return (dark && isDarkTheme(config?.theme)) ? dark : usual
+  // `ground`: the colour the logo sits on when it is not the page (a bold header in the accent colour, a dark footer).
+  const onDark = ground ? Boolean(hexRgb(ground)) && luminance(hexRgb(ground)) < DARK_BELOW : isDarkTheme(config?.theme)
+  return (dark && onDark) ? dark : usual
 }
 
 /**

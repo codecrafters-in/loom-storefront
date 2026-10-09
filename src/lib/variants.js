@@ -236,17 +236,25 @@ export function priceFor(model, selection, product, extra = 0) {
  * Images tagged with that value, plus every untagged one (a detail crop, a
  * packshot) which belongs to all of them. Tags are value names in
  * `images[].color`, as today; a store that tags nothing sees every image.
+ *
+ * A variant's own photos (`images[].variants`, Odoo's variant image and extra
+ * media) show only once it is chosen, first; its own image takes the product's
+ * main one (`tmpl-…`) away, as on Odoo's product page.
  */
 export function galleryFor(product, model, selection) {
-  const images = product?.images || []
+  const all = product?.images || []
+  const variant = variantFor(model, selection)
+  const own = all.filter((img) => variant && img.variants?.includes(variant.id))
+  const replaced = own.some((img) => img.id.startsWith('var-'))
+  const images = all.filter((img) => !img.variants && !(replaced && img.id.startsWith('tmpl-')))
   const follow = model.options.find((o) => o.imagesFollow)
   const chosen = follow?.choices.find((c) => c.id === selection[follow.id])
-  if (!chosen) return images
+  if (!chosen) return [...own, ...images]
   const scoped = [
     ...images.filter((img) => img.color != null && img.color === chosen.name),
     ...images.filter((img) => img.color == null),
   ]
-  return scoped.length ? scoped : images
+  return [...own, ...(scoped.length ? scoped : images)]
 }
 
 /* ── extra options ─────────────────────────────────────────────────────── */

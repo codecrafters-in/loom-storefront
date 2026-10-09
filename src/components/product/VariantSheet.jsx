@@ -29,7 +29,7 @@ export default function VariantSheet({ product, choice, busy, aside, onClose, on
 
   return (
     <div ref={trapRef} tabIndex={-1} className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label={t('Choose options for {title}', { title: product.title })}>
-      <button type="button" aria-label={t('Close')} onClick={onClose} className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" />
+      <button type="button" aria-label={t('Close')} onClick={onClose} className="absolute inset-0 bg-scrim/40 backdrop-blur-[2px]" />
 
       <div className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-lg border-t border-line bg-page">
         {/* A grab handle is the only affordance that says "this came from the

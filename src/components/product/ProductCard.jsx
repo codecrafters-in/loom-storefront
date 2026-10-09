@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Badge, Icon, Price } from '../ui/index.jsx'
+import { Badge, Icon, Price, Ribbon } from '../ui/index.jsx'
 import Media from '../ui/Media.jsx'
 import { SIZES } from '../../lib/images.js'
 import { optionsOf } from '../../lib/variants.js'
@@ -8,6 +8,8 @@ import { useWishlist } from '../../store/WishlistContext.jsx'
 import { t } from '../../i18n/index.js'
 import api from '../../lib/api/index.js'
 import { selectItem } from '../../lib/analytics.js'
+import { useStorefrontTheme } from '../../store/StorefrontContext.jsx'
+import { themeStyle } from '../../lib/style.js'
 
 // Downloaded the first time somebody asks for a quick look, not with the grid.
 const QuickView = lazy(() => import('./QuickView.jsx'))
@@ -49,9 +51,30 @@ export default function ProductCard({ product, priority = false, className = '' 
   const images = product.images?.length ? product.images : product.image ? [product.image] : []
   const badge = product.badges?.find((b) => ['sold-out', 'sale', 'new', 'bestseller'].includes(b))
   const soldOut = product.badges?.includes('sold-out') || product.available === false
+  // framed: a card with a border; overlay: name and price in a band over the photograph. See src/lib/style.js.
+  const look = themeStyle(useStorefrontTheme()).card
+  const framed = look === 'framed'
+  const overlay = look === 'overlay'
+
+  const details = (
+    <>
+      {product.brand && (
+        <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{product.brand.name}</p>
+      )}
+      <h3 className="font-sans text-[15px] font-medium leading-snug">
+        <Link to={`/product/${product.slug}`} className="link-underline decoration-transparent">
+          {product.title}
+        </Link>
+      </h3>
+      {product.subtitle && !overlay && <p className="mt-1 text-[13px] text-faint">{product.subtitle}</p>}
+      <Price price={!product.priceOnRequest && span.price} to={span.to} compareAt={span.compareAt} size="sm" className={`${overlay ? 'mt-1' : 'mt-2'} flex-wrap`} />
+    </>
+  )
 
   return (
-    <article className={`group relative ${className}`}>
+    <article
+      className={`product-card group relative ${framed ? 'rounded-xs border border-line bg-surface p-2.5 shadow-card transition-shadow hover:shadow-panel' : ''} ${className}`}
+    >
       <div className="relative">
         <Link
           to={`/product/${product.slug}`}
@@ -87,14 +110,19 @@ export default function ProductCard({ product, priority = false, className = '' 
                 className="absolute inset-0 h-full w-full scale-[1.02] object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
               />
             )}
-            {badge && <Badge kind={badge} className="absolute start-3 top-3" />}
+            {/* Odoo's ribbon where the API sends one; the theme's own badge on data without ribbons. */}
+            {'ribbon' in product
+              ? <Ribbon ribbon={product.ribbon} className={product.ribbon?.position === 'right' ? 'top-12' : 'top-0'} />
+              : badge && <Badge kind={badge} className="absolute start-3 top-3" />}
             {soldOut && (
-              <span className="absolute inset-x-0 bottom-0 bg-ink/75 py-2 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-page">
+              <span className={`absolute inset-x-0 ${overlay ? 'top-12' : 'bottom-0'} bg-ink/75 py-2 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-page`}>
                 {t('Sold out')}
               </span>
             )}
           </div>
         </Link>
+
+        {overlay && <div className="absolute inset-x-2 bottom-2 rounded-xs bg-surface/90 p-3 shadow-card backdrop-blur">{details}</div>}
 
         <button
           type="button"
@@ -108,14 +136,14 @@ export default function ProductCard({ product, priority = false, className = '' 
 
         {/* On hover or focus, over the photograph: the look is the question. Not
             on a phone, where there is no hover and the page is one tap away. */}
-        <button
+        {!overlay && <button
           type="button"
           onClick={() => setQuick(true)}
           aria-label={t('Quick view: {title}', { title: product.title })}
           className="absolute inset-x-2.5 bottom-2.5 hidden h-9 items-center justify-center rounded-xs bg-page/90 text-[12px] font-medium text-ink opacity-0 backdrop-blur transition-opacity focus-visible:opacity-100 group-hover:opacity-100 sm:flex"
         >
           {t('Quick view')}
-        </button>
+        </button>}
       </div>
 
       {/*
@@ -123,17 +151,8 @@ export default function ProductCard({ product, priority = false, className = '' 
         The two-column row falls apart in a two-up mobile grid: a struck-through
         original with a discount chip leaves the title forty pixels.
       */}
-      <div className="pt-4">
-        {product.brand && (
-          <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{product.brand.name}</p>
-        )}
-        <h3 className="font-sans text-[15px] font-medium leading-snug">
-          <Link to={`/product/${product.slug}`} className="link-underline decoration-transparent">
-            {product.title}
-          </Link>
-        </h3>
-        {product.subtitle && <p className="mt-1 text-[13px] text-faint">{product.subtitle}</p>}
-        <Price price={span.price} to={span.to} compareAt={span.compareAt} size="sm" className="mt-2 flex-wrap" />
+      <div className={overlay ? 'pt-2' : framed ? 'px-1 pb-1 pt-3' : 'pt-4'}>
+        {!overlay && details}
 
         {/* One fit signal in the grid. Someone comparing eight products decides
             which two to open here, and "runs small" is the fact that decides it. */}

@@ -196,6 +196,27 @@ test('the gallery follows the chosen colour and keeps the shared shots', () => {
   assert.deepEqual(galleryFor(phone, model, {}).map((i) => i.id), ['g', 'detail', 's'], 'nothing chosen: every image')
 })
 
+test("a variant's own photos show once it is chosen, first, its image in the main one's place", () => {
+  const shirt = {
+    options: [{ id: 'c', name: 'Colour', choices: [{ id: 'r', name: 'Red' }, { id: 'b', name: 'Blue' }] }],
+    variants: [
+      { id: '1', options: { Colour: 'Red' }, optionIds: { c: 'r' }, available: true, price: { amount: 100, currency: 'USD' } },
+      { id: '2', options: { Colour: 'Blue' }, optionIds: { c: 'b' }, available: true, price: { amount: 100, currency: 'USD' } },
+    ],
+    images: [
+      { id: 'tmpl-9', url: '/main' },
+      { id: 'img-1', url: '/detail' },
+      { id: 'var-2', url: '/blue', variants: ['2'] },
+      { id: 'img-5', url: '/blue-back', variants: ['2'] },
+      { id: 'img-6', url: '/red-back', variants: ['1'] },
+    ],
+  }
+  const model = modelOf(shirt)
+  assert.deepEqual(galleryFor(shirt, model, {}).map((i) => i.id), ['tmpl-9', 'img-1'], 'nothing chosen: the product')
+  assert.deepEqual(galleryFor(shirt, model, { c: 'b' }).map((i) => i.id), ['var-2', 'img-5', 'img-1'])
+  assert.deepEqual(galleryFor(shirt, model, { c: 'r' }).map((i) => i.id), ['img-6', 'tmpl-9', 'img-1'], 'extra media only: the main image stays')
+})
+
 test('extra options: a required radio starts chosen, checkboxes add up, typed text is required', () => {
   const pen = {
     options: [],

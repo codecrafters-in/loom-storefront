@@ -74,7 +74,9 @@ export function CartProvider({ children }) {
       try {
         const next = await work()
         setCart(tell(push, next))
-        if (successMessage) push(successMessage)
+        // Odoo's warning when stock allowed fewer than asked: said instead of "Added".
+        if (next?.warning) push(next.warning, { tone: 'error', duration: 6000 })
+        else if (successMessage) push(successMessage)
         if (openDrawer) setOpen(true)
         return next
       } catch (err) {

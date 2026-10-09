@@ -15,7 +15,9 @@ export default function Home() {
     <>
       <Seo site />
       {home.map((section, i) => (
-        <Section key={`${section.type}-${i}`} section={section} />
+        <div key={`${section.type}-${i}`} data-home-block={section.type}>
+          <Section section={section} />
+        </div>
       ))}
     </>
   )

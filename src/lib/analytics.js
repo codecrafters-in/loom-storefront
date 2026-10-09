@@ -144,6 +144,20 @@ export function consentState() {
   return { analytics: allowed('analytics'), marketing: allowed('marketing') }
 }
 
+/** This browser's random id: proof of consent, and Odoo's visitor for product views once analytics is allowed. */
+export function visitorId() {
+  try {
+    let id = localStorage.getItem('loom.visitor')
+    if (!id) {
+      id = (crypto.randomUUID?.() || `${Date.now()}${Math.random()}`).replace(/[^A-Za-z0-9]/g, '').slice(0, 32)
+      localStorage.setItem('loom.visitor', id)
+    }
+    return id
+  } catch {
+    return `anon${Date.now()}`
+  }
+}
+
 /** A route change in the single-page app. */
 export const pageView = (path) =>
   track('page_view', {

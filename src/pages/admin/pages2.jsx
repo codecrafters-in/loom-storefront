@@ -7,6 +7,8 @@ import RecordRow, { RowAction } from '../../components/admin/RecordRow.jsx'
 import ListToolbar, { matches } from '../../components/admin/ListToolbar.jsx'
 import { formatMoney, toMajor, toMinor } from '../../lib/money.js'
 import { LiveData, LiveSettings } from './backoffice.jsx'
+import ThemePresetPicker from '../../components/admin/ThemePresetPicker.jsx'
+import { THEME_PRESETS, presetTheme } from '../../data/theme-presets.js'
 import { usesSizeCharts } from '../../lib/product-types.js'
 
 /* ── categories ────────────────────────────────────────────────────────── */
@@ -512,6 +514,11 @@ function StorefrontScreen() {
       </div>
 
       <div className="mt-8 max-w-2xl space-y-8">
+        <Group title="Look" note="A ready-made look sets every colour, both fonts, the corners and the layout. On a live store each one can be changed in Odoo.">
+          <ThemePresetPicker presets={THEME_PRESETS} value={cfg.theme?.preset || null}
+            onChange={(id) => patch('theme', presetTheme(THEME_PRESETS.find((p) => p.id === id)))} />
+        </Group>
+
         <Group title="Company profile" note="Shown in the header, footer, page titles and the Open Graph card.">
           <Row label="Store name" value={cfg.store?.name || ''} onChange={(e) => patch('store.name', e.target.value)} />
           <Row label="Tagline" value={cfg.store?.tagline || ''} onChange={(e) => patch('store.tagline', e.target.value)} />
@@ -739,16 +746,21 @@ function DataScreen() {
         </Card>
       </div>
 
-      <div className="mt-8 max-w-2xl rounded-xs border border-sale/25 bg-surface p-5">
-        <h2 className="text-[14px] font-medium text-sale">Reset</h2>
-        <p className="mt-2 text-[13px] leading-relaxed text-muted">
-          Discards every change and reseeds the demo catalogue. Local data only — this never touches
-          a real backend.
-        </p>
-        <Button size="sm" variant="quiet" className="mt-4" onClick={reset} disabled={busy}>
-          Reset to demo data
-        </Button>
-      </div>
+      {/* Demo-only: reseeds the bundled mock catalogue. A real backend has no
+          /admin/reset route (it answers use_odoo_backend), so the control is
+          hidden outside mock mode rather than offered as a dead button. */}
+      {isMock && (
+        <div className="mt-8 max-w-2xl rounded-xs border border-sale/25 bg-surface p-5">
+          <h2 className="text-[14px] font-medium text-sale">Reset</h2>
+          <p className="mt-2 text-[13px] leading-relaxed text-muted">
+            Discards every change and reseeds the demo catalogue. Local data only — this never touches
+            a real backend.
+          </p>
+          <Button size="sm" variant="quiet" className="mt-4" onClick={reset} disabled={busy}>
+            Reset to demo data
+          </Button>
+        </div>
+      )}
     </>
   )
 }

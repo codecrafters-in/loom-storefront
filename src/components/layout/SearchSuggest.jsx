@@ -32,7 +32,7 @@ export default function SearchSuggest({ q, listId, keysRef, onActive, onClose })
   const options = useMemo(() => {
     if (!data) return []
     return [
-      ...data.products.map((p) => ({ key: `p-${p.slug}`, to: `/product/${p.slug}`, label: p.title, image: p.image, price: p.price })),
+      ...data.products.map((p) => ({ key: `p-${p.slug}`, to: `/product/${p.slug}`, label: p.title, image: p.image, price: !p.priceOnRequest && p.price })),
       ...data.categories.map((c) => ({ key: `c-${c.slug}`, to: `/shop/${c.slug}`, label: c.name, note: t('Category') })),
       ...data.brands.map((b) => ({ key: `b-${b.slug}`, to: `/brands/${b.slug}`, label: b.name, note: t('Brand') })),
     ]

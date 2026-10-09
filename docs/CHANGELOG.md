@@ -2,6 +2,52 @@
 
 Newest first. Each entry links to the page with the detail.
 
+## What's new — Odoo parity: prices
+
+With the Odoo module's 19.0.2.5.0. Details: [API.md](API.md).
+
+- The catalogue is priced with the bag's pricelist (`pricelistId`, sent back as `X-Loom-Pricelist`) once the bag has
+  one, as Odoo's shop is: a code, the customer's own pricelist or a country's shows across the shop, not only in the bag.
+- A line the pricelist discounts shows its price before the discount struck through (`compareAtTotal`) in the bag, the
+  drawer and the checkout summary. The customer's own coupons and gift cards are offered under **Choose your reward**
+  with the end of their code.
+- No delivery in the bag before the delivery step (`shippingMethod: null`): the bag, the drawer and the checkout
+  summary print Delivery as "-", as Odoo's cart does, and the total is the products'.
+- The product page is priced for the quantity picked past a price break (`quantity` on the combination call), shows the
+  chosen variant's quantity prices, and a combo shows Odoo's tax note (`taxDisclaimer`) under its total. Options priced
+  by a fixed-price rule no longer show "+x".
+
+## What's new — Tax shown as Odoo shows it
+
+With the Odoo module's 19.0.2.3.0. Details: [API.md](API.md).
+
+- The bag page, the drawer, the checkout summary and the order page print Odoo's cart summary in either of its
+  Display Product Prices modes: Delivery, Subtotal (untaxed, the new `untaxed`), Taxes and Total, with discounts, gift
+  wrapping and the cash-on-delivery fee above them. Lines are Odoo's own line amounts, with or without tax
+  (`taxIncluded`).
+- Delivery options at checkout use `displayAmount` (with or without tax, as the store shows prices); wallets keep
+  `amount`, always with tax.
+- The bag's fiscal position (`fiscalPositionId`) goes back to the API as `X-Loom-Fiscal-Position`, so a tax-free
+  export bag shows tax-free prices across the shop.
+- The demo's payment calls load with the payment step (`mock-account.js`), which brings the demo's first download
+  back under its budget.
+
+## What's new — Ready-made looks
+
+With the Odoo module's 19.0.2.3.0. Details: [THEMING.md](THEMING.md#ready-made-looks), [ADMIN.md](ADMIN.md#settings).
+
+- Twelve looks (Linen, Paper, Midnight, Evergreen, Harbour, Blush, Terracotta, Circuit, Noir, Playroom, Sage,
+  Espresso), light and dark, picked under **Storefront › Look** in the admin, on the store's Look tab in Odoo or in its
+  setup wizard. Each sets every colour, both fonts and the corners, and passes the contrast checks.
+- `theme.preset` and `theme.presetChanged` in the storefront document; `admin.themePresets` and
+  `PATCH /admin/storefront { theme: { preset } }`.
+- The demo keeps the same looks in `src/data/theme-presets.js` and applies them at once.
+- **Layout styles:** `theme.style` picks the header (classic, centred, minimal, bold), product cards (portrait, square,
+  framed, name on the photo), buttons (solid, pill, outline), home-page spacing, heading case and footer tone. Each look
+  sets one; the first value of each is the old layout, so a backend that sends no style changes nothing
+  ([THEMING.md](THEMING.md#layout-styles)).
+- The Odoo setup wizard suggests a look from what the shop sells.
+
 ## What's new — Specification defaults and values that grow
 
 With the Odoo module's 19.0.2.3.0. Details: [ADMIN.md](ADMIN.md) and [API.md](API.md).

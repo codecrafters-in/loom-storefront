@@ -1,7 +1,7 @@
 import api from './api/index.js'
 import { ApiError } from './api/contracts.js'
 import { loadScript } from './payments/load-script.js'
-import { addressPrefix } from '../i18n/index.js'
+import { addressPrefix, currentLanguage, languageFromAddress } from '../i18n/index.js'
 
 /**
  * Checkout, in five modes.
@@ -37,12 +37,21 @@ import { addressPrefix } from '../i18n/index.js'
  * secret this file could read is a secret every visitor could read.
  */
 
+/**
+ * Whether checkout asks an address. A bag with nothing to ship (services, downloads) still has the billing address
+ * Odoo asks for (`requiresBillingAddress`), unless the backend says it asks none.
+ */
+export const asksAddress = (cart) => cart?.requiresShipping !== false || cart?.requiresBillingAddress !== false
+
+/** The address sent with checkout: only the name when none is asked. */
+export const checkoutAddress = (cart, address) => (asksAddress(cart) ? address : { name: address.name })
+
 const template = (str, vars) =>
   String(str || '').replace(/:([a-zA-Z]+)/g, (m, key) => (vars[key] ?? m))
 
 export async function startCheckout({
   config, cart, email, shippingAddress, shippingMethod, billingAddress, companyName, vat, note, giftMessage, giftWrap, acceptTerms,
-  deliverySlot,
+  deliverySlot, extraInfo,
 }) {
   const checkout = config?.checkout || {}
   const mode = checkout.mode || 'demo'
@@ -82,6 +91,7 @@ export async function startCheckout({
     gift_wrap: giftWrap,
     accept_terms: acceptTerms,
     delivery_slot: deliverySlot,
+    extra_info: extraInfo,
     // Absolute, because the payment provider redirects a browser back here from
     // its own domain and a relative path would resolve against theirs.
     success_url: absolute(template(checkout.successUrl, { orderId: '{ORDER_ID}' })),
@@ -116,7 +126,10 @@ function absolute(path) {
 /** `createUrl` may be a full URL (a payment service) or a path on the store API. */
 async function postAbsolute(url, body) {
   const { config: env } = await import('./config.js')
-  const target = /^https?:\/\//.test(url) ? url : `${env.api.baseUrl}${url}`
+  const own = !/^https?:\/\//.test(url)
+  const target = own ? `${env.api.baseUrl}${url}` : url
+  // The store's API is told the page's language, as every other call does: a guest's contact speaks it.
+  const language = own && languageFromAddress() ? currentLanguage() : ''
 
   let session = ''
   try {
@@ -132,6 +145,7 @@ async function postAbsolute(url, body) {
       'content-type': 'application/json',
       accept: 'application/json',
       ...(session ? { authorization: `Bearer ${session}` } : {}),
+      ...(language ? { 'x-loom-lang': language } : {}),
     },
     body: JSON.stringify(body),
   })

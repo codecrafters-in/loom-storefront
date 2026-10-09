@@ -8,7 +8,7 @@ import Promises from '../components/layout/Promises.jsx'
 import Seo from '../components/Seo.jsx'
 import { useBootstrap, useStorefront } from '../store/StorefrontContext.jsx'
 import { categoryTrail, flattenCategories } from '../lib/categories.js'
-import { Breadcrumbs, Button, Empty, ErrorState, Icon, Pagination } from '../components/ui/index.jsx'
+import { Breadcrumbs, Button, Empty, ErrorState, Icon, Pagination, Rich } from '../components/ui/index.jsx'
 import { t, plural, mark } from '../i18n/index.js'
 import { viewItemList } from '../lib/analytics.js'
 
@@ -18,6 +18,7 @@ const SORTS = [
   ['price-asc', mark('Price, low to high')],
   ['price-desc', mark('Price, high to low')],
   ['rating', mark('Best rated')],
+  ['name', mark('Name, A to Z')],
 ]
 
 const PER_PAGE = 12
@@ -41,9 +42,10 @@ export const listingQuery = (extra = {}) => ({
   inStock: false,
   minPrice: undefined,
   maxPrice: undefined,
-  sort: 'featured',
+  // Left out, the API uses Odoo's default sort and products per page (`commerce.shop`).
+  sort: undefined,
   page: 1,
-  perPage: PER_PAGE,
+  perPage: undefined,
   ...extra,
 })
 
@@ -61,7 +63,7 @@ export const filtersFromParams = (params) => ({
   inStock: params.get('in_stock') === '1',
   minPrice: price(params, 'min_price'),
   maxPrice: price(params, 'max_price'),
-  sort: params.get('sort') || 'featured',
+  sort: params.get('sort') || undefined,
   page: Number(params.get('page') || 1),
 })
 
@@ -89,7 +91,7 @@ function useFilters() {
       if (next.inStock) p.set('in_stock', '1')
       if (next.minPrice != null) p.set('min_price', String(next.minPrice))
       if (next.maxPrice != null) p.set('max_price', String(next.maxPrice))
-      if (next.sort && next.sort !== 'featured') p.set('sort', next.sort)
+      if (next.sort) p.set('sort', next.sort)
       if (next.page && next.page > 1) p.set('page', String(next.page))
       setParams(p, { replace: true })
     },
@@ -212,7 +214,9 @@ export default function Shop({ mode = 'category' }) {
               <span aria-hidden="true" className="skeleton inline-block h-[0.9em] w-64 max-w-full rounded-xs align-middle" />
             </h1>
           )}
-          {blurb && <p className="mt-4 text-[15px] leading-relaxed text-muted">{blurb}</p>}
+          {!brand && !col && meta?.descriptionHtml
+            ? <Rich html={meta.descriptionHtml} className="mt-4 text-[15px] leading-relaxed text-muted" />
+            : blurb && <p className="mt-4 text-[15px] leading-relaxed text-muted">{blurb}</p>}
         </header>
       </div>
 
@@ -236,7 +240,7 @@ export default function Shop({ mode = 'category' }) {
               <div className="relative">
                 <select
                   id="sort"
-                  value={filters.sort}
+                  value={filters.sort || config.commerce?.shop?.sort || 'featured'}
                   onChange={(e) => setFilters({ ...filters, sort: e.target.value, page: 1 })}
                   className="field h-9 appearance-none py-0 pe-8 text-[13px]"
                 >
@@ -260,11 +264,11 @@ export default function Shop({ mode = 'category' }) {
             />
           ) : (
             <>
-              <ProductGrid products={data?.items || []} loading={loading} skeletonCount={PER_PAGE} />
+              <ProductGrid products={data?.items || []} loading={loading} skeletonCount={config.commerce?.shop?.perPage || PER_PAGE} />
               <div className="mt-14">
                 <Pagination
                   page={filters.page}
-                  perPage={PER_PAGE}
+                  perPage={data?.perPage || PER_PAGE}
                   total={data?.total || 0}
                   onPage={(p) => {
                     setFilters({ ...filters, page: p })
@@ -281,7 +285,7 @@ export default function Shop({ mode = 'category' }) {
       <div
         onClick={() => setDrawer(false)}
         aria-hidden="true"
-        className={`fixed inset-0 z-40 bg-ink/35 transition-opacity lg:hidden ${drawer ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        className={`fixed inset-0 z-40 bg-scrim/35 transition-opacity lg:hidden ${drawer ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
       />
       <div
         role="dialog"

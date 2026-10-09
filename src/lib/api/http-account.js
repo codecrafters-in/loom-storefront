@@ -1,10 +1,14 @@
 /**
  * The real-backend adapter's account, after-purchase and community calls, loaded with the first of them
  * (see `later` in http.js): password and email changes, sign-in by code or provider, company accounts, returns,
- * cancelling and buying again, reviews, questions, alerts and the newsletter links. Documented in docs/API.md.
+ * cancelling and buying again, reviews, questions, alerts, the newsletter links, and asking what can pay for the bag
+ * and starting its payment. Documented in docs/API.md.
  */
-import { ApiError, assertCart, assertList } from './contracts.js'
-import { get, post, request, send, customerToken, storeSession, mergeGuestWishlist, SESSION_KEY, CART_KEY, FRESH_CART_KEY } from './http.js'
+import { ApiError, ContractError, assertCart, assertList } from './contracts.js'
+import {
+  get, post, request, send, customerToken, storeSession, mergeGuestWishlist, SESSION_KEY, CART_KEY, FRESH_CART_KEY, ensureCart,
+  assertPayment, forgetSpentCart,
+} from './http.js'
 
 /** Answered questions about a product (`features.questions`): `{items, total, page, perPage}`. */
 export const getQuestions = (slug, { page = 1, perPage = 5 } = {}) =>
@@ -131,4 +135,58 @@ export async function recoverCart({ order, token }) {
     /* storage unavailable: the bag lives for this tab only */
   }
   return cart
+}
+
+/* ── on-site payments (checkout.mode "payments"): what can pay, and starting a payment ── */
+
+// Never cached: every answer here is about one shopper's money.
+
+const checkoutFields = (body = {}) => ({
+  email: body.email,
+  shipping_address: body.shippingAddress,
+  shipping_method: body.shippingMethod,
+  currency: body.currency,
+  // Optional: a billing address other than the delivery one, and a business's company name and tax ID.
+  billing_address: body.billingAddress,
+  company_name: body.companyName,
+  vat: body.vat,
+  // Optional, as far as the store's checkout settings allow: delivery instructions, gift message and wrapping, and
+  // the terms checkbox when the store requires it.
+  note: body.note,
+  gift_message: body.giftMessage,
+  gift_wrap: body.giftWrap,
+  accept_terms: body.acceptTerms,
+  // One of `getDeliverySlots`, when the delivery method offers slots.
+  delivery_slot: body.deliverySlot,
+  // Odoo's Extra Info step: `{ name: value }` for the fields in `checkout.extraInfo`.
+  extra_info: body.extraInfo,
+  // Ticked "email me news and offers": a newsletter subscription waiting for its confirmation email.
+  newsletter: body.newsletter || undefined,
+  newsletter_consent: body.newsletter ? body.newsletterConsent : undefined,
+})
+
+export async function getPaymentOptions(cartIdArg, body = {}) {
+  const id = cartIdArg || (await ensureCart()).id
+  const options = await post(`/carts/${encodeURIComponent(id)}/payment-options`, checkoutFields(body))
+  if (!options || !Array.isArray(options.methods)) {
+    throw new ContractError('POST /carts/:id/payment-options', 'an object with a "methods" array', options)
+  }
+  return options
+}
+
+export async function createPayment(cartIdArg, body = {}) {
+  const id = cartIdArg || (await ensureCart()).id
+  const payment = await post(`/carts/${encodeURIComponent(id)}/payments`, {
+    ...checkoutFields(body),
+    provider_id: body.providerId,
+    method_id: body.methodId,
+    token_id: body.tokenId,
+    // A company allowed to pay on invoice: the order is confirmed without a payment (method `code: invoice`).
+    pay_on_invoice: body.payOnInvoice || undefined,
+    save_method: Boolean(body.saveMethod),
+    success_url: body.successUrl,
+    cancel_url: body.cancelUrl,
+    expected_total: body.expectedTotal,
+  })
+  return forgetSpentCart(assertPayment(payment, 'POST /carts/:id/payments'))
 }

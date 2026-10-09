@@ -13,6 +13,7 @@ import { useCart } from '../store/CartContext.jsx'
 import { useStorefront } from '../store/StorefrontContext.jsx'
 import { useToast } from '../store/ToastContext.jsx'
 import { nestLines } from '../lib/cart-lines.js'
+import TotalRows from '../components/cart/TotalRows.jsx'
 import LineDetails from '../components/cart/LineDetails.jsx'
 import { formatDay } from '../lib/returns.js'
 import { COUNTER_FROM, MAX_MESSAGE_LENGTH, messageTime, visibleMessages } from '../lib/order-messages.js'
@@ -179,18 +180,7 @@ export default function OrderConfirmation() {
             ))}
           </ul>
           <dl className="space-y-2.5 border-t border-line px-6 py-5 text-sm">
-            <div className="flex justify-between"><dt className="text-muted">{t('Subtotal')}</dt><dd className="tabular-nums">{formatMoney(order.subtotal)}</dd></div>
-            {order.discount?.amount > 0 && (
-              <div className="flex justify-between text-sale"><dt>{order.discountCode?.label || t('Discount')}</dt><dd className="tabular-nums">−{formatMoney(order.discount)}</dd></div>
-            )}
-            <div className="flex justify-between"><dt className="text-muted">{t('Shipping')}</dt><dd className="tabular-nums">{order.shipping.amount === 0 ? t('Free') : formatMoney(order.shipping)}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted">{t('Tax')}</dt><dd className="tabular-nums">{formatMoney(order.tax)}</dd></div>
-            {order.fee?.amount > 0 && (
-              <div className="flex justify-between"><dt className="text-muted">{t('Cash on delivery fee')}</dt><dd className="tabular-nums">{formatMoney(order.fee)}</dd></div>
-            )}
-            {order.giftWrap?.amount > 0 && (
-              <div className="flex justify-between"><dt className="text-muted">{t('Gift wrapping')}</dt><dd className="tabular-nums">{formatMoney(order.giftWrap)}</dd></div>
-            )}
+            <TotalRows bag={order} />
             <div className="flex justify-between border-t border-line pt-3 text-base"><dt>{t('Total')}</dt><dd className="tabular-nums">{formatMoney(order.total)}</dd></div>
             {order.refundedTotal?.amount > 0 && (
               <div className="flex justify-between text-muted"><dt>{t('Refunded')}</dt><dd className="tabular-nums">−{formatMoney(order.refundedTotal)}</dd></div>

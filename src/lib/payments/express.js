@@ -1,7 +1,7 @@
 import { ApiError } from '../api/contracts.js'
 import { loadScript } from './load-script.js'
 import { STRIPE_SDK, stripeAppearance } from './drivers/stripe.js'
-import { isComplete, paymentBody, pollPayment } from './index.js'
+import { isComplete, lostAnswer, paymentBody, pollPayment } from './index.js'
 
 /**
  * Apple Pay and Google Pay in the bag, through Stripe's Express Checkout Element.
@@ -57,10 +57,12 @@ export function expressPaymentBody({ event, method, cart, total, urls = {} }) {
 /**
  * Mount the wallet buttons. Resolves to `{ destroy }`, or null when the store has no wallet for this bag.
  *
+ * `countries` are the codes the store delivers to, the first its own: the sheet offers only those, and the first
+ * prices open in it rather than in whatever address the bag last had.
  * `onAvailable(bool)` says whether the browser has a wallet to show; `onDone(payment)` gets a final payment (with
  * `order` once it is placed); `onError(err)` gets a failure the sheet could not show itself.
  */
-export async function mountExpressCheckout({ container, express, cart, api, urls, deps = {}, onAvailable, onDone, onError }) {
+export async function mountExpressCheckout({ container, express, cart, api, urls, countries = [], deps = {}, onAvailable, onDone, onError }) {
   const method = express?.methods?.[0]
   const config = method?.config
   if (!config?.publishableKey || !cart?.id) return null
@@ -72,7 +74,7 @@ export async function mountExpressCheckout({ container, express, cart, api, urls
   let address = null
   let rates = []
   if (express.shippingRequired) {
-    const first = await api.getShippingOptions(cart.id, {})
+    const first = await api.getShippingOptions(cart.id, countries[0] ? { address: partialAddress({ country: countries[0] }) } : {})
     rates = shippingRates(first.options)
     total = first.total?.amount ?? total
     if (!rates.length) return null
@@ -91,7 +93,7 @@ export async function mountExpressCheckout({ container, express, cart, api, urls
     emailRequired: true,
     phoneNumberRequired: true,
     shippingAddressRequired: Boolean(express.shippingRequired),
-    ...(express.shippingRequired ? { shippingRates: rates } : {}),
+    ...(express.shippingRequired ? { shippingRates: rates, ...(countries.length ? { allowedShippingCountries: countries } : {}) } : {}),
     business: config.merchantName ? { name: config.merchantName } : undefined,
     buttonType: { applePay: 'buy', googlePay: 'buy' },
   })
@@ -146,7 +148,11 @@ export async function mountExpressCheckout({ container, express, cart, api, urls
         redirect: 'if_required',
       })) || {}
       if (error) throw new ApiError(error.message || 'The payment did not go through.', { code: 'payment_failed' })
-      let payment = await api.paymentAction(created.id, 'complete', { payment_intent: paymentIntent?.id })
+      // Stripe took the money; a lost answer from the backend is polled below, not reported as a failure.
+      let payment = await api.paymentAction(created.id, 'complete', { payment_intent: paymentIntent?.id }).catch((err) => {
+        if (lostAnswer(err)) return created
+        throw err
+      })
       if (!isComplete(payment)) {
         const polled = await pollPayment(payment.id, { getPayment: api.getPayment, ...(deps.poll || {}) })
         payment = polled.payment || payment

@@ -5,6 +5,7 @@ import useAsync from '../../hooks/useAsync.js'
 import { Button, Empty, ErrorState, Icon, Pagination, Skeleton } from '../../components/ui/index.jsx'
 import { useToast } from '../../store/ToastContext.jsx'
 import { formatMoney } from '../../lib/money.js'
+import { totalRows } from '../../lib/totals.js'
 import {
   DELIVERY_LABELS,
   DELIVERY_TONES,
@@ -561,12 +562,8 @@ function DeliveryCard({ order, can, busy, run, problem }) {
 function ItemsCard({ order }) {
   const lines = order.lines || []
   const count = lines.reduce((n, line) => n + (line.quantity || 1), 0)
-  const totals = [
-    ['Subtotal', order.subtotal],
-    order.discount?.amount ? ['Discount', order.discount] : null,
-    ['Shipping', order.shipping],
-    ['Tax', order.tax],
-  ].filter((row) => row && row[1])
+  // The rows the shopper saw: Odoo's cart summary.
+  const totals = totalRows(order).filter((row) => row.money)
 
   return (
     <Card title={`Items · ${count}`}>
@@ -598,8 +595,8 @@ function ItemsCard({ order }) {
         })}
       </ul>
       <dl className="mt-4 space-y-1.5 border-t border-line pt-4">
-        {totals.map(([label, money]) => (
-          <Row key={label} label={label}>{formatMoney(money)}</Row>
+        {totals.map((row, i) => (
+          <Row key={i} label={row.label}>{row.off ? '−' : ''}{formatMoney(row.money)}</Row>
         ))}
         <div className="flex items-baseline justify-between gap-4 border-t border-line pt-2.5 text-[15px]">
           <dt>Total</dt>

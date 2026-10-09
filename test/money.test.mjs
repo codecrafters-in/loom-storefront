@@ -73,3 +73,22 @@ test('dinars have three decimals and the backend can say so for any currency', a
   assert.equal(toMajor({ amount: 12345, currency: 'CLF' }), 1.2345)
   assert.equal(minorUnits(), 0, 'the store currency the backend named is the default')
 })
+
+test("currency symbols are the backend's, and the short ones where it says nothing", async () => {
+  const { registerCurrencies } = await import('../src/lib/money.js')
+  const fmt = (amount, currency, locale = 'en-GB') => formatMoney({ amount, currency }, { locale })
+  // Before (or without) the backend's word: the browser's narrow symbol, not CN¥ or US$.
+  assert.equal(fmt(123450, 'CNY'), '¥1,234.50')
+  assert.equal(fmt(123450, 'INR', 'en-IN'), '₹1,234.50')
+  assert.equal(fmt(123450, 'GBP'), '£1,234.50')
+  assert.equal(fmt(123450, 'USD', 'en-US'), '$1,234.50')
+  assert.match(fmt(123450, 'EUR', 'de-DE'), /^1\.234,50\s€$/)
+  assert.match(fmt(24560, 'KWD', 'en-US'), /^KWD\s24\.560$/)
+
+  registerCurrencies({ currencies: [{ code: 'CNY', symbol: '¥', decimals: 2 }, { code: 'KWD', symbol: 'KD', decimals: 3 }, { code: 'EUR', symbol: '€' }] })
+  assert.equal(fmt(123450, 'CNY', 'en-US'), '¥1,234.50')
+  assert.match(fmt(24560, 'KWD', 'en-US'), /^KD\s24\.560$/, 'three decimals, with Odoo\'s symbol')
+  assert.match(fmt(123450, 'EUR', 'de-DE'), /^1\.234,50\s€$/, 'where the locale puts it')
+  assert.equal(fmt(123450, 'EUR', 'en-IE'), '€1,234.50')
+  assert.match(formatMoney({ amount: 100, currency: 'ZZZ' }), /^ZZZ\s1\.00$/, 'an unknown code still shows a price')
+})

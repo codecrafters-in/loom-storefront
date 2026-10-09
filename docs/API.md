@@ -34,7 +34,20 @@ for JPY. The settings document says how many decimals each currency has (`pricin
 **Currency and language** travel as headers on every call when the shopper chose them: `X-Loom-Pricelist: <id>` (the
 currency switcher, one of `pricing.currencies[].pricelistId`) and `X-Loom-Lang: fr` (a language address such as
 `/fr/shop`). Without them the backend answers in the store's default currency and language. Its cached answers vary on
-both headers, and its error `message`s come in the requested language while `code`s never change.
+both headers, and its error `message`s come in the requested language while `code`s never change. Checkout sends the
+language too, including a `redirect` checkout posting to the store's own API, so a guest's contact (and Odoo's order
+emails) speak the language the shopper browsed in, as Odoo's shop does.
+
+**The bag's fiscal position** travels the same way: every cart answer carries `fiscalPositionId` (`"0"` for none), and
+the theme sends it back as `X-Loom-Fiscal-Position` on every later call (`src/lib/pricelist.js`). Once an address makes
+the bag tax-free (an export) or taxed another way, catalogue prices follow it, as Odoo's own shop does. It changes only
+what is shown; a bag is always charged with its own. Cached answers vary on it too.
+
+**The bag's pricelist** likewise: every cart answer carries `pricelistId` (`"<id>.<signature>"`, or `null`), and the
+theme sends it as `X-Loom-Pricelist` in place of the switcher's pick from then on (`src/lib/pricelist.js`), so the
+catalogue is priced with the bag's pricelist, as Odoo prices its whole shop with the cart's (a code, the customer's own,
+a country's). Picking a currency drops it until the bag answers again. A new bag after an order starts from the
+store's defaults and the currency picked in the switcher.
 
 **Errors** use the HTTP status, plus a JSON body the theme will surface verbatim:
 
@@ -281,8 +294,8 @@ form, and the captcha is reset for another try.
 | `in_brand` | string | A brand page's scope, like `category`: facets describe only that brand's products (the storefront's `/brands/:slug` sends it) |
 | `min_price`, `max_price` | int | Minor units |
 | `in_stock` | `1` | Only products with a buyable variant |
-| `sort` | enum | `featured` `newest` `price-asc` `price-desc` `rating` |
-| `page`, `per_page` | int | |
+| `sort` | enum | `featured` `newest` `price-asc` `price-desc` `rating` `name`. The shop page leaves it out until the shopper picks one, and the backend uses its default (Odoo's shop sort, `commerce.shop.sort`) |
+| `page`, `per_page` | int | The shop page leaves `per_page` out too: the backend's default (Odoo's Products per page, `commerce.shop.perPage`) |
 
 ```json
 {
@@ -496,7 +509,7 @@ option ids from the names and adds to the bag with `variant_id`.
 | `options[].role` | list, detail | `color` · `size` · `null`. Size shows the size chart link and the fit block; colour gives the card its swatches |
 | `options[].imagesFollow` | list, detail | The gallery shows images whose `color` is the chosen value of this option, plus untagged ones |
 | `options[].mode` | list, detail | `variant`, or `dynamic`: a combination may be missing from `variants[]` and is priced by `POST /products/:slug/combination` |
-| `options[].choices[]` | list, detail | `{ id, name, color, image, priceExtra, custom }`. `custom: true` asks the shopper for text |
+| `options[].choices[]` | list, detail | `{ id, name, color, image, priceExtra, custom }`. `custom: true` asks the shopper for text. `priceExtra` is `null` when a fixed price takes no extras (Odoo shows none then) |
 | `extraOptions[]` | detail | No-variant attributes: `{ id, name, displayType, multiple, required, choices }`. Checkboxes when `multiple`; a "None" row when not `required` |
 | `variants[].optionIds` | list, detail | `{ optionId: choiceId }`. Its presence is what tells the theme to add by choices |
 | `variants[].inventory` | list, detail | A number, or `null` when the store does not show stock |
@@ -505,7 +518,8 @@ option ids from the names and adds to the bag with `variant_id`.
 | `brand` | list, detail | `{ slug, name, logo }` or `null`. Shown on the card and the product page, linked to `/brands/:slug`, and used as the JSON-LD brand |
 | `breadcrumbs` | detail | `[{ slug, name }]`, root to leaf. Without it the theme walks the category tree |
 | `images[]` video | detail | `{ type: "video", provider, embedUrl, url, alt }`. `youtube` and `vimeo` show `url` as a poster and load `embedUrl` only when pressed; `file` plays `url` in a video element |
-| `combo` | detail, combo only | `[{ id, name, items: [{ id, variantId, productSlug, title, image, options, extraPrice, available }] }]`. One item per group |
+| `combo` | detail, combo only | `[{ id, name, items: [{ id, variantId, productSlug, title, image, options, extraPrice, available }] }]`. One item per group. `extraPrice` is untaxed, as Odoo's combo chooser shows it |
+| `taxDisclaimer` | detail, combo only | Odoo's note under a combo's total when its items' extras are shown before tax, or `null` |
 | `optionalProducts` | detail | `ProductSummary[]`, offered in a dialog when the product is added |
 | `accessories` | detail | `ProductSummary[]`, the "Frequently bought together" rail on the page and in the bag drawer |
 | `alternatives` | detail | `ProductSummary[]`, used for "You might also like" instead of `GET /products/:slug/related` |
@@ -542,16 +556,24 @@ options before it, so the first option is always fully open.
 
 ### `POST /products/:slug/combination`
 
-Prices what `variants[]` cannot: a dynamic combination nobody has bought, or
-extras on top of a variant. The theme calls it 250 ms after the choices settle.
+Prices what `variants[]` cannot: a dynamic combination nobody has bought,
+extras on top of a variant, or a quantity past a price break (`quantity`, sent
+when it is above 1 and the product has `priceTiers`; the price is per item for
+that quantity, as Odoo prices its product page). The theme calls it 250 ms after
+the choices settle.
 
 ```json
-{ "choiceIds": ["grind-espresso"] }
+{ "choiceIds": ["grind-espresso"], "quantity": 5 }
 ```
 
 ```json
 { "exists": false, "variantId": null, "available": true,
   "price": { "amount": 3200, "currency": "USD" }, "compareAtPrice": null, "imageId": null }
+```
+
+It may also say `priceOnRequest` and `unitPrice`, as a variant does.
+
+```json
 ```
 
 `404 not_found` for an unknown product; `422 invalid_combination` for an
@@ -853,6 +875,20 @@ Notes that matter in practice:
 - **`swatches`** maps colour name to hex. Without it the colour picker has to
   guess what "Ecru" looks like.
 - **`badges`** — `new` `sale` `bestseller` `low-stock` `sold-out`.
+- **`ribbon`** (optional, on the product and each variant) — `{ name, textColor, bgColor, position: "left" | "right",
+  style: "ribbon" | "tag" }` or `null`: Odoo's ribbon, drawn instead of the theme's badge on cards (the product's) and
+  over the product photo (the chosen variant's, else the product's). A backend without the key keeps the badges.
+- **`priceOnRequest`** (optional, on the product, variants, summaries, combinations and search suggestions) — no price
+  and no buy button; a **Contact us** button to `commerce.contactUsUrl` instead (Odoo's *Hide 'Add To Cart' when price
+  = 0*). The backend refuses such a product in the bag.
+- **`variants[].unitPrice`** (optional) — `{ price, unit }`, shown under the price: "2.50 / 100 g".
+- **`descriptionHtml`**, **`websiteDescription`**, **`outOfStockMessage`** (optional, detail) — HTML the backend has
+  sanitised: the formatted description (instead of `description`), content shown below the buy box, and a message
+  under the button of a sold-out option. Categories may send `descriptionHtml` too. Rendered as given
+  (`Rich` in `src/components/ui/index.jsx`): send only sanitised HTML.
+- **`documents`** (optional, detail) — `[{ id, name, url, link }]`, listed under **Documents**; `link` opens in a new tab.
+- **`images[].variants`** (optional) — the variant ids a photo belongs to: shown only once one of them is chosen,
+  first; an id starting `var-` takes the place of the main image (`tmpl-…`).
 
 ### `GET /products/:slug/related`
 
@@ -978,7 +1014,7 @@ return products with a similar name and say so with `fuzzy: true`; the search pa
 
 | Route | Answer |
 | --- | --- |
-| `GET /search/suggest?q=swea&limit=5` | `{ query, products: [{ slug, title, price, compareAtPrice, image }], categories: [{ slug, name, path }], brands: [{ slug, name }], fuzzy }` for the header search box. Fewer than two characters: empty lists |
+| `GET /search/suggest?q=swea&limit=5` | `{ query, products: [{ slug, title, price, compareAtPrice, priceOnRequest, image }], categories: [{ slug, name, path }], brands: [{ slug, name }], fuzzy }` for the header search box. Fewer than two characters: empty lists |
 | `GET /search/popular?limit=8` | `{ items: ["merino crew", …] }`: the most searched terms that find something, shown on an empty search page |
 | `POST /search/log` `{ q }` | Counts one search for the merchant's report; the backend counts the results itself. Sent once per results page |
 
@@ -1044,7 +1080,8 @@ client that recalculates them will eventually disagree with the invoice.
       "image": { "url": "…", "alt": "…" },
       "quantity": 2,
       "unitPrice": { "amount": 16800, "currency": "USD" },
-      "lineTotal": { "amount": 33600, "currency": "USD" }
+      "lineTotal": { "amount": 33600, "currency": "USD" },
+      "compareAtTotal": null
     }
   ],
   "subtotal": { "amount": 33600, "currency": "USD" },
@@ -1052,10 +1089,15 @@ client that recalculates them will eventually disagree with the invoice.
   "shipping": { "amount": 0, "currency": "USD" },
   "tax": { "amount": 2419, "currency": "USD" },
   "total": { "amount": 32659, "currency": "USD" },
+  "untaxed": { "amount": 30240, "currency": "USD" },
+  "taxIncluded": false,
+  "fiscalPositionId": "0",
+  "pricelistId": "1.5f0c9a1b2d3e4f5a6b7c8d9e",
   "discountCode": { "code": "LOOM10", "label": "10% off" },
   "freeShippingThreshold": { "amount": 15000, "currency": "USD" },
   "freeShippingRemaining": { "amount": 0, "currency": "USD" },
   "requiresShipping": true,
+  "requiresBillingAddress": true,
   "freeShippingProgress": {
     "method": "standard",
     "threshold": { "amount": 15000, "currency": "USD" },
@@ -1067,6 +1109,20 @@ client that recalculates them will eventually disagree with the invoice.
 }
 ```
 
+**Tax and the rows under a bag** are exactly Odoo's cart (website_sale), in either of its Display Product Prices modes.
+`taxIncluded` (also on orders, and as `pricing.taxIncluded` in the settings) says which. Lines, `subtotal` (the product
+lines added up), discounts (`codes`, `promotions`, `discount`), `shipping`, `fee` and `giftWrap` are Odoo's own line
+amounts: `price_total` with tax included, `price_subtotal` without. The summary is Odoo's `website_sale.total` in both
+modes: Delivery (`shipping`), Subtotal (`untaxed`: the untaxed amount, delivery included), Taxes (`tax`) and Total;
+discounts, gift wrapping and the cash-on-delivery fee, which are lines in Odoo's cart, come first. As in Odoo, a line
+can read a cent off its unit price (a £30.99 price with 20% tax included, rounded globally, reads £31.00) and the rows
+are not a sum: `untaxed + tax = total` is. An older backend without `untaxed` shows `total − tax`.
+
+**No delivery before the delivery step.** As in Odoo's cart, a bag has no delivery line until checkout prices the
+methods for an address: `shippingMethod` is `null`, `shipping` zero and the total the products'. The bag, the drawer
+and the checkout summary print Delivery as "-" then; the checkout's delivery options choose a method, and from then on
+the bag reprices it as it changes. An older backend always sends a method, and its amount is shown.
+
 `freeShippingRemaining` drives the "away from free shipping" line in the cart and drawer; return zero when it does not
 apply. `freeShippingProgress` (optional, `null` when nothing ships free) fills the cart's bar with `percent`, measured
 by the backend; without it the bar falls back to `subtotal / freeShippingThreshold`. `minimumOrder` (optional,
@@ -1077,15 +1133,20 @@ for a collection method, and `deliverySlot` (optional, `{ id, label, date, from,
 slot booked at checkout; orders carry both too.
 
 `requiresShipping` is `false` when nothing in the bag is shipped (services, downloads, e-gift cards): checkout then
-asks only for a name and email, and shows no address or delivery step.
+shows no delivery step. `requiresBillingAddress` says whether an address is still asked: as Odoo's shop does, a bag
+with nothing to ship asks the customer's billing address (checkout shows it as "Billing address" and sends it as
+`shipping_address`) unless the Odoo system parameter `website_sale.require_billing_details_for_services` is off; then
+checkout asks only for a name and email. A signed-in customer whose own address is complete may send none.
 
 A delivery method marked `pickup: true` in `commerce.shippingMethods` makes checkout list shops
 (`getPickupLocations`) and set one (`setPickupLocation`) before the order can be placed; one marked `slots: true` makes
 it list slots (`getDeliverySlots`) and send the chosen `delivery_slot`. Neither applies to the demo, and wallet buttons
 never offer those methods.
 
-Expected errors: `409 insufficient_inventory`, `409 out_of_stock`,
-`422 invalid_discount`.
+Expected errors: `409 out_of_stock` (nothing of it left), `422 invalid_discount`. Asking for more than is left
+is not an error: as Odoo's shop does, the line gets what is left and the answer's `warning` says so in Odoo's words
+("You ask for 5 products but only 3 is available."); the bag shows it in place of "Added to your bag". `warning` is
+`''` when the change went through as asked. `409 insufficient_inventory` is kept for backends that refuse instead.
 
 **The bag follows the backend.** A backend may reprice a bag and drop products
 that are no longer on sale whenever it is read or changed. It says so in
@@ -1108,17 +1169,27 @@ typed with `POST /carts/:id/shipping-options` (`{ address, method? }`), and the
 product page's postcode checker asks
 `GET /serviceability?country=&region=&postal_code=&variant_id=` →
 `{ deliverable, country, region, postalCode, methods: [{ id, label, note, price, arrivesAt, cutoff, shipsToday, guaranteed }] }`
-(`price` is `null` when the method is priced per bag).
+(`price` is `null` when the method is priced per bag). Delivery prices, here and in `commerce.shippingMethods`, carry the
+delivery product's taxes as every other price does: with them on a tax-included store. Each `shipping-options` option
+has `displayAmount`, priced that way for the checkout's list, and `amount`, always with tax, for a wallet sheet (Odoo's
+express checkout does the same).
 
 **Codes, promotions and rewards.** A cart may carry `codes: [{ code, label, amount }]`
 (each code with what it takes off), `promotions: [{ name, amount }]` (automatic
-discounts), `claimableRewards: [{ id, couponId, rewardId, type, description, products: [{ variantId, title }] }]`
-(shown as **Choose your reward**) and free-product lines with `isReward: true`
+discounts), `claimableRewards: [{ id, couponId, rewardId, type, description, products: [{ variantId, title }], codeHint }]`
+(shown as **Choose your reward**; the customer's own coupons and gift cards are among them, with the last four
+characters of their code in `codeHint`, as Odoo's cart shows them) and free-product lines with `isReward: true`
 and `rewardLabel`, which the bag shows without a quantity stepper. "Code
-applied" is said only when the cart changed.
+applied" is said only when the cart changed. A pricelist's code is listed in `codes` with a zero amount: it changes
+the prices, not a discount line.
+
+**Discounted lines.** A line may carry `compareAtTotal`: the price before a discount the pricelist shows on the line
+(Odoo's "Discounts" setting), for the quantity. The bag, the drawer and the checkout summary strike it through before
+`lineTotal`, as Odoo's cart does.
 
 **Quantity prices.** A product detail may carry `priceTiers: [{ minQuantity, price }]`,
-shown under the price as "5+ items · $80.00 each".
+shown under the price as "5+ items · $80.00 each", and each variant its own (`variants[].priceTiers`), shown for the
+chosen variant. With tiers, a quantity above 1 re-prices the page through `POST /products/:slug/combination`.
 
 ### Adding any product
 
@@ -1227,7 +1298,7 @@ checkout page. The storefront never records a payment — it asks.
 
 `payment-options` takes the checkout body (`email`, `shipping_address`,
 `shipping_method`, `currency`, and optionally `billing_address`, `company_name`,
-`vat`, `note`, `gift_message`, `gift_wrap`, `accept_terms` and `delivery_slot`) and applies it to the cart, because what can pay
+`vat`, `note`, `gift_message`, `gift_wrap`, `accept_terms`, `delivery_slot` and `extra_info`) and applies it to the cart, because what can pay
 depends on where the parcel is going and what it costs:
 
 ```json
@@ -1425,7 +1496,7 @@ its code the next time the form opens. The demo adapter answers from
   "id": "order_1", "number": "LM-10428", "status": "placed",
   "placedAt": "2026-09-09T10:14:00.000Z",
   "lines": [ /* CartLine */ ],
-  "subtotal": {}, "discount": {}, "shipping": {}, "tax": {}, "total": {},
+  "subtotal": {}, "discount": {}, "shipping": {}, "tax": {}, "total": {}, "untaxed": {}, "taxIncluded": false,
   "shippingAddress": { }, "email": "sam@example.com",
   "tracking": { "carrier": "DHL", "code": "JD014600…", "url": "https://…" },
   "payment": { "provider": "demo", "status": "captured", "method": "Card", "amount": {}, "capturedAt": "2026-09-09T10:15:02.000Z" },
@@ -1443,12 +1514,17 @@ its code the next time the form opens. The demo adapter answers from
 `amountDue`, `canPay` and `refundedTotal` are optional: an order without them
 shows neither. `billingAddress` (when it is not the delivery address), `company`
 and `vat` show a Billing block on the order page. The Customer carries `company`
-and `vat`, and each address a `type` (`shipping` or `billing`).
+and `vat`, and each address a `type` (`shipping` or `billing`). As in Odoo's portal, the tax ID and an address's
+country are fixed once orders or invoices were issued: the Customer says `vatLocked` and each address `countryLocked`
+(both optional, `false` when missing); the account and checkout show them read-only, and the backend refuses a change
+with `422 vat_locked` or `422 country_locked` (`detail.fields`).
 
-A paid order with digital products adds `downloads: [{ id, name, url }]`, listed
-on the order page. `url` is `GET /orders/:orderId/downloads/:documentId`; a bare
-path is resolved against the API base URL. It streams the file to the order's
-owner, or to the holder of the order link, and answers `404` before payment.
+An order with digital products adds `downloads: [{ id, name, url }]`, listed
+on the order page. As on Odoo's order page, files shared on the order come from
+confirmation, paid or not, and files shared on the quotation from the start.
+`url` is `GET /orders/:orderId/downloads/:documentId`; a bare path is resolved
+against the API base URL. It streams the file to the order's owner, or to the
+holder of the order link, and answers `404` for anything else.
 
 `payment` is `null` until the order has a payment. Its `status` is `pending`,
 `authorized`, `captured`, `cancelled` or `failed`. **`captured` is what
@@ -1488,7 +1564,7 @@ text-message code and provider buttons when the store has them.
 | `GET` | `/orders/:id/invoices/:invoiceId` | The invoice PDF — `order.invoices: [{ id, number, kind, date, total, paymentState, url }]`, saved with `downloadFile` |
 | `POST` | `/orders/:id/cancel` `{ reason }` | `Order` — `order.cancellation: { mode: cancel, refund or request, requestedAt }` says what the button does, or is `null` when the order can no longer be cancelled from the storefront (`cancelOrder`) |
 | `POST` | `/orders/:id/messages` `{ body }` | `Order` — a message to the store about the order, up to 2000 characters, while `order.messages.canReply` (`sendOrderMessage`). `403 messages_closed`, `422 empty_message`, `429 rate_limited` |
-| `POST` | `/orders/:id/reorder` `{ cart_id }` | `Cart` with `notices` — the order's items in the bag (`reorder`) |
+| `POST` | `/orders/:id/reorder` `{ cart_id }` | `Cart` with `notices` — the order's items in the bag (`reorder`), as Odoo's Order Again: a confirmed order only (`canReorder`; else `409 cannot_reorder`), combos and custom text included, capped to the stock left |
 | `GET` | `/orders/:id/returns` | `{ options: { days, until, methods, reasons, lines, unavailable, approval, refundTiming }, items: Return[] }` (`getOrderReturns`) |
 | `POST` | `/orders/:id/returns` `{ method, note, lines: [{ lineId, quantity, reasonId, comment }], photos }` | `Return` (`createReturn`); `POST /orders/:id/returns/:returnId/cancel` (`cancelReturn`) |
 | `GET` | `/returns` | `{ items: Return[], total }` — **Account › Returns** (`listReturns`) |
@@ -1549,12 +1625,16 @@ of its own; the demo's live in `src/data/storefront.js` and `src/data/pages.js` 
   `storefront.consent.enabled`, the banner (`src/components/consent/ConsentBanner.jsx`) asks once per policy
   version; in opt-in mode `track()` sends nothing until the visitor agrees, and Google Consent Mode v2 defaults
   and updates are pushed to `dataLayer`.
-- `storefront.access: { mode, message }`. When `mode` is not `open`, the shop is replaced by the maintenance or
-  password screen. `POST /access { password }` (or `POST /admin/access` for a signed-in admin) →
+- `storefront.access: { mode, message, shop }`. When `mode` is not `open`, the shop is replaced by the maintenance or
+  password screen. `shop: "logged_in"` (Odoo's eCommerce access) keeps the shop, product, search, bag and checkout
+  pages for signed-in customers: a visitor is sent to `/login` and back, and the backend answers `401 login_required`
+  (the render handler serves the shell for those addresses, and a home rail it refuses is left out). `POST /access { password }` (or `POST /admin/access` for a signed-in admin) →
   `{ token, header, expiresAt }`; the token is sent as `X-Loom-Access` on every call. A `401 store_locked` or
   `503 store_maintenance` answer drops the token and shows the screen again.
-- `storefront.theme: { colors, fonts, radius, faviconUrl, ogImageUrl, logoDarkUrl }` is applied as the CSS custom
-  properties in `src/index.css` (`src/lib/theme.js`), in the prerendered HTML too. `storefront.store.contact` fills
+- `storefront.theme: { preset, presetChanged, colors, fonts, radius, style, faviconUrl, ogImageUrl, logoDarkUrl }` is applied as the CSS custom
+  properties in `src/index.css` (`src/lib/theme.js`), in the prerendered HTML too. `style: { header, card, buttons,
+  spacing, headings, footer }` picks the layout (`src/lib/style.js`, [THEMING.md](THEMING.md#layout-styles)); a missing
+  part keeps the original layout. `storefront.store.contact` fills
   the footer and the contact block; `storefront.store.credit` is an optional credit line.
 - `GET /blog` `{ page, per_page, tag }` → `{ items, total, page, perPage, tags }`; `GET /blog/:slug` → a post with
   `contentHtml`. Shown at `/blog` and `/blog/:slug` when `features.blog` is on.
@@ -1611,8 +1691,8 @@ storefront token**. Full guide, including the reference implementation at
 | `GET` | `/admin/orders?q=&status=&payment=&delivery=&page=&per_page=` | `{ items: AdminOrder[], total, page, perPage, counts }` |
 | `GET` | `/admin/orders/:id` | `AdminOrder` — id, order number or backend id |
 | `PATCH` | `/admin/orders/:id` | `{ action, tracking? }` → `AdminOrder` — ship, update_tracking, deliver, record_payment, cancel |
-| `GET` | `/admin/storefront` | The storefront document plus `admin: { editable, canEdit, backendUrl }` |
-| `PATCH` | `/admin/storefront` | Deep-merged; arrays replace. A backend may accept only `admin.editable` paths (`422 unsupported_setting`) |
+| `GET` | `/admin/storefront` | The storefront document plus `admin: { editable, canEdit, backendUrl, themePresets }`; `themePresets` is `[{ id, name, description, industries, dark, colors, fonts, radius, style }]` |
+| `PATCH` | `/admin/storefront` | Deep-merged; arrays replace. A backend may accept only `admin.editable` paths (`422 unsupported_setting`). `{ theme: { preset } }` applies a ready-made look: every colour, both fonts, the radius and the layout style |
 | `POST` | `/admin/import` | `{ mode, products, categories, collections, settings }`, or `{ csv }`; `dry_run: true` checks without saving |
 | `GET` | `/admin/export` | The same shape, a page at a time; `?format=csv` one row per variant |
 | `POST` | `/admin/orders` | A paid webhook's `{ cart_id, email, payment, idempotency_key }`, or a phone order's `{ email, lines, shipping_address, shipping_method, payment: link, record or quote }` → AdminOrder with `created`, `paymentUrl` |
@@ -1781,6 +1861,13 @@ Day totals for the backend's dashboard, sent with `navigator.sendBeacon` as
 `text/plain`: a visit once per browser session, and the other three as they
 happen. Nothing identifies the visitor. Optional: a backend without it answers
 404 and nothing changes for the shopper.
+
+### `POST /products/:slug/views`
+
+`{ variantId?, visitorId? }` → `204`, sent when a product page opens (`recordView`). The backend records the view
+for its own visitor reports (Odoo's Visitors and recently viewed products): the signed-in customer, or `visitorId`,
+this browser's random id (`loom.visitor`, the one consent records use), sent only once analytics is allowed (or no
+cookie banner asks) and Do Not Track is off. The demo keeps nothing. Optional: a failed call changes nothing.
 
 ---
 

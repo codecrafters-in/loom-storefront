@@ -140,6 +140,7 @@
  * @property {number} quantity
  * @property {Money}  unitPrice
  * @property {Money}  lineTotal
+ * @property {Money|null} [compareAtTotal] Struck through before `lineTotal`: the price before a discount the pricelist shows.
  *
  * @typedef  {object} Cart
  * @property {string} id
@@ -147,8 +148,11 @@
  * @property {Money} subtotal
  * @property {Money} discount
  * @property {Money} shipping
- * @property {Money} tax
+ * @property {Money} tax              Always the order's tax, included or not.
  * @property {Money} total
+ * @property {boolean} [taxIncluded]   Every amount above is with tax (Odoo's Display Product Prices); absent reads as false.
+ * @property {string} [fiscalPositionId] Sent back as `X-Loom-Fiscal-Position` ("0" for none).
+ * @property {string|null} [pricelistId] The bag's pricelist, signed; sent back as `X-Loom-Pricelist`.
  * @property {{code:string, label:string}|null} discountCode
  * @property {string} currency
  *
@@ -175,6 +179,7 @@
  * @property {Money} shipping
  * @property {Money} tax
  * @property {Money} total
+ * @property {boolean} [taxIncluded]
  * @property {Address} shippingAddress
  * @property {string} shippingMethod
  * @property {string} email

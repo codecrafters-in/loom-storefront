@@ -61,8 +61,8 @@ test('buttons on a dark ground stay readable, whichever variant was chosen', () 
   for (const variant of ['outline', 'ghost']) {
     const { variant: drawn, className } = onDark(variant)
     assert.equal(drawn, 'outline')
-    assert.match(className, /!text-page/)
-    assert.match(className, /hover:!text-ink/)
+    assert.match(className, /!text-on-scrim/)
+    assert.match(className, /hover:!text-scrim/)
   }
 })
 

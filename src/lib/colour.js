@@ -30,3 +30,54 @@ export function isDarkTheme(theme) {
   const page = hexRgb(theme?.colors?.page)
   return Boolean(page) && luminance(page) < DARK_BELOW
 }
+
+const mix = (a, b, t) => a.map((v, i) => Math.round(v * (1 - t) + b[i] * t))
+const tri = (c) => c.join(' ')
+
+/** WCAG contrast ratio of two `[r, g, b]` colours. */
+export const contrast = (a, b) => {
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+  return (light + 0.05) / (dark + 0.05)
+}
+
+/** `fg`, moved towards `towards` just far enough to read at `min`:1 on `bg` (WCAG AA is 4.5). */
+export function readable(fg, bg, towards, min = 4.6) {
+  let colour = fg
+  for (let step = 1; step <= 20 && contrast(colour, bg) < min; step += 1) colour = mix(fg, towards, step / 20)
+  return colour
+}
+
+/**
+ * The colour custom properties (`{ '--page': 'R G B', … }`) for seven hex colours, the in-between shades worked out
+ * so text stays readable; null without a usable page and ink. Used for the whole theme (src/lib/theme.js) and for
+ * one repainted area such as a bold header (src/lib/style.js), which is why it lives in this small module.
+ */
+export function paletteVars(colors) {
+  const c = Object.fromEntries(Object.entries(colors || {}).map(([k, v]) => [k, hexRgb(v)]))
+  if (!c.page || !c.ink) return null
+  const surface = c.surface || c.page
+  const sunken = mix(c.page, c.ink, 0.05)
+  // Secondary and faint text sit on the page and on the sunken footer and panels; both stay readable.
+  const muted = readable(c.muted || mix(c.ink, c.page, 0.4), sunken, c.ink)
+  const faint = readable(mix(muted, c.page, 0.1), sunken, c.ink)
+  const accent = c.accent || c.ink
+  const inkIsDark = luminance(c.ink) <= luminance(c.page)
+  return {
+    '--page': tri(c.page),
+    '--surface': tri(surface),
+    '--raised': tri(surface),
+    '--sunken': tri(sunken),
+    '--ink': tri(c.ink),
+    '--muted': tri(muted),
+    '--faint': tri(faint),
+    '--line': tri(mix(c.page, c.ink, 0.12)),
+    '--accent': tri(accent),
+    '--accent-ink': tri(c.accentInk || c.page),
+    '--accent-soft': tri(mix(c.page, accent, 0.12)),
+    '--sale': tri(c.sale || accent),
+    '--shadow': tri(c.ink),
+    // Photographs are darkened and their text is light in every theme: the darker of ink and page is the wash.
+    '--scrim': tri(inkIsDark ? c.ink : c.page),
+    '--on-scrim': tri(inkIsDark ? c.page : c.ink),
+  }
+}

@@ -13,6 +13,7 @@ import { withoutBlogLinks } from '../../lib/blog.js'
 import useFocusTrap from '../../hooks/useFocusTrap.js'
 import { isMock } from '../../lib/config.js'
 import { t } from '../../i18n/index.js'
+import { themeStyle, toneGround, toneVars } from '../../lib/style.js'
 
 // Only a live store can offer several currencies; the demo build leaves the switcher out.
 const CurrencySwitcher = isMock ? null : lazy(() => import('./CurrencySwitcher.jsx'))
@@ -130,6 +131,52 @@ export default function Header() {
   const iconBtn =
     'relative grid h-10 w-10 place-items-center rounded-xs text-ink transition-colors hover:bg-sunken'
 
+  // classic: logo and menu on one row; centered: logo in the middle, menu on a row below; minimal: the menu button at
+  // every width; bold: the bar in the accent colour (every colour token inside it is repainted, see src/lib/style.js).
+  const layout = themeStyle(config.theme).header
+  const bold = layout === 'bold'
+  const centered = layout === 'centered'
+  const minimal = layout === 'minimal'
+  const barVars = bold ? toneVars(config.theme, 'accent') : null
+
+  const navItems = primary.map((item) => (
+    <div
+      key={item.label}
+      className="relative"
+      onMouseEnter={() => setOpenMenu(item.label)}
+      onMouseLeave={() => setOpenMenu(null)}
+    >
+      <NavLink
+        to={item.to}
+        className={({ isActive }) =>
+          `flex items-center gap-1 whitespace-nowrap rounded-xs px-2 py-2 text-[13px] transition-colors hover:text-accent xl:px-3 xl:text-sm ${isActive ? 'text-accent' : 'text-ink'}`
+        }
+      >
+        {item.label}
+        {item.children.length > 0 && <Icon name="chevron-down" size={13} className="text-faint" />}
+      </NavLink>
+      {item.children.length > 0 && openMenu === item.label && (
+        <div className={`absolute top-full w-56 pt-1 ${centered ? 'start-1/2 -translate-x-1/2 rtl:translate-x-1/2' : 'start-0'}`}>
+          <ul className="rounded-xs border border-line bg-surface p-1.5 shadow-card">
+            <li>
+              <Link to={item.to} className="block rounded-xs px-3 py-2 text-[13px] font-medium hover:bg-sunken">
+                {t('All {category}', { category: item.label.toLowerCase() })}
+              </Link>
+            </li>
+            {item.children.map((c) => (
+              <li key={subKey(c)}>
+                <Link to={subTo(c)} className="flex items-baseline justify-between rounded-xs px-3 py-2 text-[13px] text-muted hover:bg-sunken hover:text-ink">
+                  {c.name || c.label}
+                  <span className="text-[11px] text-faint tabular-nums">{c.count}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  ))
+
   return (
     <>
       {/* Shipping, promotions or opening hours, written in the backend (with start and end dates). */}
@@ -142,61 +189,31 @@ export default function Header() {
       )}
 
       <header
-        className={`sticky top-0 z-30 border-b bg-page/90 backdrop-blur transition-shadow ${scrolled ? 'border-line shadow-[0_1px_0_rgb(var(--line))]' : 'border-transparent'}`}
+        data-header={layout}
+        style={barVars || undefined}
+        className={`sticky top-0 z-30 border-b ${bold ? 'bg-page' : 'bg-page/90 backdrop-blur'} transition-shadow ${scrolled ? 'border-line shadow-[0_1px_0_rgb(var(--line))]' : 'border-transparent'}`}
       >
-        <div className="wrap flex h-16 items-center gap-3">
+        <div className={`wrap relative flex items-center gap-3 ${centered ? 'h-16 lg:h-20' : 'h-16'}`}>
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
             aria-label={t('Open menu')}
-            className={`${iconBtn} lg:hidden`}
+            className={`${iconBtn} ${minimal ? '' : 'lg:hidden'}`}
           >
             <Icon name="menu" size={20} />
           </button>
 
-          <Link to="/" aria-label={t('{store} home', { store: config.store?.name })}>
-            <Logo config={config} />
+          <Link
+            to="/"
+            aria-label={t('{store} home', { store: config.store?.name })}
+            className={centered ? 'lg:absolute lg:start-1/2 lg:-translate-x-1/2 rtl:lg:translate-x-1/2' : ''}
+          >
+            <Logo config={config} ground={bold ? toneGround(config.theme, 'accent') : null} />
           </Link>
 
-          <nav className="ms-6 hidden min-w-0 items-center gap-0.5 lg:flex xl:ms-8 xl:gap-1" aria-label={t('Main')}>
-            {primary.map((item) => (
-              <div
-                key={item.label}
-                className="relative"
-                onMouseEnter={() => setOpenMenu(item.label)}
-                onMouseLeave={() => setOpenMenu(null)}
-              >
-                <NavLink
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `flex items-center gap-1 whitespace-nowrap rounded-xs px-2 py-2 text-[13px] transition-colors hover:text-accent xl:px-3 xl:text-sm ${isActive ? 'text-accent' : 'text-ink'}`
-                  }
-                >
-                  {item.label}
-                  {item.children.length > 0 && <Icon name="chevron-down" size={13} className="text-faint" />}
-                </NavLink>
-
-                {item.children.length > 0 && openMenu === item.label && (
-                  <div className="absolute start-0 top-full w-56 pt-1">
-                    <ul className="rounded-xs border border-line bg-surface p-1.5 shadow-card">
-                      <li>
-                        <Link to={item.to} className="block rounded-xs px-3 py-2 text-[13px] font-medium hover:bg-sunken">
-                          {t('All {category}', { category: item.label.toLowerCase() })}
-                        </Link>
-                      </li>
-                      {item.children.map((c) => (
-                        <li key={subKey(c)}>
-                          <Link to={subTo(c)} className="flex items-baseline justify-between rounded-xs px-3 py-2 text-[13px] text-muted hover:bg-sunken hover:text-ink">
-                            {c.name || c.label}
-                            <span className="text-[11px] text-faint tabular-nums">{c.count}</span>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ))}
+          {/* classic and bold keep the menu beside the logo; centered puts it on its own row below. */}
+          <nav className={`ms-6 hidden min-w-0 items-center gap-0.5 xl:ms-8 xl:gap-1 ${centered || minimal ? '' : 'lg:flex'}`} aria-label={t('Main')}>
+            {!centered && !minimal && navItems}
           </nav>
 
           <div className="ms-auto flex items-center gap-0.5">
@@ -276,6 +293,12 @@ export default function Header() {
           </div>
         </div>
 
+        {centered && (
+          <nav className="wrap hidden h-11 items-center justify-center gap-1 border-t border-line lg:flex" aria-label={t('Main')}>
+            {navItems}
+          </nav>
+        )}
+
         {searchOpen && (
           <form onSubmit={submit} className="wrap pb-3 md:hidden">
             <div className="relative">
@@ -299,14 +322,14 @@ export default function Header() {
       <div
         onClick={() => setMenuOpen(false)}
         aria-hidden="true"
-        className={`fixed inset-0 z-40 bg-ink/35 transition-opacity lg:hidden ${menuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        className={`fixed inset-0 z-40 bg-scrim/35 transition-opacity ${minimal ? '' : 'lg:hidden'} ${menuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
       />
       <nav
         aria-label={t('Mobile')}
         ref={menuRef}
         tabIndex={-1}
         {...(menuOpen ? {} : { inert: '' })}
-        className={`fixed start-0 top-0 z-50 h-[100dvh] w-[min(84vw,20rem)] bg-page shadow-panel transition-transform lg:hidden ${menuOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'}`}
+        className={`fixed start-0 top-0 z-50 h-[100dvh] w-[min(84vw,20rem)] bg-page shadow-panel transition-transform ${minimal ? '' : 'lg:hidden'} ${menuOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'}`}
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           {/* A little smaller than in the header, from the store's own logo height, and kept inside the bar. */}

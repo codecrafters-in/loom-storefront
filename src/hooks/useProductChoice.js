@@ -37,20 +37,23 @@ export default function useProductChoice(product, { live = true } = {}) {
 
   /**
    * What only the server can price: a dynamic combination nobody has bought
-   * yet, or extras on top of a variant (a pricelist can change what they add).
-   * Keyed on the choices, so an answer to an earlier question never prices the
-   * current one, and debounced, so ticking three add-ons asks once.
+   * yet, extras on top of a variant (a pricelist can change what they add), or
+   * a quantity past a price break (Odoo prices the page for the quantity).
+   * Keyed on the quantity and the choices, so an answer to an earlier question
+   * never prices the current one, and debounced, so ticking three add-ons asks once.
    */
-  const quoteKey = live && complete && ((!variant && model.dynamic) || extraAmount > 0)
-    ? [...chosenIds, ...picked.map((x) => x.choice.id)].join('|')
+  const tiered = qty > 1 && product?.priceTiers?.length > 0
+  const quoteKey = live && complete && ((!variant && model.dynamic) || extraAmount > 0 || tiered)
+    ? [tiered ? qty : 1, ...chosenIds, ...picked.map((x) => x.choice.id)].join('|')
     : ''
   const [quote, setQuote] = useState(null)
   useEffect(() => {
     if (!quoteKey) return undefined
     let alive = true
+    const [quantity, ...ids] = quoteKey.split('|')
     const timer = setTimeout(() => {
       api
-        .getCombination(product.slug, quoteKey.split('|').filter(Boolean))
+        .getCombination(product.slug, ids.filter(Boolean), +quantity)
         .then((data) => alive && setQuote({ key: quoteKey, data }))
         .catch((error) => alive && setQuote({ key: quoteKey, error }))
     }, 250)
@@ -76,6 +79,10 @@ export default function useProductChoice(product, { live = true } = {}) {
   // that was never made, reached by restoring a stale link.
   const invalid = answer?.error?.code === 'invalid_combination' || (complete && !variant && !model.dynamic && model.options.length > 0)
   const unavailable = answer?.data ? !answer.data.available : Boolean(variant && !variant.available)
+  // Odoo's "Hide 'Add To Cart' when price = 0": no price and no button, a Contact us link instead.
+  const onRequest = Boolean((answer?.data || variant || product)?.priceOnRequest)
+  // Odoo's price per unit (`unitPrice`: 2.50 / 100 g), for the chosen option.
+  const unit = (answer?.data || variant)?.unitPrice
 
   // The first thing standing between the shopper and the bag names the button.
   const blocker = missing
@@ -116,11 +123,13 @@ export default function useProductChoice(product, { live = true } = {}) {
     variant,
     gallery,
     shown,
+    onRequest,
+    unit,
     missing,
     blocker,
     // The chosen option exists but is sold out ("Notify me" instead of "Add to bag").
     unavailable: !missing && !invalid && unavailable,
-    ready: !blocker,
+    ready: !blocker && !onRequest,
     // Nothing the shopper can choose will fix these; the sticky bar disables rather than scrolls.
     stuck: !missing && !set.missing.length && !needsText.length && Boolean(blocker),
     extras,

@@ -4,26 +4,14 @@
  * does not set are derived from the ones it does, so a merchant picks seven
  * colours, not fifteen.
  */
-import { hexRgb as rgb, isDarkTheme, luminance } from './colour.js'
+import { contrast, hexRgb as rgb, isDarkTheme, paletteVars, readable } from './colour.js'
+
+export { contrast, readable }
 
 const PRELOADED = new Set(['Inter', 'Fraunces']) // index.html loads these already
 const SYSTEM = 'ui-sans-serif, system-ui, sans-serif'
 const FALLBACK = { body: SYSTEM, heading: 'ui-serif, Georgia, serif' }
 
-const mix = (a, b, t) => a.map((v, i) => Math.round(v * (1 - t) + b[i] * t))
-const tri = (c) => c.join(' ')
-
-export const contrast = (a, b) => {
-  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x)
-  return (light + 0.05) / (dark + 0.05)
-}
-
-/** `fg`, moved towards `towards` just far enough to read at `min`:1 on `bg` (WCAG AA is 4.5). */
-export function readable(fg, bg, towards, min = 4.6) {
-  let colour = fg
-  for (let step = 1; step <= 20 && contrast(colour, bg) < min; step += 1) colour = mix(fg, towards, step / 20)
-  return colour
-}
 /**
  * A font stack. `system` is the device's own sans-serif for headings too: the heading fallback is a serif, so a
  * merchant who picked "System font" for headings got Georgia.
@@ -32,31 +20,10 @@ const family = (name, fallback) => (!name ? fallback : name === 'system' ? SYSTE
 
 /** `{ '--page': 'R G B', … }`, or null when the theme has no usable colours. */
 export function themeVars(theme) {
-  const c = Object.fromEntries(Object.entries(theme?.colors || {}).map(([k, v]) => [k, rgb(v)]))
-  if (!c.page || !c.ink) return null
-  const surface = c.surface || c.page
-  const sunken = mix(c.page, c.ink, 0.05)
-  // Secondary and faint text sit on the page and on the sunken footer and panels; both stay readable.
-  const muted = readable(c.muted || mix(c.ink, c.page, 0.4), sunken, c.ink)
-  const faint = readable(mix(muted, c.page, 0.1), sunken, c.ink)
-  const accent = c.accent || c.ink
-  const vars = {
-    '--page': tri(c.page),
-    '--surface': tri(surface),
-    '--raised': tri(surface),
-    '--sunken': tri(sunken),
-    '--ink': tri(c.ink),
-    '--muted': tri(muted),
-    '--faint': tri(faint),
-    '--line': tri(mix(c.page, c.ink, 0.12)),
-    '--accent': tri(accent),
-    '--accent-ink': tri(c.accentInk || c.page),
-    '--accent-soft': tri(mix(c.page, accent, 0.12)),
-    '--sale': tri(c.sale || accent),
-    '--shadow': tri(c.ink),
-    '--font-body': family(theme.fonts?.body, FALLBACK.body),
-    '--font-display': family(theme.fonts?.heading, FALLBACK.heading),
-  }
+  const vars = paletteVars(theme?.colors)
+  if (!vars) return null
+  vars['--font-body'] = family(theme.fonts?.body, FALLBACK.body)
+  vars['--font-display'] = family(theme.fonts?.heading, FALLBACK.heading)
   if (Number.isFinite(theme.radius)) vars['--radius'] = `${theme.radius}px`
   return vars
 }

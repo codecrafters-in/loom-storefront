@@ -120,6 +120,9 @@ export async function pollPayment(
   }
 }
 
+/** A 409 `retry`, a 5xx or a dropped connection: the backend's answer was lost, not a no. */
+export const lostAnswer = (err) => err?.code === 'retry' || err?.status >= 500 || err?.code === 'network_error' || err?.code === 'timeout'
+
 /**
  * Take a payment the backend just created to an answer the page can act on.
  *
@@ -148,7 +151,13 @@ export async function runPayment(payment, { api, input, deps, poll = {} } = {}) 
         code: 'payment_unsupported',
       })
     }
-    current = (await driver.run({ payment: current, api, input, deps })) || current
+    try {
+      current = (await driver.run({ payment: current, api, input, deps })) || current
+    } catch (err) {
+      // The gateway said yes and only the backend's answer was lost: a 409 `retry`, a 5xx, a dropped
+      // connection. The status endpoint knows (and asks the gateway), so ask it rather than offer Pay again.
+      if (!lostAnswer(err)) throw err
+    }
   }
 
   if (!isComplete(current)) {
@@ -164,6 +173,7 @@ export async function runPayment(payment, { api, input, deps, poll = {} } = {}) 
 export function paymentBody({
   email, shippingAddress, shippingMethod, currency, method, expectedTotal, successUrl, cancelUrl, saveMethod,
   billingAddress, companyName, vat, note, giftMessage, giftWrap, acceptTerms, deliverySlot, newsletter, newsletterConsent,
+  extraInfo,
 }) {
   return {
     email,
@@ -180,6 +190,7 @@ export function paymentBody({
     deliverySlot,
     newsletter,
     newsletterConsent,
+    extraInfo,
     ...(method?.saved
       ? { tokenId: method.id }
       : method?.code === 'invoice'

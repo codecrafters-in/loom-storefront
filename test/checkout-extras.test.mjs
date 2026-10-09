@@ -110,6 +110,15 @@ test('checkout extras travel with the payment request', async () => {
   assert.equal(body.accept_terms, true)
 })
 
+test("Odoo's Extra Info step reaches the API as extra_info, from the page and from a redirect checkout", async () => {
+  shared.clear()
+  const extraInfo = { client_order_ref: 'PO-4471', 'Give us your feedback': 'Lovely shop' }
+  const calls = serve(() => ({ id: 'pay-1', status: 'pending', order: null }))
+  const { paymentBody } = await import('../src/lib/payments/index.js')
+  await http.createPayment('bag', paymentBody({ email: 'a@example.com', extraInfo }))
+  assert.deepEqual(calls[0].body.extra_info, extraInfo)
+})
+
 test('delivery slots and shops to collect from use the documented routes', async () => {
   shared.clear()
   shared.set('loom.cart_id', 'bag')

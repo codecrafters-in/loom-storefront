@@ -286,6 +286,10 @@ variants that were not individually overridden. A client that can set these can
 put the catalogue into a state the storefront renders wrongly.
 
 **Operations**
+- `theme_presets` — id, name, description, industries, dark, the seven colours, heading_font, body_font, radius and
+  the six layout parts (header, card, buttons, spacing, headings, footer, each a short enum with a default):
+  the ready-made looks (shipped data, not merchant data); `stores.theme_preset_id` (nullable) remembers which one the
+  store started from, while the store keeps its own colour and layout columns
 - `stores` / `store_settings` — the storefront configuration document
   (navigation, home sections, checkout mode), plus `payment_mode` — whether
   shoppers pay on the storefront or on a hosted page of mine — as a real column,

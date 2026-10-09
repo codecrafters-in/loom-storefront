@@ -3,6 +3,7 @@ import api from '../../lib/api/index.js'
 import useAsync from '../../hooks/useAsync.js'
 import { Button, ErrorState, Icon, Skeleton } from '../../components/ui/index.jsx'
 import { useToast } from '../../store/ToastContext.jsx'
+import ThemePresetPicker from '../../components/admin/ThemePresetPicker.jsx'
 
 /*
  * Store settings and bulk import and export against a live store.
@@ -38,6 +39,11 @@ const GROUPS = [
     ],
   },
   {
+    title: 'Look',
+    note: 'A ready-made look sets every colour, both fonts, the corners and the layout. Each colour, font or part of the layout one by one is set on the store in Odoo.',
+    fields: [{ path: 'theme.preset', label: 'Ready-made look', type: 'themePreset' }],
+  },
+  {
     title: 'Prices and returns',
     fields: [
       { path: 'pricing.locale', label: 'Locale for dates and numbers', mono: true, hint: 'For example en-IN or de-DE.' },
@@ -48,12 +54,14 @@ const GROUPS = [
   },
   {
     title: 'Stock',
+    // Odoo's Show Available Quantity: the default for new products; each product keeps its own (its eCommerce tab).
+    note: 'For new products. Each product has its own setting in Odoo, on its eCommerce tab.',
     fields: [
       {
         path: 'commerce.stock.display',
         label: 'Show stock',
         type: 'select',
-        options: [['exact', 'Exact quantity'], ['low', 'Only when running low'], ['hidden', 'In stock or sold out only']],
+        options: [['low', 'Only when running low'], ['hidden', 'In stock or sold out only']],
       },
       { path: 'commerce.stock.lowThreshold', label: 'Running low at', type: 'number' },
       { path: 'commerce.stock.hideSoldOut', label: 'Leave sold-out products out of listings', type: 'toggle' },
@@ -93,8 +101,14 @@ function Section({ title, note, children }) {
   )
 }
 
-function Field({ field, value, onChange, disabled }) {
+function Field({ field, value, onChange, disabled, context = {} }) {
   const id = `setting-${field.path.replace(/\./g, '-')}`
+  if (field.type === 'themePreset') {
+    return (
+      <ThemePresetPicker presets={context.themePresets || []} value={value} changed={value === context.savedPreset && context.presetChanged}
+        onChange={onChange} disabled={disabled} />
+    )
+  }
   if (field.type === 'toggle') {
     return (
       <label className="flex cursor-pointer items-center gap-2.5 text-[14px]">
@@ -198,6 +212,7 @@ export function LiveSettings() {
             <Section key={group.title} title={group.title} note={group.note}>
               {fields.map((field) => (
                 <Field key={field.path} field={field} value={valueOf(field.path)} disabled={!canEdit}
+                  context={{ themePresets: admin.themePresets, savedPreset: data.theme?.preset, presetChanged: data.theme?.presetChanged }}
                   onChange={(value) => change(field.path, value)} />
               ))}
             </Section>
